@@ -1,8 +1,15 @@
 # Frontend build and dependencies
 Frontend/node_modules/
+Frontend/node_modules.pnpm-interrupted/
 Frontend/dist/
 Frontend/.install.log
 Frontend/.install.error.log
+Frontend/*.interrupted
+Frontend/*.tsbuildinfo
+Frontend/vite.config.js
+Frontend/vite.config.d.ts
+Frontend/.npm-install.log
+Frontend/.npm-install.error.log
 
 # Environment and editor files
 .env
