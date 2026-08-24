@@ -1,0 +1,14 @@
+# Frontend build and dependencies
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.install.log
+Frontend/.install.error.log
+
+# Environment and editor files
+.env
+api/.env
+.vscode/
+
+# Document inspection intermediates
+.requirements_extract/
+.requirements_render/
