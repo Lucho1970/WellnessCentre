@@ -13,9 +13,13 @@ Frontend/.npm-install.error.log
 
 # Environment and editor files
 .env
+Frontend/.env
+Frontend/.env.local
+Frontend/.env.*.local
 api/.env
 .vscode/
 
 # Document inspection intermediates
 .requirements_extract/
 .requirements_render/
+.tmp/
