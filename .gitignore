@@ -17,9 +17,14 @@ Frontend/.env
 Frontend/.env.local
 Frontend/.env.*.local
 api/.env
+api/vendor/
+api/var/
 .vscode/
 
 # Document inspection intermediates
 .requirements_extract/
 .requirements_render/
 .tmp/
+
+# Local Azure onboarding session data
+.copilot-azure/

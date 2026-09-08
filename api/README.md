@@ -1,11 +1,73 @@
 # Wellness Centre internal API
 
-PHP 8.2+ / MySQL 8 internal API. Copy `.env.example` to `.env`, import `database/schema.sql`, then serve the `public` directory.
+PHP 8.2+ / MySQL 8 internal API. It includes Microsoft Entra access-token validation, role enforcement, public catalogue and availability endpoints, production setup endpoints, transactional booking, notification queuing, and audit logging. See [`DATABASE_PLAN.md`](DATABASE_PLAN.md) for the complete data model and delivery sequence.
+
+Create the database and optionally load non-sensitive development data:
 
 ```powershell
-php -S localhost:8080 -t public
+mysql -u root -p < database/schema.sql
+mysql -u root -p wellness_centre < database/seed-development.sql
 ```
 
-Public availability is sanitized. Protected routes validate Microsoft Entra v2 access tokens and enforce delegated scope, staff app role, and local `tid + oid` identity matching. Route policies separate operational, practitioner, and finance access, with an example practitioner-owned resource route.
+Install dependencies and configure the environment:
+
+```powershell
+composer install --no-dev --optimize-autoloader
+Copy-Item .env.example .env
+```
+
+Set the database and Microsoft Entra values in `.env`, then serve the front controller:
+
+```powershell
+php -S localhost:8080 -t public public/index.php
+```
+
+For Apache, point the document root at `api/public` and enable `mod_rewrite`. For Nginx, route missing files to `index.php`.
+
+## First production administrator
+
+Do not run the development seed. After configuring `.env`, obtain your Microsoft Entra tenant ID and immutable user object ID (`oid`), then run:
+
+```powershell
+php bin/provision-admin.php --tenant="TENANT-ID" --oid="USER-OBJECT-ID" --email="you@example.com" --name="Your Name" --clinic="Willow Wellness Centre" --location="Toronto Clinic" --timezone="America/Toronto"
+```
+
+This is a one-time bootstrap command. Further staff accounts should be created through the authenticated admin endpoint.
+
+## Implemented endpoints
+
+Public:
+
+- `GET /api/v1/health`
+- `GET /api/v1/health/database`
+- `GET /api/v1/locations`
+- `GET /api/v1/services?practitioner_id=`
+- `GET /api/v1/practitioners?service_id=`
+- `GET /api/v1/availability?location_id=&service_id=&practitioner_id=&date_from=&date_to=`
+
+Authenticated:
+
+- `GET /api/v1/auth/me`
+- `GET /api/v1/appointments`
+- `POST /api/v1/appointments`
+
+Clinic administration:
+
+- `POST /api/v1/admin/locations`
+- `POST /api/v1/admin/rooms`
+- `POST /api/v1/admin/staff`
+- `POST /api/v1/admin/practitioners`
+- `POST /api/v1/admin/services`
+- `POST /api/v1/admin/availability-rules`
+
+Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address.
 
 See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role assignment, local configuration, and staff provisioning.
+
+## Production notes
+
+- Use a restricted database account rather than the MySQL server administrator.
+- Keep `.env`, `vendor`, and runtime cache files outside source control.
+- Serve only the `public` directory.
+- Require HTTPS and restrict `CORS_ALLOWED_ORIGINS` to exact frontend origins.
+- The notification table is a durable queue; an email worker/provider is still required before reminders are delivered.

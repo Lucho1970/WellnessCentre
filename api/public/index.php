@@ -1,10 +1,15 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/../src/Api.php';
-require_once __DIR__ . '/../src/Config.php';
-require_once __DIR__ . '/../src/Auth.php';
 
 use Wellness\Api;
 use Wellness\Config;
-Config::load(__DIR__ . '/../.env');
-Api::handle();
+use Wellness\Database;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+$root = dirname(__DIR__);
+Config::loadEnvFile($root . '/.env');
+
+$config = Config::fromEnvironment();
+$database = new Database($config);
+(new Api($config, $database))->handle();

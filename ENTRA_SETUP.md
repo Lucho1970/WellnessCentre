@@ -44,13 +44,11 @@ Under **API permissions**, add **My APIs > Wellness Centre API (Dev) > Delegated
 
 Open **Enterprise applications > Wellness Centre API (Dev) > Users and groups**. Assign each staff user exactly one Wellness role. The API requires the resulting `roles` claim.
 
-Link the same person to the local staff record using the user's immutable Entra **Object ID**, not their email. Copy it from **Microsoft Entra ID > Users > [user] > Object ID**, then update the matching record:
+Link the same person to the local staff record using the user's immutable Entra **Object ID**, not their email. The supported bootstrap command creates the local identity link and role assignment transactionally:
 
-```sql
-UPDATE staff_accounts
-SET entra_tenant_id = '<TENANT_ID>',
-    entra_object_id = '<USER_OBJECT_ID>'
-WHERE user_id = <LOCAL_STAFF_USER_ID>;
+```powershell
+cd api
+php bin/provision-admin.php --tenant="<TENANT_ID>" --oid="<USER_OBJECT_ID>" --email="you@example.com" --name="Your Name" --clinic="Willow Wellness Centre" --location="Toronto Clinic" --timezone="America/Toronto"
 ```
 
 The database role and Entra app role must match. An active `staff` user with `clinic_admin`, for example, must have `Wellness.ClinicAdmin`. This prevents an email rename or recycled address from changing identity and prevents either directory alone from silently elevating privileges.
@@ -66,7 +64,7 @@ cd Frontend
 npm run dev
 
 cd ..\api
-php -S localhost:8080 -t public
+php -S localhost:8080 -t public public/index.php
 ```
 
 The protected `GET /api/v1/auth/me` endpoint is the sign-in authorization check. It verifies the RS256 signature against Microsoft's rotating JWKS, issuer, tenant, API audience, lifetime, `access_as_user`, the app role, and the `tid + oid` database link before the dashboard is shown.
