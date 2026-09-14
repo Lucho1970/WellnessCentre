@@ -8,7 +8,6 @@ import {
   CardContent,
   Chip,
   Container,
-  Divider,
   Grid,
   IconButton,
   MenuItem,
@@ -31,8 +30,8 @@ import {
   UsersRound,
 } from "lucide-react";
 import { StaffSignIn } from "./auth/StaffSignIn";
-import { BusinessSettings } from "./admin/BusinessSettings";
 import { useClinicConfig } from "./config/ClinicConfigProvider";
+import { StaffPortal } from "./portal/StaffPortal";
 
 const services = [
   {
@@ -214,80 +213,6 @@ function Booking() {
   );
 }
 
-function DashboardPreview() {
-  return (
-    <>
-      <Grid container spacing={2.5}>
-        {[
-          ["Today’s appointments", "12", "2 awaiting confirmation"],
-          ["Room utilization", "78%", "4 rooms active"],
-          ["Outstanding balance", "$1,240", "8 open invoices"],
-          ["Waitlist matches", "3", "Review expiring offers"],
-        ].map(([label, value, note]) => (
-          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={label}>
-            <Paper sx={{ p: 2.5 }}>
-              <Typography color="text.secondary" variant="body2">
-                {label}
-              </Typography>
-              <Typography variant="h4" mt={1}>
-                {value}
-              </Typography>
-              <Typography color="primary.main" variant="body2">
-                {note}
-              </Typography>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
-      <Paper sx={{ mt: 3, p: 3 }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ sm: "center" }}
-          spacing={2}
-        >
-          <Box>
-            <Typography variant="h6">Tuesday schedule</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Conflicts, forms and appointment changes are surfaced here.
-            </Typography>
-          </Box>
-          <Button variant="contained">Create appointment</Button>
-        </Stack>
-        <Divider sx={{ my: 2 }} />
-        {[
-          "09:00 · Maya Chen · Therapeutic Massage · Room Cedar",
-          "10:15 · Olivia Martin · Initial Nutrition Consult · Room Birch",
-          "13:15 · James Patel · Naturopathic Follow-up · Room Cedar",
-        ].map((appointment, index) => (
-          <Stack
-            key={appointment}
-            direction="row"
-            spacing={2}
-            alignItems="center"
-            sx={{ py: 1.2 }}
-          >
-            <Chip
-              label={index === 1 ? "Forms due" : "Confirmed"}
-              color={index === 1 ? "warning" : "success"}
-              size="small"
-            />
-            <Typography>{appointment}</Typography>
-          </Stack>
-        ))}
-      </Paper>
-      <Typography
-        variant="caption"
-        display="block"
-        mt={2}
-        color="text.secondary"
-      >
-        The API enforces the signed-in staff member’s Entra role and resource
-        ownership.
-      </Typography>
-    </>
-  );
-}
 function Portal() {
   return (
     <Box id="portal" py={8} bgcolor="#ecf5f2">
@@ -300,9 +225,7 @@ function Portal() {
             Practice operations, in one place.
           </Typography>
         </Box>
-        <StaffSignIn>
-          {(roles) => <><DashboardPreview />{roles.includes('super_admin') && <BusinessSettings />}</>}
-        </StaffSignIn>
+        <StaffSignIn>{(roles) => <StaffPortal roles={roles} />}</StaffSignIn>
       </Container>
     </Box>
   );

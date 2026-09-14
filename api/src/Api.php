@@ -52,6 +52,9 @@ final class Api
                 $routes->addRoute('POST','/api/v1/admin/rooms','createRoom');
                 $routes->addRoute('POST','/api/v1/admin/staff','createStaff');
                 $routes->addRoute('POST','/api/v1/admin/practitioners','createPractitioner');
+                $routes->addRoute('GET','/api/v1/admin/practitioners','adminPractitioners');
+                $routes->addRoute('POST','/api/v1/admin/practitioners/onboard','onboardPractitioner');
+                $routes->addRoute('PATCH','/api/v1/admin/practitioners/{id:\\d+}','updatePractitioner');
                 $routes->addRoute('POST','/api/v1/admin/services','createService');
                 $routes->addRoute('POST','/api/v1/admin/availability-rules','createAvailability');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
@@ -74,6 +77,9 @@ final class Api
                 'createRoom'=>$this->admin->createRoom($this->user($request),$request->body,$request->correlationId),
                 'createStaff'=>$this->admin->createStaff($this->user($request),$request->body,$request->correlationId),
                 'createPractitioner'=>$this->admin->createPractitioner($this->user($request),$request->body,$request->correlationId),
+                'adminPractitioners'=>$this->admin->practitioners($this->user($request)),
+                'onboardPractitioner'=>$this->admin->onboardPractitioner($this->user($request),$request->body,$request->correlationId),
+                'updatePractitioner'=>$this->admin->updatePractitioner($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createService'=>$this->admin->createService($this->user($request),$request->body,$request->correlationId),
                 'createAvailability'=>$this->admin->createAvailability($this->user($request),$request->body,$request->correlationId),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
