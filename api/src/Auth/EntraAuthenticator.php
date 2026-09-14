@@ -5,6 +5,9 @@ namespace Wellness\Auth;
 
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
+use Firebase\JWT\BeforeValidException;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\SignatureInvalidException;
 use PDO;
 use Throwable;
 use Wellness\Config;
@@ -24,8 +27,17 @@ final class EntraAuthenticator
 
         try {
             JWT::$leeway = 60;
-            $claims = (array)JWT::decode($token, JWK::parseKeySet($this->jwks()));
-        } catch (Throwable) {
+            $claims = (array)JWT::decode($token, JWK::parseKeySet($this->jwks(), 'RS256'));
+        } catch (ApiException $error) {
+            throw $error;
+        } catch (ExpiredException) {
+            throw new ApiException(401, 'token_expired', 'The access token has expired.');
+        } catch (BeforeValidException) {
+            throw new ApiException(401, 'token_not_yet_valid', 'The access token is not yet valid.');
+        } catch (SignatureInvalidException) {
+            throw new ApiException(401, 'invalid_token_signature', 'The access token signature is invalid.');
+        } catch (Throwable $error) {
+            error_log('Entra token validation failed: ' . $error::class . ': ' . $error->getMessage());
             throw new ApiException(401, 'invalid_token', 'The access token is invalid or expired.');
         }
 

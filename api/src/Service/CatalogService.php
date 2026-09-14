@@ -4,10 +4,18 @@ declare(strict_types=1);
 namespace Wellness\Service;
 
 use Wellness\Database;
+use Wellness\Http\ApiException;
 
 final class CatalogService
 {
     public function __construct(private readonly Database $database) {}
+
+    public function siteConfig(): array
+    {
+        $clinic = $this->database->connection()->query("SELECT name,legal_name,email,phone FROM clinics WHERE status='active' ORDER BY id LIMIT 1")->fetch();
+        if (!$clinic) throw new ApiException(503, 'clinic_not_configured', 'The clinic has not been configured.');
+        return $clinic;
+    }
 
     public function locations(): array
     {

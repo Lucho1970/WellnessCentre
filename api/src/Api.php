@@ -40,6 +40,7 @@ final class Api
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
                 $routes->addRoute('GET','/api/v1/health/database','databaseHealth');
+                $routes->addRoute('GET','/api/v1/site-config','siteConfig');
                 $routes->addRoute('GET','/api/v1/locations','locations');
                 $routes->addRoute('GET','/api/v1/services','services');
                 $routes->addRoute('GET','/api/v1/practitioners','practitioners');
@@ -53,6 +54,7 @@ final class Api
                 $routes->addRoute('POST','/api/v1/admin/practitioners','createPractitioner');
                 $routes->addRoute('POST','/api/v1/admin/services','createService');
                 $routes->addRoute('POST','/api/v1/admin/availability-rules','createAvailability');
+                $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
             });
             $route=$dispatcher->dispatch($request->method,$request->path);
             if($route[0]===Dispatcher::NOT_FOUND)throw new ApiException(404,'not_found','Route not found.');
@@ -60,6 +62,7 @@ final class Api
             $data=match($route[1]){
                 'health'=>['status'=>'ok','time'=>gmdate(DATE_ATOM),'environment'=>$this->config->environment],
                 'databaseHealth'=>$this->databaseHealth(),
+                'siteConfig'=>$this->catalog->siteConfig(),
                 'locations'=>$this->catalog->locations(),
                 'services'=>$this->catalog->services(isset($request->query['practitioner_id'])?(int)$request->query['practitioner_id']:null),
                 'practitioners'=>$this->catalog->practitioners(isset($request->query['service_id'])?(int)$request->query['service_id']:null),
@@ -73,6 +76,7 @@ final class Api
                 'createPractitioner'=>$this->admin->createPractitioner($this->user($request),$request->body,$request->correlationId),
                 'createService'=>$this->admin->createService($this->user($request),$request->body,$request->correlationId),
                 'createAvailability'=>$this->admin->createAvailability($this->user($request),$request->body,$request->correlationId),
+                'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
                 default=>throw new ApiException(500,'route_handler_missing','Route handler is not configured.'),
             };
             $created=str_starts_with((string)$route[1],'create');
@@ -83,7 +87,8 @@ final class Api
 
     private function databaseHealth(): array
     {
-        $pdo=$this->database->connection();$version=(string)$pdo->query('SELECT VERSION()')->fetchColumn();$tables=(int)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_type='BASE TABLE'")->fetchColumn();return ['status'=>'ok','driver'=>'mysql','server_version'=>$version,'database'=>$this->config->dbName,'table_count'=>$tables];
+        $this->database->connection()->query('SELECT 1')->fetchColumn();
+        return ['status'=>'ok'];
     }
 
     private function user(Request $request): AuthContext{return $this->auth->authenticate($request->bearerToken());}

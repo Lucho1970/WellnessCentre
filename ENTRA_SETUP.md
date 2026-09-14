@@ -24,13 +24,13 @@ Under **Expose an API**:
 
 Under **App roles**, create these roles with **Users/Groups** as allowed member types and matching values:
 
-| Display name | Value |
-|---|---|
-| Super Admin | `Wellness.SuperAdmin` |
-| Clinic Admin | `Wellness.ClinicAdmin` |
-| Reception | `Wellness.Reception` |
+| Display name | Value                   |
+| ------------ | ----------------------- |
+| Super Admin  | `Wellness.SuperAdmin`   |
+| Clinic Admin | `Wellness.ClinicAdmin`  |
+| Reception    | `Wellness.Reception`    |
 | Practitioner | `Wellness.Practitioner` |
-| Accountant | `Wellness.Accountant` |
+| Accountant   | `Wellness.Accountant`   |
 
 Keep the requested access-token version at v2 (the default for a newly exposed API).
 
@@ -48,7 +48,7 @@ Link the same person to the local staff record using the user's immutable Entra 
 
 ```powershell
 cd api
-php bin/provision-admin.php --tenant="<TENANT_ID>" --oid="<USER_OBJECT_ID>" --email="you@example.com" --name="Your Name" --clinic="Willow Wellness Centre" --location="Toronto Clinic" --timezone="America/Toronto"
+php bin/provision-admin.php --tenant="<TENANT_ID>" --oid="<USER_OBJECT_ID>" --email="you@example.com" --name="Your Name" --clinic="Back To Balance Wellness Centre" --location="Toronto Clinic" --timezone="America/Toronto"
 ```
 
 The database role and Entra app role must match. An active `staff` user with `clinic_admin`, for example, must have `Wellness.ClinicAdmin`. This prevents an email rename or recycled address from changing identity and prevents either directory alone from silently elevating privileges.

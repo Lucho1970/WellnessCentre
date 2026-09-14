@@ -563,6 +563,7 @@ Exit criteria:
 Build:
 
 - Complete CRUD and archival for locations, practitioner profiles, services, duration choices, rooms, capabilities, restrictions, pricing, taxes, and core policies.
+- Store clinic identity and branding as database-backed configuration, with a Super Admin-only editor and audited changes.
 - Build admin screens and validation.
 - Replace frontend mock data with typed API calls.
 - Publish sanitized public catalogue endpoints.
