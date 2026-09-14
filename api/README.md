@@ -51,6 +51,7 @@ Authenticated:
 - `GET /api/v1/auth/me`
 - `GET /api/v1/appointments`
 - `POST /api/v1/appointments`
+- `GET|PUT|DELETE /api/v1/profile/avatar`
 
 Clinic administration:
 
@@ -79,3 +80,4 @@ See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role as
 - Require HTTPS and restrict `CORS_ALLOWED_ORIGINS` to exact frontend origins.
 - Keep public health responses minimal; database health confirms connectivity without exposing server or schema details.
 - The notification table is a durable queue; an email worker/provider is still required before reminders are delivered.
+- `GET|PUT|DELETE /api/v1/admin/users/{id}/avatar` (Super Admin moderation)

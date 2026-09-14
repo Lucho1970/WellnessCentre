@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -31,7 +30,7 @@ import {
 import { BusinessSettings } from "../admin/BusinessSettings";
 import { PractitionerAdmin } from "../admin/PractitionerAdmin";
 import { LocationAdmin } from "../admin/LocationAdmin";
-import { useStaffAuth } from "../auth/AuthProvider";
+import { ProfileSettings } from "../profile/ProfileSettings";
 
 type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "profile";
 
@@ -128,7 +127,6 @@ function Dashboard() {
 }
 
 export function StaffPortal({ roles }: { roles: string[] }) {
-  const {account}=useStaffAuth();
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up("md"));
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -193,7 +191,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "business" && <BusinessSettings />}
-        {page === "profile" && <Paper variant="outlined" sx={{p:{xs:2,md:3}}}><Typography variant="h5" mb={.5}>Account profile</Typography><Typography color="text.secondary" mb={3}>Your sign-in identity is managed securely through Microsoft. Application preferences will appear here as they are introduced.</Typography><Stack spacing={2} maxWidth={620}><Box><Typography variant="caption" color="text.secondary">Display name</Typography><Typography fontWeight={650}>{account?.name??'Not provided'}</Typography></Box><Box><Typography variant="caption" color="text.secondary">Microsoft sign-in</Typography><Typography fontWeight={650}>{account?.username??'Not provided'}</Typography></Box><Alert severity="info">Use “Microsoft account &amp; security” in the account menu to manage your password, authentication methods, and Microsoft profile. Contact a Super Admin to change clinic roles or practitioner details.</Alert></Stack></Paper>}
+        {page === "profile" && <ProfileSettings />}
       </Box>
     </Box>
   );
