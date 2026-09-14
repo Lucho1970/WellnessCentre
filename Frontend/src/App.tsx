@@ -9,7 +9,6 @@ import {
   Chip,
   Container,
   Grid,
-  IconButton,
   MenuItem,
   Paper,
   Stack,
@@ -25,11 +24,11 @@ import {
   Clock3,
   HeartPulse,
   MapPin,
-  Menu,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import { StaffSignIn } from "./auth/StaffSignIn";
+import { UserAccountMenu } from "./auth/UserAccountMenu";
 import { useClinicConfig } from "./config/ClinicConfigProvider";
 import { StaffPortal } from "./portal/StaffPortal";
 
@@ -254,16 +253,9 @@ export default function App() {
             >
               <Button href="#booking">Book online</Button>
               <Button href="#portal">Staff portal</Button>
-              <Button href="#portal" variant="contained">
-                Staff sign in
-              </Button>
+              <UserAccountMenu />
             </Stack>
-            <IconButton
-              aria-label="Open navigation"
-              sx={{ display: { md: "none" } }}
-            >
-              <Menu />
-            </IconButton>
+            <Box sx={{ display: { md: "none" } }}><UserAccountMenu /></Box>
           </Toolbar>
         </Container>
       </AppBar>
