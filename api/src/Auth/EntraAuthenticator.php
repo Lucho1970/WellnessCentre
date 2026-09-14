@@ -57,10 +57,12 @@ final class EntraAuthenticator
 
         $objectId = (string)($claims['oid'] ?? $claims['sub'] ?? '');
         if ($objectId === '') throw new ApiException(401, 'invalid_token_claims', 'The token has no stable user identifier.');
-        return $this->loadUser($tenant, $objectId);
+        $roleMap=['Wellness.SuperAdmin'=>'super_admin','Wellness.ClinicAdmin'=>'clinic_admin','Wellness.Reception'=>'reception','Wellness.Practitioner'=>'practitioner','Wellness.Accountant'=>'accountant'];
+        $directoryRoles=array_values(array_filter(array_map(static fn($role)=>$roleMap[(string)$role]??null,(array)($claims['roles']??[]))));
+        return $this->loadUser($tenant, $objectId, $directoryRoles);
     }
 
-    private function loadUser(string $tenantId, string $objectId): AuthContext
+    private function loadUser(string $tenantId, string $objectId, array $directoryRoles): AuthContext
     {
         $sql = "SELECT u.id,u.clinic_id,u.email,u.display_name,u.user_type,u.status,
                        GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) AS roles
@@ -73,7 +75,9 @@ final class EntraAuthenticator
         $user = $statement->fetch();
         if (!$user) throw new ApiException(403, 'staff_not_provisioned', 'This Microsoft account has not been provisioned in the Wellness Centre.');
         if ($user['status'] !== 'active') throw new ApiException(403, 'account_inactive', 'This account is not active.');
-        return new AuthContext((int)$user['id'], (int)$user['clinic_id'], $objectId, $user['email'], $user['display_name'], $user['user_type'], $user['roles'] ? explode(',', $user['roles']) : []);
+        $databaseRoles=$user['roles'] ? explode(',', $user['roles']) : [];$effectiveRoles=array_values(array_intersect($databaseRoles,$directoryRoles));
+        if($effectiveRoles===[])throw new ApiException(403,'role_assignment_mismatch','No application role is assigned in both Microsoft Entra and the Wellness Centre.');
+        return new AuthContext((int)$user['id'], (int)$user['clinic_id'], $objectId, $user['email'], $user['display_name'], $user['user_type'], $effectiveRoles);
     }
 
     private function jwks(): array

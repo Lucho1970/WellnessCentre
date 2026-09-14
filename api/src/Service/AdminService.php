@@ -12,6 +12,39 @@ final class AdminService
 {
     public function __construct(private readonly Database $database,private readonly AuditLogger $audit) {}
 
+    public function practitioners(AuthContext $actor): array
+    {
+        $this->superAdmin($actor);
+        $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY u.display_name");
+        $statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
+    }
+
+    public function onboardPractitioner(AuthContext $actor,array $body,string $correlationId): array
+    {
+        $this->superAdmin($actor);$this->required($body,['tenant_id','object_id','email','display_name','location_id','discipline']);$this->ownedLocation($actor,(int)$body['location_id']);
+        $tenantId=strtolower(trim((string)$body['tenant_id']));$objectId=strtolower(trim((string)$body['object_id']));$email=strtolower(trim((string)$body['email']));$displayName=trim((string)$body['display_name']);$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)($body['booking_mode']??'practitioner_managed');
+        $uuid='/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
+        if(!preg_match($uuid,$tenantId))throw new ApiException(422,'validation_error','Enter a valid Entra tenant ID.',['tenant_id'=>'Invalid UUID']);
+        if(!preg_match($uuid,$objectId))throw new ApiException(422,'validation_error','Enter a valid Entra Object ID.',['object_id'=>'Invalid UUID']);
+        if(filter_var($email,FILTER_VALIDATE_EMAIL)===false||strlen($email)>190)throw new ApiException(422,'validation_error','Enter a valid email address.',['email'=>'Invalid email']);
+        if(strlen($displayName)>150)throw new ApiException(422,'validation_error','The display name is too long.',['display_name'=>'Maximum 150 characters']);
+        if(strlen($discipline)>100)throw new ApiException(422,'validation_error','The discipline is too long.',['discipline'=>'Maximum 100 characters']);
+        if($credentials!==null&&strlen($credentials)>500)throw new ApiException(422,'validation_error','The credentials are too long.',['credentials'=>'Maximum 500 characters']);
+        if(!in_array($bookingMode,['practitioner_managed','clinic_managed'],true))throw new ApiException(422,'validation_error','Invalid booking mode.',['booking_mode'=>'Invalid booking mode']);
+        $pdo=$this->database->connection();
+        $existing=$pdo->prepare("SELECT 1 FROM identity_links WHERE provider='microsoft' AND tenant_id=:tenant AND provider_subject=:subject");$existing->execute(['tenant'=>$tenantId,'subject'=>$objectId]);if($existing->fetchColumn())throw new ApiException(409,'identity_already_linked','This Entra identity is already linked to a local user.');
+        $existing=$pdo->prepare('SELECT 1 FROM users WHERE clinic_id=:clinic AND email=:email');$existing->execute(['clinic'=>$actor->clinicId,'email'=>$email]);if($existing->fetchColumn())throw new ApiException(409,'email_already_exists','A user with this email already exists in the clinic.');
+        try{$pdo->beginTransaction();
+            $statement=$pdo->prepare("INSERT INTO users(clinic_id,email,display_name,user_type,status) VALUES(:clinic,:email,:name,'staff','active')");$statement->execute(['clinic'=>$actor->clinicId,'email'=>$email,'name'=>$displayName]);$userId=(int)$pdo->lastInsertId();
+            $statement=$pdo->prepare("INSERT INTO identity_links(user_id,provider,tenant_id,provider_subject,email_at_link_time) VALUES(:user,'microsoft',:tenant,:subject,:email)");$statement->execute(['user'=>$userId,'tenant'=>$tenantId,'subject'=>$objectId,'email'=>$email]);
+            $statement=$pdo->prepare("INSERT INTO user_roles(user_id,role_id,location_id,assigned_by) SELECT :user,id,:location,:actor FROM roles WHERE code='practitioner'");$statement->execute(['user'=>$userId,'location'=>(int)$body['location_id'],'actor'=>$actor->userId]);if($statement->rowCount()!==1)throw new ApiException(500,'role_not_configured','The practitioner role is not configured.');
+            $statement=$pdo->prepare('INSERT INTO staff_accounts(user_id,mfa_required) VALUES(:user,1)');$statement->execute(['user'=>$userId]);
+            $statement=$pdo->prepare('INSERT INTO practitioners(user_id,discipline,credentials,booking_mode) VALUES(:user,:discipline,:credentials,:mode)');$statement->execute(['user'=>$userId,'discipline'=>$discipline,'credentials'=>$credentials,'mode'=>$bookingMode]);$practitionerId=(int)$pdo->lastInsertId();
+            $statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id,active) VALUES(:practitioner,:location,1)');$statement->execute(['practitioner'=>$practitionerId,'location'=>(int)$body['location_id']]);
+            $this->audit->write($actor->clinicId,$actor,$correlationId,'practitioner.onboard','practitioner',$practitionerId,'success',['user_id'=>$userId,'location_id'=>(int)$body['location_id']]);$pdo->commit();return ['id'=>$practitionerId,'user_id'=>$userId,'status'=>'active'];
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
+
     public function updateClinic(AuthContext $actor,array $body,string $correlationId): array
     {
         $this->superAdmin($actor);$this->required($body,['name']);

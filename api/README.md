@@ -58,11 +58,13 @@ Clinic administration:
 - `POST /api/v1/admin/rooms`
 - `POST /api/v1/admin/staff`
 - `POST /api/v1/admin/practitioners`
+- `GET /api/v1/admin/practitioners` (Super Admin only)
+- `POST /api/v1/admin/practitioners/onboard` (Super Admin only)
 - `POST /api/v1/admin/services`
 - `POST /api/v1/admin/availability-rules`
 - `PATCH /api/v1/admin/clinic` (Super Admin only)
 
-Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address.
+Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address. Effective permissions are the intersection of the user's Entra app roles and local database roles.
 
 See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role assignment, local configuration, and staff provisioning.
 

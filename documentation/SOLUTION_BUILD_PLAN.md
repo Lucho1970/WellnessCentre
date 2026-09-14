@@ -550,6 +550,7 @@ Build:
 - Complete identity linking and first-admin provisioning.
 - Implement permission policies and clinic/location/resource scoping.
 - Add staff/role administration and audit events.
+- Keep Entra account lifecycle management separate while allowing Super Admins to link existing Entra identities and atomically create local practitioner profiles.
 - Decide and implement client Microsoft/Google login architecture.
 
 Exit criteria:

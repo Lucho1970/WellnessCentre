@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { StaffSignIn } from "./auth/StaffSignIn";
 import { BusinessSettings } from "./admin/BusinessSettings";
+import { PractitionerAdmin } from "./admin/PractitionerAdmin";
 import { useClinicConfig } from "./config/ClinicConfigProvider";
 
 const services = [
@@ -301,7 +302,7 @@ function Portal() {
           </Typography>
         </Box>
         <StaffSignIn>
-          {(roles) => <><DashboardPreview />{roles.includes('super_admin') && <BusinessSettings />}</>}
+          {(roles) => <><DashboardPreview />{roles.includes('super_admin') && <><BusinessSettings /><PractitionerAdmin /></>}</>}
         </StaffSignIn>
       </Container>
     </Box>
