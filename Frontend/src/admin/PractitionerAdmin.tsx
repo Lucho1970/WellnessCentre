@@ -52,8 +52,8 @@ export function PractitionerAdmin() {
     finally { setSaving(false); }
   };
 
-  return <Paper sx={{ mt: 3, p: 3 }}>
-    <Typography variant="h5">Staff and practitioners</Typography>
+  return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+    <Typography variant="h5">Add a practitioner</Typography>
     <Typography color="text.secondary" mb={2}>Create the Microsoft Entra account and assign its Wellness Practitioner app role first, then link that identity here.</Typography>
     <Alert severity="info" sx={{ mb: 3 }}>Use the immutable Entra Object ID, not an email address, as the identity key.</Alert>
     <Stack component="form" onSubmit={submit} spacing={2} mb={4}>

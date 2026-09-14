@@ -29,8 +29,8 @@ export function BusinessSettings() {
     finally { setSaving(false); }
   };
 
-  return <Paper component="form" onSubmit={submit} sx={{ mt: 3, p: 3 }}>
-    <Typography variant="h5">Business settings</Typography>
+  return <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+    <Typography variant="h5">Clinic identity</Typography>
     <Typography color="text.secondary" mb={3}>These values update public branding and clinic contact information without rebuilding the site.</Typography>
     <Stack spacing={2} maxWidth={680}>
       <TextField required label="Operating name" value={form.name} onChange={event => setField('name', event.target.value)} inputProps={{ maxLength: 160 }} />
