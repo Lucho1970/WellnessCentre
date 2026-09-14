@@ -60,6 +60,7 @@ Clinic administration:
 - `POST /api/v1/admin/practitioners`
 - `GET /api/v1/admin/practitioners` (Super Admin only)
 - `POST /api/v1/admin/practitioners/onboard` (Super Admin only)
+- `PATCH /api/v1/admin/practitioners/{id}` (Super Admin only; updates the local profile, location, booking ownership, and active status)
 - `POST /api/v1/admin/services`
 - `POST /api/v1/admin/availability-rules`
 - `PATCH /api/v1/admin/clinic` (Super Admin only)
