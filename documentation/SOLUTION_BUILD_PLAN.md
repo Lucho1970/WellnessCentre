@@ -247,6 +247,8 @@ Practitioner profiles include discipline, biography, credentials, services, form
 
 The Microsoft Entra sign-in address and personal notification address are separate data elements. A personal address is optional, must be verified before use, and must have explicit delivery preferences. Changing it must not alter or relink the practitioner's Entra identity. The application sends notifications directly to selected verified addresses; automatic mailbox forwarding is an email-system concern and is not configured by this application.
 
+Profile photos belong to this application and must not be read from or synchronized with Microsoft Entra, Outlook, or Google. A user may upload, replace, or remove their own photo, and a Super Admin may replace or remove any clinic user's photo for moderation. Uploads require authenticated authorization, allowlisted decoded image types, file-size and pixel-dimension limits, randomized storage names, metadata stripping/re-encoding, and private storage outside the public web root. Images are served only through an authorized endpoint. The UI uses initials when no approved photo exists. All administrative replacements and removals are audited.
+
 The booking engine must reject practitioner overlap, room overlap, incompatible capabilities, prohibited room/practitioner combinations, and appointments outside valid availability.
 
 ### 7.3 Services and rules
@@ -582,6 +584,7 @@ Exit criteria:
 Build:
 
 - Complete CRUD and archival for locations, practitioner profiles, services, duration choices, rooms, capabilities, restrictions, pricing, taxes, and core policies.
+- Add application-owned user profile photos with self-service upload/removal, Super Admin moderation, private storage, and initials fallback.
 - Store clinic identity and branding as database-backed configuration, with a Super Admin-only editor and audited changes.
 - Build admin screens and validation.
 - Replace frontend mock data with typed API calls.

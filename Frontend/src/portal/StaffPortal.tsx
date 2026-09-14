@@ -21,14 +21,18 @@ import {
   Building2,
   CalendarDays,
   LayoutDashboard,
+  MapPin,
   Menu,
   Stethoscope,
+  UserRound,
   X,
 } from "lucide-react";
 import { BusinessSettings } from "../admin/BusinessSettings";
 import { PractitionerAdmin } from "../admin/PractitionerAdmin";
+import { LocationAdmin } from "../admin/LocationAdmin";
+import { ProfileSettings } from "../profile/ProfileSettings";
 
-type PortalPage = "dashboard" | "business" | "practitioners";
+type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "profile";
 
 type NavigationItem = {
   id: PortalPage;
@@ -39,6 +43,19 @@ type NavigationItem = {
 };
 
 const navigation: NavigationItem[] = [
+  {
+    id: "locations",
+    label: "Locations",
+    description: "Addresses and booking access",
+    icon: <MapPin size={20} />,
+    superAdminOnly: true,
+  },
+  {
+    id: "profile",
+    label: "My profile",
+    description: "Identity and account preferences",
+    icon: <UserRound size={20} />,
+  },
   {
     id: "dashboard",
     label: "Dashboard",
@@ -124,6 +141,8 @@ export function StaffPortal({ roles }: { roles: string[] }) {
     if (!allowedPages.includes(page)) setPage("dashboard");
   }, [allowedPages, page]);
 
+  useEffect(()=>{const navigate=(event:Event)=>{const requested=(event as CustomEvent<string>).detail as PortalPage;if(allowedPages.includes(requested))setPage(requested);};window.addEventListener('portal-navigate',navigate);return()=>window.removeEventListener('portal-navigate',navigate);},[allowedPages]);
+
   const selectPage = (nextPage: PortalPage) => {
     setPage(nextPage);
     setDrawerOpen(false);
@@ -170,7 +189,9 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         </Stack>
         {page === "dashboard" && <Dashboard />}
         {page === "practitioners" && <PractitionerAdmin />}
+        {page === "locations" && <LocationAdmin />}
         {page === "business" && <BusinessSettings />}
+        {page === "profile" && <ProfileSettings />}
       </Box>
     </Box>
   );

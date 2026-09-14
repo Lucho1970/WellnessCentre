@@ -81,10 +81,24 @@ final class AdminService
 
     public function createLocation(AuthContext $actor,array $body,string $correlationId): array
     {
-        $this->admin($actor);$this->required($body,['name','timezone']);
+        $this->superAdmin($actor);$this->required($body,['name','timezone']);$this->validateLocation($body);
         $sql='INSERT INTO locations(clinic_id,name,timezone,address_line1,address_line2,city,province,postal_code,phone) VALUES(:clinic,:name,:timezone,:line1,:line2,:city,:province,:postal,:phone)';
-        $statement=$this->database->connection()->prepare($sql);$statement->execute(['clinic'=>$actor->clinicId,'name'=>$body['name'],'timezone'=>$body['timezone'],'line1'=>$body['address_line1']??null,'line2'=>$body['address_line2']??null,'city'=>$body['city']??null,'province'=>$body['province']??null,'postal'=>$body['postal_code']??null,'phone'=>$body['phone']??null]);
+        $statement=$this->database->connection()->prepare($sql);$statement->execute(['clinic'=>$actor->clinicId,'name'=>trim((string)$body['name']),'timezone'=>$body['timezone'],'line1'=>$this->optional($body,'address_line1'),'line2'=>$this->optional($body,'address_line2'),'city'=>$this->optional($body,'city'),'province'=>$this->optional($body,'province'),'postal'=>$this->optional($body,'postal_code'),'phone'=>$this->optional($body,'phone')]);
         return $this->created($actor,$correlationId,'location',(int)$this->database->connection()->lastInsertId());
+    }
+
+    public function locations(AuthContext $actor): array
+    {
+        $this->superAdmin($actor);$statement=$this->database->connection()->prepare('SELECT id,name,timezone,address_line1,address_line2,city,province,postal_code,phone,is_bookable FROM locations WHERE clinic_id=:clinic ORDER BY name');$statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
+    }
+
+    public function updateLocation(AuthContext $actor,int $locationId,array $body,string $correlationId): array
+    {
+        $this->superAdmin($actor);$this->required($body,['name','timezone']);$this->validateLocation($body);
+        $statement=$this->database->connection()->prepare('UPDATE locations SET name=:name,timezone=:timezone,address_line1=:line1,address_line2=:line2,city=:city,province=:province,postal_code=:postal,phone=:phone,is_bookable=:bookable WHERE id=:id AND clinic_id=:clinic');
+        $statement->execute(['name'=>trim((string)$body['name']),'timezone'=>$body['timezone'],'line1'=>$this->optional($body,'address_line1'),'line2'=>$this->optional($body,'address_line2'),'city'=>$this->optional($body,'city'),'province'=>$this->optional($body,'province'),'postal'=>$this->optional($body,'postal_code'),'phone'=>$this->optional($body,'phone'),'bookable'=>(bool)($body['is_bookable']??true)?1:0,'id'=>$locationId,'clinic'=>$actor->clinicId]);
+        if($statement->rowCount()===0){$check=$this->database->connection()->prepare('SELECT 1 FROM locations WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$locationId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'location_not_found','Location not found.');}
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'location.update','location',$locationId);return ['id'=>$locationId];
     }
 
     public function createRoom(AuthContext $actor,array $body,string $correlationId): array
@@ -131,5 +145,6 @@ final class AdminService
     private function optional(array $body,string $field): ?string{$value=trim((string)($body[$field]??''));return $value===''?null:$value;}
     private function clinic(int $clinicId): array{$statement=$this->database->connection()->prepare('SELECT name,legal_name,email,phone FROM clinics WHERE id=:clinic');$statement->execute(['clinic'=>$clinicId]);$clinic=$statement->fetch();if(!$clinic)throw new ApiException(404,'clinic_not_found','Clinic not found.');return $clinic;}
     private function ownedLocation(AuthContext $actor,int $locationId): void{$statement=$this->database->connection()->prepare('SELECT 1 FROM locations WHERE id=:id AND clinic_id=:clinic');$statement->execute(['id'=>$locationId,'clinic'=>$actor->clinicId]);if(!$statement->fetchColumn())throw new ApiException(404,'location_not_found','Location not found.');}
+    private function validateLocation(array $body): void{if(strlen(trim((string)$body['name']))>150)throw new ApiException(422,'validation_error','The location name is too long.',['name'=>'Maximum 150 characters']);if(!in_array((string)$body['timezone'],timezone_identifiers_list(),true))throw new ApiException(422,'validation_error','Enter a valid timezone.',['timezone'=>'Invalid timezone']);foreach(['address_line1'=>190,'address_line2'=>190,'city'=>100,'province'=>100,'postal_code'=>20,'phone'=>40] as $field=>$limit)if(strlen(trim((string)($body[$field]??'')))>$limit)throw new ApiException(422,'validation_error',"{$field} is too long.",[$field=>"Maximum {$limit} characters"]);}
     private function created(AuthContext $actor,string $correlationId,string $type,int $id): array{$this->audit->write($actor->clinicId,$actor,$correlationId,$type.'.create',$type,$id);return ['id'=>$id];}
 }

@@ -16,6 +16,7 @@ use Wellness\Service\AdminService;
 use Wellness\Service\AvailabilityService;
 use Wellness\Service\BookingService;
 use Wellness\Service\CatalogService;
+use Wellness\Service\ProfileService;
 use function FastRoute\simpleDispatcher;
 
 final class Api
@@ -25,10 +26,11 @@ final class Api
     private AvailabilityService $availability;
     private BookingService $bookings;
     private AdminService $admin;
+    private ProfileService $profiles;
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->bookings=new BookingService($database,$audit);$this->admin=new AdminService($database,$audit);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->bookings=new BookingService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);
     }
 
     public function handle(): never
@@ -46,9 +48,17 @@ final class Api
                 $routes->addRoute('GET','/api/v1/practitioners','practitioners');
                 $routes->addRoute('GET','/api/v1/availability','availability');
                 $routes->addRoute('GET','/api/v1/auth/me','me');
+                $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
+                $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
+                $routes->addRoute('DELETE','/api/v1/profile/avatar','deleteProfileAvatar');
+                $routes->addRoute('PUT','/api/v1/admin/users/{id:\\d+}/avatar','adminSaveAvatar');
+                $routes->addRoute('GET','/api/v1/admin/users/{id:\\d+}/avatar','adminAvatar');
+                $routes->addRoute('DELETE','/api/v1/admin/users/{id:\\d+}/avatar','adminDeleteAvatar');
                 $routes->addRoute('GET','/api/v1/appointments','appointments');
                 $routes->addRoute('POST','/api/v1/appointments','createAppointment');
                 $routes->addRoute('POST','/api/v1/admin/locations','createLocation');
+                $routes->addRoute('GET','/api/v1/admin/locations','adminLocations');
+                $routes->addRoute('PATCH','/api/v1/admin/locations/{id:\\d+}','updateLocation');
                 $routes->addRoute('POST','/api/v1/admin/rooms','createRoom');
                 $routes->addRoute('POST','/api/v1/admin/staff','createStaff');
                 $routes->addRoute('POST','/api/v1/admin/practitioners','createPractitioner');
@@ -71,9 +81,17 @@ final class Api
                 'practitioners'=>$this->catalog->practitioners(isset($request->query['service_id'])?(int)$request->query['service_id']:null),
                 'availability'=>$this->availability->search($request->query),
                 'me'=>$this->me($this->user($request)),
+                'profileAvatar'=>$this->profiles->avatar($this->user($request)),
+                'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),
+                'deleteProfileAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId),
+                'adminSaveAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'adminAvatar'=>$this->profiles->avatar($this->user($request),(int)$route[2]['id']),
+                'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
                 'appointments'=>$this->bookings->list($this->user($request)),
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
+                'adminLocations'=>$this->admin->locations($this->user($request)),
+                'updateLocation'=>$this->admin->updateLocation($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createRoom'=>$this->admin->createRoom($this->user($request),$request->body,$request->correlationId),
                 'createStaff'=>$this->admin->createStaff($this->user($request),$request->body,$request->correlationId),
                 'createPractitioner'=>$this->admin->createPractitioner($this->user($request),$request->body,$request->correlationId),
@@ -104,6 +122,6 @@ final class Api
     {
         $origin=$request->headers['origin']??'';
         if($origin!==''&&in_array($origin,$this->config->allowedOrigins,true)){header('Access-Control-Allow-Origin: '.$origin);header('Vary: Origin');header('Access-Control-Allow-Credentials: true');}
-        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Correlation-ID, Idempotency-Key');header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: no-referrer');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Correlation-ID, Idempotency-Key');header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: no-referrer');
     }
 }
