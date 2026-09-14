@@ -271,6 +271,8 @@ The application database is the authoritative schedule. Availability combines:
 
 Availability responses should expose bookable slots, not private calendar event details. Search must be fast enough for interactive use and remain correct during concurrent booking attempts.
 
+Mobile appointments must also reserve travel time before and after the visit. Availability calculations use the practitioner's preceding and following appointment locations, configurable travel buffers, and the mobile service area. The public booking experience may confirm that an address is eligible but must never reveal another client's address or a practitioner's live location.
+
 ### 7.5 External practitioner calendars
 
 External calendar integration is a post-MVP capability that must support Microsoft Outlook/Microsoft 365 and Google Calendar, with iCalendar subscription as an optional limited fallback.
@@ -299,6 +301,21 @@ Booking and rescheduling must execute transactionally:
 6. Write the appointment and status history.
 7. Queue confirmation/reminder events.
 8. Commit and return the authoritative record.
+
+#### Mobile and client-location appointments
+
+The system supports practitioners who provide services at a client's home or another client-selected address.
+
+- Client addresses are reusable private profile records with recipient name, address lines, municipality, province, postal code, country, access instructions, and an explicit active/preferred state.
+- Every mobile appointment stores an immutable address snapshot so later client-profile edits do not change the historical destination or audit record.
+- An appointment explicitly identifies its delivery mode as clinic, mobile/client location, or virtual. A clinic location remains the practitioner's operational base where required, but a mobile appointment does not require a room.
+- Only the assigned practitioner and authorized reception/administration roles may see the exact destination. Public catalogue, availability, reporting, logs, and external calendar synchronization must not expose it.
+- Address access, changes, exports, and administrative views are audited. Access instructions are treated as sensitive personal information and excluded from routine notifications.
+- The schedule displays travel blocks and a clear mobile-visit indicator. Privacy-safe external calendar events may say “Mobile appointment” but cannot include the client's name or address by default.
+- Mobile eligibility is configurable by practitioner and service, including service areas, maximum travel distance or supported postal regions, travel fees, minimum travel buffers, and appointment lead time.
+- The assigned practitioner can check in on arrival and check out after departure. Timestamps, overdue check-out escalation, and designated clinic safety contacts support worker safety; this is not continuous GPS tracking.
+- Exact device location is not collected unless a later, separately consented safety design is approved. Staff safety status is visible only to authorized operational staff and retained for a documented period.
+- Booking and rescheduling must reject travel-time conflicts as well as ordinary practitioner and room conflicts.
 
 ### 7.7 Cancellation and rescheduling
 
@@ -605,12 +622,14 @@ Build:
 - Transactional appointment creation with idempotency and concurrency protection.
 - Client booking UI and confirmation review.
 - Staff booking on behalf of clients.
+- Mobile-service eligibility, private client addresses, appointment destination snapshots, travel buffers, and travel-conflict validation.
 
 Exit criteria:
 
 - Practitioner and room double-booking is prevented under concurrent requests.
 - All 15-minute duration, availability, buffer, room, and policy constraints are tested.
 - Browser never supplies authoritative price or permission decisions.
+- Exact client destinations are visible only to the assigned practitioner and authorized operational roles.
 
 ### Phase 5 Appointment management and recurrence
 
@@ -622,6 +641,7 @@ Build:
 - Recurring series creation and occurrence/series changes.
 - Secure expiring self-service links.
 - Full status history and audit behavior.
+- Mobile-visit calendar presentation, destination access controls, arrival/departure check-in, and overdue safety escalation.
 
 Exit criteria:
 

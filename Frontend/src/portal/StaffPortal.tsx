@@ -25,14 +25,16 @@ import {
   Menu,
   Stethoscope,
   UserRound,
+  DoorOpen,
   X,
 } from "lucide-react";
 import { BusinessSettings } from "../admin/BusinessSettings";
 import { PractitionerAdmin } from "../admin/PractitionerAdmin";
 import { LocationAdmin } from "../admin/LocationAdmin";
 import { ProfileSettings } from "../profile/ProfileSettings";
+import { RoomAdmin } from "../admin/RoomAdmin";
 
-type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "profile";
+type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "rooms" | "profile";
 
 type NavigationItem = {
   id: PortalPage;
@@ -43,6 +45,7 @@ type NavigationItem = {
 };
 
 const navigation: NavigationItem[] = [
+  { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
   {
     id: "locations",
     label: "Locations",
@@ -50,17 +53,12 @@ const navigation: NavigationItem[] = [
     icon: <MapPin size={20} />,
     superAdminOnly: true,
   },
+  { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} />, superAdminOnly: true },
   {
     id: "profile",
     label: "My profile",
     description: "Identity and account preferences",
     icon: <UserRound size={20} />,
-  },
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    description: "Today at a glance",
-    icon: <LayoutDashboard size={20} />,
   },
   {
     id: "practitioners",
@@ -190,6 +188,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "dashboard" && <Dashboard />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
+        {page === "rooms" && <RoomAdmin />}
         {page === "business" && <BusinessSettings />}
         {page === "profile" && <ProfileSettings />}
       </Box>

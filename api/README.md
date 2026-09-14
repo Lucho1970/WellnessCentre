@@ -59,6 +59,8 @@ Clinic administration:
 - `POST /api/v1/admin/locations`
 - `PATCH /api/v1/admin/locations/{id}` (Super Admin only)
 - `POST /api/v1/admin/rooms`
+- `GET /api/v1/admin/rooms` (Super Admin only)
+- `PATCH /api/v1/admin/rooms/{id}` (Super Admin only)
 - `POST /api/v1/admin/staff`
 - `POST /api/v1/admin/practitioners`
 - `GET /api/v1/admin/practitioners` (Super Admin only)
