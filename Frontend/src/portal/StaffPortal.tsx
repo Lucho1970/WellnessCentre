@@ -26,6 +26,7 @@ import {
   Stethoscope,
   UserRound,
   DoorOpen,
+  HandHeart,
   X,
 } from "lucide-react";
 import { BusinessSettings } from "../admin/BusinessSettings";
@@ -33,8 +34,9 @@ import { PractitionerAdmin } from "../admin/PractitionerAdmin";
 import { LocationAdmin } from "../admin/LocationAdmin";
 import { ProfileSettings } from "../profile/ProfileSettings";
 import { RoomAdmin } from "../admin/RoomAdmin";
+import { ServiceAdmin } from "../admin/ServiceAdmin";
 
-type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "rooms" | "profile";
+type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "rooms" | "services" | "profile";
 
 type NavigationItem = {
   id: PortalPage;
@@ -54,6 +56,7 @@ const navigation: NavigationItem[] = [
     superAdminOnly: true,
   },
   { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} />, superAdminOnly: true },
+  { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} />, superAdminOnly: true },
   {
     id: "profile",
     label: "My profile",
@@ -189,6 +192,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
+        {page === "services" && <ServiceAdmin />}
         {page === "business" && <BusinessSettings />}
         {page === "profile" && <ProfileSettings />}
       </Box>
