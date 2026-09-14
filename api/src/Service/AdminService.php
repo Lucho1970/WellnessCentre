@@ -12,6 +12,18 @@ final class AdminService
 {
     public function __construct(private readonly Database $database,private readonly AuditLogger $audit) {}
 
+    public function updateClinic(AuthContext $actor,array $body,string $correlationId): array
+    {
+        $this->superAdmin($actor);$this->required($body,['name']);
+        $name=trim((string)$body['name']);$legalName=$this->optional($body,'legal_name');$email=$this->optional($body,'email');$phone=$this->optional($body,'phone');
+        if(strlen($name)>160)throw new ApiException(422,'validation_error','The operating name is too long.',['name'=>'Maximum 160 characters']);
+        if($legalName!==null&&strlen($legalName)>190)throw new ApiException(422,'validation_error','The legal name is too long.',['legal_name'=>'Maximum 190 characters']);
+        if($email!==null&&(strlen($email)>190||filter_var($email,FILTER_VALIDATE_EMAIL)===false))throw new ApiException(422,'validation_error','Enter a valid email address.',['email'=>'Invalid email']);
+        if($phone!==null&&strlen($phone)>40)throw new ApiException(422,'validation_error','The phone number is too long.',['phone'=>'Maximum 40 characters']);
+        $pdo=$this->database->connection();
+        try{$pdo->beginTransaction();$statement=$pdo->prepare('UPDATE clinics SET name=:name,legal_name=:legal_name,email=:email,phone=:phone WHERE id=:clinic');$statement->execute(['name'=>$name,'legal_name'=>$legalName,'email'=>$email,'phone'=>$phone,'clinic'=>$actor->clinicId]);if($statement->rowCount()===0){$check=$pdo->prepare('SELECT 1 FROM clinics WHERE id=:clinic');$check->execute(['clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'clinic_not_found','Clinic not found.');}$this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.settings.update','clinic',$actor->clinicId,'success',['fields'=>['name','legal_name','email','phone']]);$pdo->commit();return $this->clinic($actor->clinicId);}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
+
     public function createLocation(AuthContext $actor,array $body,string $correlationId): array
     {
         $this->admin($actor);$this->required($body,['name','timezone']);
@@ -35,7 +47,7 @@ final class AdminService
         try{$pdo->beginTransaction();$statement=$pdo->prepare("INSERT INTO users(clinic_id,email,display_name,user_type,status) VALUES(:clinic,:email,:name,'staff','active')");$statement->execute(['clinic'=>$actor->clinicId,'email'=>strtolower(trim($body['email'])),'name'=>$body['display_name']]);$id=(int)$pdo->lastInsertId();
             $statement=$pdo->prepare("INSERT INTO identity_links(user_id,provider,tenant_id,provider_subject,email_at_link_time) VALUES(:user,'microsoft',:tenant,:subject,:email)");$statement->execute(['user'=>$id,'tenant'=>$body['tenant_id'],'subject'=>$body['object_id'],'email'=>strtolower(trim($body['email']))]);
             $statement=$pdo->prepare('INSERT INTO user_roles(user_id,role_id,location_id,assigned_by) SELECT :user,id,:location,:actor FROM roles WHERE code=:role');$statement->execute(['user'=>$id,'location'=>isset($body['location_id'])?(int)$body['location_id']:null,'actor'=>$actor->userId,'role'=>$body['role']]);
-            $statement=$pdo->prepare('INSERT INTO staff_accounts(user_id,mfa_required) VALUES(:user,1)');$statement->execute(['user'=>$id]);$this->audit->write($actor->clinicId,$actor,$correlationId,'staff.create','user',$id,['role'=>$body['role']]);$pdo->commit();return ['id'=>$id,'status'=>'active'];
+            $statement=$pdo->prepare('INSERT INTO staff_accounts(user_id,mfa_required) VALUES(:user,1)');$statement->execute(['user'=>$id]);$this->audit->write($actor->clinicId,$actor,$correlationId,'staff.create','user',$id,'success',['role'=>$body['role']]);$pdo->commit();return ['id'=>$id,'status'=>'active'];
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
 
@@ -59,7 +71,10 @@ final class AdminService
     }
 
     private function admin(AuthContext $actor): void{if(!$actor->hasAnyRole('super_admin','clinic_admin'))throw new ApiException(403,'forbidden','Administrator access is required.');}
+    private function superAdmin(AuthContext $actor): void{if(!$actor->hasAnyRole('super_admin'))throw new ApiException(403,'forbidden','Super administrator access is required.');}
     private function required(array $body,array $fields): void{foreach($fields as $field)if(!array_key_exists($field,$body)||$body[$field]===''||$body[$field]===null)throw new ApiException(422,'validation_error',"{$field} is required.",[$field=>'Required']);}
+    private function optional(array $body,string $field): ?string{$value=trim((string)($body[$field]??''));return $value===''?null:$value;}
+    private function clinic(int $clinicId): array{$statement=$this->database->connection()->prepare('SELECT name,legal_name,email,phone FROM clinics WHERE id=:clinic');$statement->execute(['clinic'=>$clinicId]);$clinic=$statement->fetch();if(!$clinic)throw new ApiException(404,'clinic_not_found','Clinic not found.');return $clinic;}
     private function ownedLocation(AuthContext $actor,int $locationId): void{$statement=$this->database->connection()->prepare('SELECT 1 FROM locations WHERE id=:id AND clinic_id=:clinic');$statement->execute(['id'=>$locationId,'clinic'=>$actor->clinicId]);if(!$statement->fetchColumn())throw new ApiException(404,'location_not_found','Location not found.');}
     private function created(AuthContext $actor,string $correlationId,string $type,int $id): array{$this->audit->write($actor->clinicId,$actor,$correlationId,$type.'.create',$type,$id);return ['id'=>$id];}
 }

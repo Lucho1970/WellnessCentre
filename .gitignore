@@ -19,6 +19,15 @@ Frontend/.env.*.local
 api/.env
 api/vendor/
 api/var/
+api/deploy/netfirms/artifacts/
+Frontend/deploy/
+Frontend/release/
+release/
+
+# Temporary production diagnostics (never deploy or commit)
+api/diagnostic.php
+api/jwks-test.php
+api/php-version.php
 .vscode/
 
 # Document inspection intermediates

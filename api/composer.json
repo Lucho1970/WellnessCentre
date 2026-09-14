@@ -7,7 +7,9 @@
     "php": "^8.2",
     "ext-curl": "*",
     "ext-json": "*",
+    "ext-openssl": "*",
     "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
     "firebase/php-jwt": "^7.1",
     "nikic/fast-route": "^1.3"
   },

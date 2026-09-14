@@ -1,22 +1,446 @@
-import { useState } from 'react';
-import { Alert, AppBar, Box, Button, Card, CardContent, Chip, Container, Divider, Grid, IconButton, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Toolbar, Typography } from '@mui/material';
-import { CalendarDays, Clock3, HeartPulse, MapPin, Menu, ShieldCheck, UsersRound } from 'lucide-react';
-import { StaffSignIn } from './auth/StaffSignIn';
+import { useState } from "react";
+import {
+  Alert,
+  AppBar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Divider,
+  Grid,
+  IconButton,
+  MenuItem,
+  Paper,
+  Stack,
+  Step,
+  StepLabel,
+  Stepper,
+  TextField,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+import {
+  CalendarDays,
+  Clock3,
+  HeartPulse,
+  MapPin,
+  Menu,
+  ShieldCheck,
+  UsersRound,
+} from "lucide-react";
+import { StaffSignIn } from "./auth/StaffSignIn";
+import { BusinessSettings } from "./admin/BusinessSettings";
+import { useClinicConfig } from "./config/ClinicConfigProvider";
 
 const services = [
-  { name: 'Therapeutic Massage', duration: '60 min', price: '$115', practitioner: 'Maya Chen, RMT' },
-  { name: 'Initial Nutrition Consult', duration: '60 min', price: '$135', practitioner: 'Dr. Olivia Martin, RHN' },
-  { name: 'Naturopathic Follow-up', duration: '30 min', price: '$85', practitioner: 'Dr. James Patel, ND' },
+  {
+    name: "Therapeutic Massage",
+    duration: "60 min",
+    price: "$115",
+    practitioner: "Maya Chen, RMT",
+  },
+  {
+    name: "Initial Nutrition Consult",
+    duration: "60 min",
+    price: "$135",
+    practitioner: "Dr. Olivia Martin, RHN",
+  },
+  {
+    name: "Naturopathic Follow-up",
+    duration: "30 min",
+    price: "$85",
+    practitioner: "Dr. James Patel, ND",
+  },
 ];
-const times = ['9:00 AM', '9:30 AM', '10:15 AM', '11:00 AM', '1:15 PM', '2:00 PM', '3:30 PM'];
+const times = [
+  "9:00 AM",
+  "9:30 AM",
+  "10:15 AM",
+  "11:00 AM",
+  "1:15 PM",
+  "2:00 PM",
+  "3:30 PM",
+];
 
 function Booking() {
-  const [service, setService] = useState(services[0]); const [time, setTime] = useState(''); const [confirmed, setConfirmed] = useState(false);
-  if (confirmed) return <Paper sx={{ p: 4, textAlign: 'center', maxWidth: 620, mx: 'auto' }}><HeartPulse size={42} color="#176b62"/><Typography variant="h4" mt={2}>Your appointment is requested</Typography><Typography color="text.secondary" mt={1}>We’ve reserved {time} on Tuesday, September 16 with {service.practitioner}. Client social sign-in remains an independent future flow.</Typography><Stack direction="row" justifyContent="center" spacing={2} mt={3}><Button variant="contained" disabled>Continue with Google</Button><Button variant="outlined" disabled>View client portal</Button></Stack></Paper>;
-  return <Box id="booking" py={{ xs: 5, md: 9 }}><Container maxWidth="lg"><Typography variant="overline" color="primary.main" fontWeight={700}>BOOK ONLINE</Typography><Typography variant="h3" mb={1}>Find a time that fits your life.</Typography><Typography color="text.secondary" mb={4}>Browse first. Sign in only when you’re ready to confirm.</Typography><Stepper activeStep={time ? 2 : 1} sx={{ mb: 4, maxWidth: 650 }}><Step><StepLabel>Choose care</StepLabel></Step><Step><StepLabel>Select a time</StepLabel></Step><Step><StepLabel>Confirm</StepLabel></Step></Stepper><Grid container spacing={3}><Grid size={{ xs: 12, md: 5 }}><Card variant="outlined"><CardContent><Typography variant="h6" mb={2}>1. Select a service</Typography>{services.map(s => <Box key={s.name} onClick={() => { setService(s); setTime(''); }} sx={{ p: 2, mb: 1.5, border: '1px solid', borderColor: service.name === s.name ? 'primary.main' : 'divider', bgcolor: service.name === s.name ? 'rgba(23,107,98,.06)' : undefined, borderRadius: 2, cursor: 'pointer' }}><Stack direction="row" justifyContent="space-between"><Typography fontWeight={700}>{s.name}</Typography><Typography color="primary.main" fontWeight={700}>{s.price}</Typography></Stack><Typography variant="body2" color="text.secondary">{s.duration} · {s.practitioner}</Typography></Box>)}</CardContent></Card></Grid><Grid size={{ xs: 12, md: 7 }}><Card variant="outlined"><CardContent><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" mb={2}><Box><Typography variant="h6">2. Pick an available time</Typography><Typography variant="body2" color="text.secondary">Tuesday, September 16 · {service.duration}</Typography></Box><TextField select size="small" defaultValue="September 16"><MenuItem value="September 16">Sep 16, 2026</MenuItem><MenuItem value="September 17">Sep 17, 2026</MenuItem></TextField></Stack><Grid container spacing={1.2}>{times.map(t => <Grid size={{ xs: 6, sm: 4 }} key={t}><Button fullWidth variant={time === t ? 'contained' : 'outlined'} onClick={() => setTime(t)}>{t}</Button></Grid>)}</Grid>{time && <Alert severity="info" sx={{ mt: 3 }}>This time is held while you complete your booking. Changes within 24 hours may incur a fee.</Alert>}<Button disabled={!time} onClick={() => setConfirmed(true)} variant="contained" size="large" fullWidth sx={{ mt: 3 }}>Continue to client sign-in</Button></CardContent></Card></Grid></Grid></Container></Box>;
+  const [service, setService] = useState(services[0]);
+  const [time, setTime] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  if (confirmed)
+    return (
+      <Paper sx={{ p: 4, textAlign: "center", maxWidth: 620, mx: "auto" }}>
+        <HeartPulse size={42} color="#176b62" />
+        <Typography variant="h4" mt={2}>
+          Your appointment is requested
+        </Typography>
+        <Typography color="text.secondary" mt={1}>
+          We’ve reserved {time} on Tuesday, September 16 with{" "}
+          {service.practitioner}. Client social sign-in remains an independent
+          future flow.
+        </Typography>
+        <Stack direction="row" justifyContent="center" spacing={2} mt={3}>
+          <Button variant="contained" disabled>
+            Continue with Google
+          </Button>
+          <Button variant="outlined" disabled>
+            View client portal
+          </Button>
+        </Stack>
+      </Paper>
+    );
+  return (
+    <Box id="booking" py={{ xs: 5, md: 9 }}>
+      <Container maxWidth="lg">
+        <Typography variant="overline" color="primary.main" fontWeight={700}>
+          BOOK ONLINE
+        </Typography>
+        <Typography variant="h3" mb={1}>
+          Find a time that fits your life.
+        </Typography>
+        <Typography color="text.secondary" mb={4}>
+          Browse first. Sign in only when you’re ready to confirm.
+        </Typography>
+        <Stepper activeStep={time ? 2 : 1} sx={{ mb: 4, maxWidth: 650 }}>
+          <Step>
+            <StepLabel>Choose care</StepLabel>
+          </Step>
+          <Step>
+            <StepLabel>Select a time</StepLabel>
+          </Step>
+          <Step>
+            <StepLabel>Confirm</StepLabel>
+          </Step>
+        </Stepper>
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 5 }}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" mb={2}>
+                  1. Select a service
+                </Typography>
+                {services.map((s) => (
+                  <Box
+                    key={s.name}
+                    onClick={() => {
+                      setService(s);
+                      setTime("");
+                    }}
+                    sx={{
+                      p: 2,
+                      mb: 1.5,
+                      border: "1px solid",
+                      borderColor:
+                        service.name === s.name ? "primary.main" : "divider",
+                      bgcolor:
+                        service.name === s.name
+                          ? "rgba(23,107,98,.06)"
+                          : undefined,
+                      borderRadius: 2,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography fontWeight={700}>{s.name}</Typography>
+                      <Typography color="primary.main" fontWeight={700}>
+                        {s.price}
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {s.duration} · {s.practitioner}
+                    </Typography>
+                  </Box>
+                ))}
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Card variant="outlined">
+              <CardContent>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  justifyContent="space-between"
+                  mb={2}
+                >
+                  <Box>
+                    <Typography variant="h6">
+                      2. Pick an available time
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Tuesday, September 16 · {service.duration}
+                    </Typography>
+                  </Box>
+                  <TextField select size="small" defaultValue="September 16">
+                    <MenuItem value="September 16">Sep 16, 2026</MenuItem>
+                    <MenuItem value="September 17">Sep 17, 2026</MenuItem>
+                  </TextField>
+                </Stack>
+                <Grid container spacing={1.2}>
+                  {times.map((t) => (
+                    <Grid size={{ xs: 6, sm: 4 }} key={t}>
+                      <Button
+                        fullWidth
+                        variant={time === t ? "contained" : "outlined"}
+                        onClick={() => setTime(t)}
+                      >
+                        {t}
+                      </Button>
+                    </Grid>
+                  ))}
+                </Grid>
+                {time && (
+                  <Alert severity="info" sx={{ mt: 3 }}>
+                    This time is held while you complete your booking. Changes
+                    within 24 hours may incur a fee.
+                  </Alert>
+                )}
+                <Button
+                  disabled={!time}
+                  onClick={() => setConfirmed(true)}
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  sx={{ mt: 3 }}
+                >
+                  Continue to client sign-in
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
+  );
 }
 
-function DashboardPreview() { return <><Grid container spacing={2.5}>{[['Today’s appointments','12','2 awaiting confirmation'],['Room utilization','78%','4 rooms active'],['Outstanding balance','$1,240','8 open invoices'],['Waitlist matches','3','Review expiring offers']].map(([label,value,note]) => <Grid size={{ xs: 12, sm: 6, md: 3 }} key={label}><Paper sx={{ p: 2.5 }}><Typography color="text.secondary" variant="body2">{label}</Typography><Typography variant="h4" mt={1}>{value}</Typography><Typography color="primary.main" variant="body2">{note}</Typography></Paper></Grid>)}</Grid><Paper sx={{ mt: 3, p: 3 }}><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}><Box><Typography variant="h6">Tuesday schedule</Typography><Typography variant="body2" color="text.secondary">Conflicts, forms and appointment changes are surfaced here.</Typography></Box><Button variant="contained">Create appointment</Button></Stack><Divider sx={{ my: 2 }}/>{['09:00 · Maya Chen · Therapeutic Massage · Room Cedar','10:15 · Olivia Martin · Initial Nutrition Consult · Room Birch','13:15 · James Patel · Naturopathic Follow-up · Room Cedar'].map((appointment, index) => <Stack key={appointment} direction="row" spacing={2} alignItems="center" sx={{ py: 1.2 }}><Chip label={index === 1 ? 'Forms due' : 'Confirmed'} color={index === 1 ? 'warning' : 'success'} size="small"/><Typography>{appointment}</Typography></Stack>)}</Paper><Typography variant="caption" display="block" mt={2} color="text.secondary">The API enforces the signed-in staff member’s Entra role and resource ownership.</Typography></>; }
-function Portal() { return <Box id="portal" py={8} bgcolor="#ecf5f2"><Container maxWidth="lg"><Box mb={3}><Typography variant="overline" color="primary.main" fontWeight={700}>SECURE STAFF WORKSPACE</Typography><Typography variant="h3">Practice operations, in one place.</Typography></Box><StaffSignIn><DashboardPreview/></StaffSignIn></Container></Box>; }
+function DashboardPreview() {
+  return (
+    <>
+      <Grid container spacing={2.5}>
+        {[
+          ["Today’s appointments", "12", "2 awaiting confirmation"],
+          ["Room utilization", "78%", "4 rooms active"],
+          ["Outstanding balance", "$1,240", "8 open invoices"],
+          ["Waitlist matches", "3", "Review expiring offers"],
+        ].map(([label, value, note]) => (
+          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={label}>
+            <Paper sx={{ p: 2.5 }}>
+              <Typography color="text.secondary" variant="body2">
+                {label}
+              </Typography>
+              <Typography variant="h4" mt={1}>
+                {value}
+              </Typography>
+              <Typography color="primary.main" variant="body2">
+                {note}
+              </Typography>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+      <Paper sx={{ mt: 3, p: 3 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ sm: "center" }}
+          spacing={2}
+        >
+          <Box>
+            <Typography variant="h6">Tuesday schedule</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Conflicts, forms and appointment changes are surfaced here.
+            </Typography>
+          </Box>
+          <Button variant="contained">Create appointment</Button>
+        </Stack>
+        <Divider sx={{ my: 2 }} />
+        {[
+          "09:00 · Maya Chen · Therapeutic Massage · Room Cedar",
+          "10:15 · Olivia Martin · Initial Nutrition Consult · Room Birch",
+          "13:15 · James Patel · Naturopathic Follow-up · Room Cedar",
+        ].map((appointment, index) => (
+          <Stack
+            key={appointment}
+            direction="row"
+            spacing={2}
+            alignItems="center"
+            sx={{ py: 1.2 }}
+          >
+            <Chip
+              label={index === 1 ? "Forms due" : "Confirmed"}
+              color={index === 1 ? "warning" : "success"}
+              size="small"
+            />
+            <Typography>{appointment}</Typography>
+          </Stack>
+        ))}
+      </Paper>
+      <Typography
+        variant="caption"
+        display="block"
+        mt={2}
+        color="text.secondary"
+      >
+        The API enforces the signed-in staff member’s Entra role and resource
+        ownership.
+      </Typography>
+    </>
+  );
+}
+function Portal() {
+  return (
+    <Box id="portal" py={8} bgcolor="#ecf5f2">
+      <Container maxWidth="lg">
+        <Box mb={3}>
+          <Typography variant="overline" color="primary.main" fontWeight={700}>
+            SECURE STAFF WORKSPACE
+          </Typography>
+          <Typography variant="h3">
+            Practice operations, in one place.
+          </Typography>
+        </Box>
+        <StaffSignIn>
+          {(roles) => <><DashboardPreview />{roles.includes('super_admin') && <BusinessSettings />}</>}
+        </StaffSignIn>
+      </Container>
+    </Box>
+  );
+}
 
-export default function App() { return <><AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid #e3e9e6' }}><Container maxWidth="lg"><Toolbar disableGutters><HeartPulse color="#176b62"/><Typography fontWeight={800} ml={1.2} flexGrow={1}>Willow Wellness</Typography><Stack direction="row" spacing={1} display={{ xs: 'none', md: 'flex' }}><Button href="#booking">Book online</Button><Button href="#portal">Staff portal</Button><Button href="#portal" variant="contained">Staff sign in</Button></Stack><IconButton aria-label="Open navigation" sx={{ display: { md: 'none' } }}><Menu/></IconButton></Toolbar></Container></AppBar><Box className="hero"><Container maxWidth="lg"><Grid container spacing={4} alignItems="center" minHeight={470}><Grid size={{ xs: 12, md: 7 }}><Chip icon={<HeartPulse size={16}/>} label="Care that makes room for you" sx={{ mb: 2 }}/><Typography variant="h1" fontSize={{ xs: '2.7rem', md: '4.3rem' }} lineHeight={1.04}>Feel better, on your schedule.</Typography><Typography fontSize="1.2rem" color="text.secondary" maxWidth={590} mt={2}>A calmer way to find the right practitioner, book care, and manage your wellness journey.</Typography><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} mt={4}><Button href="#booking" size="large" variant="contained">Find an appointment</Button><Button href="#portal" size="large" variant="outlined">Staff portal</Button></Stack></Grid><Grid size={{ xs: 12, md: 5 }}><Paper elevation={3} sx={{ p: 3, borderRadius: 4 }}><Typography fontWeight={700}>Your next appointment, made simple</Typography><Stack spacing={2} mt={2}>{[[CalendarDays,'Browse availability, no sign-in needed'],[Clock3,'15-minute precision, real-time updates'],[ShieldCheck,'Privacy-first care and secure records']].map(([Icon,text]) => <Stack direction="row" spacing={1.4} alignItems="center" key={text as string}><Box sx={{ p: 1, bgcolor: '#e6f2ef', borderRadius: 2 }}><Icon size={20} color="#176b62"/></Box><Typography variant="body2">{text as string}</Typography></Stack>)}</Stack></Paper></Grid></Grid></Container></Box><Box py={3} borderBottom="1px solid #e3e9e6"><Container maxWidth="lg"><Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}><Typography><MapPin size={17}/> 240 Queen Street West, Toronto</Typography><Typography><UsersRound size={17}/> Massage therapy · Nutrition · Naturopathic care</Typography></Stack></Container></Box><Booking/><Portal/><Box component="footer" py={5} bgcolor="#123b36" color="white"><Container maxWidth="lg"><Typography fontWeight={800}>Willow Wellness Centre</Typography><Typography variant="body2" sx={{ opacity: .75, mt: 1 }}>Your information belongs to you. Request a copy or correction anytime from your client portal.</Typography></Container></Box></>; }
+export default function App() {
+  const { config } = useClinicConfig();
+  return (
+    <>
+      <AppBar
+        position="sticky"
+        color="inherit"
+        elevation={0}
+        sx={{ borderBottom: "1px solid #e3e9e6" }}
+      >
+        <Container maxWidth="lg">
+          <Toolbar disableGutters>
+            <HeartPulse color="#176b62" />
+            <Typography fontWeight={800} ml={1.2} flexGrow={1}>
+              {config.name}
+            </Typography>
+            <Stack
+              direction="row"
+              spacing={1}
+              display={{ xs: "none", md: "flex" }}
+            >
+              <Button href="#booking">Book online</Button>
+              <Button href="#portal">Staff portal</Button>
+              <Button href="#portal" variant="contained">
+                Staff sign in
+              </Button>
+            </Stack>
+            <IconButton
+              aria-label="Open navigation"
+              sx={{ display: { md: "none" } }}
+            >
+              <Menu />
+            </IconButton>
+          </Toolbar>
+        </Container>
+      </AppBar>
+      <Box className="hero">
+        <Container maxWidth="lg">
+          <Grid container spacing={4} alignItems="center" minHeight={470}>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Chip
+                icon={<HeartPulse size={16} />}
+                label="Care that makes room for you"
+                sx={{ mb: 2 }}
+              />
+              <Typography
+                variant="h1"
+                fontSize={{ xs: "2.7rem", md: "4.3rem" }}
+                lineHeight={1.04}
+              >
+                Feel better, on your schedule.
+              </Typography>
+              <Typography
+                fontSize="1.2rem"
+                color="text.secondary"
+                maxWidth={590}
+                mt={2}
+              >
+                A calmer way to find the right practitioner, book care, and
+                manage your wellness journey.
+              </Typography>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                mt={4}
+              >
+                <Button href="#booking" size="large" variant="contained">
+                  Find an appointment
+                </Button>
+                <Button href="#portal" size="large" variant="outlined">
+                  Staff portal
+                </Button>
+              </Stack>
+            </Grid>
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Paper elevation={3} sx={{ p: 3, borderRadius: 4 }}>
+                <Typography fontWeight={700}>
+                  Your next appointment, made simple
+                </Typography>
+                <Stack spacing={2} mt={2}>
+                  {[
+                    [CalendarDays, "Browse availability, no sign-in needed"],
+                    [Clock3, "15-minute precision, real-time updates"],
+                    [ShieldCheck, "Privacy-first care and secure records"],
+                  ].map(([Icon, text]) => (
+                    <Stack
+                      direction="row"
+                      spacing={1.4}
+                      alignItems="center"
+                      key={text as string}
+                    >
+                      <Box sx={{ p: 1, bgcolor: "#e6f2ef", borderRadius: 2 }}>
+                        <Icon size={20} color="#176b62" />
+                      </Box>
+                      <Typography variant="body2">{text as string}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Paper>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+      <Box py={3} borderBottom="1px solid #e3e9e6">
+        <Container maxWidth="lg">
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            justifyContent="space-between"
+            spacing={2}
+          >
+            <Typography>
+              <MapPin size={17} /> 240 Queen Street West, Toronto
+            </Typography>
+            <Typography>
+              <UsersRound size={17} /> Massage therapy · Nutrition ·
+              Naturopathic care
+            </Typography>
+          </Stack>
+        </Container>
+      </Box>
+      <Booking />
+      <Portal />
+      <Box component="footer" py={5} bgcolor="#123b36" color="white">
+        <Container maxWidth="lg">
+          <Typography fontWeight={800}>
+            {config.name}
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: 0.75, mt: 1 }}>
+            Your information belongs to you. Request a copy or correction
+            anytime from your client portal.
+          </Typography>
+        </Container>
+      </Box>
+    </>
+  );
+}

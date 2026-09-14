@@ -1,5 +1,5 @@
 USE wellness_centre;
-INSERT INTO clinics(name,legal_name,email,phone) VALUES('Willow Wellness Centre','Willow Wellness Centre Inc.','hello@example.test','+1-416-555-0100');
+INSERT INTO clinics(name,legal_name,email,phone) VALUES('Back To Balance Wellness Centre','Back To Balance Wellness Centre Inc.','hello@example.test','+1-416-555-0100');
 SET @clinic_id=LAST_INSERT_ID();
 INSERT INTO locations(clinic_id,name,timezone,address_line1,city,province,postal_code) VALUES(@clinic_id,'Toronto Clinic','America/Toronto','240 Queen Street West','Toronto','Ontario','M5V 1Z7');
 SET @location_id=LAST_INSERT_ID();

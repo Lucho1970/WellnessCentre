@@ -1,6 +1,6 @@
 # Wellness Centre internal API
 
-PHP 8.2+ / MySQL 8 internal API. It includes Microsoft Entra access-token validation, role enforcement, public catalogue and availability endpoints, production setup endpoints, transactional booking, notification queuing, and audit logging. See [`DATABASE_PLAN.md`](DATABASE_PLAN.md) for the complete data model and delivery sequence.
+PHP 8.2+ / MySQL API, deployed on Netfirms with MySQL 5.7 compatibility. It includes Microsoft Entra access-token validation, role enforcement, public catalogue and availability endpoints, production setup endpoints, transactional booking, notification queuing, and audit logging. See [`DATABASE_PLAN.md`](DATABASE_PLAN.md) for the complete data model and delivery sequence.
 
 Create the database and optionally load non-sensitive development data:
 
@@ -29,7 +29,7 @@ For Apache, point the document root at `api/public` and enable `mod_rewrite`. Fo
 Do not run the development seed. After configuring `.env`, obtain your Microsoft Entra tenant ID and immutable user object ID (`oid`), then run:
 
 ```powershell
-php bin/provision-admin.php --tenant="TENANT-ID" --oid="USER-OBJECT-ID" --email="you@example.com" --name="Your Name" --clinic="Willow Wellness Centre" --location="Toronto Clinic" --timezone="America/Toronto"
+php bin/provision-admin.php --tenant="TENANT-ID" --oid="USER-OBJECT-ID" --email="you@example.com" --name="Your Name" --clinic="Back To Balance Wellness Centre" --location="Toronto Clinic" --timezone="America/Toronto"
 ```
 
 This is a one-time bootstrap command. Further staff accounts should be created through the authenticated admin endpoint.
@@ -40,6 +40,7 @@ Public:
 
 - `GET /api/v1/health`
 - `GET /api/v1/health/database`
+- `GET /api/v1/site-config`
 - `GET /api/v1/locations`
 - `GET /api/v1/services?practitioner_id=`
 - `GET /api/v1/practitioners?service_id=`
@@ -59,6 +60,7 @@ Clinic administration:
 - `POST /api/v1/admin/practitioners`
 - `POST /api/v1/admin/services`
 - `POST /api/v1/admin/availability-rules`
+- `PATCH /api/v1/admin/clinic` (Super Admin only)
 
 Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address.
 
@@ -70,4 +72,5 @@ See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role as
 - Keep `.env`, `vendor`, and runtime cache files outside source control.
 - Serve only the `public` directory.
 - Require HTTPS and restrict `CORS_ALLOWED_ORIGINS` to exact frontend origins.
+- Keep public health responses minimal; database health confirms connectivity without exposing server or schema details.
 - The notification table is a durable queue; an email worker/provider is still required before reminders are delivered.
