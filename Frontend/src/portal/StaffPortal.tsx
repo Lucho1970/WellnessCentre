@@ -21,14 +21,16 @@ import {
   Building2,
   CalendarDays,
   LayoutDashboard,
+  MapPin,
   Menu,
   Stethoscope,
   X,
 } from "lucide-react";
 import { BusinessSettings } from "../admin/BusinessSettings";
 import { PractitionerAdmin } from "../admin/PractitionerAdmin";
+import { LocationAdmin } from "../admin/LocationAdmin";
 
-type PortalPage = "dashboard" | "business" | "practitioners";
+type PortalPage = "dashboard" | "business" | "practitioners" | "locations";
 
 type NavigationItem = {
   id: PortalPage;
@@ -39,6 +41,13 @@ type NavigationItem = {
 };
 
 const navigation: NavigationItem[] = [
+  {
+    id: "locations",
+    label: "Locations",
+    description: "Addresses and booking access",
+    icon: <MapPin size={20} />,
+    superAdminOnly: true,
+  },
   {
     id: "dashboard",
     label: "Dashboard",
@@ -170,6 +179,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         </Stack>
         {page === "dashboard" && <Dashboard />}
         {page === "practitioners" && <PractitionerAdmin />}
+        {page === "locations" && <LocationAdmin />}
         {page === "business" && <BusinessSettings />}
       </Box>
     </Box>

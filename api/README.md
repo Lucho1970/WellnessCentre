@@ -54,7 +54,9 @@ Authenticated:
 
 Clinic administration:
 
+- `GET /api/v1/admin/locations` (Super Admin only)
 - `POST /api/v1/admin/locations`
+- `PATCH /api/v1/admin/locations/{id}` (Super Admin only)
 - `POST /api/v1/admin/rooms`
 - `POST /api/v1/admin/staff`
 - `POST /api/v1/admin/practitioners`

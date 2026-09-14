@@ -49,6 +49,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/appointments','appointments');
                 $routes->addRoute('POST','/api/v1/appointments','createAppointment');
                 $routes->addRoute('POST','/api/v1/admin/locations','createLocation');
+                $routes->addRoute('GET','/api/v1/admin/locations','adminLocations');
+                $routes->addRoute('PATCH','/api/v1/admin/locations/{id:\\d+}','updateLocation');
                 $routes->addRoute('POST','/api/v1/admin/rooms','createRoom');
                 $routes->addRoute('POST','/api/v1/admin/staff','createStaff');
                 $routes->addRoute('POST','/api/v1/admin/practitioners','createPractitioner');
@@ -74,6 +76,8 @@ final class Api
                 'appointments'=>$this->bookings->list($this->user($request)),
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
+                'adminLocations'=>$this->admin->locations($this->user($request)),
+                'updateLocation'=>$this->admin->updateLocation($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createRoom'=>$this->admin->createRoom($this->user($request),$request->body,$request->correlationId),
                 'createStaff'=>$this->admin->createStaff($this->user($request),$request->body,$request->correlationId),
                 'createPractitioner'=>$this->admin->createPractitioner($this->user($request),$request->body,$request->correlationId),
