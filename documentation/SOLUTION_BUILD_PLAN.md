@@ -205,6 +205,8 @@ Every query for a protected resource must include the appropriate clinic, locati
 - Mark appointment status, including completion and no-show.
 - View related invoice status without receiving broader accounting access.
 - Import external calendar blocks for reference/conflict prevention.
+- Connect and manage a personal Outlook, Microsoft 365, or Google calendar without sharing account passwords with clinic administrators.
+- Maintain a separately verified personal notification email and choose whether operational notices go to the work address, personal address, or both.
 
 ### 6.3 Reception portal
 
@@ -243,6 +245,8 @@ Support a clinic and one or more locations from the data model onward, while opt
 
 Practitioner profiles include discipline, biography, credentials, services, forms, appointment rules, room preferences, contact preferences, and wellness-centre-specific hours. Rooms include type, capabilities, equipment notes, booking state, turnover buffers, and practitioner/service restrictions.
 
+The Microsoft Entra sign-in address and personal notification address are separate data elements. A personal address is optional, must be verified before use, and must have explicit delivery preferences. Changing it must not alter or relink the practitioner's Entra identity. The application sends notifications directly to selected verified addresses; automatic mailbox forwarding is an email-system concern and is not configured by this application.
+
 The booking engine must reject practitioner overlap, room overlap, incompatible capabilities, prohibited room/practitioner combinations, and appointments outside valid availability.
 
 ### 7.3 Services and rules
@@ -265,7 +269,21 @@ The application database is the authoritative schedule. Availability combines:
 
 Availability responses should expose bookable slots, not private calendar event details. Search must be fast enough for interactive use and remain correct during concurrent booking attempts.
 
-### 7.5 Appointment lifecycle
+### 7.5 External practitioner calendars
+
+External calendar integration is a post-MVP capability that must support Microsoft Outlook/Microsoft 365 and Google Calendar, with iCalendar subscription as an optional limited fallback.
+
+- Each practitioner authorizes their own connection using OAuth; the system never stores their calendar password.
+- Incoming synchronization imports only the time range, provider event identifier, busy state, and synchronization metadata needed to block availability. Private titles, descriptions, attendees, meeting links, and attachments are not copied into clinic records.
+- Outgoing synchronization publishes confirmed clinic appointments using privacy-safe event text and excludes clinical details.
+- The wellness-centre database remains authoritative for clinic bookings, cancellations, services, rooms, and client information.
+- Changes or deletions in an external calendar may change availability but must never silently cancel a clinic appointment.
+- Connections expose provider, selected calendar, direction, last successful synchronization, current health, error state, manual synchronization, disconnect, and consent/reauthorization controls.
+- OAuth refresh tokens and webhook secrets are encrypted at rest, never returned to the browser after connection, and revoked or deleted when disconnected.
+- Synchronization is idempotent, retryable, observable, and audited. Provider outages cannot corrupt clinic appointments.
+- Private iCalendar subscription URLs are revocable credentials. They are outgoing-only unless a deliberately configured external feed is imported, and the UI clearly explains their limitations.
+
+### 7.6 Appointment lifecycle
 
 Supported statuses are Draft, Requested, Confirmed, Rescheduled, Canceled by client, Canceled by clinic, No-show, Completed, Invoiced, and Paid. Status transitions must be explicitly allowed, audited, and transactionally consistent with notifications and billing events.
 
@@ -280,51 +298,51 @@ Booking and rescheduling must execute transactionally:
 7. Queue confirmation/reminder events.
 8. Commit and return the authoritative record.
 
-### 7.6 Cancellation and rescheduling
+### 7.7 Cancellation and rescheduling
 
 Policies support configurable windows, fixed or percentage fees, service overrides, exception reasons, authorized waivers, and audit entries. The API must calculate the consequence before the client confirms. Every confirmation/reminder includes a secure route to cancel or reschedule.
 
 Public links use high-entropy, single-purpose, expiring, revocable tokens. Store only a hash of the token when feasible. A link must not expose the client or appointment identifier as sufficient authorization.
 
-### 7.7 Recurrence
+### 7.8 Recurrence
 
 Eligible services can request recurring appointments by pattern, limit, and end date. Creation returns per-occurrence success and conflict results. Changing one occurrence must not silently alter the series; series-level operations require explicit intent.
 
-### 7.8 Time off and sick days
+### 7.9 Time off and sick days
 
 Adding time off must identify impacted appointments. Sick-day processing must notify clients and relevant staff, create follow-up call tasks, offer safe bulk actions, preserve exceptions, and maintain an audit trail.
 
-### 7.9 Waitlists
+### 7.10 Waitlists
 
 Waitlist entries capture acceptable services, practitioners, locations, dates, days/times, and notification consent. When a slot opens, matching rules create an expiring offer. Acceptance is transactional; only one client can claim the slot. Expired or declined offers advance according to configurable rules.
 
-### 7.10 Forms and practitioner notes
+### 7.11 Forms and practitioner notes
 
 Form templates are versioned and assigned by practitioner, service, appointment type, or appointment. Submissions preserve the exact version answered, timestamps, consent where relevant, and amendment history. File uploads require allowlisted types, size limits, malware scanning, randomized storage names, private storage, and authorized download endpoints.
 
 Practitioner notes are separated from ordinary booking data and use stricter permissions. Legal/privacy review must decide which notes are included in client exports.
 
-### 7.11 Notifications
+### 7.12 Notifications
 
 Email is the first channel; the design must support SMS later. The notification service owns provider-independent messages, templates, variables, scheduling, retries, delivery state, failures, and correlation to business events.
 
 Initial events include booking confirmation, reminders, changes, cancellations, sick-day impact, waitlist offer, form due, invoice, payment, refund, export-ready, and internal operational alerts. A worker claims queued events safely so retries do not send unintended duplicates.
 
-### 7.12 Billing and payments
+### 7.13 Billing and payments
 
 Completing an appointment creates an invoice snapshot. Invoices contain immutable line descriptions, quantities, unit amounts, discounts/adjustments, taxes, totals, balances, and statuses. Payments, refunds, and credits are ledger events rather than destructive edits.
 
 The MVP records payment and payment method details permitted for operations; raw card numbers must never enter this system. If online payment is added, use a PCI-compliant payment provider and hosted/tokenized payment components.
 
-### 7.13 QuickBooks Online
+### 7.14 QuickBooks Online
 
 Store OAuth credentials and refresh tokens only in protected server-side secret storage. Maintain mappings for clients/customers, services/items, taxes, invoices, and payments. Track pending, successful, failed, retrying, and manually reconciled synchronization states. Accounting outages must not block scheduling.
 
-### 7.14 Reporting
+### 7.15 Reporting
 
 Provide appointment volume, practitioner utilization, room utilization, cancellation/no-show rates, reminder delivery, waitlist conversion, invoice totals, payments, balances, refunds, and export activity. Reports must enforce the same clinic, role, and data-sensitivity boundaries as transactional endpoints.
 
-### 7.15 Privacy operations
+### 7.16 Privacy operations
 
 Support data export requests, identity verification, review, generation, secure delivery, expiry, correction requests, consent history, retention policies, and approved deletion/anonymization. Generated exports must be encrypted or delivered through authenticated, expiring access and must never be placed in a public storage location.
 
@@ -693,7 +711,11 @@ Exit criteria:
 ### Phase 11 Post MVP integrations
 
 - QuickBooks Online synchronization and reconciliation.
-- External calendar synchronization beyond initial imports.
+- Practitioner notification profiles with separately verified personal email addresses and work/personal/both delivery preferences.
+- Outlook/Microsoft 365 calendar connection, busy-time import, privacy-safe appointment publishing, connection health, and disconnect/re-consent flows.
+- Google Calendar connection with the same privacy and synchronization behavior.
+- Optional revocable iCalendar subscription feeds for practitioners who do not connect a supported provider.
+- Background calendar synchronization, webhook renewal, retry handling, reconciliation, monitoring, and audit history.
 - SMS notifications.
 - Online payment gateway.
 - Advanced analytics and forecasting.
@@ -746,6 +768,8 @@ These decisions should be made at or before the phase that depends on them:
 | Production Entra tenant | Phase 2 | Separate production configuration; do not assume the development tenant is permanent |
 | Client identity broker/provider design | Phase 2 | Microsoft and Google first; add Meta later |
 | Email provider | Phase 6 | Compare Azure Communication Services Email and SendGrid for region, deliverability, and cost |
+| Practitioner calendar integration order | Phase 11 | Microsoft Outlook/Microsoft 365 first because staff already use Entra; Google Calendar second; iCalendar as a limited fallback |
+| Calendar synchronization policy | Phase 11 | Busy-only inbound and privacy-safe appointment details outbound; clinic bookings remain authoritative |
 | Form upload storage | Phase 7 | Private Azure Blob Storage with authorized API access and malware scanning |
 | Retention and deletion rules | Phase 7 | Legal/privacy-reviewed policy by data category |
 | Payment behavior | Phase 9 | Record payments first; add a hosted/tokenized gateway only when selected |
