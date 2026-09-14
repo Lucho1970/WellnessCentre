@@ -1,5 +1,5 @@
 import { useState, type MouseEvent } from 'react';
-import { Avatar, Box, Button, CircularProgress, Divider, ListItemIcon, Menu, MenuItem, Typography } from '@mui/material';
+import { Avatar, Box, Button, CircularProgress, Divider, IconButton, ListItemIcon, Menu, MenuItem, Typography } from '@mui/material';
 import { ExternalLink, LogIn, LogOut, ShieldCheck, UserRound } from 'lucide-react';
 import { useStaffAuth } from './AuthProvider';
 
@@ -13,10 +13,9 @@ export function UserAccountMenu(){
   const name=account?.name??account?.username??'Staff member';
   const choose=(page:string)=>{setAnchor(null);openPortal(page);};
   return <>
-    <Button aria-label={`Open account menu for ${name}`} aria-controls={anchor?'staff-account-menu':undefined} aria-haspopup="menu" aria-expanded={anchor?'true':undefined} onClick={(event:MouseEvent<HTMLElement>)=>setAnchor(event.currentTarget)} sx={{minWidth:0,p:.5,borderRadius:5,textTransform:'none'}}>
+    <IconButton aria-label={`Open account menu for ${name}`} aria-controls={anchor?'staff-account-menu':undefined} aria-haspopup="menu" aria-expanded={anchor?'true':undefined} onClick={(event:MouseEvent<HTMLElement>)=>setAnchor(event.currentTarget)} sx={{p:.5}}>
       <Avatar sx={{width:36,height:36,bgcolor:'primary.main',fontSize:14,fontWeight:800}}>{initials(name)}</Avatar>
-      <Box sx={{display:{xs:'none',lg:'block'},textAlign:'left',ml:1}}><Typography variant="body2" fontWeight={750} lineHeight={1.2}>{name}</Typography><Typography variant="caption" color="text.secondary">My account</Typography></Box>
-    </Button>
+    </IconButton>
     <Menu id="staff-account-menu" anchorEl={anchor} open={Boolean(anchor)} onClose={()=>setAnchor(null)} slotProps={{paper:{sx:{width:285,mt:1}}}}>
       <Box px={2} py={1}><Typography fontWeight={750}>{name}</Typography><Typography variant="body2" color="text.secondary" noWrap>{account?.username}</Typography>{error&&<Typography variant="caption" color="error">{error}</Typography>}</Box><Divider/>
       <MenuItem onClick={()=>choose('profile')}><ListItemIcon><UserRound size={18}/></ListItemIcon>My profile</MenuItem>
