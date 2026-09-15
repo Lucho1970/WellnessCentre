@@ -40,6 +40,7 @@ import { ServiceAssignments } from "../admin/ServiceAssignments";
 import { CatalogueSettings } from "../admin/CatalogueSettings";
 import { StaffAdmin } from "../admin/StaffAdmin";
 import { AvailabilityAdmin } from "../scheduling/AvailabilityAdmin";
+import { ScheduleExceptions } from "../scheduling/ScheduleExceptions";
 
 type PortalPage = "dashboard" | "calendar" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
 
@@ -168,7 +169,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
-        {page === "calendar" && <AvailabilityAdmin />}
+        {page === "calendar" && <><AvailabilityAdmin /><ScheduleExceptions /></>}
         {page === "profile" && <ProfileSettings />}
       </Box>
     </Box>

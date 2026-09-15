@@ -617,6 +617,8 @@ Exit criteria:
 
 ### Phase 4 Scheduling and booking engine
 
+Progress: recurring practitioner/location working hours plus one-time availability overrides and time off are implemented in the API and staff administration portal. Schedule records are clinic-scoped, practitioner self-service is restricted to the signed-in practitioner's records, and one-time local times are normalized to UTC using the selected location timezone. Conflict-safe slot generation is the next implementation unit.
+
 Build:
 
 - Recurring availability, overrides, time off, imported blocks, room constraints, buffers, lead times, cutoffs, and horizons.
