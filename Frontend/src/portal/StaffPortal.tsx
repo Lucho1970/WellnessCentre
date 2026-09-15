@@ -35,6 +35,7 @@ import { LocationAdmin } from "../admin/LocationAdmin";
 import { ProfileSettings } from "../profile/ProfileSettings";
 import { RoomAdmin } from "../admin/RoomAdmin";
 import { ServiceAdmin } from "../admin/ServiceAdmin";
+import { ServiceAssignments } from "../admin/ServiceAssignments";
 
 type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "rooms" | "services" | "profile";
 
@@ -193,6 +194,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
         {page === "services" && <ServiceAdmin />}
+        {page === "services" && <Box mt={3}><ServiceAssignments /></Box>}
         {page === "business" && <BusinessSettings />}
         {page === "profile" && <ProfileSettings />}
       </Box>
