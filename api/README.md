@@ -69,6 +69,8 @@ Clinic administration:
 - `POST /api/v1/admin/services`
 - `GET /api/v1/admin/services` (Super Admin only)
 - `PATCH /api/v1/admin/services/{id}` (Super Admin only)
+- `GET /api/v1/admin/service-assignments` (Super Admin only)
+- `PUT /api/v1/admin/services/{id}/assignments` (Super Admin only)
 - `POST /api/v1/admin/availability-rules`
 - `PATCH /api/v1/admin/clinic` (Super Admin only)
 

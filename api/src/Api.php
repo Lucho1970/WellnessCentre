@@ -70,6 +70,8 @@ final class Api
                 $routes->addRoute('POST','/api/v1/admin/services','createService');
                 $routes->addRoute('GET','/api/v1/admin/services','adminServices');
                 $routes->addRoute('PATCH','/api/v1/admin/services/{id:\\d+}','updateService');
+                $routes->addRoute('GET','/api/v1/admin/service-assignments','serviceAssignments');
+                $routes->addRoute('PUT','/api/v1/admin/services/{id:\\d+}/assignments','updateServiceAssignments');
                 $routes->addRoute('POST','/api/v1/admin/availability-rules','createAvailability');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
             });
@@ -107,6 +109,8 @@ final class Api
                 'createService'=>$this->admin->createService($this->user($request),$request->body,$request->correlationId),
                 'adminServices'=>$this->admin->services($this->user($request)),
                 'updateService'=>$this->admin->updateService($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'serviceAssignments'=>$this->admin->serviceAssignments($this->user($request)),
+                'updateServiceAssignments'=>$this->admin->updateServiceAssignments($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createAvailability'=>$this->admin->createAvailability($this->user($request),$request->body,$request->correlationId),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
                 default=>throw new ApiException(500,'route_handler_missing','Route handler is not configured.'),
