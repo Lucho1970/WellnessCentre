@@ -89,3 +89,8 @@ See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role as
 - Keep public health responses minimal; database health confirms connectivity without exposing server or schema details.
 - The notification table is a durable queue; an email worker/provider is still required before reminders are delivered.
 - `GET|PUT|DELETE /api/v1/admin/users/{id}/avatar` (Super Admin moderation)
+- `GET /api/v1/admin/staff` and `PATCH /api/v1/admin/staff/{id}` (Super Admin only)
+- `GET /api/v1/admin/catalogue-settings` (Super Admin only)
+- `POST /api/v1/admin/service-categories` and `POST /api/v1/admin/taxes` (Super Admin only)
+- `PATCH /api/v1/admin/booking-settings` (Super Admin only)
+- `GET /api/v1/admin/room-practitioner-restrictions` and `PUT /api/v1/admin/rooms/{id}/practitioners` (Super Admin only)
