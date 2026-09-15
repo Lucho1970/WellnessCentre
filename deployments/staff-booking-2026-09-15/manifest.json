@@ -1,0 +1,25 @@
+{
+  "source_commit": "33c3c983c5aa95f21f394501d7f52eef0175d68f",
+  "built_at_utc": "2026-09-15T22:13:41.1156383Z",
+  "target": "https://wellness.copihue.ca",
+  "archives": [
+    {
+      "file": "wellness-api-private.zip",
+      "bytes": 134306,
+      "entries": 117,
+      "sha256": "b6900dac658dde03c7ec01f4799069ea04e3c9a908f30a398c9ed04d1b4e0aae"
+    },
+    {
+      "file": "wellness-api-public.zip",
+      "bytes": 734,
+      "entries": 2,
+      "sha256": "db4341a2af8bd62133e322436a8e6c403f6d38a655323880f4fe022309d97767"
+    },
+    {
+      "file": "wellness-frontend.zip",
+      "bytes": 253513,
+      "entries": 4,
+      "sha256": "d451437a7d9bca74e1276bc88ab3a8d5451a280cf49a4c611817d662c0b21439"
+    }
+  ]
+}
