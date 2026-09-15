@@ -48,6 +48,8 @@ Public:
 
 Authenticated:
 
+- `GET|POST /api/v1/clients` and `GET|PATCH /api/v1/clients/{id}` (staff with Super Admin, Clinic Admin, or reception role; clinic-scoped). See `../documentation/CLIENT_MANAGEMENT.md` for payloads and revision handling.
+
 - `GET /api/v1/auth/me`
 - `GET /api/v1/appointments`
 - `POST /api/v1/appointments`
@@ -74,6 +76,10 @@ Clinic administration:
 - `GET /api/v1/admin/service-assignments` (Super Admin only)
 - `PUT /api/v1/admin/services/{id}/assignments` (Super Admin only)
 - `POST /api/v1/admin/availability-rules`
+- `GET /api/v1/admin/availability-rules` and `DELETE /api/v1/admin/availability-rules/{id}`
+- `GET /api/v1/admin/schedule-exceptions`
+- `POST|DELETE /api/v1/admin/availability-overrides[/{id}]`
+- `POST|DELETE /api/v1/admin/time-off[/{id}]`
 - `PATCH /api/v1/admin/clinic` (Super Admin only)
 
 Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address. Effective permissions are the intersection of the user's Entra app roles and local database roles.
@@ -81,6 +87,14 @@ Protected requests require an Entra access token with the configured audience an
 See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role assignment, local configuration, and staff provisioning.
 
 ## Production notes
+
+Booking confirmation now rechecks availability while holding a clinic-level transaction lock. See `../documentation/BOOKING_VALIDATION_TESTS.md` for replay behavior, local tests, and required MySQL concurrency acceptance. Timestamps require ISO-8601 seconds and a timezone; source is assigned by the server. No migration is needed.
+
+### Availability checkpoint (2026-09-15)
+
+Availability results include `available_room_ids` for services requiring rooms. Search merges recurring hours and available overrides; time off, blocked overrides, imported busy periods, and appointments at any location take precedence. Service buffers must fit working hours. Room checks include capabilities, practitioner restrictions, and turnover on both existing and proposed bookings. Recurrence weeks are anchored to Monday of the rule's valid-from week.
+
+Run `php tests/schedule-intervals.php` for interval and daylight-saving checks. Before deployment acceptance, verify extra openings, time off, room shortages, and cross-location appointments against MySQL. Booking-time revalidation and concurrency coverage remain Phase 4 work. No schema migration is needed for this checkpoint.
 
 - Use a restricted database account rather than the MySQL server administrator.
 - Keep `.env`, `vendor`, and runtime cache files outside source control.

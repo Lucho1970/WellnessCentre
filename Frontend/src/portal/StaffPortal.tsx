@@ -26,6 +26,7 @@ import {
   DoorOpen,
   HandHeart,
   Users,
+  CalendarRange,
   X,
 } from "lucide-react";
 import { BusinessSettings } from "../admin/BusinessSettings";
@@ -38,8 +39,11 @@ import { ServiceAdmin } from "../admin/ServiceAdmin";
 import { ServiceAssignments } from "../admin/ServiceAssignments";
 import { CatalogueSettings } from "../admin/CatalogueSettings";
 import { StaffAdmin } from "../admin/StaffAdmin";
+import { AvailabilityAdmin } from "../scheduling/AvailabilityAdmin";
+import { ScheduleExceptions } from "../scheduling/ScheduleExceptions";
+import { ClientManagement } from "../clients/ClientManagement";
 
-type PortalPage = "dashboard" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
+type PortalPage = "dashboard" | "clients" | "calendar" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
 
 type NavigationItem = {
   id: PortalPage;
@@ -47,10 +51,13 @@ type NavigationItem = {
   description: string;
   icon: ReactNode;
   superAdminOnly?: boolean;
+  roles?: string[];
 };
 
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
+  { id: "clients", label: "Clients", description: "Contact details and client records", icon: <Users size={20} />, roles: ['super_admin', 'clinic_admin', 'reception'] },
+  { id: "calendar", label: "Availability", description: "Working hours and schedules", icon: <CalendarRange size={20} />, superAdminOnly: true },
   {
     id: "locations",
     label: "Locations",
@@ -99,7 +106,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
   const desktop = useMediaQuery(theme.breakpoints.up("md"));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const allowedNavigation = useMemo(
-    () => navigation.filter((item) => !item.superAdminOnly || roles.includes("super_admin")),
+    () => navigation.filter((item) => (!item.superAdminOnly || roles.includes("super_admin")) && (!item.roles || item.roles.some(role => roles.includes(role)))),
     [roles],
   );
   const allowedPages = useMemo(() => allowedNavigation.map((item) => item.id), [allowedNavigation]);
@@ -156,6 +163,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
           </Box>
         </Stack>
         {page === "dashboard" && <Dashboard />}
+        {page === "clients" && <ClientManagement />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
@@ -165,6 +173,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
+        {page === "calendar" && <><AvailabilityAdmin /><ScheduleExceptions /></>}
         {page === "profile" && <ProfileSettings />}
       </Box>
     </Box>
