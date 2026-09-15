@@ -52,7 +52,10 @@ Authenticated:
 
 - `GET /api/v1/auth/me`
 - `GET /api/v1/appointments`
+- `GET /api/v1/booking-options` (staff administrators/reception; clinic-scoped booking combinations and room names)
 - `POST /api/v1/appointments`
+
+Appointment lists accept `view=upcoming|past|all&page=1` and return up to 50 rows per page. Staff listing requires an operational role; practitioners and clients see only their own appointments. Staff booking workflow and acceptance instructions: `../documentation/STAFF_BOOKING.md`.
 - `GET|PUT|DELETE /api/v1/profile/avatar`
 
 Clinic administration:

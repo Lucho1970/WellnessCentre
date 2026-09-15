@@ -42,8 +42,9 @@ import { StaffAdmin } from "../admin/StaffAdmin";
 import { AvailabilityAdmin } from "../scheduling/AvailabilityAdmin";
 import { ScheduleExceptions } from "../scheduling/ScheduleExceptions";
 import { ClientManagement } from "../clients/ClientManagement";
+import { StaffAppointments } from "../booking/StaffAppointments";
 
-type PortalPage = "dashboard" | "clients" | "calendar" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
+type PortalPage = "dashboard" | "appointments" | "clients" | "calendar" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
 
 type NavigationItem = {
   id: PortalPage;
@@ -56,6 +57,7 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
+  { id: "appointments", label: "Appointments", description: "Bookings and scheduled visits", icon: <CalendarDays size={20} />, roles: ['super_admin', 'clinic_admin', 'reception', 'practitioner'] },
   { id: "clients", label: "Clients", description: "Contact details and client records", icon: <Users size={20} />, roles: ['super_admin', 'clinic_admin', 'reception'] },
   { id: "calendar", label: "Availability", description: "Working hours and schedules", icon: <CalendarRange size={20} />, superAdminOnly: true },
   {
@@ -97,7 +99,7 @@ function pageFromUrl(allowedPages: PortalPage[]): PortalPage {
 
 function Dashboard() {
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>Your workspace is ready.</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>Clinic catalogue and staff administration are configured here. Live schedules, appointment totals, room utilization, balances, and waitlist metrics will appear when Phase 4 connects the scheduling engine—no demonstration data is shown.</Typography></Paper>
+    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>Your clinic workspace</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>Use the portal menu to view appointments and access the tools available to your role. Administrators and reception can manage clients and book appointments; practitioners can view their own appointments.</Typography></Paper>
   );
 }
 
@@ -164,6 +166,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         </Stack>
         {page === "dashboard" && <Dashboard />}
         {page === "clients" && <ClientManagement />}
+        {page === "appointments" && <StaffAppointments canBook={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))} />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}

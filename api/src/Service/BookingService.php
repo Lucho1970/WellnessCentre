@@ -69,11 +69,42 @@ final class BookingService
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
 
-    public function list(AuthContext $actor): array
+    public function options(AuthContext $actor): array
     {
-        $sql="SELECT a.id,a.client_id,a.practitioner_id,a.service_id,a.room_id,a.starts_at,a.ends_at,a.status,s.name service_name,u.display_name client_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id WHERE a.clinic_id=:clinic";$params=['clinic'=>$actor->clinicId];
+        ClientService::authorize($actor);
+        $pdo=$this->database->connection();
+        $s=$pdo->prepare("SELECT l.id location_id,l.name location_name,l.timezone,s.id service_id,s.name service_name,s.requires_room,p.id practitioner_id,u.display_name practitioner_name,d.id duration_option_id,d.duration_minutes
+            FROM services s JOIN service_locations sl ON sl.service_id=s.id AND sl.active=1
+            JOIN locations l ON l.id=sl.location_id AND l.clinic_id=s.clinic_id AND l.is_bookable=1
+            JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1
+            JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1
+            JOIN users u ON u.id=p.user_id AND u.clinic_id=s.clinic_id AND u.status='active'
+            JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=l.id AND pl.active=1
+            JOIN service_duration_options d ON d.service_id=s.id AND d.active=1
+            WHERE s.clinic_id=:clinic AND s.active=1 ORDER BY l.name,s.name,u.display_name,d.duration_minutes");
+        $s->execute(['clinic'=>$actor->clinicId]);$combinations=$s->fetchAll();
+        $s=$pdo->prepare('SELECT r.id,r.name,r.location_id FROM rooms r JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic AND r.is_bookable=1 ORDER BY r.name');$s->execute(['clinic'=>$actor->clinicId]);
+        return ['combinations'=>$combinations,'rooms'=>$s->fetchAll()];
+    }
+
+    public static function authorizeList(AuthContext $actor): void
+    {
+        if($actor->userType==='client')return;
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot view appointments.');
+    }
+
+    public function list(AuthContext $actor,array $query=[]): array
+    {
+        self::authorizeList($actor);
+        $sql="SELECT a.id,a.client_id,a.practitioner_id,a.service_id,a.room_id,a.starts_at,a.ends_at,a.status,s.name service_name,u.display_name client_name,pu.display_name practitioner_name,l.name location_name,l.timezone,r.name room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN practitioners p ON p.id=a.practitioner_id JOIN users pu ON pu.id=p.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.clinic_id=:clinic";$params=['clinic'=>$actor->clinicId];
         if($actor->userType==='client'){$sql.=' AND a.client_id=:user';$params['user']=$actor->userId;}elseif($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')){$sql.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user)';$params['user']=$actor->userId;}
-        $sql.=' ORDER BY a.starts_at DESC LIMIT 200';$statement=$this->database->connection()->prepare($sql);$statement->execute($params);return $statement->fetchAll();
+        $view=$query['view']??'all';
+        if(!in_array($view,['all','upcoming','past'],true))throw new ApiException(422,'validation_error','Invalid appointment view.');
+        if($view==='upcoming')$sql.=' AND a.ends_at>=UTC_TIMESTAMP()';
+        if($view==='past')$sql.=' AND a.ends_at<UTC_TIMESTAMP()';
+        $page=max(1,min(100000,(int)($query['page']??1)));$offset=($page-1)*50;
+        $sql.=$view==='upcoming'?' ORDER BY a.starts_at ASC,a.id ASC':' ORDER BY a.starts_at DESC,a.id DESC';
+        $sql.=" LIMIT 50 OFFSET {$offset}";$statement=$this->database->connection()->prepare($sql);$statement->execute($params);return $statement->fetchAll();
     }
 
     private function getById(AuthContext $actor,int $id): array

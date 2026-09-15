@@ -617,6 +617,8 @@ Exit criteria:
 
 ### Phase 4 Scheduling and booking engine
 
+Staff booking checkpoint: the Appointments portal page now supports administrator/reception client selection, active service/practitioner/location combinations, available times and rooms, review, confirmation, retry handling, and paginated appointment lists. Practitioners can view only their own appointments. No migration is required. Signed-in deployment and MySQL acceptance remain pending; see `STAFF_BOOKING.md`. Public client booking, practitioner booking, mobile destinations, and schedule-write concurrency coordination remain open.
+
 Client-management checkpoint: administrators and reception can search, create, and edit clinic-scoped client contact profiles, including inactive status and stale-edit protection. The Clients portal page is implemented; no migration is needed. Practitioner directory access, client sign-in, and mobile addresses remain future work. See `CLIENT_MANAGEMENT.md` for deployment and acceptance checks.
 
 2026-09-15 confirmation checkpoint: booking creation revalidates against availability, checks client/location ownership and practitioner permissions, serializes clinic confirmations, and verifies idempotent retries. Local request tests pass; MySQL concurrency acceptance remains pending. See `BOOKING_VALIDATION_TESTS.md` for deployment tests and remaining administrative-edit coordination.

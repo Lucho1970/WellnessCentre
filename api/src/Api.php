@@ -58,6 +58,7 @@ final class Api
                 $routes->addRoute('DELETE','/api/v1/admin/users/{id:\\d+}/avatar','adminDeleteAvatar');
                 $routes->addRoute('GET','/api/v1/appointments','appointments');
                 $routes->addRoute('POST','/api/v1/appointments','createAppointment');
+                $routes->addRoute('GET','/api/v1/booking-options','bookingOptions');
                 $routes->addRoute('GET','/api/v1/clients','clients');
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
@@ -117,7 +118,8 @@ final class Api
                 'adminSaveAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
                 'adminAvatar'=>$this->profiles->avatar($this->user($request),(int)$route[2]['id']),
                 'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
-                'appointments'=>$this->bookings->list($this->user($request)),
+                'appointments'=>$this->bookings->list($this->user($request),$request->query),
+                'bookingOptions'=>$this->bookings->options($this->user($request)),
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
                 'clients'=>$this->clients->search($this->user($request),$request->query),
                 'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),

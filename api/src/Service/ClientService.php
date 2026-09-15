@@ -24,6 +24,7 @@ final class ClientService
         $page=max(1,min(100000,(int)($query['page']??1))); $offset=($page-1)*25;
         $sql="FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client'";
         $params=['clinic'=>$actor->clinicId];
+        if(($query['status']??'')==='active')$sql.=" AND u.status='active'";
         if ($term!=='') {
             $sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR p.phone LIKE :phone ESCAPE '!')";
             $term='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';
