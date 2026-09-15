@@ -86,6 +86,8 @@ See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role as
 
 ## Production notes
 
+Booking confirmation now rechecks availability while holding a clinic-level transaction lock. See `../documentation/BOOKING_VALIDATION_TESTS.md` for replay behavior, local tests, and required MySQL concurrency acceptance. Timestamps require ISO-8601 seconds and a timezone; source is assigned by the server. No migration is needed.
+
 ### Availability checkpoint (2026-09-15)
 
 Availability results include `available_room_ids` for services requiring rooms. Search merges recurring hours and available overrides; time off, blocked overrides, imported busy periods, and appointments at any location take precedence. Service buffers must fit working hours. Room checks include capabilities, practitioner restrictions, and turnover on both existing and proposed bookings. Recurrence weeks are anchored to Monday of the rule's valid-from week.
