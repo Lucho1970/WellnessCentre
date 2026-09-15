@@ -23,7 +23,7 @@ final class AvailabilityService
         if($to<$from||$to>$from->modify('+31 days')) throw new ApiException(422,'invalid_date_range','The availability range must be between 1 and 31 days.');
 
         $sql="SELECT s.lead_time_minutes,s.booking_horizon_days,s.buffer_before_minutes,s.buffer_after_minutes,d.id duration_option_id,d.duration_minutes,l.timezone
-                FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.active=1 JOIN locations l ON l.id=:location
+                FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.active=1 JOIN locations l ON l.id=:location JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=l.id AND sl.active=1
                 JOIN practitioner_services ps ON ps.service_id=s.id AND ps.practitioner_id=:practitioner AND ps.active=1
                WHERE s.id=:service AND s.active=1";
         $statement=$this->database->connection()->prepare($sql);$statement->execute(['location'=>$locationId,'practitioner'=>$practitionerId,'service'=>$serviceId]);$options=$statement->fetchAll();

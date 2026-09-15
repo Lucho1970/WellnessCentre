@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   AppBar,
@@ -8,6 +8,7 @@ import {
   CardContent,
   Chip,
   Container,
+  CircularProgress,
   Grid,
   MenuItem,
   Paper,
@@ -32,40 +33,20 @@ import { UserAccountMenu } from "./auth/UserAccountMenu";
 import { useClinicConfig } from "./config/ClinicConfigProvider";
 import { StaffPortal } from "./portal/StaffPortal";
 
-const services = [
-  {
-    name: "Therapeutic Massage",
-    duration: "60 min",
-    price: "$115",
-    practitioner: "Maya Chen, RMT",
-  },
-  {
-    name: "Initial Nutrition Consult",
-    duration: "60 min",
-    price: "$135",
-    practitioner: "Dr. Olivia Martin, RHN",
-  },
-  {
-    name: "Naturopathic Follow-up",
-    duration: "30 min",
-    price: "$85",
-    practitioner: "Dr. James Patel, ND",
-  },
-];
-const times = [
-  "9:00 AM",
-  "9:30 AM",
-  "10:15 AM",
-  "11:00 AM",
-  "1:15 PM",
-  "2:00 PM",
-  "3:30 PM",
-];
+const apiBaseUrl=import.meta.env.VITE_API_BASE_URL??"http://localhost:8080/api/v1";
+type PublicLocation={id:number;name:string;city:string|null;province:string|null};
+type PublicService={id:number;name:string;description:string|null;price_cents:number;durations:{id:number;minutes:number;price_cents:number}[]};
+type PublicPractitioner={id:number;display_name:string;discipline:string;credentials:string|null};
+type Slot={duration_option_id:number;starts_at:string;ends_at:string};
 
 function Booking() {
-  const [service, setService] = useState(services[0]);
-  const [time, setTime] = useState("");
+  const [locations,setLocations]=useState<PublicLocation[]>([]),[services,setServices]=useState<PublicService[]>([]),[practitioners,setPractitioners]=useState<PublicPractitioner[]>([]),[slots,setSlots]=useState<Slot[]>([]);
+  const [locationId,setLocationId]=useState(""),[serviceId,setServiceId]=useState(""),[practitionerId,setPractitionerId]=useState(""),[slot,setSlot]=useState<Slot|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const service=services.find(x=>x.id===Number(serviceId));const practitioner=practitioners.find(x=>x.id===Number(practitionerId));
+  useEffect(()=>{void(async()=>{try{const[r1,r2]=await Promise.all([fetch(`${apiBaseUrl}/locations`),fetch(`${apiBaseUrl}/services`)]),[b1,b2]=await Promise.all([r1.json(),r2.json()]);if(!r1.ok||!r2.ok)throw new Error("Unable to load online booking.");setLocations(b1.data);setServices(b2.data);setLocationId(String(b1.data[0]?.id??""));setServiceId(String(b2.data[0]?.id??""));}catch(c){setError(c instanceof Error?c.message:"Unable to load online booking.");}finally{setLoading(false)}})()},[]);
+  useEffect(()=>{if(!serviceId)return;void(async()=>{setPractitionerId("");setSlots([]);setSlot(null);const r=await fetch(`${apiBaseUrl}/practitioners?service_id=${serviceId}`),b=await r.json();if(r.ok){setPractitioners(b.data);setPractitionerId(String(b.data[0]?.id??""));}})()},[serviceId]);
+  useEffect(()=>{if(!serviceId||!practitionerId||!locationId)return;void(async()=>{setSlot(null);const from=new Date().toISOString().slice(0,10),to=new Date(Date.now()+7*86400000).toISOString().slice(0,10),r=await fetch(`${apiBaseUrl}/availability?service_id=${serviceId}&practitioner_id=${practitionerId}&location_id=${locationId}&date_from=${from}&date_to=${to}`),b=await r.json();setSlots(r.ok?b.data.availability:[]);})()},[serviceId,practitionerId,locationId]);
   if (confirmed)
     return (
       <Paper sx={{ p: 4, textAlign: "center", maxWidth: 620, mx: "auto" }}>
@@ -74,8 +55,8 @@ function Booking() {
           Your appointment is requested
         </Typography>
         <Typography color="text.secondary" mt={1}>
-          We’ve reserved {time} on Tuesday, September 16 with{" "}
-          {service.practitioner}. Client social sign-in remains an independent
+          We’ve held {slot?new Date(slot.starts_at).toLocaleString():"your selected time"} with{" "}
+          {practitioner?.display_name}. Client social sign-in remains an independent
           future flow.
         </Typography>
         <Stack direction="row" justifyContent="center" spacing={2} mt={3}>
@@ -100,7 +81,7 @@ function Booking() {
         <Typography color="text.secondary" mb={4}>
           Browse first. Sign in only when you’re ready to confirm.
         </Typography>
-        <Stepper activeStep={time ? 2 : 1} sx={{ mb: 4, maxWidth: 650 }}>
+        <Stepper activeStep={slot ? 2 : 1} sx={{ mb: 4, maxWidth: 650 }}>
           <Step>
             <StepLabel>Choose care</StepLabel>
           </Step>
@@ -111,28 +92,30 @@ function Booking() {
             <StepLabel>Confirm</StepLabel>
           </Step>
         </Stepper>
-        <Grid container spacing={3}>
+        {loading&&<Stack alignItems="center" py={4}><CircularProgress/></Stack>}{error&&<Alert severity="error" sx={{mb:3}}>{error}</Alert>}
+        {!loading&&!error&&services.length===0&&<Alert severity="info">Online services have not been configured yet.</Alert>}
+        {!loading&&!error&&services.length>0&&<Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 5 }}>
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="h6" mb={2}>
-                  1. Select a service
+                  1. Select care
                 </Typography>
+                <TextField select fullWidth label="Location" value={locationId} onChange={e=>setLocationId(e.target.value)} sx={{mb:2}}>{locations.map(l=><MenuItem key={l.id} value={String(l.id)}>{l.name}</MenuItem>)}</TextField>
                 {services.map((s) => (
                   <Box
                     key={s.name}
                     onClick={() => {
-                      setService(s);
-                      setTime("");
+                      setServiceId(String(s.id));
                     }}
                     sx={{
                       p: 2,
                       mb: 1.5,
                       border: "1px solid",
                       borderColor:
-                        service.name === s.name ? "primary.main" : "divider",
+                        serviceId === String(s.id) ? "primary.main" : "divider",
                       bgcolor:
-                        service.name === s.name
+                        serviceId === String(s.id)
                           ? "rgba(23,107,98,.06)"
                           : undefined,
                       borderRadius: 2,
@@ -142,11 +125,11 @@ function Booking() {
                     <Stack direction="row" justifyContent="space-between">
                       <Typography fontWeight={700}>{s.name}</Typography>
                       <Typography color="primary.main" fontWeight={700}>
-                        {s.price}
+                        ${(Number(s.price_cents)/100).toFixed(2)}
                       </Typography>
                     </Stack>
                     <Typography variant="body2" color="text.secondary">
-                      {s.duration} · {s.practitioner}
+                      {s.durations.map(d=>`${d.minutes} min`).join(" / ")}{s.description?` · ${s.description}`:""}
                     </Typography>
                   </Box>
                 ))}
@@ -163,38 +146,35 @@ function Booking() {
                 >
                   <Box>
                     <Typography variant="h6">
-                      2. Pick an available time
+                      2. Pick a practitioner and time
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Tuesday, September 16 · {service.duration}
+                      Real availability for the next seven days
                     </Typography>
                   </Box>
-                  <TextField select size="small" defaultValue="September 16">
-                    <MenuItem value="September 16">Sep 16, 2026</MenuItem>
-                    <MenuItem value="September 17">Sep 17, 2026</MenuItem>
-                  </TextField>
+                  <TextField select size="small" label="Practitioner" value={practitionerId} onChange={e=>setPractitionerId(e.target.value)} sx={{minWidth:220}}>{practitioners.map(p=><MenuItem key={p.id} value={String(p.id)}>{p.display_name} · {p.credentials||p.discipline}</MenuItem>)}</TextField>
                 </Stack>
                 <Grid container spacing={1.2}>
-                  {times.map((t) => (
-                    <Grid size={{ xs: 6, sm: 4 }} key={t}>
+                  {slots.slice(0,24).map((t) => (
+                    <Grid size={{ xs: 12, sm: 6 }} key={`${t.duration_option_id}-${t.starts_at}`}>
                       <Button
                         fullWidth
-                        variant={time === t ? "contained" : "outlined"}
-                        onClick={() => setTime(t)}
+                        variant={slot?.starts_at === t.starts_at&&slot.duration_option_id===t.duration_option_id ? "contained" : "outlined"}
+                        onClick={() => setSlot(t)}
                       >
-                        {t}
+                        {new Date(t.starts_at).toLocaleString([],{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}
                       </Button>
                     </Grid>
                   ))}
                 </Grid>
-                {time && (
+                {!practitionerId&&<Alert severity="info" sx={{mt:2}}>No practitioner is assigned to this service yet.</Alert>}{practitionerId&&slots.length===0&&<Alert severity="info" sx={{mt:2}}>No available times were found in the next seven days.</Alert>}{slot && (
                   <Alert severity="info" sx={{ mt: 3 }}>
                     This time is held while you complete your booking. Changes
                     within 24 hours may incur a fee.
                   </Alert>
                 )}
                 <Button
-                  disabled={!time}
+                  disabled={!slot}
                   onClick={() => setConfirmed(true)}
                   variant="contained"
                   size="large"
@@ -206,7 +186,7 @@ function Booking() {
               </CardContent>
             </Card>
           </Grid>
-        </Grid>
+        </Grid>}
       </Container>
     </Box>
   );
