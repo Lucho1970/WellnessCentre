@@ -61,6 +61,8 @@ Clinic administration:
 - `POST /api/v1/admin/rooms`
 - `GET /api/v1/admin/rooms` (Super Admin only)
 - `PATCH /api/v1/admin/rooms/{id}` (Super Admin only)
+- `GET|POST /api/v1/admin/room-capabilities` (Super Admin only)
+- `PUT /api/v1/admin/room-capability-assignments` (Super Admin only)
 - `POST /api/v1/admin/staff`
 - `POST /api/v1/admin/practitioners`
 - `GET /api/v1/admin/practitioners` (Super Admin only)
