@@ -68,6 +68,8 @@ final class Api
                 $routes->addRoute('POST','/api/v1/admin/practitioners/onboard','onboardPractitioner');
                 $routes->addRoute('PATCH','/api/v1/admin/practitioners/{id:\\d+}','updatePractitioner');
                 $routes->addRoute('POST','/api/v1/admin/services','createService');
+                $routes->addRoute('GET','/api/v1/admin/services','adminServices');
+                $routes->addRoute('PATCH','/api/v1/admin/services/{id:\\d+}','updateService');
                 $routes->addRoute('POST','/api/v1/admin/availability-rules','createAvailability');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
             });
@@ -103,6 +105,8 @@ final class Api
                 'onboardPractitioner'=>$this->admin->onboardPractitioner($this->user($request),$request->body,$request->correlationId),
                 'updatePractitioner'=>$this->admin->updatePractitioner($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createService'=>$this->admin->createService($this->user($request),$request->body,$request->correlationId),
+                'adminServices'=>$this->admin->services($this->user($request)),
+                'updateService'=>$this->admin->updateService($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createAvailability'=>$this->admin->createAvailability($this->user($request),$request->body,$request->correlationId),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
                 default=>throw new ApiException(500,'route_handler_missing','Route handler is not configured.'),
