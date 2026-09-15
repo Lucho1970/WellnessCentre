@@ -48,6 +48,8 @@ Public:
 
 Authenticated:
 
+- `GET|POST /api/v1/clients` and `GET|PATCH /api/v1/clients/{id}` (staff with Super Admin, Clinic Admin, or reception role; clinic-scoped). See `../documentation/CLIENT_MANAGEMENT.md` for payloads and revision handling.
+
 - `GET /api/v1/auth/me`
 - `GET /api/v1/appointments`
 - `POST /api/v1/appointments`

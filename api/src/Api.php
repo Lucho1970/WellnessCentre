@@ -17,6 +17,7 @@ use Wellness\Service\AvailabilityService;
 use Wellness\Service\BookingService;
 use Wellness\Service\CatalogService;
 use Wellness\Service\ProfileService;
+use Wellness\Service\ClientService;
 use function FastRoute\simpleDispatcher;
 
 final class Api
@@ -27,10 +28,11 @@ final class Api
     private BookingService $bookings;
     private AdminService $admin;
     private ProfileService $profiles;
+    private ClientService $clients;
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->bookings=new BookingService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->bookings=new BookingService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);
     }
 
     public function handle(): never
@@ -56,6 +58,10 @@ final class Api
                 $routes->addRoute('DELETE','/api/v1/admin/users/{id:\\d+}/avatar','adminDeleteAvatar');
                 $routes->addRoute('GET','/api/v1/appointments','appointments');
                 $routes->addRoute('POST','/api/v1/appointments','createAppointment');
+                $routes->addRoute('GET','/api/v1/clients','clients');
+                $routes->addRoute('POST','/api/v1/clients','createClient');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
+                $routes->addRoute('PATCH','/api/v1/clients/{id:\\d+}','updateClient');
                 $routes->addRoute('POST','/api/v1/admin/locations','createLocation');
                 $routes->addRoute('GET','/api/v1/admin/locations','adminLocations');
                 $routes->addRoute('PATCH','/api/v1/admin/locations/{id:\\d+}','updateLocation');
@@ -113,6 +119,10 @@ final class Api
                 'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
                 'appointments'=>$this->bookings->list($this->user($request)),
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
+                'clients'=>$this->clients->search($this->user($request),$request->query),
+                'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'createClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId),
+                'updateClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
                 'adminLocations'=>$this->admin->locations($this->user($request)),
                 'updateLocation'=>$this->admin->updateLocation($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),

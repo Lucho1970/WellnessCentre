@@ -617,6 +617,8 @@ Exit criteria:
 
 ### Phase 4 Scheduling and booking engine
 
+Client-management checkpoint: administrators and reception can search, create, and edit clinic-scoped client contact profiles, including inactive status and stale-edit protection. The Clients portal page is implemented; no migration is needed. Practitioner directory access, client sign-in, and mobile addresses remain future work. See `CLIENT_MANAGEMENT.md` for deployment and acceptance checks.
+
 2026-09-15 confirmation checkpoint: booking creation revalidates against availability, checks client/location ownership and practitioner permissions, serializes clinic confirmations, and verifies idempotent retries. Local request tests pass; MySQL concurrency acceptance remains pending. See `BOOKING_VALIDATION_TESTS.md` for deployment tests and remaining administrative-edit coordination.
 
 Progress: recurring practitioner/location working hours plus one-time availability overrides and time off are implemented in the API and Super Admin portal. The scheduling API restricts practitioner access to their own records; practitioner portal access still needs to be connected. Availability search now includes extra openings, recurrence intervals, merged hours, service buffers and horizons, cross-location practitioner conflicts, and eligible rooms with capabilities, restrictions, and turnover. These changes require deployed MySQL verification. Next: enforce the same rules during booking, add concurrency tests, and connect the booking interface. Phase 4 remains in progress.
