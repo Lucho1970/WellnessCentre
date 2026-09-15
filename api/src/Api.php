@@ -80,6 +80,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/service-assignments','serviceAssignments');
                 $routes->addRoute('PUT','/api/v1/admin/services/{id:\\d+}/assignments','updateServiceAssignments');
                 $routes->addRoute('POST','/api/v1/admin/availability-rules','createAvailability');
+                $routes->addRoute('GET','/api/v1/admin/availability-rules','availabilityRules');
+                $routes->addRoute('DELETE','/api/v1/admin/availability-rules/{id:\\d+}','deleteAvailabilityRule');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
                 $routes->addRoute('GET','/api/v1/admin/catalogue-settings','catalogueSettings');
                 $routes->addRoute('POST','/api/v1/admin/service-categories','createServiceCategory');
@@ -130,6 +132,8 @@ final class Api
                 'serviceAssignments'=>$this->admin->serviceAssignments($this->user($request)),
                 'updateServiceAssignments'=>$this->admin->updateServiceAssignments($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createAvailability'=>$this->admin->createAvailability($this->user($request),$request->body,$request->correlationId),
+                'availabilityRules'=>$this->admin->availabilityRules($this->user($request)),
+                'deleteAvailabilityRule'=>$this->admin->deleteAvailabilityRule($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
                 'catalogueSettings'=>$this->admin->catalogueSettings($this->user($request)),
                 'createServiceCategory'=>$this->admin->createServiceCategory($this->user($request),$request->body,$request->correlationId),

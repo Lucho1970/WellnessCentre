@@ -74,6 +74,7 @@ Clinic administration:
 - `GET /api/v1/admin/service-assignments` (Super Admin only)
 - `PUT /api/v1/admin/services/{id}/assignments` (Super Admin only)
 - `POST /api/v1/admin/availability-rules`
+- `GET /api/v1/admin/availability-rules` and `DELETE /api/v1/admin/availability-rules/{id}`
 - `PATCH /api/v1/admin/clinic` (Super Admin only)
 
 Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address. Effective permissions are the intersection of the user's Entra app roles and local database roles.

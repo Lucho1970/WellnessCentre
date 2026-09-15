@@ -26,6 +26,7 @@ import {
   DoorOpen,
   HandHeart,
   Users,
+  CalendarRange,
   X,
 } from "lucide-react";
 import { BusinessSettings } from "../admin/BusinessSettings";
@@ -38,8 +39,9 @@ import { ServiceAdmin } from "../admin/ServiceAdmin";
 import { ServiceAssignments } from "../admin/ServiceAssignments";
 import { CatalogueSettings } from "../admin/CatalogueSettings";
 import { StaffAdmin } from "../admin/StaffAdmin";
+import { AvailabilityAdmin } from "../scheduling/AvailabilityAdmin";
 
-type PortalPage = "dashboard" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
+type PortalPage = "dashboard" | "calendar" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
 
 type NavigationItem = {
   id: PortalPage;
@@ -51,6 +53,7 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
+  { id: "calendar", label: "Availability", description: "Working hours and schedules", icon: <CalendarRange size={20} />, superAdminOnly: true },
   {
     id: "locations",
     label: "Locations",
@@ -165,6 +168,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
+        {page === "calendar" && <AvailabilityAdmin />}
         {page === "profile" && <ProfileSettings />}
       </Box>
     </Box>
