@@ -34,6 +34,7 @@ import { PractitionerAdmin } from "../admin/PractitionerAdmin";
 import { LocationAdmin } from "../admin/LocationAdmin";
 import { ProfileSettings } from "../profile/ProfileSettings";
 import { RoomAdmin } from "../admin/RoomAdmin";
+import { RoomCapabilities } from "../admin/RoomCapabilities";
 import { ServiceAdmin } from "../admin/ServiceAdmin";
 import { ServiceAssignments } from "../admin/ServiceAssignments";
 
@@ -193,6 +194,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
+        {page === "rooms" && <Box mt={3}><RoomCapabilities /></Box>}
         {page === "services" && <ServiceAdmin />}
         {page === "services" && <Box mt={3}><ServiceAssignments /></Box>}
         {page === "business" && <BusinessSettings />}
