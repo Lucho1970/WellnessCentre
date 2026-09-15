@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Box,
   Button,
-  Chip,
   Divider,
   Drawer,
-  Grid,
   IconButton,
   List,
   ListItemButton,
@@ -27,6 +25,7 @@ import {
   UserRound,
   DoorOpen,
   HandHeart,
+  Users,
   X,
 } from "lucide-react";
 import { BusinessSettings } from "../admin/BusinessSettings";
@@ -37,8 +36,10 @@ import { RoomAdmin } from "../admin/RoomAdmin";
 import { RoomCapabilities } from "../admin/RoomCapabilities";
 import { ServiceAdmin } from "../admin/ServiceAdmin";
 import { ServiceAssignments } from "../admin/ServiceAssignments";
+import { CatalogueSettings } from "../admin/CatalogueSettings";
+import { StaffAdmin } from "../admin/StaffAdmin";
 
-type PortalPage = "dashboard" | "business" | "practitioners" | "locations" | "rooms" | "services" | "profile";
+type PortalPage = "dashboard" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
 
 type NavigationItem = {
   id: PortalPage;
@@ -59,6 +60,7 @@ const navigation: NavigationItem[] = [
   },
   { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} />, superAdminOnly: true },
   { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} />, superAdminOnly: true },
+  { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} />, superAdminOnly: true },
   {
     id: "profile",
     label: "My profile",
@@ -88,44 +90,7 @@ function pageFromUrl(allowedPages: PortalPage[]): PortalPage {
 
 function Dashboard() {
   return (
-    <>
-      <Grid container spacing={2.5}>
-        {[
-          ["Today’s appointments", "12", "2 awaiting confirmation"],
-          ["Room utilization", "78%", "4 rooms active"],
-          ["Outstanding balance", "$1,240", "8 open invoices"],
-          ["Waitlist matches", "3", "Review expiring offers"],
-        ].map(([label, value, note]) => (
-          <Grid size={{ xs: 12, sm: 6, xl: 3 }} key={label}>
-            <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
-              <Typography color="text.secondary" variant="body2">{label}</Typography>
-              <Typography variant="h4" mt={1}>{value}</Typography>
-              <Typography color="primary.main" variant="body2">{note}</Typography>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
-      <Paper variant="outlined" sx={{ mt: 3, p: { xs: 2, md: 3 } }}>
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} spacing={2}>
-          <Box>
-            <Typography variant="h6">Tuesday schedule</Typography>
-            <Typography variant="body2" color="text.secondary">Conflicts, forms and appointment changes are surfaced here.</Typography>
-          </Box>
-          <Button variant="contained" startIcon={<CalendarDays size={18} />}>Create appointment</Button>
-        </Stack>
-        <Divider sx={{ my: 2 }} />
-        {[
-          "09:00 · Maya Chen · Therapeutic Massage · Room Cedar",
-          "10:15 · Olivia Martin · Initial Nutrition Consult · Room Birch",
-          "13:15 · James Patel · Naturopathic Follow-up · Room Cedar",
-        ].map((appointment, index) => (
-          <Stack key={appointment} direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} sx={{ py: 1.2 }}>
-            <Chip label={index === 1 ? "Forms due" : "Confirmed"} color={index === 1 ? "warning" : "success"} size="small" />
-            <Typography>{appointment}</Typography>
-          </Stack>
-        ))}
-      </Paper>
-    </>
+    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>Your workspace is ready.</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>Clinic catalogue and staff administration are configured here. Live schedules, appointment totals, room utilization, balances, and waitlist metrics will appear when Phase 4 connects the scheduling engine—no demonstration data is shown.</Typography></Paper>
   );
 }
 
@@ -198,6 +163,8 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "services" && <ServiceAdmin />}
         {page === "services" && <Box mt={3}><ServiceAssignments /></Box>}
         {page === "business" && <BusinessSettings />}
+        {page === "business" && <CatalogueSettings />}
+        {page === "staff" && <StaffAdmin />}
         {page === "profile" && <ProfileSettings />}
       </Box>
     </Box>

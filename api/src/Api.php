@@ -65,7 +65,11 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/room-capabilities','roomCapabilities');
                 $routes->addRoute('POST','/api/v1/admin/room-capabilities','createRoomCapability');
                 $routes->addRoute('PUT','/api/v1/admin/room-capability-assignments','updateRoomCapabilityAssignments');
+                $routes->addRoute('GET','/api/v1/admin/room-practitioner-restrictions','roomPractitionerRestrictions');
+                $routes->addRoute('PUT','/api/v1/admin/rooms/{id:\\d+}/practitioners','updateRoomPractitioners');
                 $routes->addRoute('POST','/api/v1/admin/staff','createStaff');
+                $routes->addRoute('GET','/api/v1/admin/staff','adminStaff');
+                $routes->addRoute('PATCH','/api/v1/admin/staff/{id:\\d+}','updateStaff');
                 $routes->addRoute('POST','/api/v1/admin/practitioners','createPractitioner');
                 $routes->addRoute('GET','/api/v1/admin/practitioners','adminPractitioners');
                 $routes->addRoute('POST','/api/v1/admin/practitioners/onboard','onboardPractitioner');
@@ -77,6 +81,10 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/admin/services/{id:\\d+}/assignments','updateServiceAssignments');
                 $routes->addRoute('POST','/api/v1/admin/availability-rules','createAvailability');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
+                $routes->addRoute('GET','/api/v1/admin/catalogue-settings','catalogueSettings');
+                $routes->addRoute('POST','/api/v1/admin/service-categories','createServiceCategory');
+                $routes->addRoute('POST','/api/v1/admin/taxes','createTax');
+                $routes->addRoute('PATCH','/api/v1/admin/booking-settings','updateBookingSettings');
             });
             $route=$dispatcher->dispatch($request->method,$request->path);
             if($route[0]===Dispatcher::NOT_FOUND)throw new ApiException(404,'not_found','Route not found.');
@@ -107,7 +115,11 @@ final class Api
                 'roomCapabilities'=>$this->admin->roomCapabilities($this->user($request)),
                 'createRoomCapability'=>$this->admin->createRoomCapability($this->user($request),$request->body,$request->correlationId),
                 'updateRoomCapabilityAssignments'=>$this->admin->updateRoomCapabilityAssignments($this->user($request),$request->body,$request->correlationId),
+                'roomPractitionerRestrictions'=>$this->admin->roomPractitionerRestrictions($this->user($request)),
+                'updateRoomPractitioners'=>$this->admin->updateRoomPractitioners($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createStaff'=>$this->admin->createStaff($this->user($request),$request->body,$request->correlationId),
+                'adminStaff'=>$this->admin->staff($this->user($request)),
+                'updateStaff'=>$this->admin->updateStaff($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createPractitioner'=>$this->admin->createPractitioner($this->user($request),$request->body,$request->correlationId),
                 'adminPractitioners'=>$this->admin->practitioners($this->user($request)),
                 'onboardPractitioner'=>$this->admin->onboardPractitioner($this->user($request),$request->body,$request->correlationId),
@@ -119,6 +131,10 @@ final class Api
                 'updateServiceAssignments'=>$this->admin->updateServiceAssignments($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createAvailability'=>$this->admin->createAvailability($this->user($request),$request->body,$request->correlationId),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
+                'catalogueSettings'=>$this->admin->catalogueSettings($this->user($request)),
+                'createServiceCategory'=>$this->admin->createServiceCategory($this->user($request),$request->body,$request->correlationId),
+                'createTax'=>$this->admin->createTax($this->user($request),$request->body,$request->correlationId),
+                'updateBookingSettings'=>$this->admin->updateBookingSettings($this->user($request),$request->body,$request->correlationId),
                 default=>throw new ApiException(500,'route_handler_missing','Route handler is not configured.'),
             };
             $created=str_starts_with((string)$route[1],'create');

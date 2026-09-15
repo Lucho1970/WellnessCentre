@@ -14,14 +14,14 @@ The initial market is a single Canadian wellness centre with support for future 
 
 ## 3 Current implementation baseline
 
-The repository currently contains a working foundation rather than a complete product.
+The repository contains a deployed foundation and completed Phase 3 catalogue/administration increment, but not yet a complete scheduling product.
 
 | Area | Current state | Remaining work |
 |---|---|---|
-| React frontend | Responsive Material UI prototype with public booking and portal mock-ups | Routing, real API integration, authentication, role-specific screens, forms, error/loading states, accessibility verification, and tests |
-| PHP API foundation | Versioned front controller, structured responses, correlation IDs, CORS, Entra token validation, role context, catalogue, availability, appointment list/create, and initial admin creation endpoints | Most domain endpoints, policy enforcement, workers, rate limiting, production hardening, tests, and deployment configuration |
-| MySQL schema | Broad normalized schema covering identity, scheduling, rooms, forms, messaging, billing, accounting, privacy, and audit | Numbered migrations, production database identity, backup/restore validation, retention jobs, and migration automation |
-| Authentication | Initial Microsoft Entra access-token validation for staff-style identities | Final app registrations, client identity strategy, consent flows, role administration, token integration in React, and end-to-end authorization tests |
+| React frontend | Responsive Material UI public catalogue and role-aware staff portal with business, staff, practitioner, location, room, capability, service, assignment, and profile administration | Phase 4 calendar/booking screens, remaining domain portals, accessibility verification, tests, and bundle splitting |
+| PHP API foundation | Deployed versioned API with Entra authentication, local authorization, audited Phase 3 administration, public catalogue, initial availability, and appointment endpoints | Scheduling policy completion, client identity, remaining domain endpoints, workers, rate limiting, production hardening, and tests |
+| MySQL schema | Broad normalized schema plus numbered avatar, service-delivery, and catalogue-settings migrations | Migration runner, production database identity, backup/restore validation, retention jobs, and later-phase migrations |
+| Authentication | Working Microsoft Entra staff sign-in with app-role/local-role intersection and Super Admin role management | Client identity, consent flows, broader isolation tests, and production-tenant configuration |
 | Notifications | Durable notification records exist in the data model | Email provider, templates, rendering, worker, retries, delivery webhooks, and monitoring |
 | Billing | Tables exist | Invoice lifecycle, taxes, payments, refunds, receipts, reconciliation, UI, and tests |
 | Deployment | No repeatable infrastructure or deployment workflow | Hosting decision, network configuration, secrets, environments, CI/CD, monitoring, and rollback process |
@@ -598,6 +598,8 @@ Exit criteria:
 
 ### Phase 3 Catalogue and administration
 
+Implementation status: **complete in source as of the Phase 3 completion release**. Production readiness remains governed by Phase 10.
+
 Build:
 
 - Complete CRUD and archival for locations, practitioner profiles, services, duration choices, rooms, capabilities, restrictions, pricing, taxes, and core policies.
@@ -800,16 +802,4 @@ These decisions should be made at or before the phase that depends on them:
 
 ## 19 Recommended next build piece
 
-Begin with **Phase 1 Deployable secure API foundation**. It creates a safe development API that the frontend can consume while preserving the correct public-API/private-database architecture.
-
-The first implementation task should include:
-
-1. PHP runtime extension declarations.
-2. Configurable verified MySQL TLS.
-3. Minimal public health output.
-4. Initial automated API tests and continuous integration.
-5. Numbered database migration support.
-6. Azure App Service deployment configuration with `api/public` as the document root.
-7. Secure environment configuration and private database connectivity.
-
-After that foundation is deployed and verified, proceed to Phase 2 identity and authorization before connecting real client or staff workflows.
+Proceed to **Phase 4 Scheduling and booking engine**, beginning with practitioner availability administration: recurring working hours, location-specific rules, one-time overrides, time off, and role-scoped calendar views. Then connect those rules to conflict-safe slot generation before enabling real appointment confirmation.
