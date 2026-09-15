@@ -86,6 +86,12 @@ See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role as
 
 ## Production notes
 
+### Availability checkpoint (2026-09-15)
+
+Availability results include `available_room_ids` for services requiring rooms. Search merges recurring hours and available overrides; time off, blocked overrides, imported busy periods, and appointments at any location take precedence. Service buffers must fit working hours. Room checks include capabilities, practitioner restrictions, and turnover on both existing and proposed bookings. Recurrence weeks are anchored to Monday of the rule's valid-from week.
+
+Run `php tests/schedule-intervals.php` for interval and daylight-saving checks. Before deployment acceptance, verify extra openings, time off, room shortages, and cross-location appointments against MySQL. Booking-time revalidation and concurrency coverage remain Phase 4 work. No schema migration is needed for this checkpoint.
+
 - Use a restricted database account rather than the MySQL server administrator.
 - Keep `.env`, `vendor`, and runtime cache files outside source control.
 - Serve only the `public` directory.

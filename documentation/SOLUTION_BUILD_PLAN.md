@@ -617,7 +617,7 @@ Exit criteria:
 
 ### Phase 4 Scheduling and booking engine
 
-Progress: recurring practitioner/location working hours plus one-time availability overrides and time off are implemented in the API and staff administration portal. Schedule records are clinic-scoped, practitioner self-service is restricted to the signed-in practitioner's records, and one-time local times are normalized to UTC using the selected location timezone. Conflict-safe slot generation is the next implementation unit.
+Progress: recurring practitioner/location working hours plus one-time availability overrides and time off are implemented in the API and Super Admin portal. The scheduling API restricts practitioner access to their own records; practitioner portal access still needs to be connected. Availability search now includes extra openings, recurrence intervals, merged hours, service buffers and horizons, cross-location practitioner conflicts, and eligible rooms with capabilities, restrictions, and turnover. These changes require deployed MySQL verification. Next: enforce the same rules during booking, add concurrency tests, and connect the booking interface. Phase 4 remains in progress.
 
 Build:
 
