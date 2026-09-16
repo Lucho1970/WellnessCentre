@@ -55,6 +55,18 @@ Vite's normal environment precedence is preserved: builds read `.env.production`
 
 ## Deploy to a portal subdomain
 
+**16 September hosting correction:** production portal builds now always use
+`/api/v1` on the portal origin. Upload the two files from
+`api/deploy/netfirms/public` into `/public_html/wellness-portal/api/`, including
+`.htaccess`. Both entry points load the same private `/wellness-api`; no vendor,
+environment, database or application-source copy belongs in the portal root.
+The release builder includes these two files inside `wellness-portal.zip`.
+`VITE_API_BASE_URL` still configures the public build and local development;
+production portal builds deliberately override it. Direct `dist/portal` uploads
+must also include the entry-point files. Vite preview itself does not execute PHP.
+This avoids cross-origin preflight for deployed portal requests; it does not fix
+Netfirms OPTIONS handling for cross-origin local development.
+
 The owner confirmed `https://portal.copihue.ca/` mapped to `/public_html/wellness-portal`, and `https://wellness.copihue.ca/` mapped to `/public_html/wellness`. The hostnames are configured in `Frontend/.env.production`. These are owner-provided mappings; live DNS/routing and HTTPS readiness still require verification. Do not upload a `/portal/`-based fallback build unchanged to a subdomain root.
 
 1. Verify that `portal.copihue.ca` serves `/public_html/wellness-portal` and has a valid HTTPS certificate. This is a sibling of `/public_html/wellness`, not a directory inside it. Do not point the subdomain at the private PHP application directory.
@@ -68,8 +80,8 @@ The owner confirmed `https://portal.copihue.ca/` mapped to `/public_html/wellnes
 
    Retain the existing three Entra IDs. By default the auth callback/logout destination is the portal origin plus its build base, so a subdomain-root build returns to `https://portal.copihue.ca/`. `VITE_ENTRA_REDIRECT_URI` is an optional exact override on that same portal origin/base; it must not point back to the public site. No client secret belongs in the frontend.
 3. In the **existing staff SPA app registration**, add the exact HTTPS portal callback under the **Single-page application** platform. Keep authorization-code/PKCE via MSAL; do not enable implicit grant or add a client secret. Keep API audience, scope, role assignments and database identity links unchanged. Retain old callbacks during a controlled rollback window, then remove obsolete ones after acceptance. Existing public-site browser sessions do not transfer to the new origin: expect staff to sign in again.
-4. On the private PHP API `.env`, add the portal **origin** (scheme + hostname, no path/trailing slash) to the comma-separated `CORS_ALLOWED_ORIGINS`, preserving the public origin and only the other environments you intentionally permit. For example, `https://wellness.copihue.ca,https://portal.copihue.ca`. Do not use `*`. Verify preflight allows the existing Authorization/Content-Type headers and methods. The API stays on the existing website host; no second PHP copy or database is needed. Do not change `APP_URL` to the portal merely to permit CORS; it is not the origin allowlist.
-5. Run `npm run build` in `Frontend`. Upload **contents** of `dist/public` to `/public_html/wellness` and **contents** of `dist/portal` to `/public_html/wellness-portal`. Each destination should contain its own `index.html`, `assets/` and `.htaccess` directly, not an extra `public/` or `portal/` wrapper directory. Include each `.htaccess` for deep-link refreshes. Preserve hosting-required directives when updating `.htaccess`. Never overwrite/delete `/public_html/wellness/api/`, the private API `.env`, vendor files or runtime uploads during this frontend deployment. Do not copy the PHP API into the portal folder: both sites use the existing API on the wellness host.
+4. Preserve the private API `.env`, including its explicit CORS allowlist. No configuration change is required for the same-origin portal entry point. Do not use `*` or change `APP_URL` to the portal. Cross-origin development still requires working hosting preflight handling; deployed portal requests no longer depend on that.
+5. Run `npm run build` in `Frontend`. Upload **contents** of `dist/public` to `/public_html/wellness` and **contents** of `dist/portal` to `/public_html/wellness-portal`. Each destination should contain its own `index.html`, `assets/` and `.htaccess` directly, not an extra wrapper directory. Also install the portal API entry files described above, or use the deployment ZIP which includes them. Preserve hosting-required directives when updating `.htaccess`. Never overwrite/delete the existing website API, private `.env`, vendor or runtime uploads during this frontend deployment.
 6. Test the checks below before considering the split deployed. No SQL script or data seed is needed.
 
 The PHP API itself is unchanged by this feature; only the example CORS configuration includes the new local development origin. Actual server configuration must be updated by the operator.

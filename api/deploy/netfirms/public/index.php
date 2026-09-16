@@ -8,6 +8,7 @@ use Wellness\Database;
 // Netfirms layout:
 //   /wellness-api                 (private application)
 //   /public_html/wellness/api     (this public directory)
+// or /public_html/wellness-portal/api (same depth, same private application)
 $root = dirname(__DIR__, 3) . '/wellness-api';
 
 if (!is_file($root . '/vendor/autoload.php')) {

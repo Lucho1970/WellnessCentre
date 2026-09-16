@@ -17,9 +17,13 @@ test('built public and portal deep links load independently, including base path
   await page.goto(`http://localhost:5193${info.config.metadata.publicBase}contact`);
   await expect(page.getByRole('heading', { name: 'Contact Build Smoke Clinic' })).toBeVisible();
   await page.reload(); await expect(page.getByRole('heading', { name: 'Contact Build Smoke Clinic' })).toBeVisible();
+  const portalRequests: string[] = [];
+  page.on('request', request => { if (request.url().includes('/api/v1/')) portalRequests.push(request.url()); });
   await page.goto(`http://localhost:5194${info.config.metadata.portalBase}admin/clients`);
   await expect(page.getByRole('heading', { name: 'Staff portal', exact: true })).toBeVisible();
   await page.reload(); await expect(page.getByRole('button', { name: 'Sign in with Microsoft', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add client' })).toHaveCount(0);
+  expect(portalRequests.length).toBeGreaterThan(0);
+  expect(portalRequests.every(url => url.startsWith('http://localhost:5194/api/v1/'))).toBe(true);
   expect(errors).toEqual([]);
 });

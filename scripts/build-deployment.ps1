@@ -28,7 +28,11 @@ function Write-DeploymentZip([string]$Source,[string]$Target) {
     } finally { $archive.Dispose() }
 }
 Write-DeploymentZip (Join-Path $repo 'Frontend/dist/public') (Join-Path $destination 'wellness-public.zip')
-Write-DeploymentZip (Join-Path $repo 'Frontend/dist/portal') (Join-Path $destination 'wellness-portal.zip')
+$portalStage = Join-Path $stage 'portal'
+Copy-Item -LiteralPath (Join-Path $repo 'Frontend/dist/portal') -Destination $portalStage -Recurse
+# Both public entry points resolve to the same private application; no backend copy.
+Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $portalStage 'api') -Recurse
+Write-DeploymentZip $portalStage (Join-Path $destination 'wellness-portal.zip')
 Write-DeploymentZip $private (Join-Path $destination 'wellness-api-private.zip')
 Write-DeploymentZip (Join-Path $repo 'api/deploy/netfirms/public') (Join-Path $destination 'wellness-api-public.zip')
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/migrations') -Destination (Join-Path $destination 'sql-updates') -Recurse
