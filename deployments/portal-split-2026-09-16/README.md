@@ -1,5 +1,7 @@
 # Complete public / portal deployment — 16 September 2026
 
+> Follow-up correction: after this base release, apply the [one-file preflight response patch](../preflight-fix-2026-09-16/README.md). These original ZIPs retain their published checksums and do not include that correction.
+
 Built from source commit `a078deb` on `codex/public-portal-separation`. Includes the current public website, separate staff portal and complete PHP API. This is a development deployment, not a declaration that all planned production features are ready.
 
 Download the ZIPs from this branch using GitHub's **Download raw file** option. Extract their contents directly into the destinations below, not into extra ZIP-named wrapper folders. `manifest.json` records source, SHA-256 hashes, sizes and entry counts.
