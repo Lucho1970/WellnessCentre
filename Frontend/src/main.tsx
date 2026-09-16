@@ -1,19 +1,8 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
-import App from './App';
 import './styles.css';
-import { StaffAuthProvider, msalInstance } from './auth/AuthProvider';
-import { ClinicConfigProvider } from './config/ClinicConfigProvider';
 
-const theme = createTheme({ palette: { primary: { main: '#176b62' }, secondary: { main: '#d8754c' }, background: { default: '#f7faf8', paper: '#fff' } }, typography: { fontFamily: 'Inter, system-ui, sans-serif', h1: { fontWeight: 750 }, h2: { fontWeight: 700 } }, shape: { borderRadius: 14 } });
-async function bootstrap() {
-  await msalInstance.initialize();
-  const redirectResult = await msalInstance.handleRedirectPromise();
-  if (redirectResult?.account) msalInstance.setActiveAccount(redirectResult.account);
-  else if (msalInstance.getAllAccounts()[0]) msalInstance.setActiveAccount(msalInstance.getAllAccounts()[0]);
-  createRoot(document.getElementById('root')!).render(<React.StrictMode><StaffAuthProvider><ClinicConfigProvider><ThemeProvider theme={theme}><CssBaseline/><BrowserRouter><App/></BrowserRouter></ThemeProvider></ClinicConfigProvider></StaffAuthProvider></React.StrictMode>);
-}
-
-void bootstrap();
+// Compile-time selection keeps workforce authentication out of the public build.
+const start = __APP_SURFACE__ === 'portal' ? import('./portal/bootstrap') : import('./public/bootstrap');
+void start.then(module => module.bootstrap()).catch(() => {
+  const root = document.getElementById('root');
+  if (root) root.textContent = 'Unable to start the application. Please reload the page. If this continues, contact the clinic.';
+});

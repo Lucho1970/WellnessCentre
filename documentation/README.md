@@ -9,6 +9,8 @@ Start with these two authoritative documents:
 
 ## Supporting records and historical sources
 
+- [Public/portal separation checkpoint](PORTAL_SEPARATION.md): build outputs, routes, preserved permissions, subdomain deployment steps and acceptance checks. No SQL upgrade for this change.
+
 - [Staff booking checkpoint](STAFF_BOOKING.md), [Client management](CLIENT_MANAGEMENT.md) and [Booking validation tests](BOOKING_VALIDATION_TESTS.md) describe specific implementation/test checkpoints; they do not establish production readiness.
 - [API setup](../api/README.md) and [Entra setup](../ENTRA_SETUP.md) remain component runbooks. Follow the master documents if a cross-system design statement conflicts.
 - [Original product requirements](wellness-centre-app-requirements.docx), [former solution plan](SOLUTION_BUILD_PLAN.md), [site restructuring proposal](SITE_STRUCTURE_REQUIREMENTS.md) and [former database plan](../api/DATABASE_PLAN.md) are preserved historical inputs, superseded as master specifications.

@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# API errors must not become successful SPA HTML responses.
+RewriteRule ^api(?:/|$) - [L]
+
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]

@@ -24,7 +24,7 @@ Portal (client / practitioner / admin layouts) ── HTTPS ── PHP /api/v1 A
 
 The browser calls an internet-accessible API; “internal API” means first-party use, not private reachability. Database network isolation is a separate control. Authorization belongs at the API and resource layer, never in a shared frontend secret.
 
-**Current:** `Frontend/src/App.tsx` combines marketing, public booking and staff portal; MSAL initializes globally; portal selections use query/hash navigation. React Router is available but separate role route trees are not implemented. PHP lives in `api/`, with private application/dependency files and a public front controller. Staff booking at `57d8212` is source work that was not yet on main at baseline review.
+**Current source after R1:** `Frontend/src/App.tsx` is public-only. Separate public/portal bootstrap modules share providers/theme, while only the portal initializes MSAL. Explicit Vite configs emit `dist/public` and `dist/portal`; real role-filtered routes replace query/hash navigation, with legacy-link compatibility. Existing domain components remain in place and load on demand. PHP still lives in `api/`, with private application/dependency files and a public front controller. Staff-booking source was merged into main before this work. [Portal separation checkpoint](PORTAL_SEPARATION.md) records deployment and acceptance still required.
 
 **Target repository:** Keep `Frontend/` and `api/`; extract frontend areas without a framework rewrite:
 
@@ -254,6 +254,6 @@ Stage gates follow R0–R9 in Master Requirements. Keep deployment acceptance se
 | Database remains schedule authority | Retained; all conflicting writers must join lock protocol |
 | Existing phases are not erased | Mapped to R stages; code-complete and production-accepted remain distinct |
 
-**Next slice: R1 portal foundations.** Extract shared theme/business configuration/account menu; create public and portal entry points/layouts and route guards; move current staff/client-management/catalogue/booking screens without changing domain behavior; remove misleading local-only booking success; test role-filtered deep links and existing workflows. Keep customer auth as a separate proof/implementation branch after these foundations. Record migrations as “none” if the extraction genuinely needs none; do not run a database update merely because the frontend changed.
+**R1 foundations are implemented in source; hosted acceptance is next.** Configure the chosen portal subdomain, callback and CORS; build/upload both surfaces and verify existing staff workflows. This extraction requires no SQL migration. Keep customer auth as a separate R2 proof/implementation branch; the client route is currently an explicit unavailable-information page, not an authenticated customer portal.
 
 Before implementing R2–R3, resolve the remaining decisions in Master Requirements and the provider/account-claim/session proof. Provider sequencing and separate role permissions are already confirmed. Before each later domain, refine its detailed endpoint/data/test design against stable requirement IDs. This document owns cross-system decisions; module runbooks can supply procedural details without becoming a third master specification.

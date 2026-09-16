@@ -1,1 +1,4 @@
 html { scroll-behavior: smooth; } body { margin: 0; } .hero { background: radial-gradient(circle at 80% 12%, #d8eee6 0, transparent 32%), linear-gradient(120deg, #f7faf8 0%, #f3f7f3 100%); } svg { vertical-align: middle; } 
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 2000; padding: 12px; background: white; color: #123b36; }
+.skip-link:focus { top: 8px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

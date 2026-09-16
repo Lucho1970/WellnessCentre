@@ -27,13 +27,14 @@ function Write-DeploymentZip([string]$Source,[string]$Target) {
         }
     } finally { $archive.Dispose() }
 }
-Write-DeploymentZip (Join-Path $repo 'Frontend/dist') (Join-Path $destination 'wellness-frontend.zip')
+Write-DeploymentZip (Join-Path $repo 'Frontend/dist/public') (Join-Path $destination 'wellness-public.zip')
+Write-DeploymentZip (Join-Path $repo 'Frontend/dist/portal') (Join-Path $destination 'wellness-portal.zip')
 Write-DeploymentZip $private (Join-Path $destination 'wellness-api-private.zip')
 Write-DeploymentZip (Join-Path $repo 'api/deploy/netfirms/public') (Join-Path $destination 'wellness-api-public.zip')
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/migrations') -Destination (Join-Path $destination 'sql-updates') -Recurse
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
-$manifest = [ordered]@{ source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); target='https://wellness.copihue.ca'; archives=@() }
+$manifest = [ordered]@{ source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-and-portal'; deployment_guide='documentation/PORTAL_SEPARATION.md'; archives=@() }
 foreach ($file in Get-ChildItem -LiteralPath $destination -Filter '*.zip') {
     $archive = [System.IO.Compression.ZipFile]::OpenRead($file.FullName)
     try {

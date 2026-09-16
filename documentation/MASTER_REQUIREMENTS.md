@@ -129,6 +129,8 @@ Requirement identifiers below are stable references for implementation and tests
 
 ## 12. Verified source baseline versus remaining work
 
+**R1 source update (16 September 2026):** The public/portal separation is now implemented on `codex/public-portal-separation`: separate builds, role-filtered routes, preserved staff screens, legacy links and truthful public booking handoff. See [the checkpoint](PORTAL_SEPARATION.md) for tests and deployment steps. Hosted acceptance and customer identity remain pending. The table below preserves the pre-R1 baseline for traceability.
+
 Baseline: source reviewed on 16 September 2026, combining `origin/main` at `9b5fa3a` and staff-booking work at `57d8212`. This documentation branch includes both histories. Source status is not deployment verification.
 
 | Area | Source baseline | Still required |

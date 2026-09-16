@@ -6,8 +6,12 @@ Frontend/.install.log
 Frontend/.install.error.log
 Frontend/*.interrupted
 Frontend/*.tsbuildinfo
+Frontend/test-results/
+Frontend/playwright-report/
 Frontend/vite.config.js
 Frontend/vite.config.d.ts
+Frontend/vite.portal.config.js
+Frontend/vite.portal.config.d.ts
 Frontend/.npm-install.log
 Frontend/.npm-install.error.log
 

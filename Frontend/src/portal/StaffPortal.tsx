@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { legacyPage, pageAt, pagePath, pagesFor, workspacesFor, type PortalPage, type Workspace } from './access';
+import { useStaffAuth } from '../auth/AuthProvider';
 import {
   Box,
+  Alert,
   Button,
   Divider,
   Drawer,
@@ -29,47 +33,42 @@ import {
   CalendarRange,
   X,
 } from "lucide-react";
-import { BusinessSettings } from "../admin/BusinessSettings";
-import { PractitionerAdmin } from "../admin/PractitionerAdmin";
-import { LocationAdmin } from "../admin/LocationAdmin";
-import { ProfileSettings } from "../profile/ProfileSettings";
-import { RoomAdmin } from "../admin/RoomAdmin";
-import { RoomCapabilities } from "../admin/RoomCapabilities";
-import { ServiceAdmin } from "../admin/ServiceAdmin";
-import { ServiceAssignments } from "../admin/ServiceAssignments";
-import { CatalogueSettings } from "../admin/CatalogueSettings";
-import { StaffAdmin } from "../admin/StaffAdmin";
-import { AvailabilityAdmin } from "../scheduling/AvailabilityAdmin";
-import { ScheduleExceptions } from "../scheduling/ScheduleExceptions";
-import { ClientManagement } from "../clients/ClientManagement";
-import { StaffAppointments } from "../booking/StaffAppointments";
-
-type PortalPage = "dashboard" | "appointments" | "clients" | "calendar" | "business" | "practitioners" | "staff" | "locations" | "rooms" | "services" | "profile";
+const BusinessSettings = lazy(() => import('../admin/BusinessSettings').then(module => ({ default: module.BusinessSettings })));
+const PractitionerAdmin = lazy(() => import('../admin/PractitionerAdmin').then(module => ({ default: module.PractitionerAdmin })));
+const LocationAdmin = lazy(() => import('../admin/LocationAdmin').then(module => ({ default: module.LocationAdmin })));
+const ProfileSettings = lazy(() => import('../profile/ProfileSettings').then(module => ({ default: module.ProfileSettings })));
+const RoomAdmin = lazy(() => import('../admin/RoomAdmin').then(module => ({ default: module.RoomAdmin })));
+const RoomCapabilities = lazy(() => import('../admin/RoomCapabilities').then(module => ({ default: module.RoomCapabilities })));
+const ServiceAdmin = lazy(() => import('../admin/ServiceAdmin').then(module => ({ default: module.ServiceAdmin })));
+const ServiceAssignments = lazy(() => import('../admin/ServiceAssignments').then(module => ({ default: module.ServiceAssignments })));
+const CatalogueSettings = lazy(() => import('../admin/CatalogueSettings').then(module => ({ default: module.CatalogueSettings })));
+const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ default: module.StaffAdmin })));
+const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
+const ScheduleExceptions = lazy(() => import('../scheduling/ScheduleExceptions').then(module => ({ default: module.ScheduleExceptions })));
+const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
+const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 
 type NavigationItem = {
   id: PortalPage;
   label: string;
   description: string;
   icon: ReactNode;
-  superAdminOnly?: boolean;
-  roles?: string[];
 };
 
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
-  { id: "appointments", label: "Appointments", description: "Bookings and scheduled visits", icon: <CalendarDays size={20} />, roles: ['super_admin', 'clinic_admin', 'reception', 'practitioner'] },
-  { id: "clients", label: "Clients", description: "Contact details and client records", icon: <Users size={20} />, roles: ['super_admin', 'clinic_admin', 'reception'] },
-  { id: "calendar", label: "Availability", description: "Working hours and schedules", icon: <CalendarRange size={20} />, superAdminOnly: true },
+  { id: "appointments", label: "Appointments", description: "Bookings and scheduled visits", icon: <CalendarDays size={20} /> },
+  { id: "clients", label: "Clients", description: "Contact details and client records", icon: <Users size={20} /> },
+  { id: "calendar", label: "Availability", description: "Working hours and schedules", icon: <CalendarRange size={20} /> },
   {
     id: "locations",
     label: "Locations",
     description: "Addresses and booking access",
     icon: <MapPin size={20} />,
-    superAdminOnly: true,
   },
-  { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} />, superAdminOnly: true },
-  { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} />, superAdminOnly: true },
-  { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} />, superAdminOnly: true },
+  { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} /> },
+  { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} /> },
+  { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
   {
     id: "profile",
     label: "My profile",
@@ -81,21 +80,14 @@ const navigation: NavigationItem[] = [
     label: "Practitioners",
     description: "Staff access and profiles",
     icon: <Stethoscope size={20} />,
-    superAdminOnly: true,
   },
   {
     id: "business",
     label: "Business settings",
     description: "Clinic identity and defaults",
     icon: <Building2 size={20} />,
-    superAdminOnly: true,
   },
 ];
-
-function pageFromUrl(allowedPages: PortalPage[]): PortalPage {
-  const requested = new URLSearchParams(window.location.search).get("portal") as PortalPage | null;
-  return requested && allowedPages.includes(requested) ? requested : "dashboard";
-}
 
 function Dashboard() {
   return (
@@ -107,42 +99,44 @@ export function StaffPortal({ roles }: { roles: string[] }) {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up("md"));
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const allowedNavigation = useMemo(
-    () => navigation.filter((item) => (!item.superAdminOnly || roles.includes("super_admin")) && (!item.roles || item.roles.some(role => roles.includes(role)))),
-    [roles],
-  );
-  const allowedPages = useMemo(() => allowedNavigation.map((item) => item.id), [allowedNavigation]);
-  const [page, setPage] = useState<PortalPage>(() => pageFromUrl(allowedPages));
-
+  const location = useLocation();
+  const { account } = useStaffAuth();
+  const workspaces = workspacesFor(roles);
+  const preferenceKey = `wellness.workspace.${account?.homeAccountId ?? 'staff'}`;
+  let remembered: string | null = null;
+  try { remembered = sessionStorage.getItem(preferenceKey); } catch { /* Storage may be disabled. */ }
+  const defaultWorkspace = workspaces.find(item => item === remembered) ?? workspaces[0];
+  const workspace = location.pathname.split('/')[1] as Workspace;
+  const allowedPages = pagesFor(roles, workspace);
+  const allowedNavigation = navigation.filter(item => allowedPages.includes(item.id));
+  const page = pageAt(location.pathname, workspace);
+  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
   useEffect(() => {
-    if (!allowedPages.includes(page)) setPage("dashboard");
-  }, [allowedPages, page]);
-
-  useEffect(()=>{const navigate=(event:Event)=>{const requested=(event as CustomEvent<string>).detail as PortalPage;if(allowedPages.includes(requested))setPage(requested);};window.addEventListener('portal-navigate',navigate);return()=>window.removeEventListener('portal-navigate',navigate);},[allowedPages]);
-
-  const selectPage = (nextPage: PortalPage) => {
-    setPage(nextPage);
-    setDrawerOpen(false);
-    const url = new URL(window.location.href);
-    if (nextPage === "dashboard") url.searchParams.delete("portal");
-    else url.searchParams.set("portal", nextPage);
-    window.history.replaceState({}, "", `${url.pathname}${url.search}#portal`);
-  };
-
-  const current = allowedNavigation.find((item) => item.id === page) ?? allowedNavigation[0];
+    if (workspacesFor(roles).includes(workspace)) {
+      try { sessionStorage.setItem(preferenceKey, workspace); } catch { /* Preference only, never authority. */ }
+    }
+  }, [roles, workspace, preferenceKey]);
+  if (!defaultWorkspace) return <Alert severity="warning">This account has no available staff workspace. Please contact the clinic administrator.</Alert>;
+  if (['/', '/login', '/profile'].includes(location.pathname)) {
+    const requested = location.pathname === '/profile' ? 'profile' : legacyPage(new URLSearchParams(location.search).get('portal')) ?? 'dashboard';
+    return <Navigate replace to={pagePath(defaultWorkspace, requested)} />;
+  }
+  if (!page || !allowedPages.includes(page)) return <Paper variant="outlined" sx={{ p: 4 }}><Alert severity="warning">{page ? 'You do not have permission to access this page.' : 'This portal page was not found.'}</Alert><Button component={Link} to={pagePath(defaultWorkspace, 'dashboard')} sx={{ mt: 2 }}>Return to your workspace</Button></Paper>;
+  const current = allowedNavigation.find(item => item.id === page)!;
   const navigationList = (
     <Box sx={{ width: 280, p: 2 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" px={1} py={1.5}>
         <Box>
-          <Typography variant="overline" color="primary.main" fontWeight={800}>Staff workspace</Typography>
+          <Typography variant="overline" color="primary.main" fontWeight={800}>{workspace === 'practitioner' ? 'Practitioner workspace' : 'Operations workspace'}</Typography>
           <Typography variant="h6">Portal menu</Typography>
         </Box>
         {!desktop && <IconButton aria-label="Close portal menu" onClick={() => setDrawerOpen(false)}><X size={20} /></IconButton>}
       </Stack>
       <Divider sx={{ mb: 1.5 }} />
+      {workspaces.length > 1 && <Stack spacing={1} mb={2} aria-label="Switch workspace">{workspaces.map(item => <Button key={item} component={Link} to={pagePath(item, 'dashboard')} variant={workspace === item ? 'contained' : 'outlined'}>{item === 'admin' ? 'Operations' : 'Practitioner'}</Button>)}</Stack>}
       <List aria-label="Staff portal navigation">
         {allowedNavigation.map((item) => (
-          <ListItemButton key={item.id} selected={page === item.id} onClick={() => selectPage(item.id)} sx={{ borderRadius: 2, mb: 0.75, alignItems: "flex-start" }}>
+          <ListItemButton component={Link} to={pagePath(workspace, item.id)} aria-current={page === item.id ? 'page' : undefined} key={item.id} selected={page === item.id} sx={{ borderRadius: 2, mb: 0.75, alignItems: "flex-start" }}>
             <ListItemIcon sx={{ minWidth: 40, mt: 0.4, color: page === item.id ? "primary.main" : "text.secondary" }}>{item.icon}</ListItemIcon>
             <ListItemText primary={item.label} secondary={item.description} primaryTypographyProps={{ fontWeight: page === item.id ? 750 : 600 }} />
           </ListItemButton>
@@ -153,20 +147,21 @@ export function StaffPortal({ roles }: { roles: string[] }) {
 
   return (
     <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-      {desktop ? <Paper variant="outlined" component="nav" sx={{ flex: "0 0 280px", position: "sticky", top: 88 }}>{navigationList}</Paper> : (
+      {desktop ? <Paper variant="outlined" component="nav" sx={{ flex: "0 0 280px", position: "sticky", top: 88, maxHeight: 'calc(100dvh - 112px)', overflowY: 'auto' }}>{navigationList}</Paper> : (
         <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>{navigationList}</Drawer>
       )}
-      <Box component="main" sx={{ minWidth: 0, flex: 1 }}>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
         <Stack direction="row" spacing={1.5} alignItems="center" mb={3}>
           {!desktop && <IconButton aria-label="Open portal menu" onClick={() => setDrawerOpen(true)} sx={{ border: "1px solid", borderColor: "divider" }}><Menu /></IconButton>}
           <Box>
-            <Typography variant="h4" component="h2">{current.label}</Typography>
+            <Typography variant="h4" component="h1">{current.label}</Typography>
             <Typography color="text.secondary">{current.description}</Typography>
           </Box>
         </Stack>
+        <Suspense fallback={<Typography role="status">Loading workspace…</Typography>}>
         {page === "dashboard" && <Dashboard />}
         {page === "clients" && <ClientManagement />}
-        {page === "appointments" && <StaffAppointments canBook={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))} />}
+        {page === "appointments" && <StaffAppointments canBook={workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))} />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
@@ -178,6 +173,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "staff" && <StaffAdmin />}
         {page === "calendar" && <><AvailabilityAdmin /><ScheduleExceptions /></>}
         {page === "profile" && <ProfileSettings />}
+        </Suspense>
       </Box>
     </Box>
   );

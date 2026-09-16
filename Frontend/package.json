@@ -4,9 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "lint": "eslint ."
+    "dev": "vite --config vite.config.ts",
+    "dev:portal": "vite --config vite.portal.config.ts",
+    "build": "tsc --noEmit && npm run build:public && npm run build:portal",
+    "build:public": "vite build --config vite.config.ts",
+    "build:portal": "vite build --config vite.portal.config.ts",
+    "preview:public": "vite preview --config vite.config.ts",
+    "preview:portal": "vite preview --config vite.portal.config.ts",
+    "lint": "eslint .",
+    "test": "playwright test",
+    "test:build": "npm run build && playwright test --config playwright.build.config.ts",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.19.0",
@@ -22,6 +30,7 @@
     "react-router-dom": "^7.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

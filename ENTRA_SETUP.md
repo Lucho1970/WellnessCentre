@@ -1,5 +1,7 @@
 # Microsoft Entra staff authentication setup
 
+> Public/portal split: see [the deployment checkpoint](documentation/PORTAL_SEPARATION.md). Staff login now runs on the portal origin, locally `http://localhost:5174/`; register that exact SPA callback and the chosen HTTPS portal URL. Public browsing remains on port 5173 and does not initialize MSAL.
+
 Staff authentication is intentionally separate from future client social sign-in. The SPA is a public client and uses MSAL's authorization-code flow with PKCE; it has no client secret. The PHP API accepts only single-tenant v2 access tokens issued for the API.
 
 ## Values to collect
@@ -36,7 +38,7 @@ Keep the requested access-token version at v2 (the default for a newly exposed A
 
 ## 2. Register the SPA
 
-Create **Wellness Centre Staff Portal (Dev)** as **Accounts in this organizational directory only**. Under **Authentication**, add the **Single-page application** platform with redirect URI `http://localhost:5173`. Add the same URI as the front-channel logout URL if desired. Leave implicit grant disabled; MSAL uses authorization code with PKCE.
+Create **Wellness Centre Staff Portal (Dev)** as **Accounts in this organizational directory only** (or update the existing registration). Under **Authentication**, add the **Single-page application** redirect URI `http://localhost:5174/` and the exact HTTPS portal callback for the deployment. Leave implicit grant disabled; MSAL uses authorization code with PKCE. Do not add a frontend client secret or treat a front-channel logout setting as a replacement for implementing sign-out.
 
 Under **API permissions**, add **My APIs > Wellness Centre API (Dev) > Delegated permissions > access_as_user**, then grant tenant admin consent if your tenant requires it. Do not add a secret.
 
@@ -57,11 +59,14 @@ The database role and Entra app role must match. An active `staff` user with `cl
 
 Copy `Frontend/.env.example` to `Frontend/.env.local` and replace all three GUIDs. Copy `api/.env.example` to `api/.env`, replace the tenant/API GUIDs, and set the local MySQL connection. Both files are ignored by Git.
 
-Run the frontend at `http://localhost:5173` and the API at `http://localhost:8080`:
+Run public browsing at `http://localhost:5173`, the staff portal at `http://localhost:5174` (separate terminal), and the API at `http://localhost:8080` when using a local backend:
 
 ```powershell
 cd Frontend
 npm run dev
+
+# In a second terminal, also from Frontend:
+npm run dev:portal
 
 cd ..\api
 php -S localhost:8080 -t public public/index.php
