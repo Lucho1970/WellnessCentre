@@ -1,6 +1,6 @@
 # Wellness Centre internal API
 
-PHP 8.2+ / MySQL API, deployed on Netfirms with MySQL 5.7 compatibility. It includes Microsoft Entra access-token validation, role enforcement, public catalogue and availability endpoints, production setup endpoints, transactional booking, notification queuing, and audit logging. See [`DATABASE_PLAN.md`](DATABASE_PLAN.md) for the complete data model and delivery sequence.
+PHP 8.2+ / MySQL API, deployed on Netfirms with MySQL 5.7 compatibility. It includes Microsoft Entra access-token validation, role enforcement, public catalogue and availability endpoints, production setup endpoints, transactional booking, notification queuing, and audit logging. See [Master Requirements](../documentation/MASTER_REQUIREMENTS.md) for scope and delivery stages and [System Design](../documentation/SYSTEM_DESIGN.md) for architecture and data design. [`DATABASE_PLAN.md`](DATABASE_PLAN.md) is a historical table reference, not the current master plan.
 
 Create the database and optionally load non-sensitive development data:
 

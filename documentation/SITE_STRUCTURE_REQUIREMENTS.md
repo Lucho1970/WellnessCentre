@@ -1,4 +1,7 @@
 # Wellness Centre Platform
+
+> Historical additive proposal, consolidated on 16 September 2026 into [Master Requirements](MASTER_REQUIREMENTS.md) and [System Design](SYSTEM_DESIGN.md). Those documents retain existing product scope and resolve role, identity and implementation-status differences. Example domains below are not approved deployment settings.
+
 ## Portal and Authentication Restructuring Requirements
 
 **Version:** 1.0  

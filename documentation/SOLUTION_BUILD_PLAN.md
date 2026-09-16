@@ -1,5 +1,7 @@
 # Wellness Centre Solution Build Plan
 
+> Historical source, superseded as the authoritative blueprint on 16 September 2026 by [Master Requirements](MASTER_REQUIREMENTS.md) and [System Design](SYSTEM_DESIGN.md). Preserved for traceability; phase labels, status statements and hosting assumptions below may be outdated. Use the new documents for current scope, design and delivery order.
+
 ## 1 Purpose
 
 This document is the build blueprint for the complete Wellness Centre scheduling and practice operations platform. It converts the product requirements into an architecture, security model, component plan, delivery sequence, and measurable acceptance criteria.

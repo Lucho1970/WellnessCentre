@@ -1,5 +1,7 @@
 # Database and API implementation plan
 
+> Historical schema/design reference, superseded for cross-system decisions by [Master Requirements](../documentation/MASTER_REQUIREMENTS.md) and [System Design](../documentation/SYSTEM_DESIGN.md). Keep using actual schema/migrations and API runbooks for implementation. In particular, the observed Netfirms database is MySQL 5.7.44; the MySQL 8+ assumption below is not the current hosting baseline. Existing tables do not mean all described workflows are implemented.
+
 ## Core design
 
 - MySQL 8.0+ with InnoDB, foreign keys, `utf8mb4`, and integer cents for money.

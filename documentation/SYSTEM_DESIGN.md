@@ -1,0 +1,259 @@
+# Wellness Centre — System Design
+
+Version 1.0 · 16 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
+
+## 1. Authority and design posture
+
+This is the authoritative cross-system design. Requirements and delivery scope live in Master Requirements; setup commands and operational procedures remain in component runbooks. Sections explicitly distinguish **current source** from **target**. Do not assume the deployed environment matches source, or that existing tables imply working modules.
+
+Preserve the working React/TypeScript + PHP + MySQL implementation and Netfirms deployment. Refactor into separate public and portal experiences sharing domain components and one backend. No Azure hosting migration, new paid service or production identity tenant is authorized by this design.
+
+## 2. Architecture and repository
+
+```text
+Public website (anonymous discovery) ─── sanitized catalogue/availability ─┐
+    │ booking preferences / login link                                  │
+    v                                                                   v
+Portal (client / practitioner / admin layouts) ── HTTPS ── PHP /api/v1 API
+    │ staff Entra or approved customer identity                 │
+    └─ acquire API-scoped access token ──────────────────────────┤
+                                                               ├─ MySQL (internal network)
+                                                               ├─ Private files / audit
+                                                               └─ Durable jobs → email/integrations
+```
+
+The browser calls an internet-accessible API; “internal API” means first-party use, not private reachability. Database network isolation is a separate control. Authorization belongs at the API and resource layer, never in a shared frontend secret.
+
+**Current:** `Frontend/src/App.tsx` combines marketing, public booking and staff portal; MSAL initializes globally; portal selections use query/hash navigation. React Router is available but separate role route trees are not implemented. PHP lives in `api/`, with private application/dependency files and a public front controller. Staff booking at `57d8212` is source work that was not yet on main at baseline review.
+
+**Target repository:** Keep `Frontend/` and `api/`; extract frontend areas without a framework rewrite:
+
+```text
+Frontend/src/
+  public/          public entry, layout, marketing and discovery routes
+  portal/          portal entry, role routes, layouts and workspace selection
+  shared/          theme, business configuration, UI, API/error helpers
+  features/        auth, profiles, clients, catalogue, scheduling, forms,
+                   messaging, billing, reports and administration
+api/
+  public/          index.php and web-server routing only
+  src/             HTTP/auth/policy + domain services + persistence
+  database/        fresh schema and ordered additive migrations
+  bin/             protected operator and scheduled-job commands
+documentation/     master requirements, system design, supporting runbooks
+```
+
+This is a proposed extraction map, not a claim these directories already exist. Prefer two Vite entry/build configurations with explicit outputs (`dist/public`, `dist/portal`) and shared source. Keep a single dependency lockfile and theme initially; a workspace monorepo migration is unnecessary. Preserve existing imports/workflows in small steps.
+
+Current libraries include React 19, TypeScript, Vite, MUI, Lucide, date-fns and MSAL. Retain them. Evaluate a query/cache library, schema-backed form validation and browser/component testing when the relevant module is built; TanStack Query, React Hook Form/Zod and Playwright/Vitest are candidates, not installed or mandatory claims.
+
+## 3. Routes, navigation and host boundaries
+
+| Surface | Target paths | Access and behavior |
+| --- | --- | --- |
+| Public | `/`, `/services`, `/practitioners`, `/resources`, `/about`, `/contact`, `/book` | Anonymous sanitized content/discovery; no operational dashboard |
+| Portal entry | `/login`, provider callback routes, workspace selection | Choose staff/customer flow; authenticated return path must be allowlisted |
+| Client | `/client`, `/client/appointments`, `/client/book`, `/client/forms`, `/client/messages`, `/client/invoices`, `/client/profile` | Own records; show only released routes |
+| Practitioner | `/practitioner`, `/practitioner/schedule`, `/practitioner/clients`, `/practitioner/notes`, `/practitioner/availability`, related messages/reports/profile | Active practitioner and authorized care relationships |
+| Operations | `/admin`, `/admin/clients`, `/admin/practitioners`, `/admin/appointments`, `/admin/billing`, `/admin/reports`, `/admin/settings`, `/admin/audit`, `/admin/users` | Per-module permissions; reception/accountant get restricted subsets |
+
+Portal initialization waits for identity initialization, obtains a token for the chosen API, calls the authenticated current-user endpoint and receives server-derived roles/scopes/personas. Pick an eligible remembered workspace, otherwise present a chooser or safe default. Route guards improve UX; every API call independently checks authorization. Handle forbidden, inactive/unlinked account, expired identity and unavailable API separately.
+
+On public-to-portal booking navigation, transfer only service/practitioner/location/duration/date preferences. Avoid personal data in URLs; allowlist return paths to prevent open redirects. A slot selection is advisory. Re-fetch availability and a server quote after login. Never move tokens between domains through query strings, fragments, localStorage copying or postMessage shortcuts.
+
+Dedicated callback behavior must match the chosen identity SDK; do not allow the general router to consume/rewrite authorization responses before processing. Test popup and redirect flows under real production-style headers. Public and portal deep-link refreshes need separate SPA fallbacks; `/api/*` must never fall back to frontend HTML.
+
+## 4. Authentication and authorization design
+
+### 4.1 Staff — retained implementation, explicit hardening
+
+Current staff authenticator validates Entra token signatures using JWKS, supported signing algorithm, tenant, issuer, audience, scopes and expiry. It links immutable tenant/object identifiers to local users and intersects recognized Entra app roles with local role assignments. Preserve these controls; don't repair token failures by disabling validation.
+
+| Entra app role | Existing local role |
+| --- | --- |
+| `Wellness.SuperAdmin` | `super_admin` |
+| `Wellness.ClinicAdmin` | `clinic_admin` |
+| `Wellness.Reception` | `reception` |
+| `Wellness.Practitioner` | `practitioner` |
+| `Wellness.Accountant` | `accountant` |
+
+Keep Entra user provisioning outside this app. SuperAdmin links existing identities and manages permitted local assignments. Enforce active account/clinic, allowed role and location scope on each request. A role removal in the app must take effect on subsequent requests; document identity-provider token/role revocation latency separately. Verify MFA policy in the tenant; an `mfa_required` database flag alone does not enforce MFA.
+
+### 4.2 Customer identity — planned proof before rollout
+
+Use authorization-code flow with PKCE and a maintained broker/SDK capable of issuing tokens explicitly intended for this API. Entra External ID is a candidate, not a committed service. Google sign-in and Microsoft **personal** sign-in must both be proven; organizational Microsoft federation is not the same requirement. Never send a Google/Microsoft Graph access token to this API and treat it as an application token.
+
+For reference, Microsoft states Azure AD B2C is no longer available to purchase for new customers from 1 May 2025: [B2C identity-provider documentation](https://learn.microsoft.com/en-us/azure/active-directory-b2c/add-identity-provider). Review [External ID customer authentication methods](https://learn.microsoft.com/en-us/entra/external-id/customers/concept-authentication-methods-customers) during the proof of concept; provider availability/configuration must be checked at implementation time. Do not assume turnkey personal Microsoft support from a workforce setup.
+
+The proof must establish supported provider/account types, custom API tokens/audience, issuer/subject semantics, callbacks/logout, MFA/step-up options, recovery, consent, pricing/tenant constraints and Netfirms-compatible validation. If the broker cannot issue suitable API tokens, decide on a backend session/exchange architecture explicitly; do not improvise acceptance of arbitrary ID tokens. No client passwords are stored locally by default.
+
+Introduce distinct trusted staff and customer authentication adapters producing a common principal: internal user ID, clinic memberships, authentication context, linked persona IDs and granted scopes. Choose adapters only from a configured issuer allowlist and then validate fully; never select trust/key URLs from unchecked token input. Customer identity cannot populate staff roles from user-editable claims.
+
+### 4.3 Local identity migration and safe claims
+
+Current `users.user_type` is `client|staff`, email is unique per clinic, and `identity_links.provider` is an enum (`microsoft`, `google`, `meta`, `internal`). Those constraints do not yet satisfy dual personas, Apple or broker-neutral identity linkage.
+
+Target additive migration, designed before customer rollout:
+
+1. Keep stable user IDs and all existing appointment/finance references. Represent client/staff persona membership independently rather than requiring two people with the same identity. Continue supporting existing profiles during transition.
+2. Add normalized provider/issuer + immutable subject identity keys with a uniqueness constraint, plus tenant/object metadata where applicable. Backfill existing Entra links without changing who can sign in. Do not switch an existing issuer identity to an email match.
+3. Create claim/invitation records with hashed single-use random token, intended record, expiry, consumed/revoked state and audit. Agree verification evidence and recovery rules. Email possession alone must not silently claim a pre-existing sensitive record without the approved invitation/review process.
+4. Authenticated users explicitly link additional identities through fresh proof; lock linking/claiming transactions and prevent duplicate assignment. Staff+client linking must prove both identities or use a controlled reviewed process.
+5. Resolve shared-email/dependent policy before relaxing email uniqueness. Email is a contact attribute, not a universal unique person identifier. Test duplicates, reassigned email, Apple relay-style addresses and changed email without losing records.
+6. Record default workspace/preferences separately from permissions. Block staff persona access when signed in with a client-only authentication context, even for a linked person.
+
+Detailed migration names are not allocated until implemented. This document is not executable SQL.
+
+### 4.4 Resource policies and sessions
+
+Centralize policy helpers by capability and resource: clinic scope, location assignment, practitioner relationship, client ownership, finance rights and sensitive clinical access. Apply equivalent checks to list filters, counts, downloads, mutations and nested IDs. An authorized appointment ID does not authorize arbitrary replacement client/practitioner/location IDs.
+
+Current catalogue/configuration administration is largely SuperAdmin-only; target ClinicAdmin permissions in Master Requirements are an intentional future expansion requiring tests, not permissions that can be assumed today. Practitioners only see relevant clients through an established authorized care relationship; deactivated/ended relationships require an explicit historical-access policy.
+
+Session targets are in AUTH-06. Existing bearer-token validation alone does not implement authoritative inactivity revocation. Design a server-tracked session/revocation mechanism compatible with the selected broker before claiming these limits are enforced. UI locks alone are insufficient. If adopting cookie sessions, add Secure/HttpOnly cookies, appropriate SameSite behavior and explicit CSRF defenses; cross-origin cookie choices require a separate reviewed configuration. Keep tokens out of logs/URLs, minimize browser persistence, reauthenticate sensitive actions and clear private client caches on logout/account switch.
+
+## 5. Domain model and database strategy
+
+Current host evidence reports MySQL **5.7.44**, not the MySQL 8+ aspiration in the old database plan. Test migrations against the actual host dialect; an upgrade assessment is a production-readiness task, not a silent schema prerequisite. Use InnoDB transactions, foreign keys, `utf8mb4`, UTC instants and named location timezones. Avoid assuming unsupported SQL features or enforced constraints without verification.
+
+| Domain | Existing foundation | Planned extensions / responsibility |
+| --- | --- | --- |
+| Organization/identity | `clinics`, `locations`, `users`, `roles`, `user_roles`, `staff_accounts`, `identity_links`, `user_profile_images` | Persona/issuer-aware linkage, claims/recovery, policy/session state; retain app-owned avatar storage |
+| Catalogue | Practitioners, services/durations, practitioner/service assignments, rooms/capabilities, `service_locations`, taxes and `clinic_booking_settings` | Delegated editing, explicit policy versions/quotes; central branding and publication projection |
+| Availability | `availability_rules`, `availability_overrides`, `time_off`, `imported_calendar_entries` | Practitioner UX, import provenance, shared conflict locking and impacted-booking tasks |
+| Appointments | `appointments`, `appointment_attendees`, `appointment_status_history`, `cancellation_adjustments` | Price/policy/destination snapshots, recurrence operations, mobile travel/check-in events |
+| Clients | `client_profiles` associated with users | Private reusable addresses, client onboarding, record claims and profile permissions |
+| Care/forms | `form_templates`, `form_assignments`, `form_submissions`, `practitioner_client_notes`, `consent_records` | Immutable version history, protected clinical-note workflows, amendments and private attachment metadata |
+| Messaging | No complete conversation domain | Conversations, participants, messages, read state, attachments and access policies; not notification events |
+| Notifications/waitlist | Templates/events/reminder schedules and waitlist foundations | Reliable delivery worker, offers/expiry/claims, follow-up tasks and operational visibility |
+| Finance | Invoices/lines, payments/refunds, taxes, accounting connection/mapping/sync records | Immutable snapshots, ledger/reconciliation policy, gateway adapters and idempotency |
+| Privacy/operations | `audit_logs`, `data_export_requests`, `retention_policies` | Controlled exports, legal holds/disposition, audit querying, migration tracking and recovery evidence |
+
+Table presence does not imply endpoints/UI or tested business behavior. Read `api/database/schema.sql` and actual migrations for exact physical names and constraints before implementation; this table maps responsibilities, not a replacement schema.
+
+Existing upgrade scripts are `api/database/migrations/001_user_profile_images.sql`, `002_service_delivery_assignments.sql`, and `003_catalogue_settings.sql`. Fresh-install `schema.sql` is not a repeatable upgrade script for an existing database. Inspect actual schema before applying any migration; do not rerun a bulk create or seed file to repair a live deployment.
+
+Add migration version/checksum tracking and preflight checks. Back up first; make additive changes, backfill in bounded steps, verify counts/constraints, then switch readers/writers. MySQL DDL may commit implicitly: transaction wrappers are not a universal rollback guarantee. Every release must identify applicable migrations, compatibility with the previous app, restore path and validation queries. Never rebuild/drop production data to adopt this design.
+
+Application avatars currently use `user_profile_images` database storage. Preserve it initially; validate actual size/type/dimension protections and add metadata stripping/re-encoding and abuse controls as needed. Private form attachments/exports need an explicitly chosen protected storage strategy; do not assume an Azure Blob account exists.
+
+## 6. Scheduling, transactions and state
+
+### Availability and confirmation
+
+Existing `AvailabilityService` derives slots from recurring rules/overrides, busy/time-off data, existing appointments, eligibility, room capabilities and buffers. Current implementation may perform repeated per-slot queries; profile and batch relevant date-window data before scaling rather than weakening constraints.
+
+Existing `BookingService` uses a **clinic-row transaction lock**, rechecks availability, validates scope/client eligibility, creates the appointment/history/audit/notification event and supports idempotent requests. This is a coarse but useful starting lock, not a practitioner-level lock or a complete guarantee against all writers. Availability/canonical schedule edits do not all currently participate in the same lock protocol.
+
+Target critical write path:
+
+1. Authenticate/authorize actor, validate body and referenced records, bind idempotency key to actor + operation + request fingerprint.
+2. Begin transaction and acquire the agreed schedule lock(s) in deterministic order. Initially reuse the clinic lock for **all** conflicting booking/reschedule/cancel/time-off/availability/import mutations; optimize only with proven equivalent locking and cross-location practitioner coverage.
+3. Re-read current availability, statuses, travel, room/service rules, price and policy. If the quote changed, return an explicit refresh/review requirement rather than silently charge differently.
+4. Persist appointment and relevant immutable snapshots; append history/audit and durable outbox/notification records in the same transaction.
+5. Commit, then return durable IDs and authoritative status. Deliver messages outside the booking transaction.
+6. Replay the same key/body to the same recorded result; reject the same key with different content. Lock/unique-key conflicts return safe retry/conflict errors. Persist enough request state for controlled retries across refreshes; current in-memory form state alone does not do that.
+
+Do not add slot-hold messaging until a real hold table/expiry/locking design exists. For now selection does not reserve capacity. Client confirmation and staff confirmation call the same service with different actor policies. No booking flow may bypass availability using direct inserts.
+
+Maintain explicit transition rules with allowed actors, prerequisite state, fee effects, notification effects and audit. Rescheduling must reserve the new slot and release the old atomically. Recurrence needs a series model with per-occurrence results and explicit all-or-partial policy; design before enabling it. Invoice/payment states are related financial projections, not a single free-form appointment status editor.
+
+### Mobile and safety
+
+Introduce protected address records, appointment destination snapshots, delivery-mode validation, travel blocks and check-in/out/escalation events. Existing mobile flags/radius/fee fields do not yet provide this workflow. Store base clinic/location even when no room is used. Default to configurable travel buffers until a routing provider is chosen; enforce adjacent appointment feasibility and revalidate after changes. Do not publish destinations through public responses, logs, notification previews or external calendar sync.
+
+### Time off and external busy data
+
+Block creation must identify impacted booked appointments and create an exception/follow-up queue; notification alone does not complete resolution. Imported blocks retain source IDs, provenance and a distinguishable type. Later provider sync requires deduplication, update/deletion semantics, freshness/connection health and conflict review. Internal appointments remain authoritative when external entries change.
+
+## 7. API and frontend contracts
+
+Preserve `/api/v1` and the existing JSON success/error envelope, including safe error code/message/correlation ID. Use ISO-8601 timestamps with explicit zones at boundaries; avoid ambiguous local strings. Money uses integer cents and currency. Validate request size, supported content type, enumerations, ranges and nested resource scope. Lists need bounded pagination and stable sorting; preserve current page contracts unless versioning a change.
+
+Expected domain groups: auth/current user; public catalogue/availability; business/practitioner/room/service administration; clients/profiles; appointments/recurrence/cancellation; availability/time off; waitlists; forms/notes/files; messaging; notifications; finance/accounting; reports/audit/privacy. Not all groups are implemented. Produce an OpenAPI contract alongside each new group; do not document planned routes as live.
+
+Mutation contracts need optimistic revisions where concurrent edits are possible, and idempotency for booking, offer acceptance, payment/refund and external synchronization. Derive authoritative actor/client identity from the principal; a client-supplied user ID never proves ownership. Public projections are allowlists separate from internal entity serializers.
+
+Central frontend request handling must tolerate empty/non-JSON infrastructure errors without replacing the real failure with an unexplained JSON parse exception. Distinguish 401 reauthentication, 403 forbidden, validation, stale-edit/conflict, rate-limit and service failures. Show a safe correlation reference when available. Guard against retry loops and abort obsolete queries on account/workspace changes.
+
+Do not cache API/auth responses in a service worker. Cache only explicitly selected same-origin static GET assets; never attempt to cache POST, extension-scheme requests or sensitive user data. Version/retire existing caches during split deployment and test upgrades from previous installed workers.
+
+## 8. Background work, communications and integration boundaries
+
+Current notification records are only a foundation; no verified complete email sender/reminder service exists. Build a durable worker using pending/leased/delivered/failed states, attempt counts, next-attempt time, lease expiry, retry backoff and dead-letter/operator review. Use an atomic MySQL-5.7-compatible claim mechanism; do not assume `SKIP LOCKED` support. Jobs must be idempotent, bounded and recover from process interruption.
+
+Confirm Netfirms scheduling/CLI capabilities. Preferred execution is a protected scheduled command outside the public web root. If unavailable, explicitly approve a safe external scheduler/worker arrangement; never expose an unauthenticated “send all reminders” URL or rely on visitors to trigger jobs. Queue and provider delivery events are distinct; track both.
+
+Email templates contain minimal necessary details, local timezone and secure action links. Cancel superseded reminders after state changes. Personal-email verification/preferences are independent of Entra login identifiers. Messaging uses its own participant-authorized persistence; email merely announces an unread message. Never copy clinical message content into an email by default.
+
+Invoice generation on completion must be idempotent; snapshot service/tax amounts and preserve adjustments/refunds as auditable records. Manual payments first. Gateway and QuickBooks adapters use encrypted credentials, scoped permissions, stable external IDs, verified webhooks where applicable and reconciliation queues. Accounting outages cannot roll back an otherwise valid appointment.
+
+Calendar integrations are optional adapters, not alternate scheduling authorities. Store encrypted refresh tokens outside public access, use minimal scopes, revoke on disconnect and manage webhook renewal/polling safely. Inbound busy-only data and outbound privacy-safe blocks come before richer sync. A revocable iCal feed token is a secret and must not expose client identity or address.
+
+## 9. Security, privacy and observability
+
+Apply defense in depth: HTTPS, strong token validation, least-privilege DB/runtime identities, parameterized queries, bounded requests, explicit CORS origins, safe headers, rate limiting, upload controls and generic errors. HSTS/CSP rollout must be tested against both hosts, authentication flows and resource loading. CORS is not protection against non-browser callers.
+
+Use a purpose/permission matrix for operational notes, clinical notes, forms, addresses, finance, messages and exports. A broad administrator role does not inherently justify clinical access. Keep sensitive values out of logs, job errors and metrics. Audit actor/resource/action/outcome/correlation rather than copying changed clinical text. Define protected audit retention and tamper-resistance appropriate to the host; existing tables alone are insufficient evidence.
+
+Enforce server-side validation and re-encoding of supported profile images, private attachment delivery, upload size/dimension limits and malware scanning for document uploads. Export generation should be identity-verified, reviewed when necessary, time-limited and logged. Retention workflows honor legal holds and verified legal/business policies; they are not simple cascade deletes.
+
+Record structured request errors with correlation IDs, booking conflict/latency metrics, authentication failures, worker lag/failure and integration health. Public health returns only minimal liveness. Restrict database/schema diagnostic routes and remove temporary diagnostic files before live use. Do not expose database names/versions/table counts to anonymous visitors as normal health information.
+
+The host must provide evidence of supported software, TLS/database transport, encryption/backup protection, protected secrets, access control and recovery. MySQL 5.7 compatibility is a development constraint, not a production security endorsement. Identify host support/upgrade options and residual risks before clinical production use. This document does not certify PIPEDA or healthcare compliance.
+
+## 10. Hosting, configuration and release packaging
+
+Current development site: `https://wellness.copihue.ca/`. Existing layout:
+
+```text
+account-private-root/wellness-api/       .env, src, vendor, bin, private data
+public_html/wellness/                   frontend static assets
+public_html/wellness/api/               index.php, .htaccess
+```
+
+Target adds a separate portal document root/host while retaining one PHP application and database. A sibling `public_html/wellness-portal/` is a possible layout, subject to DNS/document-root confirmation. Configure the front controller's private root explicitly; do not assume a changed subdomain has the same relative filesystem depth. Do not duplicate private API state or business logic per host.
+
+Baseline target: one canonical API origin/path, with exact development/public/portal CORS allowlists where cross-origin browser requests are needed. Same-origin proxy arrangements are an optional deployment choice only if host support is verified. Avoid domain-wide cookies and wildcard credentialed CORS. Register exact callbacks/logout URLs for each enabled identity environment; frontend build configuration contains public identifiers, never secrets.
+
+Maintain environment settings for public URL, portal URL, API base URL, accepted token issuers/audiences/scopes, CORS origins, database credentials, private paths and worker/provider credentials. Map names to actual `.env`/build configuration when implemented rather than inventing live variable names here. Business display settings belong in the database; secrets and infrastructure settings do not.
+
+Retain `scripts/build-deployment.ps1`, release manifests/checksums and documented Netfirms packages. Extend it for public + portal outputs and explicit SQL upgrade instructions. Rebuild dependencies from lockfiles and replace each vendor bundle consistently: mixing `vendor/autoload.php` with another build's generated Composer files previously caused fatal startup errors. Preserve server `.env`, private uploads and other runtime data; deployment is not a blind overwrite of the private directory.
+
+Release sequence: record source commit → build/test → package and checksum → back up database/runtime assets → inspect/apply applicable migrations → deploy compatible private API/vendor + public front controller → deploy public/portal assets → verify deep links, health/auth and core flows → record outcome. Use a maintenance window or compatible staging/swap strategy supported by the host to avoid partially uploaded code. Keep prior artifacts and a tested recovery plan; data rollback may require restore, not just older PHP files.
+
+Tracked release packages must exclude `.env`, secrets, tokens, real client data and private uploads. Supporting deployment documents specify exact paths/package contents. No release package is required for this documentation-only consolidation.
+
+## 11. Verification and rollout gates
+
+Current focused local checks cover client validation/authorization, booking request validation, interval/DST helpers and appointment-role filtering. They are useful but are not evidence of real MySQL races, complete browser flows, legal compliance or successful production recovery.
+
+| Test layer | Required evidence |
+| --- | --- |
+| Static/build | PHP syntax/dependency checks, TypeScript/frontend builds, lint and secret/package inspection |
+| Unit/policy | Permission matrix incl. negative cases, fees/money, durations/buffers, state transitions, idempotency fingerprints and timezone edges |
+| Real MySQL integration | Concurrent booking/reschedule/time-off/import conflicts, transaction rollback, duplicate requests/offers/payments, migration/backfill integrity and scope isolation |
+| Identity | Staff MFA/roles, inactive/unlinked users, Google and personal Microsoft, wrong issuer/audience/expired token, safe linking/recovery, dual persona and privilege non-escalation |
+| Browser | Public discovery → portal auth → durable booking; staff/reception/practitioner/accountant paths; deep links, refresh/back/logout/account switch; error recovery and upgrades from old workers |
+| Care/privacy | Unrelated practitioner/client denial, note/form/address/file restrictions, consent versions, reviewed export expiry, audit contents and retention/legal-hold behavior |
+| Jobs/finance | Retries after crashes/timeouts, obsolete reminder suppression, delivery failure visibility, invoice uniqueness/refund reconciliation and provider outage isolation |
+| Accessibility/operations | Keyboard/screen-reader/mobile/tablet checks, WCAG 2.2 AA review, measured load target, monitoring alerts and timed backup restore drill |
+
+Stage gates follow R0–R9 in Master Requirements. Keep deployment acceptance separate from local tests. Do not enable real client booking before email/operational follow-up exists, or clinical records before protected storage/access and approved privacy policies exist. Run schema tests with synthetic fixtures only; never seed demonstration records into the live clinic.
+
+## 12. Decision record and next implementation slice
+
+| Decision | Status and consequence |
+| --- | --- |
+| Keep Netfirms/PHP/MySQL and existing React stack | Accepted consolidation direction; no rewrite/hosting migration |
+| Separate public and portal; share one API | Accepted direction; exact domains/document roots pending |
+| Preserve all six roles | Owner confirmed separate permissions; further delegation beyond SuperAdmin requires approval |
+| Staff Entra, customer identity separately | Accepted direction; broker/provider proof and linking/session design still required |
+| Google + personal Microsoft first; Apple/Meta later | Owner confirmed 16 September 2026; broker proof still required |
+| Stable user identity, multiple personas | Target; additive migration required before client account rollout |
+| Database remains schedule authority | Retained; all conflicting writers must join lock protocol |
+| Existing phases are not erased | Mapped to R stages; code-complete and production-accepted remain distinct |
+
+**Next slice: R1 portal foundations.** Extract shared theme/business configuration/account menu; create public and portal entry points/layouts and route guards; move current staff/client-management/catalogue/booking screens without changing domain behavior; remove misleading local-only booking success; test role-filtered deep links and existing workflows. Keep customer auth as a separate proof/implementation branch after these foundations. Record migrations as “none” if the extraction genuinely needs none; do not run a database update merely because the frontend changed.
+
+Before implementing R2–R3, resolve the remaining decisions in Master Requirements and the provider/account-claim/session proof. Provider sequencing and separate role permissions are already confirmed. Before each later domain, refine its detailed endpoint/data/test design against stable requirement IDs. This document owns cross-system decisions; module runbooks can supply procedural details without becoming a third master specification.
