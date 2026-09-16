@@ -1,0 +1,9 @@
+{
+  "source_commit": "32e4ca095b610f09bcb4aadbfc0fa4f68f5cb498",
+  "built_at_utc": "2026-09-16T23:11:57.6513545Z",
+  "target": "/public_html/wellness-portal",
+  "file": "wellness-portal.zip",
+  "entries": 32,
+  "bytes": 280820,
+  "sha256": "f5f879cb716dfaf969d0feee344fc3fae94453cbe07872016175d835f5a044b0"
+}
