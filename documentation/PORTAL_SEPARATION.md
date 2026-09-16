@@ -55,20 +55,20 @@ Vite's normal environment precedence is preserved: builds read `.env.production`
 
 ## Deploy to a portal subdomain
 
-The owner plans a separate portal subdomain; the exact hostname/document root must be confirmed before deployment. Do not upload a `/portal/`-based fallback build unchanged to a subdomain root.
+The owner confirmed `https://portal.copihue.ca/` for the portal and `https://wellness.copihue.ca/` for the public site. These values are configured in `Frontend/.env.production`. The portal document root and HTTPS readiness still need verification before deployment. Do not upload a `/portal/`-based fallback build unchanged to a subdomain root.
 
 1. Create the subdomain with its own document root, separate from `/public_html/wellness`, and enable a valid HTTPS certificate. Do not point it at the private PHP application directory. Record the exact URL and filesystem path.
-2. Before building, set these **frontend build** values to the real URLs. Example shape (replace `YOUR-PORTAL-HOST`, which is not a selected hostname):
+2. The current **frontend build** values are:
 
    ```dotenv
    VITE_PUBLIC_URL=https://wellness.copihue.ca/
-   VITE_PORTAL_URL=https://YOUR-PORTAL-HOST/
+   VITE_PORTAL_URL=https://portal.copihue.ca/
    VITE_API_BASE_URL=https://wellness.copihue.ca/api/v1
    ```
 
-   Retain the existing three Entra IDs. By default the auth callback/logout destination is the portal origin plus its build base, so a subdomain-root build returns to `https://YOUR-PORTAL-HOST/`. `VITE_ENTRA_REDIRECT_URI` is an optional exact override on that same portal origin/base; it must not point back to the public site. No client secret belongs in the frontend.
+   Retain the existing three Entra IDs. By default the auth callback/logout destination is the portal origin plus its build base, so a subdomain-root build returns to `https://portal.copihue.ca/`. `VITE_ENTRA_REDIRECT_URI` is an optional exact override on that same portal origin/base; it must not point back to the public site. No client secret belongs in the frontend.
 3. In the **existing staff SPA app registration**, add the exact HTTPS portal callback under the **Single-page application** platform. Keep authorization-code/PKCE via MSAL; do not enable implicit grant or add a client secret. Keep API audience, scope, role assignments and database identity links unchanged. Retain old callbacks during a controlled rollback window, then remove obsolete ones after acceptance. Existing public-site browser sessions do not transfer to the new origin: expect staff to sign in again.
-4. On the private PHP API `.env`, add the portal **origin** (scheme + hostname, no path/trailing slash) to the comma-separated `CORS_ALLOWED_ORIGINS`, preserving the public origin and only the other environments you intentionally permit. For example, `https://wellness.copihue.ca,https://YOUR-PORTAL-HOST`. Do not use `*`. Verify preflight allows the existing Authorization/Content-Type headers and methods. The API stays on the existing website host; no second PHP copy or database is needed. Do not change `APP_URL` to the portal merely to permit CORS; it is not the origin allowlist.
+4. On the private PHP API `.env`, add the portal **origin** (scheme + hostname, no path/trailing slash) to the comma-separated `CORS_ALLOWED_ORIGINS`, preserving the public origin and only the other environments you intentionally permit. For example, `https://wellness.copihue.ca,https://portal.copihue.ca`. Do not use `*`. Verify preflight allows the existing Authorization/Content-Type headers and methods. The API stays on the existing website host; no second PHP copy or database is needed. Do not change `APP_URL` to the portal merely to permit CORS; it is not the origin allowlist.
 5. Run `npm run build` in `Frontend`. Upload **contents** of `dist/public` to the public website root and **contents** of `dist/portal` to the portal document root. Include each `.htaccess` for deep-link refreshes. Preserve hosting-required directives when updating `.htaccess`. Never overwrite/delete the existing public `api/` folder, private API `.env`, vendor files or runtime uploads during this frontend deployment.
 6. Test the checks below before considering the split deployed. No SQL script or data seed is needed.
 
@@ -94,11 +94,11 @@ The deployment script now produces `wellness-public.zip` and `wellness-portal.zi
 ./scripts/build-deployment.ps1 -ReleaseName YOUR-UNIQUE-RELEASE-NAME
 ```
 
-Run packaging from the repository root after configuring the actual deployment URLs and committing the source to be packaged. Packages include hidden routing files and exclude environment files. No new deployment ZIP has been generated as part of this checkpoint because the final portal URL is not yet configured.
+Run packaging from the repository root after configuring the actual deployment URLs and committing the source to be packaged. Packages include hidden routing files and exclude environment files. No new deployment ZIP has been generated as part of this checkpoint. The confirmed hostnames are configured; create a release package when ready to deploy.
 
 ## Verification
 
-Local checkpoint results: both production builds and TypeScript checks pass; 13 browser/policy scenarios and 2 production-artifact/deep-link smoke tests pass. Desktop/mobile screenshots were inspected. Vite still reports a non-blocking size warning for the shared portal bootstrap bundle; individual operational screens are lazy-loaded. The complete ZIP packaging script was syntax-checked, not executed for a release with an unconfirmed hostname.
+Local checkpoint results: both production builds and TypeScript checks pass; 13 browser/policy scenarios and 2 production-artifact/deep-link smoke tests pass. Desktop/mobile screenshots were inspected. Vite still reports a non-blocking size warning for the shared portal bootstrap bundle; individual operational screens are lazy-loaded. The complete ZIP packaging script was syntax-checked, not executed to generate a release package.
 
 Automated browser/policy tests use synthetic API data and test-only network replacement of the auth module for role scenarios. There is no production authentication bypass. These tests verify frontend behavior, **not** real Entra authentication or database integration. The anonymous login test loads the real MSAL bootstrap. Tests use separate ports 5183/5184 and do not stop an existing development server. `npm run test:build` rebuilds both production outputs and runs artifact/deep-link smoke checks on ports 5193/5194, including the configured base paths and public bundle isolation. Its local login smoke check uses the default derived callback; a deliberately hardcoded hosted `VITE_ENTRA_REDIRECT_URI` must instead be checked on that actual host.
 
@@ -118,4 +118,8 @@ For rollback, restore the prior public frontend artifacts and prior routing conf
 
 ## Still pending
 
-DNS/TLS/document-root setup, exact production portal URL, actual Entra callback/CORS changes, hosted sign-in/database acceptance, customer identity and account claiming, client confirmation, unreleased care/finance/messaging modules and the broader launch gates. See R2 onward in Master Requirements. This checkpoint completes the separation in source, not a production launch.
+DNS/TLS/document-root verification, actual Entra callback/CORS changes, hosted sign-in/database acceptance, customer identity and account claiming, client confirmation, unreleased care/finance/messaging modules and the broader launch gates. See R2 onward in Master Requirements. This checkpoint completes the separation in source, not a production launch.
+
+## Future domain change
+
+Keep the public and portal URLs explicit in environment configuration. When the new domain is chosen, set `VITE_PUBLIC_URL` to its public website URL and `VITE_PORTAL_URL` to `https://portal.NEW-DOMAIN/`, update `VITE_API_BASE_URL` if the API moves, then rebuild both surfaces. Update the corresponding API origin allowlist and staff SPA callbacks during the cutover. No business records or database identity links need to change merely because the domain changes. Do not derive the public host by removing `portal.`: the current public site uses a different subdomain.
