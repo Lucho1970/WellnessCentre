@@ -94,11 +94,11 @@ The deployment script now produces `wellness-public.zip` and `wellness-portal.zi
 ./scripts/build-deployment.ps1 -ReleaseName YOUR-UNIQUE-RELEASE-NAME
 ```
 
-Run packaging from the repository root after configuring the actual deployment URLs and committing the source to be packaged. Packages include hidden routing files and exclude environment files. No new deployment ZIP has been generated as part of this checkpoint. The confirmed hostnames are configured; create a release package when ready to deploy.
+Run packaging from the repository root after configuring the actual deployment URLs and committing the source to be packaged. Packages include hidden routing files and exclude environment files. The complete [portal-split-2026-09-16 release](../deployments/portal-split-2026-09-16/README.md) is now generated for the confirmed hosts, with all four ZIPs and checksums tracked in Git.
 
 ## Verification
 
-Local checkpoint results: both production builds and TypeScript checks pass; 13 browser/policy scenarios and 2 production-artifact/deep-link smoke tests pass. Desktop/mobile screenshots were inspected. Vite still reports a non-blocking size warning for the shared portal bootstrap bundle; individual operational screens are lazy-loaded. The complete ZIP packaging script was syntax-checked, not executed to generate a release package.
+Local checkpoint results: both production builds and TypeScript checks pass; 13 browser/policy scenarios and 2 production-artifact/deep-link smoke tests pass. Desktop/mobile screenshots were inspected. Vite still reports a non-blocking size warning for the shared portal bootstrap bundle; individual operational screens are lazy-loaded. The complete ZIP packaging script has run successfully; archive hashes, required files, excluded private files and extracted PHP autoloading were verified. Production-artifact smoke tests passed again on the packaged build.
 
 Automated browser/policy tests use synthetic API data and test-only network replacement of the auth module for role scenarios. There is no production authentication bypass. These tests verify frontend behavior, **not** real Entra authentication or database integration. The anonymous login test loads the real MSAL bootstrap. Tests use separate ports 5183/5184 and do not stop an existing development server. `npm run test:build` rebuilds both production outputs and runs artifact/deep-link smoke checks on ports 5193/5194, including the configured base paths and public bundle isolation. Its local login smoke check uses the default derived callback; a deliberately hardcoded hosted `VITE_ENTRA_REDIRECT_URI` must instead be checked on that actual host.
 
