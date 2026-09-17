@@ -1,8 +1,18 @@
 # R2 client sign-in proof — 17 September 2026
 
-Status: provider recommendation awaiting owner approval. Branch: `codex/client-sign-in`.
-No customer tenant, subscription, credentials, database migration or runtime authentication
-changes have been created by this checkpoint. Existing staff sign-in remains unchanged.
+Status: owner approved External ID and reports the customer tenant created using an
+existing subscription under their other login. Branch: `codex/client-sign-in`.
+Customer tenant ID: `0a3841c6-b244-410d-821f-bbd9ccd1b5e2`.
+Primary domain: `copihuewellnessclientsdev.onmicrosoft.com`.
+These are owner-provided public configuration identifiers, not independently verified
+resource state. Billing configuration and region have not been inspected by the agent.
+No customer app credentials, database migration or runtime authentication changes have
+been created by this checkpoint. Existing staff sign-in remains unchanged.
+
+Next registration: `Wellness Client Portal Dev`, single-tenant SPA in the customer
+tenant. Planned customer-only callback: `https://portal.copihue.ca/client/auth/callback`.
+This callback is reserved for implementation; it is not working in the deployed app yet.
+Do not create a SPA client secret or enable implicit grants.
 
 ## Recommended provider
 
