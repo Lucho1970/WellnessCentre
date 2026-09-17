@@ -30,6 +30,40 @@ async function fixtures(page: Page, roles?: string[]) {
   });
 }
 
+test('new services can be assigned without reloading or losing assignment selections', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const services = [{ id: 1, name: 'Existing massage', price_cents: 10000, durations: [60], active: 1, requires_room: 1 }];
+  let savedAssignment: unknown;
+  await page.route('**/api/v1/admin/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = [];
+    if (path.endsWith('/services')) {
+      if (route.request().method() === 'POST') services.push({ ...services[0], ...route.request().postDataJSON(), id: 2 });
+      data = services;
+    } else if (path.endsWith('/service-assignments')) data = { practitioners: [], locations: [] };
+    else if (path.endsWith('/locations')) data = [{ id: 1, name: 'Test location' }];
+    else if (path.endsWith('/practitioners')) data = [{ practitioner_id: 3, display_name: 'Test Therapist' }];
+    else if (path.endsWith('/assignments')) savedAssignment = route.request().postDataJSON();
+    else data = {};
+    await route.fulfill({ json: { data } });
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  await expect(page.getByRole('combobox', { name: /^Service / })).toHaveText('Existing massage');
+  await page.getByRole('checkbox', { name: 'Test Therapist', exact: true }).check();
+  await page.getByRole('textbox', { name: 'Service name', exact: true }).fill('New massage');
+  await page.getByRole('spinbutton', { name: 'Price (CAD)' }).fill('120');
+  await page.getByRole('button', { name: 'Add service', exact: true }).click();
+  await expect(page.getByText('New massage was created.')).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Test Therapist', exact: true })).toBeChecked();
+  await page.getByRole('combobox', { name: /^Service / }).click();
+  await page.getByRole('option', { name: 'New massage', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Test Therapist', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Test location', exact: true }).check();
+  await page.getByRole('button', { name: 'Save assignments' }).click();
+  await expect(page.getByText('Service assignments saved.')).toBeVisible();
+  expect(savedAssignment).toMatchObject({ location_ids: [1], practitioners: [{ practitioner_id: 3, service_id: 2 }] });
+});
+
 test('role policies preserve current access without broadening permissions', () => {
   expect(workspacesFor(['client'])).toEqual([]);
   expect(workspacesFor(['reception'])).toEqual(['admin']);

@@ -96,6 +96,7 @@ function Dashboard() {
 }
 
 export function StaffPortal({ roles }: { roles: string[] }) {
+  const [catalogueVersion, setCatalogueVersion] = useState(0);
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up("md"));
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -166,8 +167,8 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
         {page === "rooms" && <Box mt={3}><RoomCapabilities /></Box>}
-        {page === "services" && <ServiceAdmin />}
-        {page === "services" && <Box mt={3}><ServiceAssignments /></Box>}
+        {page === "services" && <ServiceAdmin onSaved={() => setCatalogueVersion(version => version + 1)} />}
+        {page === "services" && <Box mt={3}><ServiceAssignments catalogueVersion={catalogueVersion} /></Box>}
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
