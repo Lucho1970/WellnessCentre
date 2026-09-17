@@ -11,6 +11,7 @@ type Availability = { timezone: string; availability: Slot[] };
 const message = (cause: unknown) => cause instanceof Error ? cause.message : 'Unable to load online booking.';
 
 export function Booking() {
+  const [mode,setMode]=useState('mobile');
   const [locations, setLocations] = useState<Location[]>([]), [services, setServices] = useState<Service[]>([]), [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [locationId, setLocationId] = useState(''), [serviceId, setServiceId] = useState(''), [practitionerId, setPractitionerId] = useState('');
   const [availability, setAvailability] = useState<Availability>({ timezone: 'America/Toronto', availability: [] });
@@ -42,16 +43,16 @@ export function Booking() {
     setSlotBusy(true);
     const timezone = locations.find(item => String(item.id) === locationId)?.timezone || 'America/Toronto';
     const date = (value: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
-    const query = new URLSearchParams({ location_id: locationId, service_id: serviceId, practitioner_id: practitionerId, date_from: date(new Date()), date_to: date(new Date(Date.now() + 6 * 86400000)) });
+    const query = new URLSearchParams({ delivery_mode: mode, location_id: locationId, service_id: serviceId, practitioner_id: practitionerId, date_from: date(new Date()), date_to: date(new Date(Date.now() + 6 * 86400000)) });
     void apiRequest<Availability>(`/availability?${query}`, { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) setAvailability(data); })
       .catch(cause => { if (!controller.signal.aborted) setSlotError(message(cause)); })
       .finally(() => { if (!controller.signal.aborted) setSlotBusy(false); });
     return () => controller.abort();
-  }, [locationId, serviceId, practitionerId, locations, retry]);
+  }, [locationId, serviceId, practitionerId, locations, retry, mode]);
 
   const handoff = new URL(portalLink('client/book'));
-  if (slot) handoff.search = new URLSearchParams({ location_id: locationId, service_id: serviceId, practitioner_id: practitionerId, duration_option_id: String(slot.duration_option_id), starts_at: slot.starts_at }).toString();
+  if (slot) handoff.search = new URLSearchParams({ delivery_mode: mode, location_id: locationId, service_id: serviceId, practitioner_id: practitionerId, duration_option_id: String(slot.duration_option_id), starts_at: slot.starts_at }).toString();
   return <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 } }}>
     <Typography variant="overline" color="primary">Book online</Typography><Typography variant="h3" component="h1">Find a time that fits your life.</Typography>
     <Alert severity="info" sx={{ my: 3 }}>Availability browsing is open. Client sign-in and online confirmation are not available yet; contact the clinic to book. Selecting a time does not reserve it.</Alert>
@@ -61,9 +62,10 @@ export function Booking() {
     {!loading && !error && services.length > 0 && locations.length > 0 && <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 5 }}><Paper variant="outlined" sx={{ p: 3 }}><Stack spacing={3}>
         <Typography variant="h5" component="h2">Choose care</Typography>
-        <TextField select label="Location" value={locationId} onChange={event => { setSlot(null); setLocationId(event.target.value); }}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
+        <TextField select label="Visit type" value={mode} onChange={event=>{setSlot(null);setMode(event.target.value);}}><MenuItem value="mobile">At client location</MenuItem><MenuItem value="clinic">In clinic</MenuItem></TextField>
+        <TextField select label="Base location / service area" value={locationId} onChange={event => { setSlot(null); setLocationId(event.target.value); }}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
         <TextField select label="Service" value={serviceId} onChange={event => { setSlot(null); setPractitionerId(''); setServiceId(event.target.value); }}>{services.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
-        {service && <Box><Typography color="text.secondary">{service.description}</Typography><Typography mt={1}>From ${(Number(service.price_cents) / 100).toFixed(2)}</Typography><Typography variant="body2">{service.durations.map(duration => `${duration.minutes} min`).join(' / ')}</Typography></Box>}
+        {service && <Box><Typography color="text.secondary">{service.description}</Typography><Typography mt={1}>Treatment from ${(Number(service.price_cents) / 100).toFixed(2)} before taxes</Typography><Typography variant="body2">{mode==='mobile'?'Mobile surcharge may apply; staff will confirm coverage, travel time and price. ':''}{service.durations.map(duration => `${duration.minutes} min`).join(' / ')}</Typography></Box>}
       </Stack></Paper></Grid>
       <Grid size={{ xs: 12, md: 7 }}><Paper variant="outlined" sx={{ p: 3 }}><Stack spacing={2}>
         <Typography variant="h5" component="h2">Choose a time</Typography>

@@ -160,6 +160,13 @@ Maintain explicit transition rules with allowed actors, prerequisite state, fee 
 
 ### Mobile and safety
 
+Implemented mobile-first staff booking slice: [MOBILE_BOOKING.md](MOBILE_BOOKING.md).
+Migration 004 adds practitioner/service clinic eligibility and appointment delivery,
+destination, travel and price snapshots. Existing base locations remain scheduling scopes;
+mobile booking skips rooms but applies travel buffers through the same availability engine.
+Coverage is explicitly staff-verified until a routing provider is selected. No claim of
+automated geographical validation, tax computation or real-time practitioner tracking.
+
 Introduce protected address records, appointment destination snapshots, delivery-mode validation, travel blocks and check-in/out/escalation events. Existing mobile flags/radius/fee fields do not yet provide this workflow. Store base clinic/location even when no room is used. Default to configurable travel buffers until a routing provider is chosen; enforce adjacent appointment feasibility and revalidate after changes. Do not publish destinations through public responses, logs, notification previews or external calendar sync.
 
 ### Time off and external busy data

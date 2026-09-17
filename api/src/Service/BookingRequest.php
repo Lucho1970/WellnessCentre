@@ -19,6 +19,9 @@ final class BookingRequest
     {
         $matches=(int)$row['created_by']===$userId && $row['starts_at']===$start->format('Y-m-d H:i:s');
         foreach(['client_id','location_id','practitioner_id','service_id','duration_option_id','room_id'] as $field)$matches=$matches && (int)($row[$field]??0)===(int)($body[$field]??0);
+        $matches=$matches&&($row['delivery_mode']??'clinic')===Delivery::mode($body);
+        $stored=$row['destination_snapshot']??null;
+        $matches=$matches&&($stored===null?null:json_decode($stored,true))===Delivery::destination($body);
         if(!$matches)throw new ApiException(409,'idempotency_conflict','This idempotency key was already used for another booking request.');
     }
 }

@@ -64,6 +64,45 @@ test('new services can be assigned without reloading or losing assignment select
   expect(savedAssignment).toMatchObject({ location_ids: [1], practitioners: [{ practitioner_id: 3, service_id: 2 }] });
 });
 
+test('mobile-only booking captures destination and price without requesting a room', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let booking: Record<string, any> | undefined;
+  let availabilityMode = '';
+  await page.route('**/api/v1/booking-options', route => route.fulfill({ json: { data: { rooms: [], combinations: [{ location_id: 1, location_name: 'Mobile service area', timezone: 'America/Toronto', service_id: 2, service_name: 'Massage', requires_room: 1, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 2500, base_price_cents: 12000, practitioner_id: 3, practitioner_name: 'Therapist', duration_option_id: 4, duration_minutes: 60 }] } } }));
+  await page.route('**/api/v1/clients?**', route => route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Test Client', email: 'test@example.test' }], has_more: false } } }));
+  await page.route('**/api/v1/availability?**', route => {
+    availabilityMode = new URL(route.request().url()).searchParams.get('delivery_mode') ?? '';
+    return route.fulfill({ json: { data: { availability: [{ duration_option_id: 4, starts_at: '2030-10-01T10:00:00-04:00', ends_at: '2030-10-01T11:00:00-04:00', available_room_ids: [] }] } } });
+  });
+  await page.route('**/api/v1/appointments', route => { booking=route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 99 } } }); });
+  await page.goto(`${portalHost}/admin/appointments`);
+  await page.getByRole('button', { name: 'Book appointment', exact: true }).click();
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const select = async (label: RegExp, option: string) => { await page.getByRole('combobox', { name: label }).click(); await page.getByRole('option', { name: option, exact: true }).click(); };
+  await select(/^Client/, 'Test Client · test@example.test');
+  await select(/^Base location/, 'Mobile service area');
+  await select(/^Service/, 'Massage');
+  await select(/^Practitioner/, 'Therapist');
+  await select(/^Duration/, '60 minutes');
+  await expect(page.getByRole('button', { name: 'Find a time', exact: true })).toBeDisabled();
+  await page.getByRole('textbox', { name: 'address line1' }).fill('123 Test Street');
+  await page.getByRole('textbox', { name: 'city', exact: true }).fill('Test City');
+  await page.getByRole('textbox', { name: 'postal code' }).fill('A1A 1A1');
+  await page.getByRole('checkbox', { name: /I verified this address/ }).check();
+  await page.getByRole('button', { name: 'Find a time', exact: true }).click();
+  await page.getByLabel('Appointment date').fill('2030-10-01');
+  await page.getByRole('button', { name: 'Find times', exact: true }).click();
+  await page.getByRole('button', { name: /Oct 1, 2030/ }).click();
+  await expect(page.getByRole('combobox', { name: /Available room/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Review appointment' }).click();
+  await expect(page.getByText(/Subtotal:.*145/)).toBeVisible();
+  await page.getByRole('button', { name: 'Confirm appointment', exact: true }).click();
+  await expect(page.getByText(/Appointment #99 confirmed/)).toBeVisible();
+  expect(availabilityMode).toBe('mobile');
+  expect(booking).toMatchObject({ delivery_mode: 'mobile', destination: { address_line1: '123 Test Street' }, coverage_confirmed: true, quoted_base_price_cents: 12000, quoted_mobile_fee_cents: 2500 });
+  expect(booking).not.toHaveProperty('room_id');
+});
+
 test('role policies preserve current access without broadening permissions', () => {
   expect(workspacesFor(['client'])).toEqual([]);
   expect(workspacesFor(['reception'])).toEqual(['admin']);
@@ -92,7 +131,7 @@ test('public booking hands off preferences without reserving or creating an appo
   await fixtures(page); await page.goto(`${publicHost}/book`);
   await page.getByRole('button', { name: /Oct 1.*60 min/ }).click();
   await page.getByRole('link', { name: 'View client booking information' }).click();
-  await expect(page).toHaveURL(/localhost:5184\/client\/book\?location_id=1/);
+  await expect(page).toHaveURL(/localhost:5184\/client\/book\?delivery_mode=mobile&location_id=1/);
   await expect(page.getByText('No appointment has been requested or reserved.', { exact: false })).toBeVisible();
   expect(writes).toEqual([]);
 });

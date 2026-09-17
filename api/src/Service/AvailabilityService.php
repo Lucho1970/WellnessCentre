@@ -16,13 +16,14 @@ final class AvailabilityService
 
     public function search(array $query): array
     {
+        $mode=Delivery::mode($query);
         $serviceId=(int)($query['service_id']??0); $practitionerId=(int)($query['practitioner_id']??0); $locationId=(int)($query['location_id']??0);
         if(!$serviceId||!$practitionerId||!$locationId) throw new ApiException(422,'validation_error','service_id, practitioner_id, and location_id are required.');
         $from=$this->date((string)($query['date_from']??date('Y-m-d')),'date_from');
         $to=$this->date((string)($query['date_to']??$from->modify('+7 days')->format('Y-m-d')),'date_to');
         if($to<$from||$to>$from->modify('+31 days')) throw new ApiException(422,'invalid_date_range','The availability range must be between 1 and 31 days.');
 
-        $sql="SELECT s.lead_time_minutes,s.booking_horizon_days,s.buffer_before_minutes,s.buffer_after_minutes,s.requires_room,d.id duration_option_id,d.duration_minutes,l.timezone
+        $sql="SELECT ps.offers_mobile,ps.offers_clinic,ps.travel_buffer_minutes,ps.mobile_fee_cents,COALESCE(ps.price_override_cents,d.price_cents,s.price_cents) base_price_cents,s.lead_time_minutes,s.booking_horizon_days,s.buffer_before_minutes,s.buffer_after_minutes,s.requires_room,d.id duration_option_id,d.duration_minutes,l.timezone
                 FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.active=1 JOIN locations l ON l.id=:location JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=l.id AND sl.active=1
                 JOIN practitioner_services ps ON ps.service_id=s.id AND ps.practitioner_id=:practitioner AND ps.active=1
                 JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1
@@ -37,16 +38,17 @@ final class AvailabilityService
             $weekday=(int)$day->format('N');
             $rules=$this->rules($practitionerId,$locationId,$weekday,$day->format('Y-m-d'),$timezone);
             foreach($rules as $rule){ foreach($options as $option){
+                $terms=Delivery::terms($option,$mode);
                 $windowStart=new DateTimeImmutable($day->format('Y-m-d').' '.$rule['start_time'],$timezone);
                 $cursor=$windowStart; $end=new DateTimeImmutable($day->format('Y-m-d').' '.$rule['end_time'],$timezone);
                 $cursor=$cursor->setTimestamp((int)(ceil($cursor->getTimestamp()/900)*900));
                 while($cursor->setTimestamp($cursor->getTimestamp()+(int)$option['duration_minutes']*60)<=$end){
                     $slotEnd=$cursor->setTimestamp($cursor->getTimestamp()+(int)$option['duration_minutes']*60);
                     $utcStart=$cursor->setTimezone(new DateTimeZone('UTC'));$utcEnd=$slotEnd->setTimezone(new DateTimeZone('UTC'));
-                    $bufferStart=$utcStart->modify('-'.$option['buffer_before_minutes'].' minutes');$bufferEnd=$utcEnd->modify('+'.$option['buffer_after_minutes'].' minutes');
+                    $bufferStart=$utcStart->modify('-'.((int)$option['buffer_before_minutes']+$terms['travel']).' minutes');$bufferEnd=$utcEnd->modify('+'.((int)$option['buffer_after_minutes']+$terms['travel']).' minutes');
                     if($utcStart>=$now->modify('+'.$option['lead_time_minutes'].' minutes')&&$utcStart<=$now->modify('+'.$option['booking_horizon_days'].' days')&&$bufferStart>=(new DateTimeImmutable($day->format('Y-m-d').' '.$rule['start_time'],$timezone))&&$bufferEnd<=$end&&!$this->blocked($practitionerId,$locationId,$bufferStart,$bufferEnd)){
-                        $rooms=$option['requires_room']?$this->rooms($serviceId,$practitionerId,$locationId,$bufferStart,$bufferEnd):[];
-                        if(!$option['requires_room']||$rooms)$slots[$option['duration_option_id'].':'.$utcStart->getTimestamp()]=['duration_option_id'=>(int)$option['duration_option_id'],'starts_at'=>$cursor->format(DATE_ATOM),'ends_at'=>$slotEnd->format(DATE_ATOM),'available_room_ids'=>$rooms];
+                        $rooms=$terms['requires_room']?$this->rooms($serviceId,$practitionerId,$locationId,$bufferStart,$bufferEnd):[];
+                        if(!$terms['requires_room']||$rooms)$slots[$option['duration_option_id'].':'.$utcStart->getTimestamp()]=['duration_option_id'=>(int)$option['duration_option_id'],'starts_at'=>$cursor->format(DATE_ATOM),'ends_at'=>$slotEnd->format(DATE_ATOM),'available_room_ids'=>$rooms];
                     }
                     $cursor=$cursor->setTimestamp($cursor->getTimestamp()+900);
                 }
