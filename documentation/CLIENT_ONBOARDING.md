@@ -1,20 +1,20 @@
 # Client onboarding and record linking — implementation contract
 
-Status: design checkpoint on `codex/client-onboarding`. No onboarding endpoints,
-database migration, customer record access or session implementation is released by
-this document. The existing verified-sign-in flow remains unchanged.
+Status: implemented on `codex/client-onboarding`, disabled by default. Local synthetic
+database and browser acceptance are recorded below. Hosted External ID freshness proof
+and Netfirms acceptance are required before enabling this for real clients.
 
 This runbook implements AUTH-04/05/06/07, CRM-02 and the onboarding portion of R3 in
 MASTER_REQUIREMENTS.md; SYSTEM_DESIGN.md remains the architecture authority.
 
-## Decisions to confirm before enabling existing-record access
+## Owner-confirmed decisions — 17 September 2026
 
-1. Recommended: a signed-in client accepts an invitation, then authorized staff verify
+1. A signed-in client accepts an invitation, then authorized staff verify
    the claimant and approve the link. Possession of the invitation alone grants no
    access to the existing record. Staff use a known contact channel independently of
    unverified details supplied in the claim. No date-of-birth or email knowledge quiz
    is treated as sufficient identity evidence.
-2. Recommended client application session limits: 30 minutes idle, 8 hours absolute.
+2. Client application session limits: 30 minutes idle, 8 hours absolute.
    Fresh identity proof is required to establish a replacement after expiry. Staff
    session changes are a separate unit; do not change workforce permissions here.
 
@@ -40,10 +40,10 @@ MASTER_REQUIREMENTS.md; SYSTEM_DESIGN.md remains the architecture authority.
 
 ## Additive database design
 
-Allocate the next migration only after decisions are confirmed. Use MySQL 5.7-compatible
-InnoDB tables, UTC timestamps and explicit foreign keys. Do not seed live records.
+Migration: `api/database/migrations/005_customer_onboarding.sql`. Additive MySQL
+5.7-compatible InnoDB tables, UTC timestamps and explicit foreign keys. No seed records.
 
-| Proposed table | Purpose and key constraints |
+| Table | Purpose and key constraints |
 | --- | --- |
 | customer_identities | Immutable trusted issuer + case-sensitive subject, unique by a canonical identity digest; separate from workforce identity_links. Stores no roles from token claims. |
 | customer_client_links | Approved identity-to-existing-client relationship; unique identity and client for this first self-only release. Includes clinic, approval actor and timestamp. |
@@ -51,6 +51,8 @@ InnoDB tables, UTC timestamps and explicit foreign keys. Do not seed live record
 | client_link_claims | Invitation claimant identity, pending/approved/rejected state, reviewing staff actor and timestamps. No client data disclosed while pending. |
 | client_contact_addresses | Reusable private address for a client. Separate from immutable appointment destination snapshots. Updating it never rewrites past appointments. |
 | customer_sessions | Hashed random session credential, identity, verified authentication time, creation/last-activity/absolute-expiry/revocation timestamps. |
+| customer_auth_challenges | Hashed server-generated nonce, ten-minute expiry and one-time consumption. |
+| customer_rate_limits | HMAC-digested fixed-window buckets for challenge, session and invitation attempts. |
 
 An explicit server-side deployment clinic selection is required for new registrations;
 do not infer clinic from an untrusted request or choose the first clinic implicitly.
@@ -58,16 +60,16 @@ Invitation routes always use the invitation's clinic and the staff actor's clini
 
 ## Transactions and failure behavior
 
-- Registration locks the identity, rechecks whether it is linked, then creates the
+- Registration locks the configured clinic, rechecks whether the identity is linked, then creates the
   client/profile/address/link and audit in one transaction. Retried requests return the
   existing result for that identity; unique constraints handle races without duplicates.
 - Issuing a replacement invitation revokes prior outstanding invitations for the same
   record atomically. Block inactive clients and records already linked in this slice.
-- Acceptance locks the invitation and identity; verifies expiry, revocation and unused
+- Acceptance locks the configured clinic and invitation; verifies expiry, revocation and unused
   state; consumes it once and creates a pending claim. Another identity cannot replay it.
 - Approval requires Super Admin, Clinic Admin or reception client-management permission,
   same clinic and explicit confirmation of independent identity verification. Lock the
-  identity, claim and client in a consistent order; recheck both link uniqueness and
+  clinic, invitation, claim and client in a consistent order; recheck both link uniqueness and
   active client status immediately before insertion. Competing approvals cannot reassign
   ownership. Rejection grants nothing. Staff status changes apply on the next API call.
 - Audit issue/revoke/accept/approve/reject/register/profile access with internal identifiers
@@ -83,7 +85,7 @@ token's `iat` must not substitute for authentication time. Session establishment
 verified broker authentication-time evidence and replay protection. Prototype this with
 the configured External ID tenant before exposing the linked profile/appointment API.
 
-Preferred first design: keep the current Authorization access token and additionally
+Implemented design: keep the current Authorization access token and additionally
 require an opaque server-tracked application-session credential on protected customer
 operations. Store only its digest server-side; bind it to the validated issuer/subject.
 Use a dedicated header and tab-scoped storage, never a URL or shared-domain cookie.
@@ -123,5 +125,83 @@ accept unsigned browser claims, or label a UI-only timeout as an enforced sessio
 - Back up before migration; deploy migration before matching code. Roll back code without
   dropping identity/link/audit records. Never undo real onboarding by destructive cleanup.
 
-Hosted acceptance, session proof and MySQL concurrency tests remain required before this
-unit is described as ready to deploy. No live database changes are authorized by this file.
+## Session exchange implementation
+
+1. Anonymous `POST /customer/auth/challenge` creates a 256-bit nonce (20/IP/10 minutes).
+2. MSAL redirects with that nonce, `prompt=login`, explicit `max_age=0`, and an essential
+   `auth_time` ID-token claim request. The explicit query parameter is covered by a real
+   MSAL browser test; `maxAge: 0` alone was not serialized by this installed version.
+3. `POST /customer/auth/session` validates the API access JWT and a separate signed
+   ID-token proof. The proof must have the configured SPA audience, trusted issuer,
+   matching signed tenant/object IDs, an unused nonce and authentication within ten
+   minutes (not predating the challenge by more than 60 seconds). No unsigned decoding
+   or `iat` fallback is allowed. An ID token alone cannot call protected APIs.
+4. A random credential goes into tab-scoped sessionStorage. Only its SHA-256 hash is
+   stored in MySQL. Send it as `X-Customer-Session` alongside the API bearer token.
+5. Normal reads do not extend inactivity. Trusted pointer/keyboard interactions send
+   at most one activity request per minute. The server rejects expired/revoked sessions
+   even on the activity endpoint. Absolute expiry is verified `auth_time` + 8 hours.
+6. Logout revokes the current application session before provider logout. It does not
+   claim to revoke sessions in every other browser. UI expiry removes private forms.
+
+The fixed-window rate limits are an application safeguard, not a replacement for host
+request-size/traffic controls. Customer request bodies are capped at 64 KiB. Error logs
+contain exception class + correlation ID, not SQL values, proofs or stack arguments.
+
+## Deployment and activation
+
+1. Back up the existing database and private `.env`/`var` folders. Run **005 only** if
+   migrations 001–004 were already applied. Do not rerun the base schema on a live DB.
+   For a brand-new DB, the current base schema already includes 001–004; run 005 after it.
+2. Deploy matching public website, portal (including its small `/api` pointer), private
+   API with its complete matching vendor directory, and public API pointer. Preserve
+   `.env` and `var`. Never mix files from different vendor builds.
+3. Add these settings to the private API `.env` (also in `api/onboarding.env.example`):
+
+   ```dotenv
+   CUSTOMER_ONBOARDING_ENABLED=false
+   CUSTOMER_CLINIC_ID=YOUR_EXISTING_CLINIC_ID
+   ```
+
+   Find the real clinic with `SELECT id, name, status FROM clinics;`. Do not assume ID 1.
+   Existing CUSTOMER_ENTRA_* settings remain unchanged. No new secret belongs in React.
+4. With the flag false, existing customer sign-in verification and staff operations
+   remain available; onboarding, invitations and private customer records stay disabled.
+5. In the development deployment, enable the flag and sign in afresh with a test
+   customer. Verify `auth/session` succeeds without copying its token into logs/chat.
+   If it returns `fresh_sign_in_required`, the provider may not have supplied fresh
+   `auth_time`/object-ID evidence. Turn the flag off and resolve provider configuration;
+   do not weaken the check. Local tests cannot establish what the live provider emits.
+6. Test new registration, refresh/profile save, client-created duplicate email refusal,
+   staff-issued invitation, manual delivery, pending privacy, review-code + independent
+   verification approval, own appointments, logout and both timeout limits. Repeat
+   staff booking/practitioner access checks. Use synthetic development records only.
+7. Revert the flag to false if acceptance fails. Roll back matching code packages if
+   needed, but retain the additive tables and links/audit trail. Never delete real links
+   or clients to undo this deployment.
+
+Existing client invitations are in **Clients → edit a client → Client portal access**.
+Links expire after 48 hours and are displayed once; send them manually through a known
+channel. The customer gives staff the review code during independent verification.
+Expired pending claims remain pending until staff reject/revoke or replace the invitation;
+this intentionally avoids offering a new duplicate registration while a claim is unresolved.
+
+Optional daily bounded cleanup: `api/database/maintenance/purge_expired_customer_sessions.sql`.
+It removes old expired challenges/rate buckets/sessions only, never clinical/link/audit data.
+
+## Local verification and remaining acceptance
+
+- PHP policy/JWT tests cover signed proof audience/issuer separation, fresh authentication,
+  replay/expiry boundaries, profile field allowlisting and staff/customer separation.
+- `php api/tests/integration/customer-onboarding.php` creates a random scratch DB on
+  **127.0.0.1:13317 only**, never loads `.env`, and uses synthetic records. Tested against
+  portable MariaDB 10.11.14: schema + migration rerun, registration retry/conflict,
+  pending access denial, verified approval, inactive/cross-clinic/role denial, profile
+  revision conflicts, own appointment filtering, logout/idle/absolute expiry and rate
+  limiting. Separate PHP processes exercise concurrent registration, acceptance and approval.
+- Browser tests cover actual MSAL authorization parameters, forms, invitations, private
+  UI removal on idle expiry, request-loop regression and existing workforce journeys.
+- Netfirms **MySQL 5.7** compatibility and real External ID provider/session behavior
+  still require hosted acceptance. MariaDB/local mocked browser APIs are not that proof.
+- This slice does not implement client appointment creation, cancellation/rescheduling,
+  automated email, provider linking/recovery, staff+client persona merge or dependent accounts.

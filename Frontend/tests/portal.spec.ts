@@ -31,6 +31,35 @@ async function fixtures(page: Page, roles?: string[]) {
   });
 }
 
+test('staff client invitation approval requires review code and verification checkbox', async ({page})=>{
+  await fixtures(page,['super_admin']);
+  let approved=false, posts=0;
+  const client={id:7,display_name:'Existing Client',given_name:'Existing',family_name:'Client',email:'existing@example.test',phone:'555-0100',status:'active',preferred_contact:'email',revision:'rev'};
+  await page.route('**/api/v1/clients**',route=>{
+    const path=new URL(route.request().url()).pathname;
+    let data:unknown={items:[client],has_more:false};
+    if(path.endsWith('/7'))data=client;
+    if(path.includes('/invitations')){
+      if(route.request().method()==='POST'){
+        const body=route.request().postDataJSON();expect(body.action).toBe('approve');expect(body.identity_verified).toBe(true);expect(body.review_code).toBe('ABCDEF123456');approved=true;posts++;
+      }
+      data={linked:approved,items:[{id:9,expires_at:'2026-10-01 12:00:00',consumed_at:'2026-09-17 12:00:00',revoked_at:null,claim_status:approved?'approved':'pending',claimant_name:'Unverified Claimant'}]};
+    }
+    return route.fulfill({json:{data}});
+  });
+  await page.goto(`${portalHost}/admin/clients`);
+  await page.getByRole('button',{name:'Edit Existing Client'}).click();
+  const approve=page.getByRole('button',{name:'Approve client link'});
+  await expect(approve).toBeDisabled();
+  await page.getByRole('textbox',{name:'Review code from the verified client'}).fill('ABCDEF123456');
+  await expect(approve).toBeDisabled();
+  await page.getByRole('checkbox',{name:/I independently verified/}).check();
+  await expect(approve).toBeEnabled();page.on('dialog',dialog=>dialog.accept());
+  await approve.click();
+  await expect(page.getByText('This client record has an approved customer identity link.')).toBeVisible();
+  expect(posts).toBe(1);
+});
+
 test('new services can be assigned without reloading or losing assignment selections', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   const services = [{ id: 1, name: 'Existing massage', price_cents: 10000, durations: [60], active: 1, requires_room: 1 }];

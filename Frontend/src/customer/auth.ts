@@ -37,10 +37,16 @@ export async function customerToken() {
 }
 
 export async function customerSignIn() {
-  await customerInstance.loginRedirect({ scopes: customerScopes, prompt: 'select_account' });
+  const { beginCustomerLogin } = await import('./session');
+  const nonce = await beginCustomerLogin();
+  await customerInstance.loginRedirect({ scopes: customerScopes, prompt: nonce ? 'login' : 'select_account',
+    // Explicit query parameter: this MSAL version does not serialize maxAge=0.
+    ...(nonce ? { nonce, maxAge: 0, extraQueryParameters: { max_age: '0' }, claims: JSON.stringify({ id_token: { auth_time: { essential: true } } }) } : {}) });
 }
 
 export async function customerSignOut() {
+  const { endCustomerSession } = await import('./session');
+  await endCustomerSession();
   const account = selectCustomerAccount();
   if (!account) return;
   await customerInstance.logoutRedirect({ account, postLogoutRedirectUri: customerHome });

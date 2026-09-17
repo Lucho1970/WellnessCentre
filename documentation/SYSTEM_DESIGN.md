@@ -1,6 +1,28 @@
 # Wellness Centre — System Design
 
-Version 1.0 · 16 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
+Version 1.1 · 17 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
+
+### Customer onboarding implementation checkpoint
+
+Migration 005 adds separate customer identity/link, invitation/claim, reusable address,
+challenge, session and rate-limit tables. `CUSTOMER_CLINIC_ID` explicitly selects the
+deployment clinic; `CUSTOMER_ONBOARDING_ENABLED` defaults false. Immutable issuer/subject,
+not email/name/DOB, identifies the external principal. Staff approve existing-record
+claims after independent verification plus a customer-provided review code. New records
+are explicitly created, never automatically matched to an existing email.
+
+Protected customer endpoints require both the customer API access token and a hashed,
+server-tracked opaque session credential. Session establishment validates a separate
+signed SPA ID-token freshness proof (matching object/tenant, one-time nonce, auth_time);
+ID tokens are never accepted as API authorization. Confirmed client limits are 30-minute
+idle / 8-hour absolute. No background renewal or `iat` fallback. Staff sessions and
+permissions are unchanged. Profile writes use current locking reads/revisions; ownership
+changes serialize on the configured clinic with unique constraints as a second guard.
+
+Local integration/browser checks are in place; real External ID freshness proof and
+Netfirms acceptance remain release gates. See [CLIENT_ONBOARDING.md](CLIENT_ONBOARDING.md)
+for exact endpoints, rollout and remaining R3 scope. Older target statements below about
+linking multiple providers, recovery, personas and client booking remain unimplemented.
 
 ## 1. Authority and design posture
 

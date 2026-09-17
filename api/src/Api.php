@@ -19,6 +19,7 @@ use Wellness\Service\BookingService;
 use Wellness\Service\CatalogService;
 use Wellness\Service\ProfileService;
 use Wellness\Service\ClientService;
+use Wellness\Service\CustomerOnboarding;
 use function FastRoute\simpleDispatcher;
 
 final class Api
@@ -42,6 +43,9 @@ final class Api
         try{
             $request=Request::capture();$this->cors($request);
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
+            if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
+                Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
+            }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
                 $routes->addRoute('GET','/api/v1/health/database','databaseHealth');
@@ -65,6 +69,9 @@ final class Api
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
                 $routes->addRoute('PATCH','/api/v1/clients/{id:\\d+}','updateClient');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/invitations','clientInvitations');
+                $routes->addRoute('POST','/api/v1/clients/{id:\\d+}/invitations','issueClientInvitation');
+                $routes->addRoute('POST','/api/v1/clients/{id:\\d+}/invitations/{invitation:\\d+}','reviewClientInvitation');
                 $routes->addRoute('POST','/api/v1/admin/locations','createLocation');
                 $routes->addRoute('GET','/api/v1/admin/locations','adminLocations');
                 $routes->addRoute('PATCH','/api/v1/admin/locations/{id:\\d+}','updateLocation');
@@ -128,6 +135,9 @@ final class Api
                 'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId),
                 'updateClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'clientInvitations'=>$this->onboarding()->invitations($this->user($request),(int)$route[2]['id']),
+                'issueClientInvitation'=>$this->onboarding()->invite($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'reviewClientInvitation'=>$this->onboarding()->review($this->user($request),(int)$route[2]['id'],(int)$route[2]['invitation'],$request->body,$request->correlationId),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
                 'adminLocations'=>$this->admin->locations($this->user($request)),
                 'updateLocation'=>$this->admin->updateLocation($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
@@ -169,13 +179,57 @@ final class Api
             $created=str_starts_with((string)$route[1],'create');
             Response::json(['data'=>$data],$created?201:200,$request->correlationId);
         }catch(ApiException $e){Response::json(['error'=>array_filter(['code'=>$e->errorCode,'message'=>$e->getMessage(),'fields'=>$e->fields?:null,'correlation_id'=>$request?->correlationId])],$e->status,$request?->correlationId);}
-        catch(Throwable $e){error_log($e->__toString());$message=$this->config->debug?$e->getMessage():'An unexpected error occurred.';Response::json(['error'=>['code'=>'internal_error','message'=>$message,'correlation_id'=>$request?->correlationId]],500,$request?->correlationId);}
+        catch(Throwable $e){
+            // Exception messages/traces can contain SQL contact values or authentication arguments.
+            error_log('API failure '.get_class($e).' correlation_id='.($request?->correlationId ?? 'unavailable'));
+            Response::json(['error'=>['code'=>'internal_error','message'=>'An unexpected error occurred.','correlation_id'=>$request?->correlationId]],500,$request?->correlationId);
+        }
     }
 
     private function customerMe(Request $request): array
     {
         header('Cache-Control: no-store');
+        if ($this->config->customerOnboardingEnabled) {
+            $service = $this->onboarding();
+            $session = $service->session((new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
+            $identity = $session['identity_id']; unset($session['identity_id']);
+            return $service->status($identity) + ['session' => $session];
+        }
         return (new CustomerAuthenticator($this->config))->authenticate($request->bearerToken());
+    }
+
+    private function onboarding(): CustomerOnboarding
+    {
+        if (!$this->config->customerOnboardingEnabled) throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled.');
+        return new CustomerOnboarding($this->database->connection(), $this->config);
+    }
+
+    private function customerRoute(Request $r): array
+    {
+        $route = $r->method . ' ' . substr($r->path, strlen('/api/v1/customer/'));
+        if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled];
+        $service = $this->onboarding();
+        if ($route === 'POST auth/challenge') return $service->challenge($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $token = $r->headers['x-customer-session'] ?? null;
+        if ($route === 'POST auth/logout') return $service->logout($token, $r->correlationId);
+        $auth = new CustomerAuthenticator($this->config);
+        $claims = $auth->claims($r->bearerToken());
+        if ($route === 'POST auth/session') {
+            if (!is_string($r->body['id_token'] ?? null)) throw new ApiException(422, 'invalid_proof', 'A fresh sign-in proof is required.');
+            return $service->startSession($claims, $auth->claims($r->body['id_token'], true), $r->correlationId);
+        }
+        $session = $service->session($claims, $token, $route === 'POST auth/activity');
+        $identity = $session['identity_id'];
+        unset($session['identity_id']);
+        return match ($route) {
+            'POST auth/activity' => ['session' => $session],
+            'POST register' => $service->register($identity, $r->body, $r->correlationId),
+            'POST invitations/accept' => $service->accept($identity, $r->body, $r->correlationId),
+            'GET profile' => $service->profile($identity, $r->correlationId),
+            'PATCH profile' => $service->saveProfile($identity, $r->body, $r->correlationId),
+            'GET appointments' => $service->appointments($identity, $r->correlationId),
+            default => throw new ApiException(404, 'not_found', 'Route not found.'),
+        };
     }
 
     private function databaseHealth(): array
@@ -191,6 +245,6 @@ final class Api
     {
         $origin=$request->headers['origin']??'';
         if($origin!==''&&in_array($origin,$this->config->allowedOrigins,true)){header('Access-Control-Allow-Origin: '.$origin);header('Vary: Origin');header('Access-Control-Allow-Credentials: true');}
-        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Correlation-ID, Idempotency-Key');header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: no-referrer');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Correlation-ID, Idempotency-Key, X-Customer-Session');header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: no-referrer');
     }
 }

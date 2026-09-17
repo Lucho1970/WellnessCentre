@@ -53,3 +53,14 @@ $staff = new \Wellness\Auth\EntraAuthenticator($config, new \Wellness\Database($
 try { $staff->authenticate($sign($claims + ['roles' => ['Wellness.SuperAdmin']])); throw new RuntimeException('Customer gained staff access'); }
 catch (ApiException $e) { if ($e->errorCode !== 'invalid_token_claims') throw $e; }
 echo "1 customer-to-staff boundary check passed.\n";
+
+// ID tokens are allowed only as separately validated session freshness proofs.
+$proof=array_replace($claims,['aud'=>$config->customerSpaClientId,'auth_time'=>time(),'nonce'=>str_repeat('a',64)]);
+unset($proof['scp'],$proof['azp']);
+if($auth->claims($sign($proof),true)['nonce']!==str_repeat('a',64)) throw new RuntimeException('Valid ID proof rejected');
+$reject($sign($proof)); // Cannot authorize API requests.
+foreach(['aud'=>$config->customerApiClientId,'iss'=>'untrusted','azp'=>'other','exp'=>time()-120] as $field=>$value) {
+    try{$auth->claims($sign(array_replace($proof,[$field=>$value])),true);throw new RuntimeException('Invalid ID proof accepted');}
+    catch(ApiException $e){if($e->status!==401)throw $e;}
+}
+echo "6 ID-proof boundary checks passed.\n";

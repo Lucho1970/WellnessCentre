@@ -25,6 +25,8 @@ final readonly class Config
         public string $customerSubdomain = '',
         public string $customerApiClientId = '',
         public string $customerSpaClientId = '',
+        public bool $customerOnboardingEnabled = false,
+        public int $customerClinicId = 0,
     ) {}
 
     public static function fromEnvironment(): self
@@ -54,6 +56,8 @@ final readonly class Config
             $value('CUSTOMER_ENTRA_SUBDOMAIN'),
             $value('CUSTOMER_ENTRA_API_CLIENT_ID'),
             $value('CUSTOMER_ENTRA_SPA_CLIENT_ID'),
+            filter_var($value('CUSTOMER_ONBOARDING_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            (int)$value('CUSTOMER_CLINIC_ID', '0'),
         );
     }
 

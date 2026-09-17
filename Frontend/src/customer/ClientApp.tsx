@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Alert, AppBar, Avatar, Box, Button, Container, IconButton, Menu, MenuItem, Paper, Stack, Toolbar, Typography } from '@mui/material';
 import { useClinicConfig } from '../config/ClinicConfigProvider';
 import { publicLink } from '../shared/urls';
-import { customerConfigured, customerInstance, customerSignIn, customerSignOut, customerToken } from './auth';
+import { customerConfigured, customerInstance, customerSignIn, customerSignOut } from './auth';
+import { customerFetch, clearCustomerSession, updateSessionTimes, type SessionTimes } from './session';
+import { CustomerWorkspace, type CustomerStatus } from './CustomerWorkspace';
 
 export function ClientApp({ initialError = '' }: { initialError?: string }) {
   const { config } = useClinicConfig();
@@ -15,9 +17,27 @@ export function ClientApp({ initialError = '' }: { initialError?: string }) {
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [status, setStatus] = useState<CustomerStatus | null>(null);
+  const [session, setSession] = useState<SessionTimes | null>(null);
+  useEffect(() => {
+    const end = () => { clearCustomerSession(); setVerified(false); setStatus(null); setSession(null); setChecking(false); setError('Your client session has ended. Please sign in again.'); };
+    window.addEventListener('customer-session-ended', end);
+    const expires = session ? Math.min(session.idle_expires_at, session.absolute_expires_at) * 1000 : null;
+    const timer = expires ? window.setTimeout(end, Math.max(0, expires - Date.now())) : undefined;
+    let lastActivity = Date.now();
+    const activity = (event: Event) => {
+      if (!verified || !session || !event.isTrusted || Date.now() - lastActivity < 60000) return;
+      lastActivity = Date.now();
+      void customerFetch('/auth/activity', { method: 'POST', body: '{}' }).then(data => { updateSessionTimes(data.session); setSession(data.session); }).catch(() => { /* Expiry is still enforced by the server and timer. */ });
+    };
+    window.addEventListener('pointerdown', activity); window.addEventListener('keydown', activity);
+    return () => { window.clearTimeout(timer); window.removeEventListener('customer-session-ended', end); window.removeEventListener('pointerdown', activity); window.removeEventListener('keydown', activity); };
+  }, [session, verified]);
   useEffect(() => {
     if (!account || initialError) { setChecking(false); return; }
     const controller = new AbortController();
+    const end = () => controller.abort();
+    window.addEventListener('customer-session-ended', end);
     setVerified(false); setChecking(true); setError('');
     const timeout = window.setTimeout(() => {
       controller.abort(); setChecking(false);
@@ -25,28 +45,20 @@ export function ClientApp({ initialError = '' }: { initialError?: string }) {
     }, 20000);
     void (async () => {
       try {
-        const token = await customerToken();
-        if (controller.signal.aborted) return;
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? '/api/v1'}/customer/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }, signal: controller.signal, cache: 'no-store', credentials: 'omit',
-        });
-        const body = await response.json().catch(() => null);
-        if (!response.ok) {
-          const reference = body?.error?.correlation_id;
-          const message = response.status === 401 ? 'Your customer authorization is invalid or expired. Please sign in again.'
-            : response.status === 403 ? 'This account does not have the customer API permission. Contact the clinic.'
-            : 'The customer sign-in service is unavailable. Please retry later.';
-          throw new Error(message + (typeof reference === 'string' ? ` Reference: ${reference}` : ''));
-        }
-        if (body?.data?.authenticated !== true || body.data.authentication_context !== 'customer' || body.data.onboarding_status !== 'not_linked') {
+        const data = await customerFetch('/auth/me', { signal: controller.signal });
+        if (data?.authenticated !== true || data.authentication_context !== 'customer' || !['not_linked','pending_review','linked'].includes(data.onboarding_status)) {
           throw new Error('The server returned an unexpected customer sign-in response. Please contact the clinic.');
         }
-        if (!controller.signal.aborted) setVerified(true);
+        if (data.session && Math.min(data.session.idle_expires_at, data.session.absolute_expires_at) * 1000 <= Date.now()) throw new Error('Your client session has ended. Please sign in again.');
+        if (!controller.signal.aborted) {
+          setVerified(true); setStatus(data.session ? data : null); setSession(data.session ?? null);
+          if (data.session) updateSessionTimes(data.session);
+        }
       } catch (cause) {
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to verify customer sign-in.');
       } finally { window.clearTimeout(timeout); if (!controller.signal.aborted) setChecking(false); }
     })();
-    return () => { window.clearTimeout(timeout); controller.abort(); };
+    return () => { window.clearTimeout(timeout); controller.abort(); window.removeEventListener('customer-session-ended', end); };
   }, [account, attempt, initialError]);
 
   const run = async (action: () => Promise<void>) => {
@@ -76,8 +88,9 @@ export function ClientApp({ initialError = '' }: { initialError?: string }) {
           : checking ? <Typography role="status" sx={{ my: 2 }}>Verifying customer sign-in…</Typography>
           : verified ? <Alert severity="success" sx={{ my: 2 }}>Customer sign-in verified.</Alert>
           : <Typography sx={{ my: 2 }}>Sign in using Google, your personal Microsoft account, or an email code.</Typography>}
-        <Alert severity="info" sx={{ my: 2 }}>Client booking is coming next. Online confirmation and client records are not available yet. No appointment has been requested or reserved.</Alert>
-        {verified && <Typography>Your sign-in has not been linked to a clinic record. Contact the clinic for assistance. Matching an email address does not grant access to an existing record.</Typography>}
+        <Alert severity="info" sx={{ my: 2 }}>Client booking is coming next. No appointment has been requested or reserved. Contact the clinic to book or change an appointment.</Alert>
+        {verified && !status && <Typography>Your sign-in has not been linked to a clinic record. Contact the clinic for assistance. Matching an email address does not grant access to an existing record.</Typography>}
+        {verified && status && <CustomerWorkspace status={status} onRefresh={() => setAttempt(value => value + 1)} />}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={3}>
           {customerConfigured && !verified && <Button variant="contained" disabled={busy || checking} onClick={() => void run(customerSignIn)}>{account ? 'Sign in again' : 'Sign in or create client account'}</Button>}
           {account && error && <Button disabled={checking || busy} onClick={() => setAttempt(value => value + 1)}>Retry verification</Button>}

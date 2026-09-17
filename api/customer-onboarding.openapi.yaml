@@ -1,0 +1,187 @@
+openapi: 3.0.3
+info:
+  title: Wellness customer onboarding and reviewed record access
+  version: 0.1.0
+  description: >-
+    Default-off feature. All responses have data/error envelopes and Cache-Control no-store.
+    Customer endpoints derive clinic and client identity on the server. No email matching.
+    Missing/invalid access JWT or session is 401; missing scope/role or inactive client is
+    403; disabled feature, invalid clinic configuration or unavailable signing keys is 503.
+    Request body limit 64 KiB. See customer-auth.openapi.yaml for GET customer/auth/me,
+    and documentation/CLIENT_ONBOARDING.md for complete field limits and rollout.
+security:
+  - customerBearer: []
+    customerSession: []
+paths:
+  /api/v1/customer/auth/options:
+    get:
+      security: []
+      responses:
+        '200': {description: 'data.onboarding_enabled boolean; no private configuration'}
+  /api/v1/customer/auth/challenge:
+    post:
+      security: []
+      summary: One-use 256-bit nonce, ten-minute expiry
+      responses:
+        '200': {description: 'data.nonce: 64 lowercase hex characters'}
+        '429': {description: 20 attempts per IP per ten-minute fixed window exceeded}
+  /api/v1/customer/auth/session:
+    post:
+      security: [{customerBearer: []}]
+      summary: Fresh signed ID proof exchange; ID token cannot authorize normal API access
+      description: >-
+        Requires SPA-audience proof matching signed access-JWT oid/tid, unused challenge
+        nonce and auth_time within ten minutes, no earlier than challenge creation minus
+        60 seconds. Limit 15 attempts per identity per ten minutes. No iat fallback.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token: {type: string, maxLength: 16384}
+      responses:
+        '200': {description: 'data.session_token (once), idle_expires_at and absolute_expires_at (Unix seconds)'}
+        '401': {description: Invalid proof/access token, stale or absent authentication time, mismatch or replay}
+        '422': {description: Missing proof}
+        '429': {description: Rate limited}
+  /api/v1/customer/auth/activity:
+    post:
+      summary: Explicit user activity; cannot revive expired or revoked session
+      responses:
+        '200': {description: 'data.session.idle_expires_at and absolute_expires_at Unix seconds'}
+        '401': {description: Invalid/expired session or JWT}
+  /api/v1/customer/auth/logout:
+    post:
+      security: [{customerSession: []}]
+      summary: Idempotently revoke current session, without needing an unexpired access JWT
+      responses:
+        '200': {description: 'data.signed_out=true, including unknown session'}
+  /api/v1/customer/register:
+    post:
+      summary: Explicit new client registration; repeated same-identity request is idempotent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Profile'}
+      responses:
+        '200': {description: Linked onboarding status}
+        '409': {description: Neutral email/concurrency conflict or pending invitation; never links an existing email}
+        '422': {description: Invalid or privileged profile fields}
+  /api/v1/customer/invitations/accept:
+    post:
+      summary: Consume private invitation and submit claim for staff review; no record access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, claimant_name]
+              properties:
+                token: {type: string, pattern: '^[a-f0-9]{64}$'}
+                claimant_name: {type: string, minLength: 1, maxLength: 150}
+      responses:
+        '200': {description: Pending status and customer review_code; retry by same identity remains pending}
+        '409': {description: Generic unavailable/expired/revoked/consumed invitation, already linked or pending elsewhere}
+        '422': {description: Invalid invitation code/name}
+        '429': {description: Ten attempts per identity per ten-minute fixed window exceeded}
+  /api/v1/customer/profile:
+    get:
+      summary: Own contact profile only; never notes, DOB, roles or account identifiers
+      responses:
+        '200': {description: Profile fields plus revision; existing address/phone may be null}
+        '403': {description: Not linked or inactive}
+    patch:
+      summary: Update own allowed contact fields without changing appointment destinations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/Profile'}
+                - {type: object, required: [revision]}
+      responses:
+        '200': {description: Updated profile with new revision}
+        '403': {description: Not linked or inactive}
+        '409': {description: Stale revision or neutral email/concurrency conflict}
+        '422': {description: Invalid/privileged fields}
+  /api/v1/customer/appointments:
+    get:
+      summary: Most recent 100 own appointments, descending start time, read-only
+      responses:
+        '200': {description: 'data.items: id, starts_at, ends_at (UTC), status, delivery_mode, service, practitioner, location, timezone. data.limit=100. No notes/addresses/attendees/financial data.'}
+        '403': {description: Not linked or inactive}
+  /api/v1/clients/{id}/invitations:
+    parameters:
+      - {$ref: '#/components/parameters/ClientId'}
+    get:
+      security: [{staffBearer: []}]
+      summary: Same-clinic SuperAdmin/ClinicAdmin/reception views last 20 invitation summaries
+      responses:
+        '200': {description: Linked flag and summaries; no token or review code}
+        '404': {description: Client outside scope or missing}
+    post:
+      security: [{staffBearer: []}]
+      summary: Issue 48-hour manual-delivery invitation, revoking previous invitations/pending claims
+      responses:
+        '200': {description: 'data.id, token (once), expires_at Unix seconds, delivery=manual'}
+        '404': {description: Client outside scope or missing}
+        '409': {description: Inactive/already linked client}
+  /api/v1/clients/{id}/invitations/{invitation}:
+    parameters:
+      - {$ref: '#/components/parameters/ClientId'}
+      - {name: invitation, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      security: [{staffBearer: []}]
+      summary: Same-clinic client-management staff approve/reject/revoke
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: {type: string, enum: [approve, reject, revoke]}
+                identity_verified: {type: boolean, description: Must be true for approval after independent verification}
+                review_code: {type: string, description: Approval requires code obtained from independently verified client}
+      responses:
+        '200': {description: Updated invitation summaries}
+        '404': {description: Client/invitation outside scope}
+        '409': {description: Expired/revoked/reviewed/link conflict; cannot undo approved link}
+        '422': {description: Missing verification confirmation or correct review code}
+components:
+  parameters:
+    ClientId: {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+  securitySchemes:
+    customerBearer: {type: http, scheme: bearer, bearerFormat: JWT, description: Configured External ID API access token and SPA azp with access_as_client scope}
+    customerSession: {type: apiKey, in: header, name: X-Customer-Session}
+    staffBearer: {type: http, scheme: bearer, bearerFormat: JWT}
+  schemas:
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [given_name, family_name, email, phone, address]
+      properties:
+        given_name: {type: string, maxLength: 100}
+        family_name: {type: string, maxLength: 100}
+        email: {type: string, format: email, maxLength: 190}
+        phone: {type: string, maxLength: 40}
+        preferred_contact: {type: string, enum: [email, phone], default: email}
+        revision: {type: string, description: Required for PATCH; obtained from GET}
+        address:
+          type: object
+          required: [address_line1, city, province, postal_code, country]
+          properties:
+            address_line1: {type: string, maxLength: 190}
+            address_line2: {type: string, maxLength: 190}
+            city: {type: string, maxLength: 100}
+            province: {type: string, maxLength: 80}
+            postal_code: {type: string, maxLength: 20}
+            country: {type: string, maxLength: 80}
+            instructions: {type: string, maxLength: 500}

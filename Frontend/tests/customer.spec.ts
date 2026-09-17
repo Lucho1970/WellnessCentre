@@ -120,6 +120,8 @@ test('callback failure strips response and offers deliberate recovery', async ({
 });
 
 test('real customer MSAL starts code flow with PKCE and customer-only scope', async ({ page }) => {
+  await page.route('**/api/v1/customer/auth/options', route => route.fulfill({ json: { data: { onboarding_enabled: true } } }));
+  await page.route('**/api/v1/customer/auth/challenge', route => route.fulfill({ json: { data: { nonce: 'a'.repeat(64) } } }));
   await page.route('**/api/v1/site-config', route => route.fulfill({ json: { data: { name: 'Test Wellness' } } }));
   const authority = 'https://testcustomers.ciamlogin.com/44444444-4444-4444-4444-444444444444';
   await page.route('https://testcustomers.ciamlogin.com/**', route => {
@@ -143,4 +145,63 @@ test('real customer MSAL starts code flow with PKCE and customer-only scope', as
   expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:5184/client/auth/callback');
   expect(url.searchParams.get('scope')).toContain('api://66666666-6666-6666-6666-666666666666/access_as_client');
   expect(url.searchParams.has('client_secret')).toBe(false);
+  expect(url.searchParams.get('nonce')).toBe('a'.repeat(64));
+  expect(url.searchParams.get('prompt')).toBe('login');
+  expect(url.searchParams.get('max_age')).toBe('0');
+  expect(JSON.parse(url.searchParams.get('claims') ?? '{}').id_token.auth_time.essential).toBe(true);
+});
+
+test('new customer registers once and pending invitation never exposes a profile', async ({ page }) => {
+  await fixture(page, true);
+  let status = 'not_linked', registrations = 0, checks = 0;
+  await page.route('**/api/v1/customer/auth/me', route => {
+    checks++;
+    return route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: status,
+      review_code: 'ABCDEF123456', session: { idle_expires_at: Date.now()/1000+1800, absolute_expires_at: Date.now()/1000+28800 } } } });
+  });
+  await page.route('**/api/v1/customer/register', route => {
+    registrations++; const body = route.request().postDataJSON();
+    expect(body.given_name).toBe('Test'); expect(body.address.city).toBe('Town');
+    expect(body.client_id).toBeUndefined(); expect(body.roles).toBeUndefined();
+    status = 'pending_review'; // Exercise the privacy boundary on the subsequent status response.
+    return route.fulfill({ json: { data: { onboarding_status: status } } });
+  });
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button', { name: 'I am a new client' }).click();
+  for (const [label,value] of Object.entries({ 'First name':'Test','Last name':'Client','Contact email':'test@example.test',Phone:'555-0100','Street address':'1 Test Street',City:'Town','Province / region':'ON','Postal code':'A1A 1A1' })) await page.getByRole('textbox',{name:label,exact:true}).fill(value);
+  await page.getByRole('button',{name:'Create my client record'}).click();
+  await expect(page.getByText(/Staff must verify your identity/)).toBeVisible();
+  await expect(page.getByText('ABCDEF123456')).toBeVisible();
+  await expect(page.getByRole('button',{name:'My profile',exact:true})).toHaveCount(0);
+  expect(registrations).toBe(1); expect(checks).toBeLessThanOrEqual(3);
+});
+
+test('linked client sees own information and idle expiry removes private UI without polling', async ({ page }) => {
+  await fixture(page,true); await page.clock.install();
+  const now=Date.now()/1000; let checks=0;
+  await page.route('**/api/v1/customer/auth/me', route => {
+    checks++; return route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',session:{idle_expires_at:now+1800,absolute_expires_at:now+28800}}}});
+  });
+  await page.route('**/api/v1/customer/profile', route => route.fulfill({json:{data:{given_name:'Private',family_name:'Client',email:'private@example.test',phone:'555-0100',address:null,revision:'revision'}}}));
+  await page.goto('http://localhost:5184/client');
+  await expect(page.getByRole('textbox',{name:'First name',exact:true})).toHaveValue('Private');
+  await page.clock.fastForward(1800001);
+  await expect(page.getByText('Your client session has ended. Please sign in again.')).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'First name',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Sign in again',exact:true})).toBeVisible();
+  expect(checks).toBeLessThanOrEqual(2);
+});
+
+test('invitation fragment is removed and acceptance remains pending until manual refresh', async ({page})=>{
+  await fixture(page,true);let pending=false, reads=0;
+  await page.route('**/api/v1/customer/auth/me',route=>{reads++;return route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:pending?'pending_review':'not_linked',review_code:'CODE12345678',session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}});});
+  await page.route('**/api/v1/customer/invitations/accept',route=>{expect(route.request().postDataJSON().token).toBe('b'.repeat(64));pending=true;return route.fulfill({json:{data:{onboarding_status:'pending_review'}}});});
+  await page.goto('http://localhost:5184/client/invite#token='+'b'.repeat(64));
+  await expect(page).toHaveURL('http://localhost:5184/client');
+  await page.getByRole('button',{name:'I have an invitation'}).click();
+  await page.getByLabel('Your full name').fill('Test Client');
+  await page.getByRole('button',{name:'Accept invitation',exact:true}).click();
+  await expect(page.getByText('CODE12345678')).toBeVisible();
+  const before=reads; await page.getByRole('button',{name:'Check approval status'}).click();
+  await expect.poll(()=>reads).toBeGreaterThan(before);
 });

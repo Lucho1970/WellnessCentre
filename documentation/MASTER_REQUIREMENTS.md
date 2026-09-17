@@ -1,6 +1,13 @@
 # Wellness Centre — Master Requirements
 
-Version 1.0 · Consolidated 16 September 2026 · Product owner: Luis Duran
+Version 1.1 · Updated 17 September 2026 · Product owner: Luis Duran
+
+Onboarding checkpoint: new-client registration, reviewed existing-record invitations,
+own contact profile/read-only appointments and server-tracked client sessions are now
+implemented behind a default-off flag. Owner confirmed staff approval and 30-minute
+client idle / 8-hour absolute limits. Hosted provider/Netfirms acceptance is still required.
+See [CLIENT_ONBOARDING.md](CLIENT_ONBOARDING.md). This is part of R3, not completion of
+all AUTH-04/05/06, CRM-03 or client booking requirements.
 
 ## 1. Authority and purpose
 
@@ -46,7 +53,7 @@ booking or clinical access is enabled by it. AUTH-04/05/06 and R3 remain open.
 - **AUTH-03 — Provider scope:** Owner confirmed: Google and Microsoft **personal** accounts first; Apple and Facebook/Meta remain planned extensions. Confirm Microsoft-personal support in a proof of concept before selecting the broker. Optional email/password or passwordless email is an open product choice; do not implement local password storage by default. This stages, rather than deletes, original Meta support.
 - **AUTH-04 — Account linking:** Authenticate with immutable provider identifiers. Never grant access to an existing client record solely because an email string matches. Support verified claiming of staff-created client records, explicit linking/unlinking of multiple providers, recovery, and audited duplicate-resolution workflows. Do not permit removal of the last viable sign-in method without recovery.
 - **AUTH-05 — Personas:** One person may be both practitioner/staff and client. Client access must not inherit staff privileges, and social sign-in must never create staff access. Linking these identities requires explicit proof of both accounts or a reviewed recovery process.
-- **AUTH-06 — Session control:** Clear sign-out, safe expiry/re-authentication, minimal scopes, protected tokens, and safe return paths. Proposed baseline pending operational approval: 15-minute staff inactivity lock, 30-minute client inactivity lock, and an 8-hour absolute application session; sensitive identity/financial/privacy actions require recent authentication. These are targets, not existing enforcement claims.
+- **AUTH-06 — Session control:** Clear sign-out, safe expiry/re-authentication, minimal scopes, protected tokens, and safe return paths. Owner-approved client limits: 30-minute inactivity and 8-hour absolute application session, implemented behind the onboarding flag with hosted acceptance pending. A 15-minute staff inactivity lock remains a proposed target, not an enforcement claim. Sensitive identity/financial/privacy actions require recent authentication.
 - **AUTH-07 — API authority:** Enforce authentication, clinic/location scope, role and resource relationship on every protected operation. Neither frontend hiding, CORS, guessed object IDs, nor a browser-shipped secret is an authorization boundary. Role/status changes must affect subsequent API authorization.
 
 ### Role policy (target, not a statement of every current endpoint)

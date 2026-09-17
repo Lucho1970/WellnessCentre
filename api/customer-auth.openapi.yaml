@@ -1,17 +1,23 @@
 openapi: 3.0.3
 info:
-  title: Wellness customer identity checkpoint
-  version: 0.1.0
+  title: Wellness customer identity and onboarding status
+  version: 0.2.0
+  description: Session and record endpoints are documented in customer-onboarding.openapi.yaml and documentation/CLIENT_ONBOARDING.md.
 paths:
   /api/v1/customer/auth/me:
     get:
-      summary: Verify a customer access token without claiming any local records
-      description: No database writes or email matching. Not a client profile endpoint. Responses use Cache-Control no-store.
+      summary: Verify identity and return explicit onboarding status
+      description: With onboarding disabled returns legacy not_linked proof without session. When enabled X-Customer-Session is mandatory and returns server deadlines, linked/pending status and pending review code. No email matching. Cache-Control no-store.
+      parameters:
+        - name: X-Customer-Session
+          in: header
+          description: Required when onboarding is enabled
+          schema: {type: string}
       security:
         - customerBearer: []
       responses:
         '200':
-          description: Valid identity; no local record access
+          description: Valid identity and current onboarding status; no profile contents
           content:
             application/json:
               schema:
@@ -24,8 +30,14 @@ paths:
                     properties:
                       authenticated: {type: boolean, enum: [true]}
                       authentication_context: {type: string, enum: [customer]}
-                      onboarding_status: {type: string, enum: [not_linked]}
-                      capabilities: {type: array, maxItems: 0, items: {type: string}}
+                      onboarding_status: {type: string, enum: [not_linked, pending_review, linked]}
+                      capabilities: {type: array, items: {type: string, enum: [own_profile, own_appointments]}}
+                      review_code: {type: string, nullable: true}
+                      session:
+                        type: object
+                        properties:
+                          idle_expires_at: {type: integer, description: Unix seconds}
+                          absolute_expires_at: {type: integer, description: Unix seconds}
         '401':
           description: Missing, expired, invalid or wrong-context bearer token
         '403':

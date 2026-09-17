@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { ArrowLeft, ArrowRight, Plus, Search, Users } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { ClientInvitations } from './ClientInvitations';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Summary = { id: number; display_name: string; email: string; phone: string | null; status: string };
@@ -117,6 +118,7 @@ export function ClientManagement() {
             <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth select disabled={saving} label="Status" helperText="Inactive clients cannot receive new bookings." value={form.status} onChange={event => setForm(current => ({ ...current, status: event.target.value }))}><MenuItem value="active">Active</MenuItem><MenuItem value="inactive">Inactive</MenuItem>{!['active', 'inactive'].includes(form.status) && <MenuItem value={form.status}>{form.status} — choose a new status</MenuItem>}</TextField></Grid>
           </Grid>
           {formError && <Alert severity="error" sx={{ mt: 2 }}>{formError}</Alert>}
+          {id !== null && <ClientInvitations key={id} clientId={id} request={request} />}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}><Button onClick={close} disabled={saving}>Cancel</Button><Button type="submit" variant="contained" disabled={saving}>{saving ? 'Saving…' : 'Save client'}</Button></DialogActions>
       </Box>

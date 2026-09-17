@@ -17,6 +17,12 @@ final class CustomerAuthenticator
 
     public function authenticate(?string $token): array
     {
+        $this->claims($token);
+        return ['authenticated' => true, 'authentication_context' => 'customer', 'onboarding_status' => 'not_linked', 'capabilities' => []];
+    }
+
+    public function claims(?string $token, bool $idProof = false): array
+    {
         if (!$token) throw new ApiException(401, 'unauthorized', 'Customer sign-in is required.');
         $c = $this->config;
         foreach ([$c->customerTenantId, $c->customerApiClientId, $c->customerSpaClientId] as $id) {
@@ -43,17 +49,18 @@ final class CustomerAuthenticator
             } finally { JWT::$leeway = $previousLeeway; }
             $issuer = "https://{$c->customerTenantId}.ciamlogin.com/{$c->customerTenantId}/v2.0";
             if (($claims['iss'] ?? null) !== $issuer || ($claims['tid'] ?? null) !== $c->customerTenantId
-                || ($claims['aud'] ?? null) !== $c->customerApiClientId || ($claims['azp'] ?? null) !== $c->customerSpaClientId
+                || ($claims['aud'] ?? null) !== ($idProof ? $c->customerSpaClientId : $c->customerApiClientId)
+                || (!$idProof && ($claims['azp'] ?? null) !== $c->customerSpaClientId)
+                || ($idProof && isset($claims['azp']) && $claims['azp'] !== $c->customerSpaClientId)
                 || ($claims['ver'] ?? null) !== '2.0' || !is_string($claims['sub'] ?? null) || $claims['sub'] === ''
                 || !is_int($claims['exp'] ?? null) || !is_int($claims['iat'] ?? null)
-                || $claims['iat'] > time() + 60 || $claims['exp'] <= $claims['iat'] || !is_string($claims['scp'] ?? null)) {
+                || $claims['iat'] > time() + 60 || $claims['exp'] <= $claims['iat'] || (!$idProof && !is_string($claims['scp'] ?? null))) {
                 throw new \UnexpectedValueException();
             }
-            if (!in_array('access_as_client', preg_split('/\s+/', trim($claims['scp'])) ?: [], true)) {
+            if (!$idProof && !in_array('access_as_client', preg_split('/\s+/', trim($claims['scp'])) ?: [], true)) {
                 throw new ApiException(403, 'missing_scope', 'The customer API permission is missing.');
             }
-            // No email lookup, local user creation, record claiming, roles or clinical data.
-            return ['authenticated' => true, 'authentication_context' => 'customer', 'onboarding_status' => 'not_linked', 'capabilities' => []];
+            return $claims; // Internal only. Never serialize raw token claims to the browser.
         } catch (ApiException $error) { throw $error; }
         catch (Throwable) { throw new ApiException(401, 'invalid_customer_token', 'Customer authorization is invalid or expired. Please sign in again.'); }
     }
