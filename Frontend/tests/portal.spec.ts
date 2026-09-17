@@ -13,6 +13,7 @@ async function fixtures(page: Page, roles?: string[]) {
     const auth={account,configured:true,isAuthenticated:true,signIn:async()=>{},signOut:async()=>{},getAccessToken:async()=>'test-only-token'};
     export const msalInstance={initialize:async()=>{},handleRedirectPromise:async()=>null,getActiveAccount:()=>account,getAllAccounts:()=>[account],setActiveAccount:()=>{}};
     export const StaffAuthProvider=({children})=>children;
+    export const selectStaffAccount=()=>account;
     export const useStaffAuth=()=>auth;
   ` }));
   await page.route('**/api/v1/**', route => {
@@ -117,11 +118,12 @@ test('role policies preserve current access without broadening permissions', () 
   expect(pagePath('practitioner', 'appointments')).toBe('/practitioner/schedule');
 });
 
-test('public home has no staff workspace, MSAL initialization or fake address', async ({ page }) => {
+test('public home has client-first login and no workforce authentication or fake address', async ({ page }) => {
   const requests: string[] = []; page.on('request', request => requests.push(request.url()));
   await fixtures(page); await page.goto(publicHost);
   await expect(page.getByRole('heading', { name: 'Feel better, on your schedule.' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Login / portal' })).toHaveAttribute('href', `${portalHost}/login`);
+  await expect(page.getByRole('link', { name: 'Login', exact: true })).toHaveAttribute('href', `${portalHost}/client`);
+  await expect(page.getByRole('link', { name: 'Staff login', exact: true })).toHaveAttribute('href', `${portalHost}/staff/login`);
   await expect(page.getByText('240 Queen Street')).toHaveCount(0);
   expect(requests.some(url => url.includes('AuthProvider') || url.includes('login.microsoftonline.com') || url.includes('/auth/me'))).toBe(false);
 });
@@ -217,6 +219,13 @@ test('unknown portal paths show a safe not-found screen', async ({ page }) => {
   await expect(page.getByText('This portal page was not found.')).toBeVisible();
   await page.getByRole('link', { name: 'Return to your workspace' }).click();
   await expect(page).toHaveURL(`${portalHost}/admin`);
+});
+
+test('signed-in staff login returns to the authorized workspace', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  await page.goto(`${portalHost}/staff/login`);
+  await expect(page).toHaveURL(`${portalHost}/practitioner`);
+  await expect(page.getByText('Your clinic workspace', { exact: true })).toBeVisible();
 });
 
 test('screenshots: public and mobile portal layouts', async ({ page }) => {

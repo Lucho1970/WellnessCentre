@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { selectAccount } from '../src/auth/accountSelection';
+import type { AccountInfo } from '@azure/msal-browser';
 
 async function fixture(page: Page, signedIn = false, callbackFails = false) {
   // Only Playwright intercepts this module; no production bypass or fake tokens.
@@ -6,7 +8,8 @@ async function fixture(page: Page, signedIn = false, callbackFails = false) {
     const account=${signedIn ? "{homeAccountId:'customer',name:'Test Client'}" : 'null'};
     export const customerConfigured=true;
     export const customerHome='http://localhost:5184/client';
-    export const customerInstance={initialize:async()=>{},handleRedirectPromise:async()=>{${callbackFails ? "throw new Error('test callback failure');" : 'return null;'}},getActiveAccount:()=>account,getAllAccounts:()=>account?[account]:[],setActiveAccount:()=>{}};
+    export const customerInstance={initialize:async()=>{},handleRedirectPromise:async()=>{${callbackFails ? "throw new Error('test callback failure');" : 'return null;'}},getActiveAccount:()=>account?{...account}:null,getAllAccounts:()=>account?[{...account}]:[],setActiveAccount:()=>{}};
+    export const selectCustomerAccount=()=>account?{...account,idTokenClaims:{exp:Math.floor(Date.now()/1000)+3600}}:null;
     export const customerToken=async()=>'customer-test-token';
     export const customerSignIn=async()=>{window.customerSignInCalled=true;};
     export const customerSignOut=async()=>{window.customerSignOutCalled=true;};
@@ -26,7 +29,9 @@ test('customer route offers sign-in without running staff authentication', async
 });
 test('verified identity remains unlinked with no client records or staff roles', async ({ page }) => {
   await fixture(page, true);
+  let checks = 0;
   await page.route('**/api/v1/customer/auth/me', route => {
+    checks++;
     expect(route.request().headers().authorization).toBe('Bearer customer-test-token');
     return route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: 'not_linked', capabilities: [] } } });
   });
@@ -36,9 +41,62 @@ test('verified identity remains unlinked with no client records or staff roles',
   await expect(page.getByText(/has not been linked to a clinic record/)).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('client-verified.png'), fullPage: true });
   await page.getByRole('button', { name: 'Open client account menu' }).click();
+  expect(checks).toBe(1);
   await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
   expect(await page.evaluate(() => (window as any).customerSignOutCalled)).toBe(true);
   await expect(page.getByText('Customer sign-in verified.', { exact: true })).toHaveCount(0);
+});
+
+test('account restoration separates staff and customers even with a wrong active account', () => {
+  const staff = { homeAccountId: 'staff', tenantId: 'staff-tenant', environment: 'login.windows.net' } as AccountInfo;
+  const client = { homeAccountId: 'client', tenantId: 'client-tenant', environment: 'clients.ciamlogin.com' } as AccountInfo;
+  expect(selectAccount([client, staff], client, 'staff-tenant', ['login.windows.net'])).toBe(staff);
+  expect(selectAccount([staff, client], staff, 'client-tenant', ['clients.ciamlogin.com'])).toBe(client);
+  expect(selectAccount([client], client, 'staff-tenant', ['login.windows.net'])).toBeNull();
+  expect(selectAccount([{ ...client, environment: 'untrusted.test' }], null, 'client-tenant', ['clients.ciamlogin.com'])).toBeNull();
+});
+
+test('client verification stays stable across rerenders, refresh and public navigation', async ({ page }) => {
+  await fixture(page, true);
+  let checks = 0;
+  await page.route('**/api/v1/customer/auth/me', route => { checks++; return route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: 'not_linked', capabilities: [] } } }); });
+  await page.goto('http://localhost:5184/client');
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open client account menu' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
+  expect(checks).toBe(1);
+  await page.reload();
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
+  expect(checks).toBe(2);
+  await page.getByRole('link', { name: 'Public website' }).click();
+  await expect(page.getByRole('link', { name: 'Open client account', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Open client account', exact: true })).toBeVisible();
+  expect(checks).toBe(2); // Display bridge never requests tokens or API verification.
+  await page.getByRole('link', { name: 'Open client account', exact: true }).click();
+  await expect(page).toHaveURL('http://localhost:5184/client');
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
+  expect(checks).toBe(3);
+});
+
+test('generic login is client-first and staff login remains separate', async ({ page }) => {
+  await fixture(page);
+  await page.goto('http://localhost:5184/login');
+  await expect(page).toHaveURL('http://localhost:5184/client');
+  await expect(page.getByRole('heading', { name: 'Client portal' })).toBeVisible();
+  await page.getByRole('link', { name: 'Staff login', exact: true }).click();
+  await expect(page).toHaveURL('http://localhost:5184/staff/login');
+  await expect(page.getByRole('heading', { name: 'Staff portal', exact: true })).toBeVisible();
+});
+
+test('public login ignores spoofed account messages and works without the bridge', async ({ page }) => {
+  await fixture(page);
+  await page.route('**/client/session', route => route.abort());
+  await page.goto('http://localhost:5183/');
+  await page.evaluate(() => window.postMessage({ type: 'wellness:account-display', initials: 'XX', nonce: '' }, '*'));
+  await expect(page.getByRole('link', { name: 'Login', exact: true })).toHaveAttribute('href', 'http://localhost:5184/client');
+  await expect(page.getByRole('link', { name: 'Open client account' })).toHaveCount(0);
 });
 for (const status of [401, 403, 500]) {
   test(`customer API ${status} is readable and never loops or grants access`, async ({ page }) => {

@@ -5,6 +5,7 @@ import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { useClinicConfig } from './config/ClinicConfigProvider';
 import { portalLink } from './shared/urls';
 import { Booking } from './public/Booking';
+import { ClientLoginLink } from './public/ClientLoginLink';
 
 function Home() {
   return <Box className="hero" py={{ xs: 7, md: 12 }}><Container maxWidth="lg"><Grid container spacing={5} alignItems="center">
@@ -50,7 +51,7 @@ export default function App() {
         <HeartPulse color="#176b62" /><Typography component={Link} to="/" color="inherit" sx={{ textDecoration: 'none', flexGrow: 1 }} fontWeight={800}>{config.name}</Typography>
         <Stack component="nav" aria-label="Public navigation" direction="row" spacing={1} flexWrap="wrap">
           <Button component={Link} to="/book">Book online</Button><Button component={Link} to="/contact">Contact</Button>
-          <Button href={portalLink('login')} variant="contained">Login / portal</Button>
+          <ClientLoginLink />
         </Stack>
       </Toolbar></Container>
     </AppBar>
@@ -62,6 +63,7 @@ export default function App() {
     </Box>
     <Box component="footer" py={4} bgcolor="#123b36" color="white"><Container maxWidth="lg"><Typography fontWeight={800}>{config.name}</Typography>
       <Typography variant="body2" mt={1}>For questions about your information or care, please contact the clinic.</Typography>
+      <Button href={portalLink('staff/login')} color="inherit" size="small" sx={{ mt: 2 }}>Staff login</Button>
     </Container></Box>
   </>;
 }

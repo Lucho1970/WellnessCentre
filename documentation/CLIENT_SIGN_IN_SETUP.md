@@ -10,6 +10,32 @@ Customer identity proof is now implemented in source, with no SQL migration or c
 record writes. Existing staff sign-in remains separate. Hosted end-to-end acceptance
 is still pending; this checkpoint does not enable client booking or clinical access.
 
+## Client-first login and refresh correction
+
+Public **Login** now targets `/client`; generic portal `/login` redirects there too.
+Employees use `/staff/login` via a secondary Staff login link. The portal root remains
+compatible with the existing workforce callback, so no Entra redirect changes are needed.
+
+Customer verification holds a stable account snapshot instead of retriggering an effect
+on every new MSAL account object. Verification times out after 20 seconds with explicit
+retry/sign-in recovery. Both personas filter restored accounts by tenant and trusted
+environment before acquiring tokens; API validation is unchanged.
+
+Public initials use a hidden portal `/client/session` page with exact-origin/source and
+nonce-checked postMessage replies. Only initials from an unexpired cached customer ID
+token are shared, never tokens, email, account IDs, staff roles or clinical data. This is
+a display hint, not authenticated API access. The bridge does not acquire/refresh tokens
+or redirect to an identity provider. Blocked iframe/storage or expired cache falls back
+to Login; opening it returns to the portal for authoritative verification. Same-tab
+navigation is supported; browser storage partitioning/new tabs can require login again.
+No shared-domain authentication cookie is introduced. Hosting must permit the public
+site to frame this bridge for initials to appear; do not disable other security controls
+to force it. Login still works if framing is blocked.
+
+Deploy both public and portal ZIPs for this correction. No SQL, API or `.env` update is
+needed if the previous customer sign-in release is already installed. Test client login,
+refresh, browse availability, public refresh and account-link return, then staff login.
+
 Owner reports registration created: `Wellness Client Portal Dev`, single-tenant SPA
 in the customer tenant. Application (client) ID: `7a522317-d74f-4ccb-9805-8e4b912c02ab`.
 Planned customer-only callback: `https://portal.copihue.ca/client/auth/callback`.

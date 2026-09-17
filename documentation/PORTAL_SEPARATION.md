@@ -22,7 +22,8 @@ Paths below are relative to the portal base: at a subdomain they start at `/`; f
 
 | Portal route | Released behavior |
 | --- | --- |
-| `/`, `/login` | Staff sign-in, then eligible default workspace |
+| `/`, `/staff/login` | Staff sign-in, then eligible default workspace; root retained for workforce callback compatibility |
+| `/login` | Redirect to client sign-in at `/client` |
 | `/profile` | Redirect to eligible workspace's profile |
 | `/admin` | Operations dashboard with truthful guidance, not invented metrics |
 | `/admin/appointments`, `/admin/clients` | Existing authorized appointment and client workflows |
@@ -31,7 +32,8 @@ Paths below are relative to the portal base: at a subdomain they start at `/`; f
 | `/admin/practitioners`, `/admin/users`, `/admin/settings` | Existing SuperAdmin practitioner/staff/business settings |
 | `/admin/profile` | Application-owned avatar/profile |
 | `/practitioner`, `/practitioner/schedule`, `/practitioner/profile` | Current practitioner workspace, appointment list and profile |
-| `/client`, `/client/book` | Explicit not-yet-available information, not a signed-in customer portal |
+| `/client`, `/client/book` | Isolated customer sign-in verification; record linking and booking not yet enabled |
+| `/client/session` | Read-only, origin-checked initials display bridge for the public website; no tokens or account access shared |
 
 Unknown paths and unauthorized module paths show safe errors without mounting the feature. API authorization remains mandatory and unchanged.
 

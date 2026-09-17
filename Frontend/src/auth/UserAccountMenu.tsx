@@ -13,7 +13,7 @@ export function UserAccountMenu(){
   const loadAvatar=useCallback(async()=>{const request=++avatarRequest.current;if(!isAuthenticated)return;try{const token=await getAccessToken(),r=await fetch(`${import.meta.env.VITE_API_BASE_URL??'http://localhost:8080/api/v1'}/profile/avatar`,{headers:{Authorization:`Bearer ${token}`}}),b=await r.json();if(r.ok&&request===avatarRequest.current)setAvatar(b.data.image_base64?`data:${b.data.mime_type};base64,${b.data.image_base64}`:undefined);}catch{/* Initials remain the safe fallback. */}},[getAccessToken,isAuthenticated]);
   useEffect(()=>{setAvatar(undefined);void loadAvatar();window.addEventListener('avatar-updated',loadAvatar);return()=>{avatarRequest.current++;window.removeEventListener('avatar-updated',loadAvatar);};},[loadAvatar]);
   const run=async(action:()=>Promise<void>)=>{setBusy(true);setError('');try{await action();}catch(cause){setError(cause instanceof Error?cause.message:'Account action failed.');setBusy(false);}};
-  if(!isAuthenticated)return <Button component={Link} to="/login" variant="contained" size="small" startIcon={<LogIn size={17}/>}>Staff sign in</Button>;
+  if(!isAuthenticated)return <Button component={Link} to="/staff/login" variant="contained" size="small" startIcon={<LogIn size={17}/>}>Staff sign in</Button>;
   const name=account?.name??account?.username??'Staff member';
   const choose=(page:string)=>{setAnchor(null);navigate(page==='profile'?'/profile':'/');};
   return <>

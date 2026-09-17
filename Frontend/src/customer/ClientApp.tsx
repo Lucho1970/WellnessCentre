@@ -6,7 +6,9 @@ import { customerConfigured, customerInstance, customerSignIn, customerSignOut, 
 
 export function ClientApp({ initialError = '' }: { initialError?: string }) {
   const { config } = useClinicConfig();
-  const account = customerConfigured ? customerInstance.getActiveAccount() : null;
+  // MSAL returns a new AccountInfo object on each read. Keep a stable snapshot for
+  // this page lifetime (sign-in/out navigate away), not an effect dependency loop.
+  const [account] = useState(() => customerConfigured ? customerInstance.getActiveAccount() : null);
   const [error, setError] = useState(initialError);
   const [verified, setVerified] = useState(false);
   const [checking, setChecking] = useState(Boolean(account));
@@ -17,6 +19,10 @@ export function ClientApp({ initialError = '' }: { initialError?: string }) {
     if (!account || initialError) { setChecking(false); return; }
     const controller = new AbortController();
     setVerified(false); setChecking(true); setError('');
+    const timeout = window.setTimeout(() => {
+      controller.abort(); setChecking(false);
+      setError('Customer verification timed out. Please retry or sign in again.');
+    }, 20000);
     void (async () => {
       try {
         const token = await customerToken();
@@ -38,9 +44,9 @@ export function ClientApp({ initialError = '' }: { initialError?: string }) {
         if (!controller.signal.aborted) setVerified(true);
       } catch (cause) {
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to verify customer sign-in.');
-      } finally { if (!controller.signal.aborted) setChecking(false); }
+      } finally { window.clearTimeout(timeout); if (!controller.signal.aborted) setChecking(false); }
     })();
-    return () => controller.abort();
+    return () => { window.clearTimeout(timeout); controller.abort(); };
   }, [account, attempt, initialError]);
 
   const run = async (action: () => Promise<void>) => {
@@ -55,7 +61,7 @@ export function ClientApp({ initialError = '' }: { initialError?: string }) {
     <AppBar position="sticky" color="inherit" elevation={0}><Container maxWidth="xl"><Toolbar disableGutters sx={{ gap: 2 }}>
       <Typography fontWeight={800} sx={{ flexGrow: 1 }}>{config.name}</Typography>
       <Button href={publicLink()}>Public website</Button>
-      <Button href={new URL(import.meta.env.BASE_URL, window.location.origin).href}>Staff portal</Button>
+      <Button href={`${import.meta.env.BASE_URL}staff/login`}>Staff login</Button>
       {account && <IconButton aria-label="Open client account menu" onClick={event => setAnchor(event.currentTarget)}><Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>{initials}</Avatar></IconButton>}
       <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
         <MenuItem disabled>{name}</MenuItem>
