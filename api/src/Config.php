@@ -21,6 +21,10 @@ final readonly class Config
         public string $entraApiClientId,
         public string $entraRequiredScope,
         public int $entraJwksCacheSeconds,
+        public string $customerTenantId = '',
+        public string $customerSubdomain = '',
+        public string $customerApiClientId = '',
+        public string $customerSpaClientId = '',
     ) {}
 
     public static function fromEnvironment(): self
@@ -46,6 +50,10 @@ final readonly class Config
             $value('ENTRA_API_CLIENT_ID'),
             $value('ENTRA_REQUIRED_SCOPE', 'access_as_user'),
             max(300, (int)$value('ENTRA_JWKS_CACHE_SECONDS', '3600')),
+            $value('CUSTOMER_ENTRA_TENANT_ID'),
+            $value('CUSTOMER_ENTRA_SUBDOMAIN'),
+            $value('CUSTOMER_ENTRA_API_CLIENT_ID'),
+            $value('CUSTOMER_ENTRA_SPA_CLIENT_ID'),
         );
     }
 

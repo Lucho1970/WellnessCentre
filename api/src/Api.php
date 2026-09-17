@@ -8,6 +8,7 @@ use PDO;
 use Throwable;
 use Wellness\Auth\AuthContext;
 use Wellness\Auth\EntraAuthenticator;
+use Wellness\Auth\CustomerAuthenticator;
 use Wellness\Http\ApiException;
 use Wellness\Http\Request;
 use Wellness\Http\Response;
@@ -50,6 +51,7 @@ final class Api
                 $routes->addRoute('GET','/api/v1/practitioners','practitioners');
                 $routes->addRoute('GET','/api/v1/availability','availability');
                 $routes->addRoute('GET','/api/v1/auth/me','me');
+                $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
                 $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
                 $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
                 $routes->addRoute('DELETE','/api/v1/profile/avatar','deleteProfileAvatar');
@@ -112,6 +114,7 @@ final class Api
                 'practitioners'=>$this->catalog->practitioners(isset($request->query['service_id'])?(int)$request->query['service_id']:null),
                 'availability'=>$this->availability->search($request->query),
                 'me'=>$this->me($this->user($request)),
+                'customerMe'=>$this->customerMe($request),
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
                 'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),
                 'deleteProfileAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId),
@@ -167,6 +170,12 @@ final class Api
             Response::json(['data'=>$data],$created?201:200,$request->correlationId);
         }catch(ApiException $e){Response::json(['error'=>array_filter(['code'=>$e->errorCode,'message'=>$e->getMessage(),'fields'=>$e->fields?:null,'correlation_id'=>$request?->correlationId])],$e->status,$request?->correlationId);}
         catch(Throwable $e){error_log($e->__toString());$message=$this->config->debug?$e->getMessage():'An unexpected error occurred.';Response::json(['error'=>['code'=>'internal_error','message'=>$message,'correlation_id'=>$request?->correlationId]],500,$request?->correlationId);}
+    }
+
+    private function customerMe(Request $request): array
+    {
+        header('Cache-Control: no-store');
+        return (new CustomerAuthenticator($this->config))->authenticate($request->bearerToken());
     }
 
     private function databaseHealth(): array

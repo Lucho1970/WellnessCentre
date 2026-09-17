@@ -16,7 +16,7 @@ use Wellness\Http\ApiException;
 
 final class EntraAuthenticator
 {
-    public function __construct(private readonly Config $config, private readonly Database $database) {}
+    public function __construct(private readonly Config $config, private readonly Database $database, private readonly ?\Closure $keyLoader = null) {}
 
     public function authenticate(?string $token): AuthContext
     {
@@ -82,6 +82,7 @@ final class EntraAuthenticator
 
     private function jwks(): array
     {
+        if ($this->keyLoader) return ($this->keyLoader)();
         $cacheDir = dirname(__DIR__, 2) . '/var/cache';
         $cacheFile = $cacheDir . '/entra-jwks.json';
         if (is_file($cacheFile) && filemtime($cacheFile) > time() - $this->config->entraJwksCacheSeconds) {

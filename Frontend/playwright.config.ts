@@ -7,9 +7,13 @@ const env = {
   VITE_ENTRA_SPA_CLIENT_ID: '22222222-2222-2222-2222-222222222222',
   VITE_ENTRA_API_CLIENT_ID: '33333333-3333-3333-3333-333333333333',
   VITE_ENTRA_REDIRECT_URI: 'http://localhost:5184/',
+  VITE_CUSTOMER_ENTRA_TENANT_ID: '44444444-4444-4444-4444-444444444444',
+  VITE_CUSTOMER_ENTRA_SUBDOMAIN: 'testcustomers',
+  VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID: '55555555-5555-5555-5555-555555555555',
+  VITE_CUSTOMER_ENTRA_API_CLIENT_ID: '66666666-6666-6666-6666-666666666666',
 };
 export default defineConfig({
-  testDir: './tests', testMatch: '**/portal.spec.ts', fullyParallel: true, workers: 2,
+  testDir: './tests', testMatch: ['**/portal.spec.ts', '**/customer.spec.ts'], fullyParallel: true, workers: 2,
   outputDir: './test-results/browser',
   use: { browserName: 'chromium', channel: process.env.PLAYWRIGHT_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined), trace: 'retain-on-failure' },
   webServer: [

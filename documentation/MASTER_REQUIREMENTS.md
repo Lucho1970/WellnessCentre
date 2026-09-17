@@ -36,6 +36,11 @@ Requirement identifiers below are stable references for implementation and tests
 
 ## 4. Identity and permissions
 
+17 September delivery note: owner configured External ID with Google, personal Microsoft
+and email one-time passcode for development. An isolated customer sign-in/API identity
+checkpoint is implemented; hosted acceptance is pending. No local record linking, client
+booking or clinical access is enabled by it. AUTH-04/05/06 and R3 remain open.
+
 - **AUTH-01 — Staff:** Microsoft Entra workforce SSO remains the staff authentication strategy, with MFA enforced through the organization's identity policies. Creating/managing Entra accounts remains a separate administrative activity; the application provisions/links authorized local staff records and assignments. No new local staff password system is planned.
 - **AUTH-02 — Clients:** Clients must not need an account in the clinic's workforce tenant. Customer authentication uses an approved standards-based identity service. A customer identity record at that service is acceptable; an organizational Microsoft 365 account is not required.
 - **AUTH-03 — Provider scope:** Owner confirmed: Google and Microsoft **personal** accounts first; Apple and Facebook/Meta remain planned extensions. Confirm Microsoft-personal support in a proof of concept before selecting the broker. Optional email/password or passwordless email is an open product choice; do not implement local password storage by default. This stages, rather than deletes, original Meta support.

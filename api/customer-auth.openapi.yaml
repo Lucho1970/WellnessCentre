@@ -1,0 +1,41 @@
+openapi: 3.0.3
+info:
+  title: Wellness customer identity checkpoint
+  version: 0.1.0
+paths:
+  /api/v1/customer/auth/me:
+    get:
+      summary: Verify a customer access token without claiming any local records
+      description: No database writes or email matching. Not a client profile endpoint. Responses use Cache-Control no-store.
+      security:
+        - customerBearer: []
+      responses:
+        '200':
+          description: Valid identity; no local record access
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [authenticated, authentication_context, onboarding_status, capabilities]
+                    properties:
+                      authenticated: {type: boolean, enum: [true]}
+                      authentication_context: {type: string, enum: [customer]}
+                      onboarding_status: {type: string, enum: [not_linked]}
+                      capabilities: {type: array, maxItems: 0, items: {type: string}}
+        '401':
+          description: Missing, expired, invalid or wrong-context bearer token
+        '403':
+          description: Missing access_as_client scope
+        '503':
+          description: Customer identity not configured or signing-key service unavailable
+components:
+  securitySchemes:
+    customerBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 v2 External ID access token for the configured customer API and SPA; never an ID token or staff token.

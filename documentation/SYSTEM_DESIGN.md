@@ -81,6 +81,14 @@ Keep Entra user provisioning outside this app. SuperAdmin links existing identit
 
 ### 4.2 Customer identity — planned proof before rollout
 
+17 September checkpoint: isolated customer MSAL bootstrap/callback and a read-only
+`GET /api/v1/customer/auth/me` token-proof endpoint are implemented. The endpoint validates
+the configured External ID issuer/audience/SPA/scope and returns no local user/record access.
+There is no email matching or identity persistence in this slice. Google, personal Microsoft
+and email-code flows are configured by the owner, but hosted end-to-end proof is pending.
+See [CLIENT_SIGN_IN_SETUP.md](CLIENT_SIGN_IN_SETUP.md) for public IDs, release settings and
+acceptance checks. R3 claims/personas/session gates remain; no SQL migration in this slice.
+
 Use authorization-code flow with PKCE and a maintained broker/SDK capable of issuing tokens explicitly intended for this API. Entra External ID is a candidate, not a committed service. Google sign-in and Microsoft **personal** sign-in must both be proven; organizational Microsoft federation is not the same requirement. Never send a Google/Microsoft Graph access token to this API and treat it as an application token.
 
 For reference, Microsoft states Azure AD B2C is no longer available to purchase for new customers from 1 May 2025: [B2C identity-provider documentation](https://learn.microsoft.com/en-us/azure/active-directory-b2c/add-identity-provider). Review [External ID customer authentication methods](https://learn.microsoft.com/en-us/entra/external-id/customers/concept-authentication-methods-customers) during the proof of concept; provider availability/configuration must be checked at implementation time. Do not assume turnkey personal Microsoft support from a workforce setup.

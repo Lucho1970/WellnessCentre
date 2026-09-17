@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
-import { Link } from 'react-router-dom';
 import { LogIn, ShieldCheck } from 'lucide-react';
 import { useStaffAuth } from './AuthProvider';
 import { apiRequest } from '../shared/api';
@@ -34,7 +33,7 @@ export function StaffSignIn({ children }: { children: (roles: string[]) => React
       {!configured && <Alert severity="warning">Staff sign-in is not configured for this environment. Please contact the administrator.</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
       <Button variant="contained" size="large" startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <LogIn size={18} />} disabled={busy || !configured} onClick={() => void login()}>Sign in with Microsoft</Button>
-      <Button component={Link} to="/client">Looking for client booking?</Button>
+      <Button href={`${import.meta.env.BASE_URL}client`}>Client sign in / booking</Button>
     </Stack>
   </Paper>;
   if (error) return <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>Retry</Button>}>{error}</Alert>;

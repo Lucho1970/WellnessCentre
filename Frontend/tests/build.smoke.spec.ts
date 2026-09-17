@@ -7,6 +7,7 @@ test('public artifacts contain no staff authentication or private feature module
   expect(code).not.toContain('login.microsoftonline.com');
   expect(code).not.toContain('StaffAuthProvider');
   expect(code).not.toContain('/auth/me');
+  expect(code).not.toContain('ciamlogin.com');
   expect(readFileSync('dist/public/.htaccess', 'utf8')).toContain('^api(?:/|$)');
   expect(readFileSync('dist/portal/.htaccess', 'utf8')).toContain('index.html');
 });
@@ -26,4 +27,11 @@ test('built public and portal deep links load independently, including base path
   expect(portalRequests.length).toBeGreaterThan(0);
   expect(portalRequests.every(url => url.startsWith('http://localhost:5194/api/v1/'))).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('built client callback loads independently of staff login', async ({ page }, info) => {
+  await page.route('**/api/v1/site-config', route => route.fulfill({ json: { data: { name: 'Build Smoke Clinic' } } }));
+  await page.goto(`http://localhost:5194${info.config.metadata.portalBase}client/auth/callback`);
+  await expect(page.getByRole('heading', { name: 'Client portal', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Staff portal', exact: true })).toHaveCount(0);
 });
