@@ -18,6 +18,7 @@ export function Booking() {
   const [slot, setSlot] = useState<Slot | null>(null), [loading, setLoading] = useState(true), [practitionerBusy, setPractitionerBusy] = useState(false), [slotBusy, setSlotBusy] = useState(false);
   const [error, setError] = useState(''), [practitionerError, setPractitionerError] = useState(''), [slotError, setSlotError] = useState(''), [retry, setRetry] = useState(0);
   const service = services.find(item => item.id === Number(serviceId));
+  const durationOption = (id: number) => service?.durations.find(option => Number(option.id) === Number(id));
 
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');
@@ -65,7 +66,7 @@ export function Booking() {
         <TextField select label="Visit type" value={mode} onChange={event=>{setSlot(null);setMode(event.target.value);}}><MenuItem value="mobile">At client location</MenuItem><MenuItem value="clinic">In clinic</MenuItem></TextField>
         <TextField select label="Base location / service area" value={locationId} onChange={event => { setSlot(null); setLocationId(event.target.value); }}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
         <TextField select label="Service" value={serviceId} onChange={event => { setSlot(null); setPractitionerId(''); setServiceId(event.target.value); }}>{services.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
-        {service && <Box><Typography color="text.secondary">{service.description}</Typography><Typography mt={1}>Treatment from ${(Number(service.price_cents) / 100).toFixed(2)} before taxes</Typography><Typography variant="body2">{mode==='mobile'?'Mobile surcharge may apply; staff will confirm coverage, travel time and price. ':''}{service.durations.map(duration => `${duration.minutes} min`).join(' / ')}</Typography></Box>}
+        {service && <Box><Typography color="text.secondary">{service.description}</Typography><Typography mt={1}>Treatment options before taxes</Typography><Typography variant="body2">{service.durations.map(option => `${option.minutes} min — $${(Number(option.price_cents) / 100).toFixed(2)}`).join(' · ')}</Typography>{mode === 'mobile' && <Typography variant="body2">A separate mobile surcharge may apply; staff will confirm coverage and travel time.</Typography>}</Box>}
       </Stack></Paper></Grid>
       <Grid size={{ xs: 12, md: 7 }}><Paper variant="outlined" sx={{ p: 3 }}><Stack spacing={2}>
         <Typography variant="h5" component="h2">Choose a time</Typography>
@@ -77,7 +78,7 @@ export function Booking() {
         {!slotBusy && <><Typography variant="body2" color="text.secondary">Times shown in {availability.timezone}. Showing up to 24 available options.</Typography>
           <Grid container spacing={1}>{availability.availability.slice(0, 24).map(time => <Grid size={{ xs: 12, sm: 6 }} key={`${time.duration_option_id}-${time.starts_at}`}>
             <Button fullWidth aria-pressed={slot === time} variant={slot === time ? 'contained' : 'outlined'} onClick={() => setSlot(time)}>
-              {new Date(time.starts_at).toLocaleString(undefined, { timeZone: availability.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {Math.round((Date.parse(time.ends_at) - Date.parse(time.starts_at)) / 60000)} min
+              {new Date(time.starts_at).toLocaleString(undefined, { timeZone: availability.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {Math.round((Date.parse(time.ends_at) - Date.parse(time.starts_at)) / 60000)} min{durationOption(time.duration_option_id) ? ` · $${(Number(durationOption(time.duration_option_id)!.price_cents) / 100).toFixed(2)}` : ''}
             </Button></Grid>)}</Grid></>}
         <Button href={slot ? handoff.href : undefined} disabled={!slot || slotBusy || practitionerBusy} variant="contained">View client booking information</Button>
       </Stack></Paper></Grid>

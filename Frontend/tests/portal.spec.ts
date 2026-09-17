@@ -62,13 +62,14 @@ test('staff client invitation approval requires review code and verification che
 
 test('new services can be assigned without reloading or losing assignment selections', async ({ page }) => {
   await fixtures(page, ['super_admin']);
-  const services = [{ id: 1, name: 'Existing massage', price_cents: 10000, durations: [60], active: 1, requires_room: 1 }];
+  const services = [{ id: 1, name: 'Existing massage', price_cents: 10000, durations: [60], duration_options: [{ minutes: 60, price_cents: 10000 }], active: 1, requires_room: 1 }];
+  let createdService: Record<string, any> | undefined;
   let savedAssignment: unknown;
   await page.route('**/api/v1/admin/**', async route => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = [];
     if (path.endsWith('/services')) {
-      if (route.request().method() === 'POST') services.push({ ...services[0], ...route.request().postDataJSON(), id: 2 });
+      if (route.request().method() === 'POST') { createdService = route.request().postDataJSON(); services.push({ ...services[0], ...createdService, id: 2 }); }
       data = services;
     } else if (path.endsWith('/service-assignments')) data = { practitioners: [], locations: [] };
     else if (path.endsWith('/locations')) data = [{ id: 1, name: 'Test location' }];
@@ -81,9 +82,13 @@ test('new services can be assigned without reloading or losing assignment select
   await expect(page.getByRole('combobox', { name: /^Service / })).toHaveText('Existing massage');
   await page.getByRole('checkbox', { name: 'Test Therapist', exact: true }).check();
   await page.getByRole('textbox', { name: 'Service name', exact: true }).fill('New massage');
-  await page.getByRole('spinbutton', { name: 'Price (CAD)' }).fill('120');
+  await page.getByRole('spinbutton', { name: 'Price 1 (CAD)' }).fill('120');
+  await page.getByRole('button', { name: 'Add duration and price' }).click();
+  await page.getByRole('spinbutton', { name: 'Duration 2 (minutes)' }).fill('90');
+  await page.getByRole('spinbutton', { name: 'Price 2 (CAD)' }).fill('165');
   await page.getByRole('button', { name: 'Add service', exact: true }).click();
   await expect(page.getByText('New massage was created.')).toBeVisible();
+  expect(createdService?.duration_options).toEqual([{ minutes: 60, price_cents: 12000 }, { minutes: 90, price_cents: 16500 }]);
   await expect(page.getByRole('checkbox', { name: 'Test Therapist', exact: true })).toBeChecked();
   await page.getByRole('combobox', { name: /^Service / }).click();
   await page.getByRole('option', { name: 'New massage', exact: true }).click();
@@ -113,7 +118,7 @@ test('mobile-only booking captures destination and price without requesting a ro
   await select(/^Base location/, 'Mobile service area');
   await select(/^Service/, 'Massage');
   await select(/^Practitioner/, 'Therapist');
-  await select(/^Duration/, '60 minutes');
+  await select(/^Duration/, '60 minutes — $120.00');
   await expect(page.getByRole('button', { name: 'Find a time', exact: true })).toBeDisabled();
   await page.getByRole('textbox', { name: 'address line1' }).fill('123 Test Street');
   await page.getByRole('textbox', { name: 'city', exact: true }).fill('Test City');
@@ -160,6 +165,8 @@ test('public home has client-first login and no workforce authentication or fake
 test('public booking hands off preferences without reserving or creating an appointment', async ({ page }) => {
   const writes: string[] = []; page.on('request', request => { if (request.method() !== 'GET') writes.push(request.url()); });
   await fixtures(page); await page.goto(`${publicHost}/book`);
+  await expect(page.getByText('60 min — $100.00')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Oct 1.*60 min.*\$100\.00/ })).toBeVisible();
   await page.getByRole('button', { name: /Oct 1.*60 min/ }).click();
   await page.getByRole('link', { name: 'View client booking information' }).click();
   await expect(page).toHaveURL(/localhost:5184\/client\/book\?delivery_mode=mobile&location_id=1/);
