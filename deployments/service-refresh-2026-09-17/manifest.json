@@ -1,0 +1,8 @@
+{
+  "source_commit": "aadd58aa9f4a8ae1b258d2704ef4a06e812a6c7a",
+  "file": "wellness-portal.zip",
+  "entries": 30,
+  "sha256": "463eb2287900127189f438ff3e7d633c2680353e89b8c5e818cdd957aee46f56",
+  "target": "/public_html/wellness-portal",
+  "preserve": "api/"
+}
