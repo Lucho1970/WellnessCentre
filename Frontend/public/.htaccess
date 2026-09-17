@@ -1,5 +1,19 @@
 RewriteEngine On
 
+# The SPA shell selects the current hashed JS/CSS files. Apply to index.html
+# after directory-index resolution and SPA rewrites, not API or asset responses.
+<Files "index.html">
+    <IfModule mod_expires.c>
+        ExpiresActive Off
+    </IfModule>
+    <IfModule mod_headers.c>
+        Header onsuccess unset Cache-Control
+        Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header onsuccess unset Expires
+        Header always set Expires "Thu, 01 Jan 1970 00:00:00 GMT"
+    </IfModule>
+</Files>
+
 # API errors must not become successful SPA HTML responses.
 RewriteRule ^api(?:/|$) - [L]
 
