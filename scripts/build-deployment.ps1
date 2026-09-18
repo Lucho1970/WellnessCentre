@@ -7,8 +7,37 @@ if (Test-Path -LiteralPath $destination) { throw "Release already exists: $desti
 $stage = Join-Path $repo ('.tmp/deployment-' + [guid]::NewGuid().ToString('N'))
 $private = Join-Path $stage 'private'
 New-Item -ItemType Directory -Path $private -Force | Out-Null
+$productionEnv = Join-Path $repo 'Frontend/.env.production'
+$productionSettings = @{}
+foreach ($line in Get-Content -LiteralPath $productionEnv) {
+    if ($line -match '^\s*([^#][^=]*)=(.*)$') {
+        $productionSettings[$matches[1].Trim()] = $matches[2].Trim()
+    }
+}
+$requiredFrontendSettings = @(
+    'VITE_CUSTOMER_ENTRA_TENANT_ID',
+    'VITE_CUSTOMER_ENTRA_SUBDOMAIN',
+    'VITE_CUSTOMER_ENTRA_API_CLIENT_ID',
+    'VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID'
+)
+$resolvedFrontendSettings = @{}
+foreach ($name in $requiredFrontendSettings) {
+    $value = [Environment]::GetEnvironmentVariable($name, 'Process')
+    if ([string]::IsNullOrWhiteSpace($value)) { $value = $productionSettings[$name] }
+    if ([string]::IsNullOrWhiteSpace($value)) { throw "Missing required production frontend setting: $name" }
+    $resolvedFrontendSettings[$name] = $value
+}
 Push-Location (Join-Path $repo 'Frontend')
 try { npm run build; if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed' } } finally { Pop-Location }
+$portalScripts = Get-ChildItem -LiteralPath (Join-Path $repo 'Frontend/dist/portal/assets') -Filter '*.js' -File
+foreach ($name in $requiredFrontendSettings) {
+    $expected = $resolvedFrontendSettings[$name]
+    $found = $false
+    foreach ($script in $portalScripts) {
+        if ([System.IO.File]::ReadAllText($script.FullName).Contains($expected)) { $found = $true; break }
+    }
+    if (-not $found) { throw "Production portal bundle is missing required setting: $name" }
+}
 Copy-Item -LiteralPath (Join-Path $repo 'api/composer.json'),(Join-Path $repo 'api/composer.lock') -Destination $private
 Copy-Item -LiteralPath (Join-Path $repo 'api/src'),(Join-Path $repo 'api/bin') -Destination $private -Recurse
 Push-Location $private
