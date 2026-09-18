@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
-import { ArrowLeft, ArrowRight, Plus, Search, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Merge, Plus, Search, Users } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { ClientInvitations } from './ClientInvitations';
 import { useTranslation } from 'react-i18next';
@@ -13,8 +13,11 @@ const emptyAddress: AddressValue = { address_line1: '', address_line2: '', city:
 const empty = { given_name: '', family_name: '', email: '', phone: '', preferred_contact: 'email', date_of_birth: '', emergency_contact_name: '', emergency_contact_phone: '', administrative_notes: '', status: 'active', revision: '', address: emptyAddress };
 type Form = typeof empty;
 type Detail = Summary & Form;
+type Candidate = Summary & { date_of_birth?: string | null };
+type MergePreview = { survivor: Detail; duplicate: Detail; relationship_counts: Record<string, number>; blocked: boolean; blocked_reason: string | null };
+class ClientRequestError extends Error { constructor(message:string,public code='',public fields:Record<string,unknown>={}){super(message);} }
 
-export function ClientManagement() {
+export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [query, setQuery] = useState('');
@@ -33,12 +36,26 @@ export function ClientManagement() {
   const [id, setId] = useState<number | null>(null);
   const [form, setForm] = useState<Form>(empty);
   const [original, setOriginal] = useState<Form>(empty);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<Candidate[]>([]);
+  const [mergeOpen,setMergeOpen]=useState(false);
+  const [mergeDuplicate,setMergeDuplicate]=useState<Summary|null>(null);
+  const [mergeSearch,setMergeSearch]=useState('');
+  const [mergeResults,setMergeResults]=useState<Summary[]>([]);
+  const [mergeSurvivor,setMergeSurvivor]=useState<Summary|null>(null);
+  const [mergePreview,setMergePreview]=useState<MergePreview|null>(null);
+  const [mergeReason,setMergeReason]=useState('');
+  const [primaryEmailSource,setPrimaryEmailSource]=useState<'survivor'|'duplicate'>('survivor');
+  const [profileSource,setProfileSource]=useState<'survivor'|'duplicate'>('survivor');
+  const [addressSource,setAddressSource]=useState<'survivor'|'duplicate'>('survivor');
+  const [mergeConfirmation,setMergeConfirmation]=useState('');
+  const [mergeBusy,setMergeBusy]=useState(false);
+  const [mergeError,setMergeError]=useState('');
 
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
     const response = await fetch(`${api}/clients${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const body = await response.json();
-    if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to complete the client request.')));
+    if (!response.ok) throw new ClientRequestError(apiErrorMessage(body, response.status, t('Unable to complete the client request.')),typeof body?.error?.code==='string'?body.error.code:'',body?.error?.fields??{});
     return body.data;
   }, [getAccessToken, t]);
 
@@ -52,13 +69,13 @@ export function ClientManagement() {
     return () => controller.abort();
   }, [request, search, page, refresh]);
 
-  const newClient = () => { const values={ ...empty, address:{...emptyAddress} }; setId(null); setForm(values); setOriginal(values); setFormError(''); setOpen(true); };
+  const newClient = () => { const values={ ...empty, address:{...emptyAddress} }; setId(null); setForm(values); setOriginal(values); setFormError(''); setDuplicateCandidates([]); setOpen(true); };
   const edit = async (clientId: number) => {
     setOpening(true); setError('');
     try {
       const client: Detail = await request(`/${clientId}`);
       const values = { ...empty, ...Object.fromEntries(Object.keys(empty).filter(key=>key!=='address').map(key => [key, client[key as keyof Form] ?? ''])), address: client.address ? { ...emptyAddress, ...client.address } : { ...emptyAddress } } as Form;
-      setId(clientId); setForm(values); setOriginal(values); setFormError(''); setOpen(true);
+      setId(clientId); setForm(values); setOriginal(values); setFormError(''); setDuplicateCandidates([]); setOpen(true);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to open client.')); }
     finally { setOpening(false); }
   };
@@ -67,15 +84,20 @@ export function ClientManagement() {
     if (JSON.stringify(form) !== JSON.stringify(original) && !window.confirm(t('Discard your unsaved client changes?'))) return;
     setOpen(false);
   };
-  const save = async (event: FormEvent) => {
-    event.preventDefault(); setSaving(true); setFormError('');
+  const saveClient = async (confirmPossibleDuplicate=false) => {
+    setSaving(true); setFormError(''); setDuplicateCandidates([]);
     try {
-      await request(id === null ? '' : `/${id}`, { method: id === null ? 'POST' : 'PATCH', body: JSON.stringify(form) });
+      await request(id === null ? '' : `/${id}`, { method: id === null ? 'POST' : 'PATCH', body: JSON.stringify({...form,confirm_possible_duplicate:confirmPossibleDuplicate}) });
       setNotice(t(id === null ? 'Client created. The record is ready for booking.' : 'Client details saved.'));
       setOpen(false); setRefresh(value => value + 1);
-    } catch (cause) { setFormError(cause instanceof Error ? cause.message : t('Unable to save client.')); }
+    } catch (cause) { if(cause instanceof ClientRequestError&&cause.code==='possible_duplicate'&&Array.isArray(cause.fields.candidates))setDuplicateCandidates(cause.fields.candidates as Candidate[]); setFormError(cause instanceof Error ? cause.message : t('Unable to save client.')); }
     finally { setSaving(false); }
   };
+  const save = (event: FormEvent) => { event.preventDefault(); void saveClient(false); };
+  const beginMerge=(client:Summary)=>{setMergeDuplicate(client);setMergeSearch('');setMergeResults([]);setMergeSurvivor(null);setMergePreview(null);setMergeReason('');setPrimaryEmailSource('survivor');setProfileSource('survivor');setAddressSource('survivor');setMergeConfirmation('');setMergeError('');setMergeOpen(true);};
+  const searchMerge=async()=>{if(!mergeDuplicate||mergeSearch.trim().length<2)return;setMergeBusy(true);setMergeError('');try{const data=await request(`?q=${encodeURIComponent(mergeSearch.trim())}&page=1`);setMergeResults((data.items as Summary[]).filter(item=>item.id!==mergeDuplicate.id));}catch(cause){setMergeError(cause instanceof Error?cause.message:t('Unable to load clients.'));}finally{setMergeBusy(false);}};
+  const chooseSurvivor=async(client:Summary)=>{if(!mergeDuplicate)return;setMergeBusy(true);setMergeError('');setMergeSurvivor(client);try{setMergePreview(await request(`/${client.id}/merge-preview/${mergeDuplicate.id}`));setMergeConfirmation('');}catch(cause){setMergePreview(null);setMergeError(cause instanceof Error?cause.message:t('Unable to review this merge.'));}finally{setMergeBusy(false);}};
+  const completeMerge=async()=>{if(!mergeDuplicate||!mergeSurvivor||!mergePreview)return;setMergeBusy(true);setMergeError('');try{await request(`/${mergeSurvivor.id}/merge/${mergeDuplicate.id}`,{method:'POST',body:JSON.stringify({survivor_revision:mergePreview.survivor.revision,duplicate_revision:mergePreview.duplicate.revision,primary_email_source:primaryEmailSource,profile_source:profileSource,address_source:addressSource,reason:mergeReason,confirmation:mergeConfirmation})});setMergeOpen(false);setNotice(t('Client records merged. Both email addresses were preserved.'));setRefresh(value=>value+1);}catch(cause){setMergeError(cause instanceof Error?cause.message:t('Unable to merge client records.'));}finally{setMergeBusy(false);}};
   const field = (key: keyof Form, label: string, options: { required?: boolean; type?: string; maxLength?: number } = {}) => <TextField
     fullWidth label={label} value={form[key]} required={options.required} type={options.type ?? 'text'} disabled={saving}
     onChange={event => setForm(current => ({ ...current, [key]: event.target.value }))}
@@ -100,7 +122,7 @@ export function ClientManagement() {
       {items.length === 0 ? <Paper variant="outlined" sx={{ p: 5, textAlign: 'center' }}><Users size={32} /><Typography variant="h6" mt={1}>{t(search ? 'No matching clients' : 'No clients yet')}</Typography><Typography color="text.secondary">{t(search ? 'Try a different name, email, or phone number.' : 'Add your first client to prepare for appointment booking.')}</Typography></Paper> :
         <Stack spacing={1.5}>{items.map(client => <Paper variant="outlined" key={client.id} sx={{ p: 2.5 }}><Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
           <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}><Stack direction="row" gap={1} alignItems="center"><Typography fontWeight={700}>{client.display_name}</Typography><Chip size="small" label={client.status} color={client.status === 'active' ? 'success' : 'default'} variant="outlined" /></Stack><Typography color="text.secondary">{client.email}</Typography>{client.phone && <Typography color="text.secondary">{client.phone}</Typography>}</Box>
-          <Button variant="outlined" disabled={opening} aria-label={t('Edit {{name}}',{name:client.display_name})} onClick={() => void edit(client.id)}>{t('View / edit')}</Button>
+          <Stack direction="row" gap={1}><Button variant="outlined" disabled={opening} aria-label={t('Edit {{name}}',{name:client.display_name})} onClick={() => void edit(client.id)}>{t('View / edit')}</Button>{canMerge&&client.status!=='inactive'&&<Button color="warning" variant="outlined" startIcon={<Merge size={16}/>} onClick={()=>beginMerge(client)}>{t('Merge duplicate')}</Button>}</Stack>
         </Stack></Paper>)}</Stack>}
       <Stack direction="row" alignItems="center" justifyContent="space-between"><Button startIcon={<ArrowLeft size={16} />} disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography color="text.secondary">{t('Page {{page}}',{page})}</Typography><Button endIcon={<ArrowRight size={16} />} disabled={!more} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
     </>}
@@ -124,10 +146,20 @@ export function ClientManagement() {
             <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth select disabled={saving} label={t('Status')} helperText={t('Inactive clients cannot receive new bookings.')} value={form.status} onChange={event => setForm(current => ({ ...current, status: event.target.value }))}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem>{!['active', 'inactive'].includes(form.status) && <MenuItem value={form.status}>{t('{{status}} — choose a new status',{status:form.status})}</MenuItem>}</TextField></Grid>
           </Grid>
           {formError && <Alert severity="error" sx={{ mt: 2 }}>{formError}</Alert>}
+          {duplicateCandidates.length>0&&<Alert severity="warning" sx={{mt:2}} action={<Button color="inherit" disabled={saving} onClick={()=>void saveClient(true)}>{t('Create anyway')}</Button>}><Typography fontWeight={700}>{t('Possible duplicate client')}</Typography>{duplicateCandidates.map(candidate=><Typography key={candidate.id} variant="body2">{candidate.display_name} — {candidate.email}{candidate.phone?` — ${candidate.phone}`:''}</Typography>)}</Alert>}
           {id !== null && <ClientInvitations key={id} clientId={id} request={request} />}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}><Button onClick={close} disabled={saving}>{t('Cancel')}</Button><Button type="submit" variant="contained" disabled={saving}>{t(saving ? 'Saving…' : 'Save client')}</Button></DialogActions>
       </Box>
+    </Dialog>
+    <Dialog open={mergeOpen} onClose={()=>!mergeBusy&&setMergeOpen(false)} fullWidth maxWidth="md">
+      <DialogTitle>{t('Merge duplicate client')}</DialogTitle><DialogContent dividers><Stack spacing={2}>
+        <Alert severity="warning">{t('This permanently reassigns the duplicate client’s records to the survivor and makes the duplicate inactive. It does not delete audit history.')}</Alert>
+        {mergeDuplicate&&<Paper variant="outlined" sx={{p:2}}><Typography variant="overline">{t('Duplicate record')}</Typography><Typography fontWeight={700}>{mergeDuplicate.display_name}</Typography><Typography>{mergeDuplicate.email}</Typography></Paper>}
+        {!mergePreview&&<><Stack component="form" direction="row" gap={1} onSubmit={event=>{event.preventDefault();void searchMerge();}}><TextField fullWidth label={t('Find the surviving client')} value={mergeSearch} onChange={event=>setMergeSearch(event.target.value)} helperText={t('Enter at least 2 characters from the client’s name, email, or phone.')}/><Button type="submit" variant="outlined" disabled={mergeBusy||mergeSearch.trim().length<2}>{t('Search')}</Button></Stack>{mergeResults.map(client=><Paper variant="outlined" key={client.id} sx={{p:2}}><Stack direction="row" justifyContent="space-between" alignItems="center"><Box><Typography fontWeight={700}>{client.display_name}</Typography><Typography color="text.secondary">{client.email}{client.phone?` · ${client.phone}`:''}</Typography></Box><Button onClick={()=>void chooseSurvivor(client)}>{t('Keep this client')}</Button></Stack></Paper>)}</>}
+        {mergePreview&&<><Paper variant="outlined" sx={{p:2}}><Typography variant="overline">{t('Surviving record')}</Typography><Typography fontWeight={700}>{mergePreview.survivor.display_name}</Typography><Typography>{mergePreview.survivor.email}</Typography></Paper>{mergePreview.blocked&&<Alert severity="error">{t(mergePreview.blocked_reason??'This merge is blocked.')}</Alert>}<Typography fontWeight={700}>{t('Records that will be reassigned')}</Typography><Stack direction="row" flexWrap="wrap" gap={1}>{Object.entries(mergePreview.relationship_counts).map(([key,value])=><Chip key={key} label={`${key.replaceAll('_',' ')}: ${value}`}/>)}</Stack><TextField select label={t('Primary email to keep')} value={primaryEmailSource} onChange={event=>setPrimaryEmailSource(event.target.value as 'survivor'|'duplicate')}><MenuItem value="survivor">{mergePreview.survivor.email}</MenuItem><MenuItem value="duplicate">{mergePreview.duplicate.email}</MenuItem></TextField><TextField select label={t('Profile details to keep')} value={profileSource} onChange={event=>setProfileSource(event.target.value as 'survivor'|'duplicate')}><MenuItem value="survivor">{t('Surviving record')}</MenuItem><MenuItem value="duplicate">{t('Duplicate record')}</MenuItem></TextField><TextField select label={t('Service address to keep')} value={addressSource} onChange={event=>setAddressSource(event.target.value as 'survivor'|'duplicate')}><MenuItem value="survivor">{t('Surviving record')}</MenuItem><MenuItem value="duplicate">{t('Duplicate record')}</MenuItem></TextField><TextField label={t('Reason for merge')} required value={mergeReason} inputProps={{maxLength:500}} onChange={event=>setMergeReason(event.target.value)}/><TextField label={t('Type {{confirmation}} to confirm',{confirmation:`MERGE ${mergeDuplicate?.id} INTO ${mergeSurvivor?.id}`})} required value={mergeConfirmation} onChange={event=>setMergeConfirmation(event.target.value)}/></>}
+        {mergeError&&<Alert severity="error">{mergeError}</Alert>}
+      </Stack></DialogContent><DialogActions><Button disabled={mergeBusy} onClick={()=>setMergeOpen(false)}>{t('Cancel')}</Button>{mergePreview&&<Button color="warning" variant="contained" disabled={mergeBusy||mergePreview.blocked||mergeReason.trim().length<5||mergeConfirmation!==`MERGE ${mergeDuplicate?.id} INTO ${mergeSurvivor?.id}`} onClick={()=>void completeMerge()}>{t(mergeBusy?'Merging…':'Merge client records')}</Button>}</DialogActions>
     </Dialog>
   </Stack>;
 }

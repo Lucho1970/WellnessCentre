@@ -164,7 +164,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         </Stack>
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
         {page === "dashboard" && <Dashboard />}
-        {page === "clients" && <ClientManagement />}
+        {page === "clients" && <ClientManagement canMerge={roles.includes('super_admin')} />}
         {page === "appointments" && <StaffAppointments practitionerMode={workspace === 'practitioner'} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}

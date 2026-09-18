@@ -17,6 +17,7 @@ $schema=preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m','',$schema);
 $db->exec($schema);
 $migration=file_get_contents(dirname(__DIR__,2).'/database/migrations/005_customer_onboarding.sql');
 $db->exec($migration); $db->exec($migration); // Rerun is safe.
+$db->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/006_client_merge.sql'));
 $db->exec("INSERT INTO clinics(id,name) VALUES(1,'Synthetic clinic'),(2,'Other clinic'); INSERT INTO users(id,clinic_id,email,display_name,user_type,status,given_name,family_name) VALUES(1,1,'staff@example.test','Staff','staff','active','Staff','Test'),(2,1,'existing@example.test','Existing Client','client','active','Existing','Client'),(3,2,'other@example.test','Other Client','client','active','Other','Client'); INSERT INTO client_profiles(user_id,phone,administrative_notes) VALUES(2,'555-0100','PRIVATE NOTE');");
 $config=new Config('test',false,'test-key',[],'127.0.0.1',$port,$name,'root','','staff','staff-api','scope',3600,customerOnboardingEnabled:true,customerClinicId:1);
 $c=new C($db,$config); $cid='test-correlation';

@@ -137,6 +137,7 @@ final class CustomerOnboarding
             if ($this->status($identity)['onboarding_status'] === 'pending_review') throw new ApiException(409, 'claim_pending', 'Your invitation is awaiting staff review.');
             $this->query("INSERT INTO users(clinic_id,given_name,family_name,display_name,email,status,user_type) VALUES(?,?,?,?,?,'active','client')", [$this->config->customerClinicId, $data['given_name'], $data['family_name'], $data['display_name'], $data['email']]);
             $client = (int)$this->db->lastInsertId();
+            $this->query("INSERT INTO client_email_addresses(clinic_id,client_id,email,is_primary,source) VALUES(?,?,?,1,'customer')", [$this->config->customerClinicId, $client, $data['email']]);
             $this->query('INSERT INTO client_profiles(user_id,phone,preferred_contact) VALUES(?,?,?)', [$client, $data['phone'], $data['preferred_contact']]);
             $this->query('INSERT INTO client_contact_addresses(client_id,address_json) VALUES(?,?)', [$client, json_encode($data['address'], JSON_THROW_ON_ERROR)]);
             $this->query('INSERT INTO customer_client_links(identity_id,client_id,clinic_id,created_at) VALUES(?,?,?,?)', [$identity, $client, $this->config->customerClinicId, self::stamp()]);
@@ -164,7 +165,10 @@ final class CustomerOnboarding
             // Current locking reads, not an earlier REPEATABLE READ snapshot, protect staff edits.
             $current = $this->ownProfile($identity, true);
             if (!is_string($body['revision'] ?? null) || !hash_equals($current['revision'], $body['revision'])) throw new ApiException(409, 'profile_changed', 'Your profile changed. Reload it before saving.');
+            if ($this->query('SELECT client_id FROM client_email_addresses WHERE clinic_id=? AND email=? AND client_id<>? FOR UPDATE', [$this->config->customerClinicId, $data['email'], $client])->fetchColumn()) throw new ApiException(409, 'email_in_use', 'This email is already used by another account in this clinic.');
             $this->query('UPDATE users SET given_name=?,family_name=?,display_name=?,email=? WHERE id=?', [$data['given_name'], $data['family_name'], $data['display_name'], $data['email'], $client]);
+            $this->query('UPDATE client_email_addresses SET is_primary=0 WHERE client_id=?', [$client]);
+            $this->query("INSERT INTO client_email_addresses(clinic_id,client_id,email,is_primary,source) VALUES(?,?,?,1,'customer') ON DUPLICATE KEY UPDATE is_primary=1", [$this->config->customerClinicId, $client, $data['email']]);
             $this->query('INSERT INTO client_profiles(user_id,phone,preferred_contact) VALUES(?,?,?) ON DUPLICATE KEY UPDATE phone=VALUES(phone),preferred_contact=VALUES(preferred_contact)', [$client, $data['phone'], $data['preferred_contact']]);
             $this->query('INSERT INTO client_contact_addresses(client_id,address_json) VALUES(?,?) ON DUPLICATE KEY UPDATE address_json=VALUES(address_json)', [$client, json_encode($data['address'], JSON_THROW_ON_ERROR)]);
             $this->audit('customer.profile.update', $client, $cid, null, ['identity_id' => $identity]); return $this->ownProfile($identity, true);

@@ -75,6 +75,8 @@ final class Api
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
                 $routes->addRoute('PATCH','/api/v1/clients/{id:\\d+}','updateClient');
+                $routes->addRoute('GET','/api/v1/clients/{survivor:\\d+}/merge-preview/{duplicate:\\d+}','clientMergePreview');
+                $routes->addRoute('POST','/api/v1/clients/{survivor:\\d+}/merge/{duplicate:\\d+}','mergeClients');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/invitations','clientInvitations');
                 $routes->addRoute('POST','/api/v1/clients/{id:\\d+}/invitations','issueClientInvitation');
                 $routes->addRoute('POST','/api/v1/clients/{id:\\d+}/invitations/{invitation:\\d+}','reviewClientInvitation');
@@ -145,6 +147,8 @@ final class Api
                 'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId),
                 'updateClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'clientMergePreview'=>$this->clients->mergePreview($this->user($request),(int)$route[2]['survivor'],(int)$route[2]['duplicate'],$request->correlationId),
+                'mergeClients'=>$this->clients->merge($this->user($request),(int)$route[2]['survivor'],(int)$route[2]['duplicate'],$request->body,$request->correlationId),
                 'clientInvitations'=>$this->onboarding()->invitations($this->user($request),(int)$route[2]['id']),
                 'issueClientInvitation'=>$this->onboarding()->invite($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'reviewClientInvitation'=>$this->onboarding()->review($this->user($request),(int)$route[2]['id'],(int)$route[2]['invitation'],$request->body,$request->correlationId),

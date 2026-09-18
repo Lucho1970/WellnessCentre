@@ -119,6 +119,38 @@ test('staff client creation saves a reusable service address with manual fallbac
   expect(saved).toMatchObject({ given_name: 'Mobile', family_name: 'Client', address: { address_line1: '123 Test Street', city: 'Test City', province: 'Ontario', postal_code: 'A1A 1A1', country: 'Canada' } });
 });
 
+test('possible duplicates require acknowledgement and Super Admin can merge with a preview', async ({page})=>{
+  await fixtures(page,['super_admin']);
+  const survivor={id:2,display_name:'Same Client',given_name:'Same',family_name:'Client',email:'first@example.test',phone:'555-1000',status:'active',preferred_contact:'email',date_of_birth:'1990-01-01',revision:'survivor-rev',address:null};
+  const duplicate={...survivor,id:3,email:'second@example.test',phone:'555-2000',revision:'duplicate-rev'};
+  let createAttempts=0,mergeBody:Record<string,unknown>|undefined;
+  await page.route('**/api/v1/clients**',route=>{
+    const url=new URL(route.request().url()),path=url.pathname,method=route.request().method();
+    if(method==='POST'&&path.endsWith('/clients')){
+      createAttempts++;const body=route.request().postDataJSON();
+      if(!body.confirm_possible_duplicate)return route.fulfill({status:409,json:{error:{code:'possible_duplicate',message:'A similar client record already exists. Review it before creating another client.',fields:{candidates:[survivor]}}}});
+      return route.fulfill({json:{data:{id:4,...body}}});
+    }
+    if(method==='GET'&&path.endsWith('/merge-preview/3'))return route.fulfill({json:{data:{survivor,duplicate,relationship_counts:{appointments:2,invoices:1},customer_links:[],blocked:false,blocked_reason:null}}});
+    if(method==='POST'&&path.endsWith('/merge/3')){mergeBody=route.request().postDataJSON();return route.fulfill({json:{data:{client:survivor,merged_client_id:3}}});}
+    return route.fulfill({json:{data:{items:[survivor,duplicate],has_more:false}}});
+  });
+  await page.goto(`${portalHost}/admin/clients`);
+  await page.getByRole('button',{name:'Add client',exact:true}).click();
+  await page.getByRole('textbox',{name:'First name'}).fill('Same');await page.getByRole('textbox',{name:'Last name'}).fill('Client');await page.getByRole('textbox',{name:'Email',exact:true}).fill('third@example.test');
+  await page.getByRole('button',{name:'Save client'}).click();
+  await expect(page.getByText('Possible duplicate client')).toBeVisible();
+  await page.getByRole('button',{name:'Create anyway'}).click();await expect(page.getByText('Client created. The record is ready for booking.')).toBeVisible();expect(createAttempts).toBe(2);
+  await page.getByRole('button',{name:'Merge duplicate'}).nth(1).click();
+  await page.getByRole('textbox',{name:'Find the surviving client'}).fill('first');await page.getByRole('button',{name:'Search',exact:true}).click();await page.getByRole('button',{name:'Keep this client'}).click();
+  await expect(page.getByText('appointments: 2')).toBeVisible();
+  await page.getByRole('textbox',{name:'Reason for merge'}).fill('Duplicate created after a retry');
+  await page.getByRole('textbox',{name:/Type MERGE 3 INTO 2/}).fill('MERGE 3 INTO 2');
+  await page.getByRole('button',{name:'Merge client records'}).click();
+  await expect(page.getByText('Client records merged. Both email addresses were preserved.')).toBeVisible();
+  expect(mergeBody).toMatchObject({survivor_revision:'survivor-rev',duplicate_revision:'duplicate-rev',reason:'Duplicate created after a retry',confirmation:'MERGE 3 INTO 2'});
+});
+
 test('mobile-only booking captures destination and price without requesting a room', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   let booking: Record<string, any> | undefined;

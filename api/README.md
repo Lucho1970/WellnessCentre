@@ -105,6 +105,8 @@ Availability results include `available_room_ids` for services requiring rooms. 
 
 Run `php tests/schedule-intervals.php` for interval and daylight-saving checks. Before deployment acceptance, verify extra openings, time off, room shortages, and cross-location appointments against MySQL. Booking-time revalidation and concurrency coverage remain Phase 4 work. No schema migration is needed for this checkpoint.
 
+Client duplicate prevention and Super Admin merge require `database/migrations/006_client_merge.sql` before the matching API is deployed. The merge endpoints are `GET /api/v1/clients/{survivor}/merge-preview/{duplicate}` and `POST /api/v1/clients/{survivor}/merge/{duplicate}`. See `../documentation/CLIENT_MERGE.md` for safeguards, deployment order and tests.
+
 - Use a restricted database account rather than the MySQL server administrator.
 - Keep `.env`, `vendor`, and runtime cache files outside source control.
 - Serve only the `public` directory.

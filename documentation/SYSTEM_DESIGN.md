@@ -174,6 +174,7 @@ Current host evidence reports MySQL **5.7.44**, not the MySQL 8+ aspiration in t
 | Notifications/waitlist | Templates/events/reminder schedules and waitlist foundations | Reliable delivery worker, offers/expiry/claims, follow-up tasks and operational visibility |
 | Finance | Invoices/lines, payments/refunds, taxes, accounting connection/mapping/sync records | Immutable snapshots, ledger/reconciliation policy, gateway adapters and idempotency |
 | Privacy/operations | `audit_logs`, `data_export_requests`, `retention_policies` | Controlled exports, legal holds/disposition, audit querying, migration tracking and recovery evidence |
+| Client identity consolidation | `client_email_addresses`, `client_merge_records` | Searchable email aliases, explicit survivor selection, immutable merge provenance and conflict-safe customer identity ownership |
 
 Table presence does not imply endpoints/UI or tested business behavior. Read `api/database/schema.sql` and actual migrations for exact physical names and constraints before implementation; this table maps responsibilities, not a replacement schema.
 
