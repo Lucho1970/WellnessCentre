@@ -475,6 +475,10 @@ const fr: Record<string, string> = {
   'Changing this does not change the Microsoft Entra account.': 'Cette modification ne change pas le compte Microsoft Entra.',
   'Account status': 'État du compte',
   'Available as a practitioner': 'Disponible comme praticien',
+  'Staff authentication must return to this portal, without query or fragment.': 'L’authentification du personnel doit revenir à ce portail, sans paramètres de requête ni fragment.',
+  'Microsoft Entra staff sign-in is not configured.': 'La connexion du personnel avec Microsoft Entra n’est pas configurée.',
+  'Staff sign-in is required.': 'La connexion du personnel est requise.',
+  'Redirecting to Microsoft Entra for authorization.': 'Redirection vers Microsoft Entra pour l’autorisation.',
 };
 
 export default fr;

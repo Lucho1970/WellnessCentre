@@ -475,6 +475,10 @@ const en = {
   'Changing this does not change the Microsoft Entra account.': 'Changing this does not change the Microsoft Entra account.',
   'Account status': 'Account status',
   'Available as a practitioner': 'Available as a practitioner',
+  'Staff authentication must return to this portal, without query or fragment.': 'Staff authentication must return to this portal, without query or fragment.',
+  'Microsoft Entra staff sign-in is not configured.': 'Microsoft Entra staff sign-in is not configured.',
+  'Staff sign-in is required.': 'Staff sign-in is required.',
+  'Redirecting to Microsoft Entra for authorization.': 'Redirecting to Microsoft Entra for authorization.',
 } as const;
 
 export default en;
