@@ -287,6 +287,20 @@ const fr: Record<string, string> = {
   'Locked': 'Verrouillé',
   'Local roles': 'Rôles locaux',
   'Save': 'Enregistrer',
+  'Client and care': 'Client et soins',
+  'Available time': 'Heure disponible',
+  'Review and confirm': 'Vérifier et confirmer',
+  'Duration': 'Durée',
+  '{{minutes}} minutes — {{price}}': '{{minutes}} minutes — {{price}}',
+  'Staff must verify the destination, coverage{{radius}}, and sufficient travel time. Driving distance is not calculated automatically.': 'Le personnel doit vérifier la destination, la zone desservie{{radius}} et le temps de déplacement requis. La distance routière n’est pas calculée automatiquement.',
+  ' (configured radius: {{radius}} km)': ' (rayon configuré : {{radius}} km)',
+  'Availability in {{timezone}}. Choose a day to see current openings.': 'Disponibilités selon le fuseau {{timezone}}. Choisissez une journée pour voir les ouvertures actuelles.',
+  '{{minutes}} minutes': '{{minutes}} minutes',
+  'Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD': 'Traitement : {{treatment}} · Supplément mobile : {{mobile}} · Sous-total : {{subtotal}} CAD',
+  'Confirming…': 'Confirmation…',
+  'Retry confirmation': 'Réessayer la confirmation',
+  'Confirm appointment': 'Confirmer le rendez-vous',
+  'Unable to confirm appointment.': 'Impossible de confirmer le rendez-vous.',
 };
 
 export default fr;

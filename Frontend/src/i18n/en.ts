@@ -287,6 +287,20 @@ const en = {
   'Locked': 'Locked',
   'Local roles': 'Local roles',
   'Save': 'Save',
+  'Client and care': 'Client and care',
+  'Available time': 'Available time',
+  'Review and confirm': 'Review and confirm',
+  'Duration': 'Duration',
+  '{{minutes}} minutes — {{price}}': '{{minutes}} minutes — {{price}}',
+  'Staff must verify the destination, coverage{{radius}}, and sufficient travel time. Driving distance is not calculated automatically.': 'Staff must verify the destination, coverage{{radius}}, and sufficient travel time. Driving distance is not calculated automatically.',
+  ' (configured radius: {{radius}} km)': ' (configured radius: {{radius}} km)',
+  'Availability in {{timezone}}. Choose a day to see current openings.': 'Availability in {{timezone}}. Choose a day to see current openings.',
+  '{{minutes}} minutes': '{{minutes}} minutes',
+  'Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD': 'Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD',
+  'Confirming…': 'Confirming…',
+  'Retry confirmation': 'Retry confirmation',
+  'Confirm appointment': 'Confirm appointment',
+  'Unable to confirm appointment.': 'Unable to confirm appointment.',
 } as const;
 
 export default en;
