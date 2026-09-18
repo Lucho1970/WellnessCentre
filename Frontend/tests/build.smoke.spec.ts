@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
+import en from '../src/i18n/en';
+import fr from '../src/i18n/fr';
 
 // Exercise release bundles under their configured origins without contacting the live site.
 const productionHosts = process.env.BUILD_PRODUCTION_HOSTS === '1';
@@ -13,6 +15,10 @@ test.beforeEach(async ({page}) => {
       await route.fulfill({ response });
     });
   }
+});
+
+test('English and French resource catalogs contain the same keys', () => {
+  expect(Object.keys(fr).sort()).toEqual(Object.keys(en).sort());
 });
 
 test('public artifacts contain no staff authentication or private feature modules', () => {
