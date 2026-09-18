@@ -7,7 +7,8 @@ import { useStaffAuth } from '../auth/AuthProvider';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const roleOptions = ['super_admin', 'clinic_admin', 'reception', 'practitioner', 'accountant'];
-type Staff = { id: number; display_name: string; email: string; status: string; roles: string[] };
+const scheduleOthers = 'schedule_for_other_practitioners';
+type Staff = { id: number; display_name: string; email: string; status: string; roles: string[]; permissions: string[] };
 
 export function StaffAdmin() {
   const { t } = useTranslation();
@@ -22,7 +23,7 @@ export function StaffAdmin() {
       const response = await fetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load staff.')));
-      setStaff(body.data);
+      setStaff(body.data.map((member: Staff) => ({ ...member, permissions: member.permissions ?? [] })));
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load staff.')); }
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
@@ -53,7 +54,16 @@ export function StaffAdmin() {
         <TextField type="email" label={t('Email')} value={editing.email} onChange={event => set('email', event.target.value)}/>
         <TextField select label={t('Status')} value={editing.status} onChange={event => set('status', event.target.value)}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem><MenuItem value="locked">{t('Locked')}</MenuItem></TextField>
         <Typography fontWeight={700}>{t('Local roles')}</Typography>
-        {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => set('roles', event.target.checked ? [...editing.roles, role] : editing.roles.filter(item => item !== role))}/>} label={role.replaceAll('_', ' ')}/>)}</Stack></DialogContent>}
+        {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => {
+          const roles = event.target.checked ? [...editing.roles, role] : editing.roles.filter(item => item !== role);
+          setEditing({ ...editing, roles, permissions: roles.includes('practitioner') ? editing.permissions : [] });
+        }}/>} label={role.replaceAll('_', ' ')}/>)}
+        {editing.roles.includes('practitioner') && <>
+          <Typography fontWeight={700}>{t('Additional permissions')}</Typography>
+          <FormControlLabel control={<Checkbox checked={editing.permissions.includes(scheduleOthers)} onChange={event => set('permissions', event.target.checked ? [...editing.permissions, scheduleOthers] : editing.permissions.filter(item => item !== scheduleOthers))}/>} label={t('Schedule for other practitioners')}/>
+          <Typography variant="body2" color="text.secondary">{t('Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.')}</Typography>
+        </>}
+      </Stack></DialogContent>}
       <DialogActions><Button onClick={() => setEditing(null)}>{t('Cancel')}</Button><Button variant="contained" startIcon={<Save size={16}/>} onClick={save}>{t('Save')}</Button></DialogActions>
     </Dialog>
   </Paper>;

@@ -73,6 +73,8 @@ booking or clinical access is enabled by it. AUTH-04/05/06 and R3 remain open.
 
 **AUTH-08:** Owner confirmed keeping separate permissions. Do not collapse reception or accountant into a generic administrator role. Restrict staff permissions/system configuration to SuperAdmin unless the owner explicitly approves a delegated permission. Existing SuperAdmin-only catalogue operations can be expanded to ClinicAdmin only with API authorization tests.
 
+**AUTH-09 — Delegated scheduling:** A practitioner books, reschedules and cancels only appointments assigned to their own active practitioner profile by default. The practitioner is selected automatically and is read-only in that workflow. SuperAdmin, ClinicAdmin and Reception may schedule across practitioners. SuperAdmin may explicitly grant a practitioner the local `schedule_for_other_practitioners` permission for delegated scheduling duties; the API enforces the same boundary for option lists, appointment lists, address coverage, creation and changes.
+
 ## 5. Business, people and catalogue
 
 - **ORG-01:** Central editable business/legal name, branding and public contact information; location name/address/contact/timezone. SuperAdmin manages business-wide configuration. No hardcoded business name/address requiring search-and-replace; secrets and deployment settings never belong in this editor.

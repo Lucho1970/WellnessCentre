@@ -111,7 +111,7 @@ export function PortalApp() {
             path="*"
             element={
               <StaffSignIn>
-                {(roles) => <StaffPortal roles={roles} />}
+                {(access) => <StaffPortal roles={access.roles} permissions={access.permissions} />}
               </StaffSignIn>
             }
           />

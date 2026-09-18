@@ -65,9 +65,12 @@ final class EntraAuthenticator
     private function loadUser(string $tenantId, string $objectId, array $directoryRoles): AuthContext
     {
         $sql = "SELECT u.id,u.clinic_id,u.email,u.display_name,u.user_type,u.status,
-                       GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) AS roles
+                       GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) AS roles,
+                       GROUP_CONCAT(DISTINCT permission.code ORDER BY permission.code) AS permissions
                   FROM identity_links i JOIN users u ON u.id=i.user_id
              LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
+             LEFT JOIN user_permissions user_permission ON user_permission.user_id=u.id
+             LEFT JOIN permissions permission ON permission.id=user_permission.permission_id
                  WHERE i.provider='microsoft' AND i.tenant_id=:tenant AND i.provider_subject=:subject
               GROUP BY u.id,u.clinic_id,u.email,u.display_name,u.user_type,u.status";
         $statement = $this->database->connection()->prepare($sql);
@@ -77,7 +80,8 @@ final class EntraAuthenticator
         if ($user['status'] !== 'active') throw new ApiException(403, 'account_inactive', 'This account is not active.');
         $databaseRoles=$user['roles'] ? explode(',', $user['roles']) : [];$effectiveRoles=array_values(array_intersect($databaseRoles,$directoryRoles));
         if($effectiveRoles===[])throw new ApiException(403,'role_assignment_mismatch','No application role is assigned in both Microsoft Entra and the Wellness Centre.');
-        return new AuthContext((int)$user['id'], (int)$user['clinic_id'], $objectId, $user['email'], $user['display_name'], $user['user_type'], $effectiveRoles);
+        $permissions=$user['permissions'] ? explode(',', $user['permissions']) : [];
+        return new AuthContext((int)$user['id'], (int)$user['clinic_id'], $objectId, $user['email'], $user['display_name'], $user['user_type'], $effectiveRoles, $permissions);
     }
 
     private function jwks(): array

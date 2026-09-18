@@ -253,7 +253,7 @@ final class Api
     }
 
     private function user(Request $request): AuthContext{return $this->auth->authenticate($request->bearerToken());}
-    private function me(AuthContext $user): array{return ['id'=>$user->userId,'clinic_id'=>$user->clinicId,'email'=>$user->email,'display_name'=>$user->displayName,'user_type'=>$user->userType,'roles'=>$user->roles];}
+    private function me(AuthContext $user): array{return ['id'=>$user->userId,'clinic_id'=>$user->clinicId,'email'=>$user->email,'display_name'=>$user->displayName,'user_type'=>$user->userType,'roles'=>$user->roles,'permissions'=>$user->permissions];}
 
     private function cors(Request $request): void
     {

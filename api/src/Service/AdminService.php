@@ -131,8 +131,32 @@ final class AdminService
             $statement=$pdo->prepare('INSERT INTO staff_accounts(user_id,mfa_required) VALUES(:user,1)');$statement->execute(['user'=>$id]);$this->audit->write($actor->clinicId,$actor,$correlationId,'staff.create','user',$id,'success',['role'=>$body['role']]);$pdo->commit();return ['id'=>$id,'status'=>'active'];
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
-    public function staff(AuthContext $actor): array{$this->superAdmin($actor);$s=$this->database->connection()->prepare("SELECT u.id,u.display_name,u.email,u.status,GROUP_CONCAT(r.code ORDER BY r.code) roles FROM users u JOIN staff_accounts a ON a.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.clinic_id=:clinic GROUP BY u.id,u.display_name,u.email,u.status ORDER BY u.display_name");$s->execute(['clinic'=>$actor->clinicId]);$rows=$s->fetchAll();foreach($rows as &$row)$row['roles']=$row['roles']?explode(',',$row['roles']):[];return $rows;}
-    public function updateStaff(AuthContext $actor,int $userId,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['display_name','email','status','roles']);if($userId===$actor->userId)throw new ApiException(422,'self_role_change','Use another Super Admin to change your own access.');$roles=array_values(array_unique($body['roles']));$allowed=['super_admin','clinic_admin','reception','practitioner','accountant'];foreach($roles as $role)if(!in_array($role,$allowed,true))throw new ApiException(422,'validation_error','Invalid role.');if(!in_array($body['status'],['active','inactive','locked'],true))throw new ApiException(422,'validation_error','Invalid staff status.');$pdo=$this->database->connection();try{$pdo->beginTransaction();$s=$pdo->prepare("UPDATE users SET display_name=:name,email=:email,status=:status WHERE id=:id AND clinic_id=:clinic AND user_type='staff'");$s->execute(['name'=>trim((string)$body['display_name']),'email'=>strtolower(trim((string)$body['email'])),'status'=>$body['status'],'id'=>$userId,'clinic'=>$actor->clinicId]);$check=$pdo->prepare('SELECT 1 FROM users WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$userId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'staff_not_found','Staff member not found.');$pdo->prepare('DELETE FROM user_roles WHERE user_id=:id')->execute(['id'=>$userId]);$insert=$pdo->prepare('INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT :user,id,:actor FROM roles WHERE code=:role');foreach($roles as $role)$insert->execute(['user'=>$userId,'actor'=>$actor->userId,'role'=>$role]);$this->audit->write($actor->clinicId,$actor,$cid,'staff.update','user',$userId,'success',['roles'=>$roles,'status'=>$body['status']]);$pdo->commit();return ['id'=>$userId];}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}}
+    public function staff(AuthContext $actor): array
+    {
+        $this->superAdmin($actor);
+        $s=$this->database->connection()->prepare("SELECT u.id,u.display_name,u.email,u.status,GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) roles,GROUP_CONCAT(DISTINCT permission.code ORDER BY permission.code) permissions FROM users u JOIN staff_accounts a ON a.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id LEFT JOIN user_permissions user_permission ON user_permission.user_id=u.id LEFT JOIN permissions permission ON permission.id=user_permission.permission_id WHERE u.clinic_id=:clinic GROUP BY u.id,u.display_name,u.email,u.status ORDER BY u.display_name");
+        $s->execute(['clinic'=>$actor->clinicId]);$rows=$s->fetchAll();
+        foreach($rows as &$row){$row['roles']=$row['roles']?explode(',',$row['roles']):[];$row['permissions']=$row['permissions']?explode(',',$row['permissions']):[];}
+        return $rows;
+    }
+
+    public function updateStaff(AuthContext $actor,int $userId,array $body,string $cid): array
+    {
+        $this->superAdmin($actor);$this->required($body,['display_name','email','status','roles']);
+        if($userId===$actor->userId)throw new ApiException(422,'self_role_change','Use another Super Admin to change your own access.');
+        $roles=array_values(array_unique($body['roles']));$allowed=['super_admin','clinic_admin','reception','practitioner','accountant'];foreach($roles as $role)if(!in_array($role,$allowed,true))throw new ApiException(422,'validation_error','Invalid role.');
+        $permissions=array_values(array_unique($body['permissions']??[]));$allowedPermissions=['schedule_for_other_practitioners'];foreach($permissions as $permission)if(!in_array($permission,$allowedPermissions,true))throw new ApiException(422,'validation_error','Invalid permission.');
+        if($permissions!==[]&&!in_array('practitioner',$roles,true))throw new ApiException(422,'validation_error','Cross-practitioner scheduling can only be assigned to a practitioner.');
+        if(!in_array($body['status'],['active','inactive','locked'],true))throw new ApiException(422,'validation_error','Invalid staff status.');
+        $pdo=$this->database->connection();
+        try{
+            $pdo->beginTransaction();$s=$pdo->prepare("UPDATE users SET display_name=:name,email=:email,status=:status WHERE id=:id AND clinic_id=:clinic AND user_type='staff'");$s->execute(['name'=>trim((string)$body['display_name']),'email'=>strtolower(trim((string)$body['email'])),'status'=>$body['status'],'id'=>$userId,'clinic'=>$actor->clinicId]);
+            $check=$pdo->prepare('SELECT 1 FROM users WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$userId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'staff_not_found','Staff member not found.');
+            $pdo->prepare('DELETE FROM user_roles WHERE user_id=:id')->execute(['id'=>$userId]);$insert=$pdo->prepare('INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT :user,id,:actor FROM roles WHERE code=:role');foreach($roles as $role)$insert->execute(['user'=>$userId,'actor'=>$actor->userId,'role'=>$role]);
+            $pdo->prepare('DELETE FROM user_permissions WHERE user_id=:id')->execute(['id'=>$userId]);$insertPermission=$pdo->prepare('INSERT INTO user_permissions(user_id,permission_id,assigned_by) SELECT :user,id,:actor FROM permissions WHERE code=:permission');foreach($permissions as $permission)$insertPermission->execute(['user'=>$userId,'actor'=>$actor->userId,'permission'=>$permission]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'staff.update','user',$userId,'success',['roles'=>$roles,'permissions'=>$permissions,'status'=>$body['status']]);$pdo->commit();return ['id'=>$userId];
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
 
     public function createPractitioner(AuthContext $actor,array $body,string $correlationId): array
     {

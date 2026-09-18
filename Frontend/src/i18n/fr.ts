@@ -724,6 +724,12 @@ const fr: Record<string, string> = {
   "This merge is blocked.": "Cette fusion est bloquée.",
   "Create anyway": "Créer quand même",
   "Possible duplicate client": "Client possiblement en double",
+  "Additional permissions": "Autorisations supplémentaires",
+  "Schedule for other practitioners": "Planifier pour d’autres praticiens",
+  "Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.":
+    "Permet à ce praticien de réserver, reporter et annuler des rendez-vous attribués à un autre praticien.",
+  "Appointments booked in your practitioner workspace are assigned to you.":
+    "Les rendez-vous réservés dans votre espace praticien vous sont automatiquement attribués.",
 };
 
 export default fr;

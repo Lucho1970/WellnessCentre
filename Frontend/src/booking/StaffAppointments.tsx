@@ -26,7 +26,7 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
   return [...new Map(rows.map(row => [String(row[key]), row])).values()];
 }
 
-export function StaffAppointments({ canBook, practitionerMode = false }: { canBook: boolean; practitionerMode?: boolean }) {
+export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean }) {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -61,7 +61,7 @@ export function StaffAppointments({ canBook, practitionerMode = false }: { canBo
       {canBook && !creating && <Button variant="contained" startIcon={<CalendarPlus size={18} />} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-    {creating && <BookingForm request={request} practitionerMode={practitionerMode} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     {managing && <ManageAppointment appointment={managing} request={request} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" gap={2} justifyContent="space-between" mb={2}>
@@ -143,8 +143,8 @@ function ManageAppointment({ appointment, request, close, complete }: ManageProp
   </Paper>;
 }
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; cancel: () => void; complete: (id: number) => void };
-function BookingForm({ request, practitionerMode, cancel, complete }: FormProps) {
+type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; cancel: () => void; complete: (id: number) => void };
+function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, complete }: FormProps) {
   const { t, i18n } = useTranslation();
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
@@ -186,12 +186,19 @@ function BookingForm({ request, practitionerMode, cancel, complete }: FormProps)
   const locationRows = eligibleOptions.filter(row => String(row.location_id) === location);
   const serviceRows = locationRows.filter(row => String(row.service_id) === service);
   const practitionerRows = serviceRows.filter(row => String(row.practitioner_id) === practitioner);
+  const practitionerLocked=practitionerMode&&!canScheduleOthers;
+  const assignedPractitioner=practitionerLocked?unique(options,'practitioner_id')[0]:undefined;
   useEffect(() => {
     const controller = new AbortController();
     void request(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); } })
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [request]);
+  useEffect(() => {
+    if (!practitionerLocked || !assignedPractitioner) return;
+    const assigned=String(assignedPractitioner.practitioner_id);
+    if (practitioner!==assigned) setPractitioner(assigned);
+  }, [assignedPractitioner, practitioner, practitionerLocked]);
   useEffect(() => {
     const term = clientQuery.trim();
     setClients([]); setClientMore(false); setClientError(''); setClientSearched(false);
@@ -269,7 +276,9 @@ function BookingForm({ request, practitionerMode, cancel, complete }: FormProps)
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); setCoverage(null); clearSlots(); })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{practitionerLocked
+            ? <TextField fullWidth label={t('Practitioner')} value={assignedPractitioner?.practitioner_name ?? ''} InputProps={{ readOnly: true }} helperText={t('Appointments booked in your practitioner workspace are assigned to you.')} />
+            : comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, practitionerRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
         </Grid>
         {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography><AddressEntry required showInstructions disabled={coverageBusy} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setCoverage(null);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.')}</Alert><Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}</Stack>}

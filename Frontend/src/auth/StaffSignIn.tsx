@@ -5,20 +5,23 @@ import { useStaffAuth } from './AuthProvider';
 import { apiRequest } from '../shared/api';
 import { useTranslation } from 'react-i18next';
 
-export function StaffSignIn({ children }: { children: (roles: string[]) => ReactNode }) {
+type StaffAccess = { roles: string[]; permissions: string[] };
+
+export function StaffSignIn({ children }: { children: (access: StaffAccess) => ReactNode }) {
   const { t } = useTranslation();
   const { account, configured, isAuthenticated, signIn, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
-  const [access, setAccess] = useState<{ account: string; roles: string[] } | null>(null);
+  const [access, setAccess] = useState<(StaffAccess & { account: string }) | null>(null);
   useEffect(() => {
     const controller = new AbortController(); setAccess(null); setError('');
     if (!isAuthenticated) return () => controller.abort();
     setBusy(true);
-    void getAccessToken().then(token => apiRequest<{ roles: string[] }>('/auth/me', { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }))
+    void getAccessToken().then(token => apiRequest<{ roles: string[]; permissions?: string[] }>('/auth/me', { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }))
       .then(data => {
         if (!Array.isArray(data.roles) || !data.roles.every(role => typeof role === 'string')) throw new Error(t('The service returned invalid staff permissions.'));
-        if (!controller.signal.aborted) setAccess({ account: accountKey, roles: data.roles });
+        if (data.permissions !== undefined && (!Array.isArray(data.permissions) || !data.permissions.every(permission => typeof permission === 'string'))) throw new Error(t('The service returned invalid staff permissions.'));
+        if (!controller.signal.aborted) setAccess({ account: accountKey, roles: data.roles, permissions: data.permissions ?? [] });
       }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Staff authorization failed.')); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
@@ -41,5 +44,5 @@ export function StaffSignIn({ children }: { children: (roles: string[]) => React
   if (error) return <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>;
   if (busy || access?.account !== accountKey) return <Stack alignItems="center" py={4}><CircularProgress /><Typography mt={2}>{t('Verifying staff access…')}</Typography></Stack>;
   if (!access.roles.length) return <Alert severity="warning">{t('This account has no active staff permissions. Please contact the clinic administrator.')}</Alert>;
-  return <div key={accountKey}>{children(access.roles)}</div>;
+  return <div key={accountKey}>{children({ roles: access.roles, permissions: access.permissions })}</div>;
 }

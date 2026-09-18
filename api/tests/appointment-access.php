@@ -17,6 +17,7 @@ foreach([['staff',[]],['staff',['accounting']],['unknown',['super_admin']]] as [
 }
 foreach(['super_admin','clinic_admin','reception'] as $role){BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',[$role]),false,'');$checks++;}
 BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',['practitioner']),true,'practitioner_managed');$checks++;
+BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',['practitioner'],['schedule_for_other_practitioners']),false,'clinic_managed');$checks++;
 foreach([[false,'practitioner_managed'],[true,'clinic_managed']] as [$owns,$mode]){
     try{BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',['practitioner']),$owns,$mode);throw new RuntimeException('Practitioner changed an unauthorized appointment.');}
     catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}

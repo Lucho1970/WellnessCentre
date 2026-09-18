@@ -697,6 +697,12 @@ const en = {
   "This merge is blocked.": "This merge is blocked.",
   "Create anyway": "Create anyway",
   "Possible duplicate client": "Possible duplicate client",
+  "Additional permissions": "Additional permissions",
+  "Schedule for other practitioners": "Schedule for other practitioners",
+  "Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.":
+    "Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.",
+  "Appointments booked in your practitioner workspace are assigned to you.":
+    "Appointments booked in your practitioner workspace are assigned to you.",
 } as const;
 
 export default en;

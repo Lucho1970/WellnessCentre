@@ -120,7 +120,7 @@ final class AddressCoverageService
         $statement->execute(['clinic' => $actor->clinicId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id']]);
         $rule = $statement->fetch();
         if (!$rule) throw new ApiException(422, 'delivery_unavailable', 'This practitioner does not offer mobile visits for the selected service and location.');
-        $practitionerOnly = $actor->hasAnyRole('practitioner') && !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception');
+        $practitionerOnly = $actor->hasAnyRole('practitioner') && !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception') && !$actor->hasPermission('schedule_for_other_practitioners');
         if ($practitionerOnly && ((int)$rule['user_id'] !== $actor->userId || $rule['booking_mode'] !== 'practitioner_managed')) {
             throw new ApiException(403, 'forbidden', 'Practitioners can only validate addresses for their own practitioner-managed appointments.');
         }

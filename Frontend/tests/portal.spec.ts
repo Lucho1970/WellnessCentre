@@ -17,7 +17,7 @@ test.beforeEach(({ page }) => {
 test.afterEach(({ page }) => {
   expect(errors.get(page)).toEqual([]);
 });
-async function fixtures(page: Page, roles?: string[]) {
+async function fixtures(page: Page, roles?: string[], permissions: string[] = []) {
   // Test-only network substitution. No production flag or authentication bypass.
   if (roles)
     await page.route("**/src/auth/AuthProvider.tsx", (route) =>
@@ -43,7 +43,7 @@ async function fixtures(page: Page, roles?: string[]) {
         email: "clinic@example.test",
         phone: "905-555-0100",
       };
-    if (path === "/auth/me") data = { roles: roles ?? [] };
+    if (path === "/auth/me") data = { roles: roles ?? [], permissions };
     if (path === "/profile/avatar") data = { image_base64: null };
     if (path === "/clients") data = { items: [], has_more: false };
     if (path === "/locations")
@@ -879,6 +879,8 @@ test("practitioner mobile navigation can book and change only the scoped schedul
       ),
     )
     .toBe(true);
+  await expect(page.getByLabel("Practitioner")).toHaveValue("Test Practitioner");
+  await expect(page.getByLabel("Practitioner")).not.toBeEditable();
   await page
     .getByRole("textbox", { name: "Find an active client" })
     .fill("New Clinic");
@@ -924,6 +926,24 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   await expect(
     page.getByText("You do not have permission to access this page."),
   ).toBeVisible();
+});
+
+test("delegated scheduling permission allows a practitioner to choose another practitioner", async ({ page }) => {
+  await fixtures(page, ["practitioner"], ["schedule_for_other_practitioners"]);
+  await page.route("**/api/v1/appointments?**", route => route.fulfill({ json: { data: [] } }));
+  await page.route("**/api/v1/booking-options?**", route => route.fulfill({ json: { data: { rooms: [], combinations: [
+    { location_id: 1, location_name: "Mobile area", timezone: "America/Toronto", service_id: 2, service_name: "Massage", requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 3, practitioner_name: "Test Practitioner", duration_option_id: 4, duration_minutes: 60 },
+    { location_id: 1, location_name: "Mobile area", timezone: "America/Toronto", service_id: 2, service_name: "Massage", requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 9, practitioner_name: "Covering Practitioner", duration_option_id: 4, duration_minutes: 60 },
+  ] } } }));
+  await page.goto(`${portalHost}/practitioner/schedule`);
+  await page.getByRole("button", { name: "Book appointment", exact: true }).click();
+  await page.getByRole("combobox", { name: "Base location / service area" }).click();
+  await page.getByRole("option", { name: "Mobile area" }).click();
+  await page.getByRole("combobox", { name: "Service", exact: true }).click();
+  await page.getByRole("option", { name: "Massage" }).click();
+  await expect(page.getByRole("combobox", { name: "Practitioner", exact: true })).toBeEditable();
+  await page.getByRole("combobox", { name: "Practitioner", exact: true }).click();
+  await expect(page.getByRole("option", { name: "Covering Practitioner" })).toBeVisible();
 });
 
 test("dual roles can switch eligible workspaces and retain that preference", async ({
