@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
+import en from '../src/i18n/en';
+import fr from '../src/i18n/fr';
 
 // Exercise release bundles under their configured origins without contacting the live site.
 const productionHosts = process.env.BUILD_PRODUCTION_HOSTS === '1';
@@ -13,6 +15,10 @@ test.beforeEach(async ({page}) => {
       await route.fulfill({ response });
     });
   }
+});
+
+test('English and French resource catalogs contain the same keys', () => {
+  expect(Object.keys(fr).sort()).toEqual(Object.keys(en).sort());
 });
 
 test('public artifacts contain no staff authentication or private feature modules', () => {
@@ -48,4 +54,25 @@ test('built client callback loads independently of staff login', async ({ page }
   await page.goto(`${portalOrigin}${info.config.metadata.portalBase}client/auth/callback`);
   await expect(page.getByRole('heading', { name: 'Client portal', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Staff portal', exact: true })).toHaveCount(0);
+});
+
+test('language selection switches to French and persists across reloads', async ({ page }, info) => {
+  await page.route('**/api/v1/site-config', route => route.fulfill({ json: { data: { name: 'Build Smoke Clinic', email: 'clinic@example.test', phone: null, legal_name: null } } }));
+  await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
+  await page.getByRole('button', { name: 'Switch language to French' }).click();
+  await expect(page.getByRole('heading', { name: 'Communiquer avec Build Smoke Clinic' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Communiquer avec Build Smoke Clinic' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Passer la langue au Anglais' })).toBeVisible();
+});
+
+test('API failures are presented in the selected language', async ({ page }, info) => {
+  await page.route('**/api/v1/site-config', route => route.fulfill({ json: { data: { name: 'Build Smoke Clinic', email: null, phone: null, legal_name: null } } }));
+  await page.route('**/api/v1/locations', route => route.fulfill({ status: 422, json: { error: { code: 'validation_error', message: 'Untranslated server detail.', correlation_id: 'build-smoke-reference' } } }));
+  await page.route('**/api/v1/services', route => route.fulfill({ json: { data: [] } }));
+  await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
+  await page.getByRole('button', { name: 'Switch language to French' }).click();
+  await page.goto(`${publicOrigin}${info.config.metadata.publicBase}book`);
+  await expect(page.getByText('Vérifiez les renseignements saisis et corrigez les champs non valides. Référence : build-smoke-reference')).toBeVisible();
 });

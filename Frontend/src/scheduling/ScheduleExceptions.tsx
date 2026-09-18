@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Alert, Button, Grid, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useStaffAuth } from "../auth/AuthProvider";
+import { apiErrorMessage } from "../shared/api";
+import { formatDateTime } from "../i18n/format";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
@@ -26,9 +29,8 @@ const initialTime = (hoursAhead: number) => {
   return local.toISOString().slice(0, 16);
 };
 
-const showUtc = (value: string) => new Date(`${value.replace(" ", "T")}Z`).toLocaleString();
-
 export function ScheduleExceptions() {
+  const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -49,7 +51,7 @@ export function ScheduleExceptions() {
         fetch(`${apiBaseUrl}/admin/schedule-exceptions`, { headers }),
       ]);
       const bodies = await Promise.all(responses.map((response) => response.json()));
-      if (responses.some((response) => !response.ok)) throw new Error("Unable to load schedule changes.");
+      if (responses.some((response) => !response.ok)) throw new Error(t("Unable to load schedule changes."));
       setPractitioners(bodies[0].data);
       setLocations(bodies[1].data);
       setExceptions(bodies[2].data);
@@ -59,9 +61,9 @@ export function ScheduleExceptions() {
         location_id: current.location_id || String(bodies[1].data[0]?.id ?? ""),
       }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load schedule changes.");
+      setError(cause instanceof Error ? cause.message : t("Unable to load schedule changes."));
     }
-  }, [getAccessToken]);
+  }, [getAccessToken, t]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -83,11 +85,11 @@ export function ScheduleExceptions() {
         body: JSON.stringify(payload),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? "Unable to save schedule change.");
-      setSaved(kind === "override" ? "Availability override added." : "Time off added.");
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t("Unable to save schedule change.")));
+      setSaved(t(kind === "override" ? "Availability override added." : "Time off added."));
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save schedule change.");
+      setError(cause instanceof Error ? cause.message : t("Unable to save schedule change."));
     } finally { setBusy(false); }
   };
 
@@ -98,32 +100,36 @@ export function ScheduleExceptions() {
       const path = item.kind === "override" ? "availability-overrides" : "time-off";
       const response = await fetch(`${apiBaseUrl}/admin/${path}/${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? "Unable to remove schedule change.");
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t("Unable to remove schedule change.")));
       await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to remove schedule change."); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t("Unable to remove schedule change.")); }
   };
 
   const selectedLocation = locations.find((location) => String(location.id) === form.location_id);
+  const showUtc = (value: string) => formatDateTime(`${value.replace(" ", "T")}Z`, i18n.resolvedLanguage, { dateStyle: "medium", timeStyle: "short" });
   return <Stack spacing={3} mt={3}>
     <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: 3 }}>
-      <Stack direction="row" spacing={1.5} alignItems="center"><CalendarOff color="#176b62"/><Typography variant="h5">Schedule changes and time off</Typography></Stack>
-      <Typography color="text.secondary" mt={1}>Add a one-time opening, blocked period, vacation, illness, or personal absence. Enter times in {selectedLocation?.timezone ?? "the selected location's timezone"}.</Typography>
+      <Stack direction="row" spacing={1.5} alignItems="center"><CalendarOff color="#176b62"/><Typography variant="h5">{t("Schedule changes and time off")}</Typography></Stack>
+      <Typography color="text.secondary" mt={1}>{t("Add a one-time opening, blocked period, vacation, illness, or personal absence. Enter times in {{timezone}}.", { timezone: selectedLocation?.timezone ?? t("the selected location's timezone") })}</Typography>
       <Grid container spacing={2} mt={1}>
-        <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth label="Change type" value={kind} onChange={(event) => { const next = event.target.value as "override" | "time_off"; setKind(next); setForm((current) => ({ ...current, type: next === "override" ? "blocked" : "vacation" })); }}><MenuItem value="override">Availability override</MenuItem><MenuItem value="time_off">Time off</MenuItem></TextField></Grid>
-        <Grid size={{ xs: 12, md: 4 }}><TextField required select fullWidth label="Practitioner" value={form.practitioner_id} onChange={(event) => setForm((current) => ({ ...current, practitioner_id: event.target.value }))}>{practitioners.map((practitioner) => <MenuItem key={practitioner.practitioner_id} value={String(practitioner.practitioner_id)}>{practitioner.display_name}</MenuItem>)}</TextField></Grid>
-        <Grid size={{ xs: 12, md: 4 }}><TextField required select fullWidth label="Timezone location" value={form.location_id} onChange={(event) => setForm((current) => ({ ...current, location_id: event.target.value }))}>{locations.map((location) => <MenuItem key={location.id} value={String(location.id)}>{location.name} ({location.timezone})</MenuItem>)}</TextField></Grid>
-        <Grid size={{ xs: 12, md: 6 }}><TextField required type="datetime-local" fullWidth label="Starts" value={form.starts_at} onChange={(event) => setForm((current) => ({ ...current, starts_at: event.target.value }))} InputLabelProps={{ shrink: true }}/></Grid>
-        <Grid size={{ xs: 12, md: 6 }}><TextField required type="datetime-local" fullWidth label="Ends" value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} InputLabelProps={{ shrink: true }}/></Grid>
-        <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth label={kind === "override" ? "Availability" : "Reason type"} value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}>{(kind === "override" ? [["blocked", "Blocked"], ["available", "Available"]] : [["vacation", "Vacation"], ["sick", "Sick"], ["personal", "Personal"], ["other", "Other"]]).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}</TextField></Grid>
-        <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth label="Notes (optional)" value={form.reason} inputProps={{ maxLength: 500 }} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))}/></Grid>
+        <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth label={t("Change type")} value={kind} onChange={(event) => { const next = event.target.value as "override" | "time_off"; setKind(next); setForm((current) => ({ ...current, type: next === "override" ? "blocked" : "vacation" })); }}><MenuItem value="override">{t("Availability override")}</MenuItem><MenuItem value="time_off">{t("Time off")}</MenuItem></TextField></Grid>
+        <Grid size={{ xs: 12, md: 4 }}><TextField required select fullWidth label={t("Practitioner")} value={form.practitioner_id} onChange={(event) => setForm((current) => ({ ...current, practitioner_id: event.target.value }))}>{practitioners.map((practitioner) => <MenuItem key={practitioner.practitioner_id} value={String(practitioner.practitioner_id)}>{practitioner.display_name}</MenuItem>)}</TextField></Grid>
+        <Grid size={{ xs: 12, md: 4 }}><TextField required select fullWidth label={t("Timezone location")} value={form.location_id} onChange={(event) => setForm((current) => ({ ...current, location_id: event.target.value }))}>{locations.map((location) => <MenuItem key={location.id} value={String(location.id)}>{location.name} ({location.timezone})</MenuItem>)}</TextField></Grid>
+        <Grid size={{ xs: 12, md: 6 }}><TextField required type="datetime-local" fullWidth label={t("Starts")} value={form.starts_at} onChange={(event) => setForm((current) => ({ ...current, starts_at: event.target.value }))} InputLabelProps={{ shrink: true }}/></Grid>
+        <Grid size={{ xs: 12, md: 6 }}><TextField required type="datetime-local" fullWidth label={t("Ends")} value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} InputLabelProps={{ shrink: true }}/></Grid>
+        <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth label={t(kind === "override" ? "Availability" : "Reason type")} value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}>{(kind === "override" ? [["blocked", "Blocked"], ["available", "Available"]] : [["vacation", "Vacation"], ["sick", "Sick"], ["personal", "Personal"], ["other", "Other"]]).map(([value, label]) => <MenuItem key={value} value={value}>{t(label)}</MenuItem>)}</TextField></Grid>
+        <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth label={t("Notes (optional)")} value={form.reason} inputProps={{ maxLength: 500 }} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))}/></Grid>
       </Grid>
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}{saved && <Alert severity="success" sx={{ mt: 2 }}>{saved}</Alert>}
-      <Button disabled={busy || !form.practitioner_id || !form.location_id} type="submit" variant="contained" startIcon={<Plus size={17}/>} sx={{ mt: 2 }}>Add schedule change</Button>
+      <Button disabled={busy || !form.practitioner_id || !form.location_id} type="submit" variant="contained" startIcon={<Plus size={17}/>} sx={{ mt: 2 }}>{t("Add schedule change")}</Button>
     </Paper>
-    <Paper variant="outlined" sx={{ p: 3 }}><Typography variant="h5" mb={2}>Upcoming schedule changes</Typography><Stack spacing={1}>{exceptions.length === 0 && <Typography color="text.secondary">No schedule changes have been added.</Typography>}{exceptions.map((item) => <Stack key={`${item.kind}-${item.id}`} direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={1} sx={{ p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 2 }}><BoxText item={item}/><Button color="error" startIcon={<Trash2 size={16}/>} onClick={() => void remove(item)}>Remove</Button></Stack>)}</Stack></Paper>
+    <Paper variant="outlined" sx={{ p: 3 }}><Typography variant="h5" mb={2}>{t("Upcoming schedule changes")}</Typography><Stack spacing={1}>{exceptions.length === 0 && <Typography color="text.secondary">{t("No schedule changes have been added.")}</Typography>}{exceptions.map((item) => <Stack key={`${item.kind}-${item.id}`} direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={1} sx={{ p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 2 }}><BoxText item={item} showUtc={showUtc}/><Button color="error" startIcon={<Trash2 size={16}/>} onClick={() => void remove(item)}>{t("Remove")}</Button></Stack>)}</Stack></Paper>
   </Stack>;
 }
 
-function BoxText({ item }: { item: Exception }) {
-  return <div><Typography fontWeight={700}>{item.practitioner_name} · {item.kind === "override" ? item.type.replace("_", " ") : `Time off — ${item.type}`}</Typography><Typography color="text.secondary">{showUtc(item.starts_at)} – {showUtc(item.ends_at)}{item.location_name ? ` · ${item.location_name}` : ""}{item.reason ? ` · ${item.reason}` : ""}</Typography></div>;
+function BoxText({ item, showUtc }: { item: Exception; showUtc: (value: string) => string }) {
+  const { t } = useTranslation();
+  const typeLabels: Record<string, string> = { blocked: 'Blocked', available: 'Available', vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
+  const translatedType = t(typeLabels[item.type] ?? item.type.replace("_", " "));
+  return <div><Typography fontWeight={700}>{item.practitioner_name} · {item.kind === "override" ? translatedType : t("Time off — {{type}}", { type: translatedType })}</Typography><Typography color="text.secondary">{showUtc(item.starts_at)} – {showUtc(item.ends_at)}{item.location_name ? ` · ${item.location_name}` : ""}{item.reason ? ` · ${item.reason}` : ""}</Typography></div>;
 }

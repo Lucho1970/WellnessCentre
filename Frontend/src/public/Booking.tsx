@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Container, Grid, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { apiRequest } from '../shared/api';
 import { portalLink } from '../shared/urls';
+import { useTranslation } from 'react-i18next';
+import { formatCad, formatDateTime } from '../i18n/format';
 
 type Location = { id: number; name: string; timezone?: string };
 type Service = { id: number; name: string; description: string | null; price_cents: number; durations: { id: number; minutes: number; price_cents: number }[] };
 type Practitioner = { id: number; display_name: string; discipline: string; credentials: string | null };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string };
 type Availability = { timezone: string; availability: Slot[] };
-const message = (cause: unknown) => cause instanceof Error ? cause.message : 'Unable to load online booking.';
-
 export function Booking() {
+  const { t, i18n } = useTranslation();
+  const message = (cause: unknown) => cause instanceof Error ? cause.message : t('Unable to load online booking.');
+  const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [mode,setMode]=useState('mobile');
   const [locations, setLocations] = useState<Location[]>([]), [services, setServices] = useState<Service[]>([]), [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [locationId, setLocationId] = useState(''), [serviceId, setServiceId] = useState(''), [practitionerId, setPractitionerId] = useState('');
@@ -55,32 +58,32 @@ export function Booking() {
   const handoff = new URL(portalLink('client/book'));
   if (slot) handoff.search = new URLSearchParams({ delivery_mode: mode, location_id: locationId, service_id: serviceId, practitioner_id: practitionerId, duration_option_id: String(slot.duration_option_id), starts_at: slot.starts_at }).toString();
   return <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 } }}>
-    <Typography variant="overline" color="primary">Book online</Typography><Typography variant="h3" component="h1">Find a time that fits your life.</Typography>
-    <Alert severity="info" sx={{ my: 3 }}>Availability browsing is open. Client sign-in and online confirmation are not available yet; contact the clinic to book. Selecting a time does not reserve it.</Alert>
-    {loading && <CircularProgress aria-label="Loading booking options" />}
-    {error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>Retry</Button>}>{error}</Alert>}
-    {!loading && !error && (!services.length || !locations.length) && <Alert severity="info">Online services and locations have not been configured yet.</Alert>}
+    <Typography variant="overline" color="primary">{t('Book online')}</Typography><Typography variant="h3" component="h1">{t('Find a time that fits your life.')}</Typography>
+    <Alert severity="info" sx={{ my: 3 }}>{t('Availability browsing is open. Client sign-in and online confirmation are not available yet; contact the clinic to book. Selecting a time does not reserve it.')}</Alert>
+    {loading && <CircularProgress aria-label={t('Loading booking options')} />}
+    {error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>}
+    {!loading && !error && (!services.length || !locations.length) && <Alert severity="info">{t('Online services and locations have not been configured yet.')}</Alert>}
     {!loading && !error && services.length > 0 && locations.length > 0 && <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 5 }}><Paper variant="outlined" sx={{ p: 3 }}><Stack spacing={3}>
-        <Typography variant="h5" component="h2">Choose care</Typography>
-        <TextField select label="Visit type" value={mode} onChange={event=>{setSlot(null);setMode(event.target.value);}}><MenuItem value="mobile">At client location</MenuItem><MenuItem value="clinic">In clinic</MenuItem></TextField>
-        <TextField select label="Base location / service area" value={locationId} onChange={event => { setSlot(null); setLocationId(event.target.value); }}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
-        <TextField select label="Service" value={serviceId} onChange={event => { setSlot(null); setPractitionerId(''); setServiceId(event.target.value); }}>{services.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
-        {service && <Box><Typography color="text.secondary">{service.description}</Typography><Typography mt={1}>Treatment options before taxes</Typography><Typography variant="body2">{service.durations.map(option => `${option.minutes} min — $${(Number(option.price_cents) / 100).toFixed(2)}`).join(' · ')}</Typography>{mode === 'mobile' && <Typography variant="body2">A separate mobile surcharge may apply; staff will confirm coverage and travel time.</Typography>}</Box>}
+        <Typography variant="h5" component="h2">{t('Choose care')}</Typography>
+        <TextField select label={t('Visit type')} value={mode} onChange={event=>{setSlot(null);setMode(event.target.value);}}><MenuItem value="mobile">{t('At client location')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
+        <TextField select label={t('Base location / service area')} value={locationId} onChange={event => { setSlot(null); setLocationId(event.target.value); }}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
+        <TextField select label={t('Service')} value={serviceId} onChange={event => { setSlot(null); setPractitionerId(''); setServiceId(event.target.value); }}>{services.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
+        {service && <Box><Typography color="text.secondary">{service.description}</Typography><Typography mt={1}>{t('Treatment options before taxes')}</Typography><Typography variant="body2">{service.durations.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(Number(option.price_cents)) })).join(' · ')}</Typography>{mode === 'mobile' && <Typography variant="body2">{t('A separate mobile surcharge may apply; staff will confirm coverage and travel time.')}</Typography>}</Box>}
       </Stack></Paper></Grid>
       <Grid size={{ xs: 12, md: 7 }}><Paper variant="outlined" sx={{ p: 3 }}><Stack spacing={2}>
-        <Typography variant="h5" component="h2">Choose a time</Typography>
-        <TextField select label="Practitioner" value={practitionerId} disabled={practitionerBusy || !practitioners.length} onChange={event => { setSlot(null); setPractitionerId(event.target.value); }}>{practitioners.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.display_name} · {item.credentials || item.discipline}</MenuItem>)}</TextField>
-        {(practitionerBusy || slotBusy) && <CircularProgress size={24} aria-label="Loading available times" />}
-        {(practitionerError || slotError) && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>Retry</Button>}>{practitionerError || slotError}</Alert>}
-        {!practitionerBusy && !practitionerError && !practitioners.length && <Alert severity="info">No practitioner is assigned to this service yet.</Alert>}
-        {!slotBusy && !practitionerBusy && practitionerId && !slotError && !availability.availability.length && <Alert severity="info">No available times were found in the next seven days.</Alert>}
-        {!slotBusy && <><Typography variant="body2" color="text.secondary">Times shown in {availability.timezone}. Showing up to 24 available options.</Typography>
+        <Typography variant="h5" component="h2">{t('Choose a time')}</Typography>
+        <TextField select label={t('Practitioner')} value={practitionerId} disabled={practitionerBusy || !practitioners.length} onChange={event => { setSlot(null); setPractitionerId(event.target.value); }}>{practitioners.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.display_name} · {item.credentials || item.discipline}</MenuItem>)}</TextField>
+        {(practitionerBusy || slotBusy) && <CircularProgress size={24} aria-label={t('Loading available times')} />}
+        {(practitionerError || slotError) && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{practitionerError || slotError}</Alert>}
+        {!practitionerBusy && !practitionerError && !practitioners.length && <Alert severity="info">{t('No practitioner is assigned to this service yet.')}</Alert>}
+        {!slotBusy && !practitionerBusy && practitionerId && !slotError && !availability.availability.length && <Alert severity="info">{t('No available times were found in the next seven days.')}</Alert>}
+        {!slotBusy && <><Typography variant="body2" color="text.secondary">{t('Times shown in {{timezone}}. Showing up to 24 available options.', { timezone: availability.timezone })}</Typography>
           <Grid container spacing={1}>{availability.availability.slice(0, 24).map(time => <Grid size={{ xs: 12, sm: 6 }} key={`${time.duration_option_id}-${time.starts_at}`}>
             <Button fullWidth aria-pressed={slot === time} variant={slot === time ? 'contained' : 'outlined'} onClick={() => setSlot(time)}>
-              {new Date(time.starts_at).toLocaleString(undefined, { timeZone: availability.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {Math.round((Date.parse(time.ends_at) - Date.parse(time.starts_at)) / 60000)} min{durationOption(time.duration_option_id) ? ` · $${(Number(durationOption(time.duration_option_id)!.price_cents) / 100).toFixed(2)}` : ''}
+              {formatDateTime(time.starts_at, i18n.resolvedLanguage, { timeZone: availability.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {t('{{minutes}} min — {{price}}', { minutes: Math.round((Date.parse(time.ends_at) - Date.parse(time.starts_at)) / 60000), price: durationOption(time.duration_option_id) ? money(Number(durationOption(time.duration_option_id)!.price_cents)) : '' }).replace(/ — $/, '')}
             </Button></Grid>)}</Grid></>}
-        <Button href={slot ? handoff.href : undefined} disabled={!slot || slotBusy || practitionerBusy} variant="contained">View client booking information</Button>
+        <Button href={slot ? handoff.href : undefined} disabled={!slot || slotBusy || practitionerBusy} variant="contained">{t('View client booking information')}</Button>
       </Stack></Paper></Grid>
     </Grid>}
   </Container>;

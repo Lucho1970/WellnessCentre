@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, Button, IconButton } from '@mui/material';
 import { portalLink, portalUrl } from '../shared/urls';
+import { useTranslation } from 'react-i18next';
 
 export function ClientLoginLink() {
+  const { t } = useTranslation();
   const frame = useRef<HTMLIFrameElement>(null);
   const nonce = useRef('');
   const [initials, setInitials] = useState('');
@@ -29,8 +31,8 @@ export function ClientLoginLink() {
     };
   }, []);
   return <>
-    <iframe ref={frame} src={portalLink('client/session')} title="Client account status" hidden onLoad={request} />
-    {initials ? <IconButton href={portalLink('client')} aria-label="Open client account"><Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>{initials}</Avatar></IconButton>
-      : <Button href={portalLink('client')} variant="contained">Login</Button>}
+    <iframe ref={frame} src={portalLink('client/session')} title={t('Client account status')} hidden onLoad={request} />
+    {initials ? <IconButton href={portalLink('client')} aria-label={t('Open client account')}><Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>{initials}</Avatar></IconButton>
+      : <Button href={portalLink('client')} variant="contained">{t('Login')}</Button>}
   </>;
 }

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Alert, Box, Button, ButtonBase, Checkbox, FormControlLabel, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { useTranslation } from 'react-i18next';
+import { formatCad, formatDateTime } from '../i18n/format';
+import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
@@ -9,13 +12,12 @@ type Combination = { location_id: number; location_name: string; timezone: strin
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type Destination = { address_line1: string; address_line2: string; city: string; province: string; postal_code: string; country: string; instructions: string };
-function addressText(value: string | Destination | null) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return 'Address unavailable'; } }
-const money=(cents:number)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(cents/100);
+function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
 type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_name: string | null; starts_at: string; ends_at: string; status: string };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; coverage_confirmed: boolean; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string) { super(message); } }
-function displayTime(value: string, zone: string, database = false) {
-  return new Date(database ? `${value.replace(' ', 'T')}Z` : value).toLocaleString(undefined, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
+function displayTime(value: string, zone: string, language?: string, database = false) {
+  return formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, language, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
 }
 function today(zone: string) { return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
 function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practitioner_id' | 'duration_option_id') {
@@ -23,6 +25,7 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
 }
 
 export function StaffAppointments({ canBook }: { canBook: boolean }) {
+  const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [view, setView] = useState('upcoming');
@@ -37,10 +40,10 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
     const response = await fetch(`${api}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const text = await response.text();
     let body;
-    try { body = JSON.parse(text); } catch { throw new RequestError(`The server returned an unreadable response (HTTP ${response.status}). Try again or contact the administrator.`, response.status, 'invalid_response'); }
-    if (!response.ok) throw new RequestError(body?.error?.message ?? `Request failed (HTTP ${response.status}).`, response.status, body?.error?.code ?? 'request_failed');
+    try { body = JSON.parse(text); } catch { throw new RequestError(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.', { status: response.status }), response.status, 'invalid_response'); }
+    if (!response.ok) throw new RequestError(apiErrorMessage(body, response.status, t('Request failed (HTTP {{status}}).', { status: response.status })), response.status, body?.error?.code ?? 'request_failed');
     return body.data;
-  }, [getAccessToken]);
+  }, [getAccessToken, t]);
   useEffect(() => {
     const controller = new AbortController(); setListBusy(true); setListError('');
     void request(`/appointments?view=${view}&page=${page}`, { signal: controller.signal })
@@ -51,27 +54,27 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
   }, [request, view, page, refresh]);
   return <Stack spacing={3}>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between">
-      <Box><Typography variant="h5">Appointments</Typography><Typography color="text.secondary">Times are shown in each clinic location’s timezone.</Typography></Box>
-      {canBook && !creating && <Button variant="contained" startIcon={<CalendarPlus size={18} />} onClick={() => { setCreating(true); setNotice(''); }}>Book appointment</Button>}
+      <Box><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Times are shown in each clinic location’s timezone.')}</Typography></Box>
+      {canBook && !creating && <Button variant="contained" startIcon={<CalendarPlus size={18} />} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-    {creating && <BookingForm request={request} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(`Appointment #${id} confirmed. Confirmation email is queued; delivery is not yet enabled.`); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" gap={2} justifyContent="space-between" mb={2}>
-        <TextField select size="small" label="Show" value={view} onChange={event => { setView(event.target.value); setPage(1); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">Upcoming</MenuItem><MenuItem value="past">Past</MenuItem><MenuItem value="all">All appointments</MenuItem></TextField>
-        <Button startIcon={<RefreshCw size={16} />} disabled={listBusy} onClick={() => setRefresh(value => value + 1)}>Refresh</Button>
+        <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
+        <Button startIcon={<RefreshCw size={16} />} disabled={listBusy} onClick={() => setRefresh(value => value + 1)}>{t('Refresh')}</Button>
       </Stack>
       {listError && <Alert severity="error">{listError}</Alert>}
-      {listBusy ? <CircularProgress aria-label="Loading appointments" /> : !listError && <Stack spacing={2}>
-        {appointments.length === 0 && <Typography color="text.secondary">No appointments in this view.</Typography>}
+      {listBusy ? <CircularProgress aria-label={t('Loading appointments')} /> : !listError && <Stack spacing={2}>
+        {appointments.length === 0 && <Typography color="text.secondary">{t('No appointments in this view.')}</Typography>}
         {appointments.map(item => <Box key={item.id} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-          <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={700}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={item.status.replaceAll('_', ' ')} variant="outlined" /></Stack>
-          <Typography>{displayTime(item.starts_at, item.timezone, true)} – {displayTime(item.ends_at, item.timezone, true)}</Typography>
-          {item.delivery_mode==='mobile'&&<><Chip label="At client location" color="info" size="small"/><Typography>{addressText(item.destination_snapshot)}</Typography><Typography variant="body2">Travel reserved: {item.travel_buffer_minutes} minutes before and after</Typography></>}
-          {item.base_price_cents!==null&&item.base_price_cents!==undefined&&<Typography variant="body2">Treatment {money(Number(item.base_price_cents))} + mobile fee {money(Number(item.mobile_fee_cents))} (before applicable taxes)</Typography>}
+          <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={700}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>
+          <Typography>{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography>
+          {item.delivery_mode==='mobile'&&<><Chip label={t('At client location')} color="info" size="small"/><Typography>{addressText(item.destination_snapshot, t('Address unavailable'))}</Typography><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after',{minutes:item.travel_buffer_minutes})}</Typography></>}
+          {item.base_price_cents!==null&&item.base_price_cents!==undefined&&<Typography variant="body2">{t('Treatment {{treatment}} + mobile fee {{mobile}} (before applicable taxes)', { treatment: formatCad(Number(item.base_price_cents), i18n.resolvedLanguage), mobile: formatCad(Number(item.mobile_fee_cents), i18n.resolvedLanguage) })}</Typography>}
           <Typography color="text.secondary">{item.practitioner_name} · {item.location_name}{item.room_name ? ` · ${item.room_name}` : ''} · #{item.id}</Typography>
         </Box>)}
-        <Stack direction="row" justifyContent="space-between" alignItems="center"><Button disabled={page === 1} onClick={() => setPage(value => value - 1)}>Previous</Button><Typography>Page {page}</Typography><Button disabled={appointments.length < 50} onClick={() => setPage(value => value + 1)}>Next</Button></Stack>
+        <Stack direction="row" justifyContent="space-between" alignItems="center"><Button disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}',{page})}</Typography><Button disabled={appointments.length < 50} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
       </Stack>}
     </Paper>
   </Stack>;
@@ -79,6 +82,8 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
 
 type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; cancel: () => void; complete: (id: number) => void };
 function BookingForm({ request, cancel, complete }: FormProps) {
+  const { t, i18n } = useTranslation();
+  const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,7 +136,7 @@ function BookingForm({ request, cancel, complete }: FormProps) {
       setClientBusy(true);
       void request(`/clients?status=active&q=${encodeURIComponent(term)}`, { signal: controller.signal })
         .then(data => { if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); setClientSearched(true); } })
-        .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : 'Unable to search clients.'); })
+        .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : t('Unable to search clients.')); })
         .finally(() => { if (!controller.signal.aborted) setClientBusy(false); });
     }, 300);
     return () => { window.clearTimeout(timer); controller.abort(); };
@@ -147,7 +152,7 @@ function BookingForm({ request, cancel, complete }: FormProps) {
     try {
       const data = await request(`/availability?location_id=${location}&service_id=${service}&practitioner_id=${practitioner}&delivery_mode=${mode}&date_from=${date}&date_to=${date}`);
       setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(duration))); setSearched(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load times.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
   const confirm = async () => {
@@ -159,60 +164,60 @@ function BookingForm({ request, cancel, complete }: FormProps) {
     catch (cause) {
       const rejected = cause instanceof RequestError && cause.status >= 400 && cause.status < 500 && cause.code !== 'invalid_response';
       if (rejected) { pendingRef.current = null; setPending(null); setStep(1); clearSlots(); }
-      setError(cause instanceof Error ? cause.message : 'Unable to confirm appointment.');
+      setError(cause instanceof Error ? cause.message : t('Unable to confirm appointment.'));
     } finally { sending.current = false; setBusy(false); }
   };
   const comboSelect = (label: string, value: string, rows: Combination[], key: 'location_id' | 'service_id' | 'practitioner_id' | 'duration_option_id', name: (row: Combination) => string, change: (value: string) => void) => <TextField required fullWidth select label={label} value={value} onChange={event => change(event.target.value)}>{unique(rows, key).map(row => <MenuItem key={row[key]} value={String(row[key])}>{name(row)}</MenuItem>)}</TextField>;
   return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
-    <Typography variant="h5" mb={2}>New appointment</Typography>
-    <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>{['Client and care', 'Available time', 'Review and confirm'].map(label => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}</Stepper>
+    <Typography variant="h5" mb={2}>{t('New appointment')}</Typography>
+    <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>{['Client and care', 'Available time', 'Review and confirm'].map(label => <Step key={label}><StepLabel>{t(label)}</StepLabel></Step>)}</Stepper>
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-    {loading ? <CircularProgress aria-label="Loading booking options" /> : options.length === 0 ? <Alert severity="info">No booking combinations are configured. Check active services, durations, practitioners, and location assignments in administration.</Alert> : <>
+    {loading ? <CircularProgress aria-label={t('Loading booking options')} /> : options.length === 0 ? <Alert severity="info">{t('No booking combinations are configured. Check active services, durations, practitioners, and location assignments in administration.')}</Alert> : <>
       {step === 0 && <Stack spacing={3}>
-        {!client && <TextField fullWidth label="Find an active client" value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => { setClient(null); setClientQuery(event.target.value); }} helperText={clientQuery.trim().length < 2 ? 'Enter at least 2 characters from the client’s name, email, or phone.' : 'Matching active clients appear automatically.'} />}
-        {clientBusy && <Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20} /><Typography>Searching active clients…</Typography></Stack>}
+        {!client && <TextField fullWidth label={t('Find an active client')} value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => { setClient(null); setClientQuery(event.target.value); }} helperText={t(clientQuery.trim().length < 2 ? 'Enter at least 2 characters from the client’s name, email, or phone.' : 'Matching active clients appear automatically.')} />}
+        {clientBusy && <Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20} /><Typography>{t('Searching active clients…')}</Typography></Stack>}
         {clientError && <Alert severity="error">{clientError}</Alert>}
-        {!client && clientSearched && clients.length === 0 && <Alert severity="info">No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.</Alert>}
-        {!client && clients.length > 0 && <Stack spacing={1} role="list" aria-label="Matching active clients">
-          {clients.map(item => <Box key={item.id} role="listitem"><ButtonBase aria-label={`Select ${item.display_name}`} onClick={() => setClient(item)} sx={{ width: '100%', p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, textAlign: 'left' }}><Stack width="100%" direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
-            <Box><Typography fontWeight={700}>{item.display_name}</Typography><Typography variant="body2">{item.email}</Typography><Typography variant="body2" color="text.secondary">{item.phone || 'No phone number on file'}</Typography></Box>
-            <Typography color="primary" fontWeight={700}>Select</Typography>
+        {!client && clientSearched && clients.length === 0 && <Alert severity="info">{t('No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.')}</Alert>}
+        {!client && clients.length > 0 && <Stack spacing={1} role="list" aria-label={t('Matching active clients')}>
+          {clients.map(item => <Box key={item.id} role="listitem"><ButtonBase aria-label={t('Select {{name}}', { name: item.display_name })} onClick={() => setClient(item)} sx={{ width: '100%', p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, textAlign: 'left' }}><Stack width="100%" direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+            <Box><Typography fontWeight={700}>{item.display_name}</Typography><Typography variant="body2">{item.email}</Typography><Typography variant="body2" color="text.secondary">{item.phone || t('No phone number on file')}</Typography></Box>
+            <Typography color="primary" fontWeight={700}>{t('Select')}</Typography>
           </Stack></ButtonBase></Box>)}
-          {clientMore && <Alert severity="info">Showing the first 25 matches. Continue typing to narrow the results.</Alert>}
+          {clientMore && <Alert severity="info">{t('Showing the first 25 matches. Continue typing to narrow the results.')}</Alert>}
         </Stack>}
         {client && <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main', borderWidth: 2 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
-          <Box><Typography variant="overline" color="primary">Selected client</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || 'No phone number on file'}</Typography></Box>
-          <Button onClick={() => { setClient(null); setClientQuery(''); setClients([]); }}>Change client</Button>
+          <Box><Typography variant="overline" color="primary">{t('Selected client')}</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || t('No phone number on file')}</Typography></Box>
+          <Button onClick={() => { setClient(null); setClientQuery(''); setClients([]); }}>{t('Change client')}</Button>
         </Stack></Paper>}
-        <TextField select label="Visit type" value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');clearSlots();}}><MenuItem value="mobile">At client location</MenuItem><MenuItem value="clinic">In clinic</MenuItem></TextField>
-        {eligibleOptions.length===0&&<Alert severity="info">No services are configured for this visit type. Enable it under Service assignments and choose a base location.</Alert>}
+        <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');clearSlots();}}><MenuItem value="mobile">{t('At client location')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
+        {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect('Base location / service area', location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect('Service', service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect('Practitioner', practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect('Duration', duration, practitionerRows, 'duration_option_id', row => `${row.duration_minutes} minutes — ${money(Number(row.base_price_cents))}`, value => { setDuration(value); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, practitionerRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
         </Grid>
-        {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">Visit address</Typography>{(Object.keys(destination) as (keyof Destination)[]).map(key=><TextField key={key} label={key.replaceAll('_',' ')} required={!['address_line2','instructions'].includes(key)} value={destination[key]} inputProps={{maxLength:key==='instructions'?500:key==='postal_code'?20:key==='city'?100:['country','province'].includes(key)?80:190}} onChange={event=>{setDestination(value=>({...value,[key]:event.target.value}));setCoverage(false);}}/>)}<Alert severity="info">Staff must verify the destination, coverage{selected?.mobile_radius_km ? ` (configured radius: ${selected.mobile_radius_km} km)`:''}, and sufficient travel time. Driving distance is not calculated automatically.</Alert><FormControlLabel control={<Checkbox checked={coverage} onChange={event=>setCoverage(event.target.checked)}/>} label="I verified this address is within coverage and the travel buffer is sufficient"/></Stack>}
-        <Button variant="contained" disabled={!client || !selected || !addressReady} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>Find a time</Button>
+        {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography>{(Object.keys(destination) as (keyof Destination)[]).map(key=><TextField key={key} label={t(({address_line1:'Street address',address_line2:'Unit (optional)',city:'City',province:'Province / region',postal_code:'Postal code',country:'Country',instructions:'Access instructions (optional)'})[key])} required={!['address_line2','instructions'].includes(key)} value={destination[key]} inputProps={{maxLength:key==='instructions'?500:key==='postal_code'?20:key==='city'?100:['country','province'].includes(key)?80:190}} onChange={event=>{setDestination(value=>({...value,[key]:event.target.value}));setCoverage(false);}}/>)}<Alert severity="info">{t('Staff must verify the destination, coverage{{radius}}, and sufficient travel time. Driving distance is not calculated automatically.',{radius:selected?.mobile_radius_km?t(' (configured radius: {{radius}} km)',{radius:selected.mobile_radius_km}):''})}</Alert><FormControlLabel control={<Checkbox checked={coverage} onChange={event=>setCoverage(event.target.checked)}/>} label={t('I verified this address is within coverage and the travel buffer is sufficient')}/></Stack>}
+        <Button variant="contained" disabled={!client || !selected || !addressReady} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
       </Stack>}
       {step === 1 && <Stack spacing={2}>
-        <Typography>Availability in {timezone}. Choose a day to see current openings.</Typography>
-        <Stack component="form" direction="row" gap={2} onSubmit={findSlots}><TextField required type="date" label="Appointment date" value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(timezone) }} onChange={event => { setDate(event.target.value); clearSlots(); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{busy ? 'Searching…' : 'Find times'}</Button></Stack>
-        {searched && slots.length === 0 && <Alert severity="info">No bookable times on this day. Try another day or check working hours and room assignments.</Alert>}
-        <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, timezone)}</Button>)}</Stack>
-        {slot && needsRoom && <TextField select required fullWidth label="Available room" value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(roomId => <MenuItem key={roomId} value={String(roomId)}>{rooms.find(item => Number(item.id) === Number(roomId))?.name ?? `Room ${roomId}`}</MenuItem>)}</TextField>}
-        <Button variant="contained" disabled={!slot || busy || (needsRoom && !room)} onClick={() => setStep(2)}>Review appointment</Button>
+        <Typography>{t('Availability in {{timezone}}. Choose a day to see current openings.',{timezone})}</Typography>
+        <Stack component="form" direction="row" gap={2} onSubmit={findSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(timezone) }} onChange={event => { setDate(event.target.value); clearSlots(); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
+        {searched && slots.length === 0 && <Alert severity="info">{t('No bookable times on this day. Try another day or check working hours and room assignments.')}</Alert>}
+        <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, timezone, i18n.resolvedLanguage)}</Button>)}</Stack>
+        {slot && needsRoom && <TextField select required fullWidth label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(roomId => <MenuItem key={roomId} value={String(roomId)}>{rooms.find(item => Number(item.id) === Number(roomId))?.name ?? `Room ${roomId}`}</MenuItem>)}</TextField>}
+        <Button variant="contained" disabled={!slot || busy || (needsRoom && !room)} onClick={() => setStep(2)}>{t('Review appointment')}</Button>
       </Stack>}
       {step === 2 && selected && slot && client && <Stack spacing={2}>
-        <Typography variant="h6">{client.display_name}</Typography><Typography>{selected.service_name} · {selected.duration_minutes} minutes · {selected.practitioner_name}</Typography>
-        <Typography>{displayTime(slot.starts_at, timezone)} – {displayTime(slot.ends_at, timezone)} ({timezone})</Typography><Typography>{selected.location_name}{room ? ` · ${rooms.find(item => String(item.id) === room)?.name ?? `Room ${room}`}` : ''}</Typography>
-        <Typography>{mode==='mobile'?'At client location':'In clinic'}</Typography>{mode==='mobile'&&<><Typography>{addressText(destination)}</Typography><Typography>Travel reserved: {selected.travel_buffer_minutes} minutes before and after</Typography></>}
-        <Typography>Treatment: {money(Number(selected.base_price_cents))} · Mobile surcharge: {money(mobileFee)} · Subtotal: {money(Number(selected.base_price_cents)+mobileFee)} CAD</Typography><Alert severity="info">Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.</Alert>
-        <Divider /><Typography color="text.secondary">Availability is checked again when you confirm. Email delivery is not enabled yet; arrange confirmation directly with the client.</Typography>
-        {pending && !busy && <Alert severity="warning">Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.</Alert>}
-        <Button variant="contained" disabled={busy} onClick={() => void confirm()}>{busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment'}</Button>
+        <Typography variant="h6">{client.display_name}</Typography><Typography>{selected.service_name} · {t('{{minutes}} minutes',{minutes:selected.duration_minutes})} · {selected.practitioner_name}</Typography>
+        <Typography>{displayTime(slot.starts_at, timezone, i18n.resolvedLanguage)} – {displayTime(slot.ends_at, timezone, i18n.resolvedLanguage)} ({timezone})</Typography><Typography>{selected.location_name}{room ? ` · ${rooms.find(item => String(item.id) === room)?.name ?? t('Room {{number}}', { number: room })}` : ''}</Typography>
+        <Typography>{t(mode==='mobile'?'At client location':'In clinic')}</Typography>{mode==='mobile'&&<><Typography>{addressText(destination, t('Address unavailable'))}</Typography><Typography>{t('Travel reserved: {{minutes}} minutes before and after',{minutes:selected.travel_buffer_minutes})}</Typography></>}
+        <Typography>{t('Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD',{treatment:money(Number(selected.base_price_cents)),mobile:money(mobileFee),subtotal:money(Number(selected.base_price_cents)+mobileFee)})}</Typography><Alert severity="info">{t('Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.')}</Alert>
+        <Divider /><Typography color="text.secondary">{t('Availability is checked again when you confirm. Email delivery is not enabled yet; arrange confirmation directly with the client.')}</Typography>
+        {pending && !busy && <Alert severity="warning">{t('Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.')}</Alert>}
+        <Button variant="contained" disabled={busy} onClick={() => void confirm()}>{t(busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment')}</Button>
       </Stack>}
     </>}
-    <Stack direction="row" justifyContent="space-between" mt={3}><Button disabled={busy || Boolean(pending)} onClick={cancel}>Cancel</Button>{step > 0 && <Button disabled={busy || Boolean(pending)} onClick={() => setStep(value => value - 1)}>Back</Button>}</Stack>
+    <Stack direction="row" justifyContent="space-between" mt={3}><Button disabled={busy || Boolean(pending)} onClick={cancel}>{t('Cancel')}</Button>{step > 0 && <Button disabled={busy || Boolean(pending)} onClick={() => setStep(value => value - 1)}>{t('Back')}</Button>}</Stack>
   </Paper>;
 }

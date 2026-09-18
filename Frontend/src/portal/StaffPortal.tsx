@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { legacyPage, pageAt, pagePath, pagesFor, workspacesFor, type PortalPage, type Workspace } from './access';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Alert,
@@ -90,12 +91,14 @@ const navigation: NavigationItem[] = [
 ];
 
 function Dashboard() {
+  const { t } = useTranslation();
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>Your clinic workspace</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>Use the portal menu to view appointments and access the tools available to your role. Administrators and reception can manage clients and book appointments; practitioners can view their own appointments.</Typography></Paper>
+    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>{t('Your clinic workspace')}</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>{t('Use the portal menu to view appointments and access the tools available to your role. Administrators and reception can manage clients and book appointments; practitioners can view their own appointments.')}</Typography></Paper>
   );
 }
 
 export function StaffPortal({ roles }: { roles: string[] }) {
+  const { t } = useTranslation();
   const [catalogueVersion, setCatalogueVersion] = useState(0);
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up("md"));
@@ -117,29 +120,29 @@ export function StaffPortal({ roles }: { roles: string[] }) {
       try { sessionStorage.setItem(preferenceKey, workspace); } catch { /* Preference only, never authority. */ }
     }
   }, [roles, workspace, preferenceKey]);
-  if (!defaultWorkspace) return <Alert severity="warning">This account has no available staff workspace. Please contact the clinic administrator.</Alert>;
+  if (!defaultWorkspace) return <Alert severity="warning">{t('This account has no available staff workspace. Please contact the clinic administrator.')}</Alert>;
   if (['/', '/login', '/staff/login', '/profile'].includes(location.pathname)) {
     const requested = location.pathname === '/profile' ? 'profile' : legacyPage(new URLSearchParams(location.search).get('portal')) ?? 'dashboard';
     return <Navigate replace to={pagePath(defaultWorkspace, requested)} />;
   }
-  if (!page || !allowedPages.includes(page)) return <Paper variant="outlined" sx={{ p: 4 }}><Alert severity="warning">{page ? 'You do not have permission to access this page.' : 'This portal page was not found.'}</Alert><Button component={Link} to={pagePath(defaultWorkspace, 'dashboard')} sx={{ mt: 2 }}>Return to your workspace</Button></Paper>;
+  if (!page || !allowedPages.includes(page)) return <Paper variant="outlined" sx={{ p: 4 }}><Alert severity="warning">{t(page ? 'You do not have permission to access this page.' : 'This portal page was not found.')}</Alert><Button component={Link} to={pagePath(defaultWorkspace, 'dashboard')} sx={{ mt: 2 }}>{t('Return to your workspace')}</Button></Paper>;
   const current = allowedNavigation.find(item => item.id === page)!;
   const navigationList = (
     <Box sx={{ width: 280, p: 2 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" px={1} py={1.5}>
         <Box>
-          <Typography variant="overline" color="primary.main" fontWeight={800}>{workspace === 'practitioner' ? 'Practitioner workspace' : 'Operations workspace'}</Typography>
-          <Typography variant="h6">Portal menu</Typography>
+          <Typography variant="overline" color="primary.main" fontWeight={800}>{t(workspace === 'practitioner' ? 'Practitioner workspace' : 'Operations workspace')}</Typography>
+          <Typography variant="h6">{t('Portal menu')}</Typography>
         </Box>
-        {!desktop && <IconButton aria-label="Close portal menu" onClick={() => setDrawerOpen(false)}><X size={20} /></IconButton>}
+        {!desktop && <IconButton aria-label={t('Close portal menu')} onClick={() => setDrawerOpen(false)}><X size={20} /></IconButton>}
       </Stack>
       <Divider sx={{ mb: 1.5 }} />
-      {workspaces.length > 1 && <Stack spacing={1} mb={2} aria-label="Switch workspace">{workspaces.map(item => <Button key={item} component={Link} to={pagePath(item, 'dashboard')} variant={workspace === item ? 'contained' : 'outlined'}>{item === 'admin' ? 'Operations' : 'Practitioner'}</Button>)}</Stack>}
-      <List aria-label="Staff portal navigation">
+      {workspaces.length > 1 && <Stack spacing={1} mb={2} aria-label={t('Switch workspace')}>{workspaces.map(item => <Button key={item} component={Link} to={pagePath(item, 'dashboard')} variant={workspace === item ? 'contained' : 'outlined'}>{t(item === 'admin' ? 'Operations' : 'Practitioner')}</Button>)}</Stack>}
+      <List aria-label={t('Staff portal navigation')}>
         {allowedNavigation.map((item) => (
           <ListItemButton component={Link} to={pagePath(workspace, item.id)} aria-current={page === item.id ? 'page' : undefined} key={item.id} selected={page === item.id} sx={{ borderRadius: 2, mb: 0.75, alignItems: "flex-start" }}>
             <ListItemIcon sx={{ minWidth: 40, mt: 0.4, color: page === item.id ? "primary.main" : "text.secondary" }}>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.label} secondary={item.description} primaryTypographyProps={{ fontWeight: page === item.id ? 750 : 600 }} />
+            <ListItemText primary={t(item.label)} secondary={t(item.description)} primaryTypographyProps={{ fontWeight: page === item.id ? 750 : 600 }} />
           </ListItemButton>
         ))}
       </List>
@@ -153,13 +156,13 @@ export function StaffPortal({ roles }: { roles: string[] }) {
       )}
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Stack direction="row" spacing={1.5} alignItems="center" mb={3}>
-          {!desktop && <IconButton aria-label="Open portal menu" onClick={() => setDrawerOpen(true)} sx={{ border: "1px solid", borderColor: "divider" }}><Menu /></IconButton>}
+          {!desktop && <IconButton aria-label={t('Open portal menu')} onClick={() => setDrawerOpen(true)} sx={{ border: "1px solid", borderColor: "divider" }}><Menu /></IconButton>}
           <Box>
-            <Typography variant="h4" component="h1">{current.label}</Typography>
-            <Typography color="text.secondary">{current.description}</Typography>
+            <Typography variant="h4" component="h1">{t(current.label)}</Typography>
+            <Typography color="text.secondary">{t(current.description)}</Typography>
           </Box>
         </Stack>
-        <Suspense fallback={<Typography role="status">Loading workspace…</Typography>}>
+        <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
         {page === "dashboard" && <Dashboard />}
         {page === "clients" && <ClientManagement />}
         {page === "appointments" && <StaffAppointments canBook={workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))} />}
