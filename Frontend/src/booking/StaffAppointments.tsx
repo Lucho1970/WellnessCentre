@@ -3,6 +3,7 @@ import { Alert, Box, Button, ButtonBase, Checkbox, FormControlLabel, Chip, Circu
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
+import { formatCad, formatDateTime } from '../i18n/format';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
@@ -10,13 +11,12 @@ type Combination = { location_id: number; location_name: string; timezone: strin
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type Destination = { address_line1: string; address_line2: string; city: string; province: string; postal_code: string; country: string; instructions: string };
-function addressText(value: string | Destination | null) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return 'Address unavailable'; } }
-const money=(cents:number)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(cents/100);
+function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
 type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_name: string | null; starts_at: string; ends_at: string; status: string };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; coverage_confirmed: boolean; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string) { super(message); } }
-function displayTime(value: string, zone: string, database = false) {
-  return new Date(database ? `${value.replace(' ', 'T')}Z` : value).toLocaleString(undefined, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
+function displayTime(value: string, zone: string, language?: string, database = false) {
+  return formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, language, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
 }
 function today(zone: string) { return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
 function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practitioner_id' | 'duration_option_id') {
@@ -24,7 +24,7 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
 }
 
 export function StaffAppointments({ canBook }: { canBook: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [view, setView] = useState('upcoming');
@@ -39,10 +39,10 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
     const response = await fetch(`${api}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const text = await response.text();
     let body;
-    try { body = JSON.parse(text); } catch { throw new RequestError(`The server returned an unreadable response (HTTP ${response.status}). Try again or contact the administrator.`, response.status, 'invalid_response'); }
-    if (!response.ok) throw new RequestError(body?.error?.message ?? `Request failed (HTTP ${response.status}).`, response.status, body?.error?.code ?? 'request_failed');
+    try { body = JSON.parse(text); } catch { throw new RequestError(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.', { status: response.status }), response.status, 'invalid_response'); }
+    if (!response.ok) throw new RequestError(body?.error?.message ?? t('Request failed (HTTP {{status}}).', { status: response.status }), response.status, body?.error?.code ?? 'request_failed');
     return body.data;
-  }, [getAccessToken]);
+  }, [getAccessToken, t]);
   useEffect(() => {
     const controller = new AbortController(); setListBusy(true); setListError('');
     void request(`/appointments?view=${view}&page=${page}`, { signal: controller.signal })
@@ -57,7 +57,7 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
       {canBook && !creating && <Button variant="contained" startIcon={<CalendarPlus size={18} />} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-    {creating && <BookingForm request={request} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(`Appointment #${id} confirmed. Confirmation email is queued; delivery is not yet enabled.`); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" gap={2} justifyContent="space-between" mb={2}>
         <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
@@ -67,10 +67,10 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
       {listBusy ? <CircularProgress aria-label={t('Loading appointments')} /> : !listError && <Stack spacing={2}>
         {appointments.length === 0 && <Typography color="text.secondary">{t('No appointments in this view.')}</Typography>}
         {appointments.map(item => <Box key={item.id} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-          <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={700}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={item.status.replaceAll('_', ' ')} variant="outlined" /></Stack>
-          <Typography>{displayTime(item.starts_at, item.timezone, true)} – {displayTime(item.ends_at, item.timezone, true)}</Typography>
-          {item.delivery_mode==='mobile'&&<><Chip label={t('At client location')} color="info" size="small"/><Typography>{addressText(item.destination_snapshot)}</Typography><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after',{minutes:item.travel_buffer_minutes})}</Typography></>}
-          {item.base_price_cents!==null&&item.base_price_cents!==undefined&&<Typography variant="body2">Treatment {money(Number(item.base_price_cents))} + mobile fee {money(Number(item.mobile_fee_cents))} (before applicable taxes)</Typography>}
+          <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={700}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>
+          <Typography>{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography>
+          {item.delivery_mode==='mobile'&&<><Chip label={t('At client location')} color="info" size="small"/><Typography>{addressText(item.destination_snapshot, t('Address unavailable'))}</Typography><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after',{minutes:item.travel_buffer_minutes})}</Typography></>}
+          {item.base_price_cents!==null&&item.base_price_cents!==undefined&&<Typography variant="body2">{t('Treatment {{treatment}} + mobile fee {{mobile}} (before applicable taxes)', { treatment: formatCad(Number(item.base_price_cents), i18n.resolvedLanguage), mobile: formatCad(Number(item.mobile_fee_cents), i18n.resolvedLanguage) })}</Typography>}
           <Typography color="text.secondary">{item.practitioner_name} · {item.location_name}{item.room_name ? ` · ${item.room_name}` : ''} · #{item.id}</Typography>
         </Box>)}
         <Stack direction="row" justifyContent="space-between" alignItems="center"><Button disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}',{page})}</Typography><Button disabled={appointments.length < 50} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
@@ -81,7 +81,8 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
 
 type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; cancel: () => void; complete: (id: number) => void };
 function BookingForm({ request, cancel, complete }: FormProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,7 +135,7 @@ function BookingForm({ request, cancel, complete }: FormProps) {
       setClientBusy(true);
       void request(`/clients?status=active&q=${encodeURIComponent(term)}`, { signal: controller.signal })
         .then(data => { if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); setClientSearched(true); } })
-        .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : 'Unable to search clients.'); })
+        .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : t('Unable to search clients.')); })
         .finally(() => { if (!controller.signal.aborted) setClientBusy(false); });
     }, 300);
     return () => { window.clearTimeout(timer); controller.abort(); };
@@ -150,7 +151,7 @@ function BookingForm({ request, cancel, complete }: FormProps) {
     try {
       const data = await request(`/availability?location_id=${location}&service_id=${service}&practitioner_id=${practitioner}&delivery_mode=${mode}&date_from=${date}&date_to=${date}`);
       setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(duration))); setSearched(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load times.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
   const confirm = async () => {
@@ -177,8 +178,8 @@ function BookingForm({ request, cancel, complete }: FormProps) {
         {clientError && <Alert severity="error">{clientError}</Alert>}
         {!client && clientSearched && clients.length === 0 && <Alert severity="info">{t('No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.')}</Alert>}
         {!client && clients.length > 0 && <Stack spacing={1} role="list" aria-label={t('Matching active clients')}>
-          {clients.map(item => <Box key={item.id} role="listitem"><ButtonBase aria-label={`Select ${item.display_name}`} onClick={() => setClient(item)} sx={{ width: '100%', p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, textAlign: 'left' }}><Stack width="100%" direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
-            <Box><Typography fontWeight={700}>{item.display_name}</Typography><Typography variant="body2">{item.email}</Typography><Typography variant="body2" color="text.secondary">{item.phone || 'No phone number on file'}</Typography></Box>
+          {clients.map(item => <Box key={item.id} role="listitem"><ButtonBase aria-label={t('Select {{name}}', { name: item.display_name })} onClick={() => setClient(item)} sx={{ width: '100%', p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, textAlign: 'left' }}><Stack width="100%" direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+            <Box><Typography fontWeight={700}>{item.display_name}</Typography><Typography variant="body2">{item.email}</Typography><Typography variant="body2" color="text.secondary">{item.phone || t('No phone number on file')}</Typography></Box>
             <Typography color="primary" fontWeight={700}>{t('Select')}</Typography>
           </Stack></ButtonBase></Box>)}
           {clientMore && <Alert severity="info">{t('Showing the first 25 matches. Continue typing to narrow the results.')}</Alert>}
@@ -202,14 +203,14 @@ function BookingForm({ request, cancel, complete }: FormProps) {
         <Typography>{t('Availability in {{timezone}}. Choose a day to see current openings.',{timezone})}</Typography>
         <Stack component="form" direction="row" gap={2} onSubmit={findSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(timezone) }} onChange={event => { setDate(event.target.value); clearSlots(); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
         {searched && slots.length === 0 && <Alert severity="info">{t('No bookable times on this day. Try another day or check working hours and room assignments.')}</Alert>}
-        <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, timezone)}</Button>)}</Stack>
+        <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, timezone, i18n.resolvedLanguage)}</Button>)}</Stack>
         {slot && needsRoom && <TextField select required fullWidth label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(roomId => <MenuItem key={roomId} value={String(roomId)}>{rooms.find(item => Number(item.id) === Number(roomId))?.name ?? `Room ${roomId}`}</MenuItem>)}</TextField>}
         <Button variant="contained" disabled={!slot || busy || (needsRoom && !room)} onClick={() => setStep(2)}>{t('Review appointment')}</Button>
       </Stack>}
       {step === 2 && selected && slot && client && <Stack spacing={2}>
         <Typography variant="h6">{client.display_name}</Typography><Typography>{selected.service_name} · {t('{{minutes}} minutes',{minutes:selected.duration_minutes})} · {selected.practitioner_name}</Typography>
-        <Typography>{displayTime(slot.starts_at, timezone)} – {displayTime(slot.ends_at, timezone)} ({timezone})</Typography><Typography>{selected.location_name}{room ? ` · ${rooms.find(item => String(item.id) === room)?.name ?? `Room ${room}`}` : ''}</Typography>
-        <Typography>{t(mode==='mobile'?'At client location':'In clinic')}</Typography>{mode==='mobile'&&<><Typography>{addressText(destination)}</Typography><Typography>{t('Travel reserved: {{minutes}} minutes before and after',{minutes:selected.travel_buffer_minutes})}</Typography></>}
+        <Typography>{displayTime(slot.starts_at, timezone, i18n.resolvedLanguage)} – {displayTime(slot.ends_at, timezone, i18n.resolvedLanguage)} ({timezone})</Typography><Typography>{selected.location_name}{room ? ` · ${rooms.find(item => String(item.id) === room)?.name ?? t('Room {{number}}', { number: room })}` : ''}</Typography>
+        <Typography>{t(mode==='mobile'?'At client location':'In clinic')}</Typography>{mode==='mobile'&&<><Typography>{addressText(destination, t('Address unavailable'))}</Typography><Typography>{t('Travel reserved: {{minutes}} minutes before and after',{minutes:selected.travel_buffer_minutes})}</Typography></>}
         <Typography>{t('Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD',{treatment:money(Number(selected.base_price_cents)),mobile:money(mobileFee),subtotal:money(Number(selected.base_price_cents)+mobileFee)})}</Typography><Alert severity="info">{t('Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.')}</Alert>
         <Divider /><Typography color="text.secondary">{t('Availability is checked again when you confirm. Email delivery is not enabled yet; arrange confirmation directly with the client.')}</Typography>
         {pending && !busy && <Alert severity="warning">{t('Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.')}</Alert>}
