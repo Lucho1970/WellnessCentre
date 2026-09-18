@@ -49,3 +49,14 @@ test('built client callback loads independently of staff login', async ({ page }
   await expect(page.getByRole('heading', { name: 'Client portal', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Staff portal', exact: true })).toHaveCount(0);
 });
+
+test('language selection switches to French and persists across reloads', async ({ page }, info) => {
+  await page.route('**/api/v1/site-config', route => route.fulfill({ json: { data: { name: 'Build Smoke Clinic', email: 'clinic@example.test', phone: null, legal_name: null } } }));
+  await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
+  await page.getByRole('button', { name: 'Switch language to French' }).click();
+  await expect(page.getByRole('heading', { name: 'Communiquer avec Build Smoke Clinic' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Communiquer avec Build Smoke Clinic' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Passer la langue au Anglais' })).toBeVisible();
+});
