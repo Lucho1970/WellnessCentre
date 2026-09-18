@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, ButtonBase, Checkbox, FormControlLabel, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
@@ -12,9 +12,10 @@ type Combination = { location_id: number; location_name: string; timezone: strin
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type Destination = { address_line1: string; address_line2: string; city: string; province: string; postal_code: string; country: string; instructions: string };
+type CoverageValidation = { destination: Destination; distance_km: number; radius_km: number; token: string; expires_at: string };
 function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
 type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
-type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; coverage_confirmed: boolean; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
+type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
   return formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, language, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
@@ -159,8 +160,10 @@ function BookingForm({ request, practitionerMode, cancel, complete }: FormProps)
   const [clientSearched, setClientSearched] = useState(false);
   const [mode,setMode]=useState<'clinic'|'mobile'>('mobile');
   const [destination,setDestination]=useState<Destination>({address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',country:'Canada',instructions:''});
-  const [coverage,setCoverage]=useState(false);
-  const addressReady=mode==='clinic'||(['address_line1','city','province','postal_code','country'] as const).every(key=>destination[key].trim())&&coverage;
+  const [coverage,setCoverage]=useState<CoverageValidation|null>(null);
+  const [coverageBusy,setCoverageBusy]=useState(false);
+  const addressComplete=(['address_line1','city','province','postal_code','country'] as const).every(key=>destination[key].trim());
+  const addressReady=mode==='clinic'||(addressComplete&&Boolean(coverage));
   const [location, setLocation] = useState('');
   const [service, setService] = useState('');
   const [practitioner, setPractitioner] = useState('');
@@ -216,15 +219,25 @@ function BookingForm({ request, practitionerMode, cancel, complete }: FormProps)
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
+  const validateCoverage = async () => {
+    if (!selected || !addressComplete) return;
+    setCoverageBusy(true); setCoverage(null); setError(''); clearSlots();
+    try {
+      const result = await request('/address-coverage/validate', { method: 'POST', body: JSON.stringify({ location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
+      setDestination(result.destination); setCoverage(result);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to validate this address.')); }
+    finally { setCoverageBusy(false); }
+  };
   const confirm = async () => {
     if (sending.current || !client || !selected || !slot) return;
     sending.current = true; setBusy(true); setError('');
-    const payload = pendingRef.current ?? { delivery_mode:mode, ...(mode==='mobile'?{destination}:{}), coverage_confirmed:coverage, quoted_base_price_cents:Number(selected.base_price_cents),quoted_mobile_fee_cents:mobileFee, client_id: Number(client.id), location_id: Number(location), service_id: Number(service), practitioner_id: Number(practitioner), duration_option_id: Number(duration), starts_at: slot.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), idempotency_key: crypto.randomUUID() };
+    const payload = pendingRef.current ?? { delivery_mode:mode, ...(mode==='mobile'?{destination,address_validation_token:coverage!.token}:{}), quoted_base_price_cents:Number(selected.base_price_cents),quoted_mobile_fee_cents:mobileFee, client_id: Number(client.id), location_id: Number(location), service_id: Number(service), practitioner_id: Number(practitioner), duration_option_id: Number(duration), starts_at: slot.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), idempotency_key: crypto.randomUUID() };
     pendingRef.current = payload; setPending(payload);
     try { const result = await request('/appointments', { method: 'POST', body: JSON.stringify(payload) }); pendingRef.current = null; setPending(null); complete(result.id); }
     catch (cause) {
       const rejected = cause instanceof RequestError && cause.status >= 400 && cause.status < 500 && cause.code !== 'invalid_response';
-      if (rejected) { pendingRef.current = null; setPending(null); setStep(1); clearSlots(); }
+      const coverageRejected = cause instanceof RequestError && ['coverage_validation_required','invalid_coverage_validation','coverage_validation_mismatch','coverage_validation_expired'].includes(cause.code);
+      if (rejected) { pendingRef.current = null; setPending(null); setStep(coverageRejected ? 0 : 1); if (coverageRejected) setCoverage(null); clearSlots(); }
       setError(cause instanceof Error ? cause.message : t('Unable to confirm appointment.'));
     } finally { sending.current = false; setBusy(false); }
   };
@@ -250,15 +263,15 @@ function BookingForm({ request, practitionerMode, cancel, complete }: FormProps)
           <Box><Typography variant="overline" color="primary">{t('Selected client')}</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || t('No phone number on file')}</Typography></Box>
           <Button onClick={() => { setClient(null); setClientQuery(''); setClients([]); }}>{t('Change client')}</Button>
         </Stack></Paper>}
-        <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');clearSlots();}}><MenuItem value="mobile">{t('At client location')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
+        <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);clearSlots();}}><MenuItem value="mobile">{t('At client location')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); setCoverage(null); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, practitionerRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
         </Grid>
-        {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography>{(Object.keys(destination) as (keyof Destination)[]).map(key=><TextField key={key} label={t(({address_line1:'Street address',address_line2:'Unit (optional)',city:'City',province:'Province / region',postal_code:'Postal code',country:'Country',instructions:'Access instructions (optional)'})[key])} required={!['address_line2','instructions'].includes(key)} value={destination[key]} inputProps={{maxLength:key==='instructions'?500:key==='postal_code'?20:key==='city'?100:['country','province'].includes(key)?80:190}} onChange={event=>{setDestination(value=>({...value,[key]:event.target.value}));setCoverage(false);}}/>)}<Alert severity="info">{t('Staff must verify the destination, coverage{{radius}}, and sufficient travel time. Driving distance is not calculated automatically.',{radius:selected?.mobile_radius_km?t(' (configured radius: {{radius}} km)',{radius:selected.mobile_radius_km}):''})}</Alert><FormControlLabel control={<Checkbox checked={coverage} onChange={event=>setCoverage(event.target.checked)}/>} label={t('I verified this address is within coverage and the travel buffer is sufficient')}/></Stack>}
+        {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography>{(Object.keys(destination) as (keyof Destination)[]).map(key=><TextField key={key} label={t(({address_line1:'Street address',address_line2:'Unit (optional)',city:'City',province:'Province / region',postal_code:'Postal code',country:'Country',instructions:'Access instructions (optional)'})[key])} required={!['address_line2','instructions'].includes(key)} value={destination[key]} inputProps={{maxLength:key==='instructions'?500:key==='postal_code'?20:key==='city'?100:['country','province'].includes(key)?80:190}} onChange={event=>{setDestination(value=>({...value,[key]:event.target.value}));setCoverage(null);}}/>)}<Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.')}</Alert><Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}</Stack>}
         <Button variant="contained" disabled={!client || !selected || !addressReady} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
       </Stack>}
       {step === 1 && <Stack spacing={2}>
@@ -272,7 +285,7 @@ function BookingForm({ request, practitionerMode, cancel, complete }: FormProps)
       {step === 2 && selected && slot && client && <Stack spacing={2}>
         <Typography variant="h6">{client.display_name}</Typography><Typography>{selected.service_name} · {t('{{minutes}} minutes',{minutes:selected.duration_minutes})} · {selected.practitioner_name}</Typography>
         <Typography>{displayTime(slot.starts_at, timezone, i18n.resolvedLanguage)} – {displayTime(slot.ends_at, timezone, i18n.resolvedLanguage)} ({timezone})</Typography><Typography>{selected.location_name}{room ? ` · ${rooms.find(item => String(item.id) === room)?.name ?? t('Room {{number}}', { number: room })}` : ''}</Typography>
-        <Typography>{t(mode==='mobile'?'At client location':'In clinic')}</Typography>{mode==='mobile'&&<><Typography>{addressText(destination, t('Address unavailable'))}</Typography><Typography>{t('Travel reserved: {{minutes}} minutes before and after',{minutes:selected.travel_buffer_minutes})}</Typography></>}
+        <Typography>{t(mode==='mobile'?'At client location':'In clinic')}</Typography>{mode==='mobile'&&<><Typography>{addressText(destination, t('Address unavailable'))}</Typography>{coverage&&<Typography>{t('{{distance}} km driving distance within a {{radius}} km service area.',{distance:coverage.distance_km,radius:coverage.radius_km})}</Typography>}<Typography>{t('Travel reserved: {{minutes}} minutes before and after',{minutes:selected.travel_buffer_minutes})}</Typography></>}
         <Typography>{t('Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD',{treatment:money(Number(selected.base_price_cents)),mobile:money(mobileFee),subtotal:money(Number(selected.base_price_cents)+mobileFee)})}</Typography><Alert severity="info">{t('Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.')}</Alert>
         <Divider /><Typography color="text.secondary">{t('Availability is checked again when you confirm. Email delivery is not enabled yet; arrange confirmation directly with the client.')}</Typography>
         {pending && !busy && <Alert severity="warning">{t('Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.')}</Alert>}

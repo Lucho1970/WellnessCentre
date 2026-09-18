@@ -14,6 +14,7 @@ use Wellness\Http\Request;
 use Wellness\Http\Response;
 use Wellness\Service\AuditLogger;
 use Wellness\Service\AdminService;
+use Wellness\Service\AddressCoverageService;
 use Wellness\Service\AvailabilityService;
 use Wellness\Service\BookingService;
 use Wellness\Service\CatalogService;
@@ -31,10 +32,11 @@ final class Api
     private AdminService $admin;
     private ProfileService $profiles;
     private ClientService $clients;
+    private AddressCoverageService $addressCoverage;
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->bookings=new BookingService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);
     }
 
     public function handle(): never
@@ -68,6 +70,7 @@ final class Api
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/availability','appointmentAvailability');
                 $routes->addRoute('GET','/api/v1/booking-options','bookingOptions');
                 $routes->addRoute('GET','/api/v1/booking-clients','bookingClients');
+                $routes->addRoute('POST','/api/v1/address-coverage/validate','validateAddressCoverage');
                 $routes->addRoute('GET','/api/v1/clients','clients');
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
@@ -134,6 +137,7 @@ final class Api
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
+                'validateAddressCoverage'=>$this->addressCoverage->validate($this->user($request),$request->body),
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
                 'updateAppointment'=>$this->bookings->update($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'appointmentAvailability'=>$this->bookings->updateAvailability($this->user($request),(int)$route[2]['id'],$request->query),

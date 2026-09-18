@@ -109,6 +109,11 @@ test('mobile-only booking captures destination and price without requesting a ro
     availabilityMode = new URL(route.request().url()).searchParams.get('delivery_mode') ?? '';
     return route.fulfill({ json: { data: { availability: [{ duration_option_id: 4, starts_at: '2030-10-01T10:00:00-04:00', ends_at: '2030-10-01T11:00:00-04:00', available_room_ids: [] }] } } });
   });
+  await page.route('**/api/v1/address-coverage/validate', route => {
+    const body = route.request().postDataJSON();
+    expect(body).toMatchObject({ location_id: 1, service_id: 2, practitioner_id: 3, destination: { address_line1: '123 Test Street' } });
+    return route.fulfill({ json: { data: { destination: { ...body.destination, address_line1: '123 Test Street' }, distance_km: 8.4, radius_km: 25, token: 'signed-address-proof', expires_at: '2030-10-01T13:00:00Z' } } });
+  });
   await page.route('**/api/v1/appointments', route => { booking=route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 99 } } }); });
   await page.goto(`${portalHost}/admin/appointments`);
   await page.getByRole('button', { name: 'Book appointment', exact: true }).click();
@@ -124,7 +129,8 @@ test('mobile-only booking captures destination and price without requesting a ro
   await page.getByRole('textbox', { name: 'Street address' }).fill('123 Test Street');
   await page.getByRole('textbox', { name: 'City', exact: true }).fill('Test City');
   await page.getByRole('textbox', { name: 'Postal code' }).fill('A1A 1A1');
-  await page.getByRole('checkbox', { name: /I verified this address/ }).check();
+  await page.getByRole('button', { name: 'Validate address and coverage' }).click();
+  await expect(page.getByText('Address confirmed: 8.4 km driving distance (25 km limit).')).toBeVisible();
   await page.getByRole('button', { name: 'Find a time', exact: true }).click();
   await page.getByLabel('Appointment date').fill('2030-10-01');
   await page.getByRole('button', { name: 'Find times', exact: true }).click();
@@ -135,7 +141,8 @@ test('mobile-only booking captures destination and price without requesting a ro
   await page.getByRole('button', { name: 'Confirm appointment', exact: true }).click();
   await expect(page.getByText(/Appointment #99 confirmed/)).toBeVisible();
   expect(availabilityMode).toBe('mobile');
-  expect(booking).toMatchObject({ delivery_mode: 'mobile', destination: { address_line1: '123 Test Street' }, coverage_confirmed: true, quoted_base_price_cents: 12000, quoted_mobile_fee_cents: 2500 });
+  expect(booking).toMatchObject({ delivery_mode: 'mobile', destination: { address_line1: '123 Test Street' }, address_validation_token: 'signed-address-proof', quoted_base_price_cents: 12000, quoted_mobile_fee_cents: 2500 });
+  expect(booking).not.toHaveProperty('coverage_confirmed');
   expect(booking).not.toHaveProperty('room_id');
 });
 

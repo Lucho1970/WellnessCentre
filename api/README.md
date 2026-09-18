@@ -53,6 +53,7 @@ Authenticated:
 - `GET /api/v1/auth/me`
 - `GET /api/v1/appointments`
 - `GET /api/v1/booking-options` (staff administrators/reception; clinic-scoped booking combinations and room names)
+- `POST /api/v1/address-coverage/validate` (authorized staff/practitioner mobile address validation and driving-distance coverage proof)
 - `POST /api/v1/appointments`
 
 Appointment lists accept `view=upcoming|past|all&page=1` and return up to 50 rows per page. Staff listing requires an operational role; practitioners and clients see only their own appointments. Staff booking workflow and acceptance instructions: `../documentation/STAFF_BOOKING.md`.
@@ -86,6 +87,11 @@ Clinic administration:
 - `PATCH /api/v1/admin/clinic` (Super Admin only)
 
 Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address. Effective permissions are the intersection of the user's Entra app roles and local database roles.
+
+Mobile coverage validation requires a server-side Google Maps key and a separate signing
+key. See [`../documentation/GOOGLE_ADDRESS_COVERAGE.md`](../documentation/GOOGLE_ADDRESS_COVERAGE.md)
+and [`google-maps.env.example`](google-maps.env.example). Never expose these values through
+frontend `VITE_` variables.
 
 See [`../ENTRA_SETUP.md`](../ENTRA_SETUP.md) for both app registrations, role assignment, local configuration, and staff provisioning.
 

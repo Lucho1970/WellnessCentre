@@ -15,10 +15,11 @@ recurring working hours. It provides timezone and scheduling scope, not a physic
 destination. No physical clinic address or room is required for mobile booking. Leave a
 service's Requires room setting enabled if it will need one for future clinic visits.
 
-Mobile appointments require a structured destination, optional access instructions and
-staff confirmation of coverage and sufficient travel allowance. No map/geocoding provider
-is installed. Radius is a manually checked operational limit, not automatic distance
-enforcement. Set a realistic travel buffer; the same fixed minutes are reserved before
+Mobile appointments require a structured destination and optional access instructions.
+Google Address Validation confirms the destination and Google Routes calculates driving
+distance from the selected base location. The API enforces the practitioner/service radius
+using a short-lived signed proof; the browser cannot self-approve coverage. Set a realistic
+travel buffer; the same fixed minutes are reserved before
 and after the treatment, in addition to service buffers. This is conservative and does
 not optimize travel between nearby consecutive visits.
 
@@ -41,8 +42,8 @@ availability or notification payloads. Viewing mobile appointment lists is audit
 copying addresses into audit metadata.
 
 Addresses are immutable booking snapshots, not yet a reusable client address book.
-Address corrections, mobile rescheduling/cancellation UI, dynamic route/radius checks,
-check-in/escalation safety workflows and automated taxes are not delivered by this slice.
+Address corrections, dynamic travel-time scheduling, check-in/escalation safety workflows
+and automated taxes are not delivered by this slice.
 Do not treat a destination snapshot as a real-time practitioner location tracker.
 
 ## Deployment order
@@ -70,15 +71,15 @@ does not enforce mobile-only eligibility: disable bookings during rollback/recov
 
 Services → Service assignments → select the massage service and base location → tick
 the practitioner → enable Mobile visits → disable Clinic visits → set fee, travel minutes
-each way and optional coverage radius → Save assignments. Repeat for each offered service.
+each way and a driving coverage radius → Save assignments. Repeat for each offered service.
 The practitioner's hours must belong to that base location. Room creation is unnecessary.
 
 ## Hosted acceptance (required)
 
 - Use labelled test records. Book a mobile visit with no rooms configured, including a
   service with Requires room enabled. Confirm address, practitioner, timezone and subtotal.
-- Missing destination or unchecked coverage must prevent confirmation. The API must
-  reject mobile delivery for a practitioner/service that does not offer it.
+- Missing, unconfirmed, expired or outside-radius destinations must prevent confirmation.
+  The API must reject mobile delivery for a practitioner/service that does not offer it.
 - Verify first/last available times include travel and service buffers inside working hours.
   Attempt a conflicting treatment/travel slot; confirmation must reject it.
 - Sign in as the assigned practitioner: verify address and travel details on the schedule.

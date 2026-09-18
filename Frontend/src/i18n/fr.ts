@@ -532,6 +532,13 @@ const fr: Record<string, string> = {
   'Appointment #{{id}} was rescheduled.': 'Le rendez-vous no {{id}} a été reporté.',
   'Unable to change the appointment.': 'Impossible de modifier le rendez-vous.',
   'Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.': 'Utilisez le menu du portail pour accéder aux outils associés à votre rôle. Les administrateurs et la réception peuvent gérer les rendez-vous de la clinique; les praticiens autonomes peuvent réserver, reporter et annuler leurs propres rendez-vous.',
+  'Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.': 'Google valide l’adresse et calcule la distance routière depuis le lieu de départ sélectionné. L’adresse doit se trouver dans la zone de service mobile configurée.',
+  'Validate address and coverage': 'Valider l’adresse et la zone desservie',
+  'Validating address…': 'Validation de l’adresse…',
+  'Address confirmed: {{distance}} km driving distance ({{radius}} km limit).': 'Adresse confirmée : distance routière de {{distance}} km (limite de {{radius}} km).',
+  '{{distance}} km driving distance within a {{radius}} km service area.': 'Distance routière de {{distance}} km dans une zone de service de {{radius}} km.',
+  'Unable to validate this address.': 'Impossible de valider cette adresse.',
+  'Driving coverage radius (km)': 'Rayon routier desservi (km)',
 };
 
 export default fr;

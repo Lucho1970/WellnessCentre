@@ -532,6 +532,13 @@ const en = {
   'Appointment #{{id}} was rescheduled.': 'Appointment #{{id}} was rescheduled.',
   'Unable to change the appointment.': 'Unable to change the appointment.',
   'Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.': 'Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.',
+  'Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.': 'Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.',
+  'Validate address and coverage': 'Validate address and coverage',
+  'Validating address…': 'Validating address…',
+  'Address confirmed: {{distance}} km driving distance ({{radius}} km limit).': 'Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',
+  '{{distance}} km driving distance within a {{radius}} km service area.': '{{distance}} km driving distance within a {{radius}} km service area.',
+  'Unable to validate this address.': 'Unable to validate this address.',
+  'Driving coverage radius (km)': 'Driving coverage radius (km)',
 } as const;
 
 export default en;

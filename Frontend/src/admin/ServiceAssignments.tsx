@@ -129,7 +129,7 @@ export function ServiceAssignments({ catalogueVersion = 0 }: { catalogueVersion?
                   <FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_clinic))} onChange={(event) => update(person.practitioner_id, 'offers_clinic', event.target.checked ? 1 : 0)} />} label={t('Clinic visits')} />
                   <FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_mobile))} onChange={(event) => update(person.practitioner_id, 'offers_mobile', event.target.checked ? 1 : 0)} />} label={t('Mobile visits')} />
                   {Boolean(Number(link.offers_mobile)) && <>
-                    <TextField size="small" type="number" label={t('Coverage radius km (staff verified)')} value={link.mobile_radius_km ?? ''} onChange={(event) => update(person.practitioner_id, 'mobile_radius_km', event.target.value === '' ? null : Number(event.target.value))} />
+                    <TextField required size="small" type="number" label={t('Driving coverage radius (km)')} value={link.mobile_radius_km ?? ''} inputProps={{ min: 1, max: 500, step: 1 }} onChange={(event) => update(person.practitioner_id, 'mobile_radius_km', event.target.value === '' ? null : Number(event.target.value))} />
                     <TextField size="small" type="number" label={t('Travel minutes each way')} value={link.travel_buffer_minutes} inputProps={{ step: 15 }} onChange={(event) => update(person.practitioner_id, 'travel_buffer_minutes', Number(event.target.value))} />
                     <TextField size="small" type="number" label={t('Mobile fee CAD')} value={link.mobile_fee_cents / 100} onChange={(event) => update(person.practitioner_id, 'mobile_fee_cents', Math.round(Number(event.target.value) * 100))} />
                   </>}

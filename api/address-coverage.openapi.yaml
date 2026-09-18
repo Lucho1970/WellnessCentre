@@ -1,0 +1,62 @@
+openapi: 3.0.3
+info:
+  title: Wellness address coverage API
+  version: 1.0.0
+paths:
+  /api/v1/address-coverage/validate:
+    post:
+      summary: Validate a mobile destination and driving-distance coverage
+      security:
+        - entraBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [location_id, service_id, practitioner_id, destination]
+              properties:
+                location_id: { type: integer, minimum: 1 }
+                service_id: { type: integer, minimum: 1 }
+                practitioner_id: { type: integer, minimum: 1 }
+                destination:
+                  $ref: '#/components/schemas/Destination'
+      responses:
+        '200':
+          description: Address is confirmed and inside the configured radius
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [destination, distance_km, radius_km, token, expires_at]
+                    properties:
+                      destination: { $ref: '#/components/schemas/Destination' }
+                      distance_km: { type: number }
+                      radius_km: { type: number }
+                      token: { type: string, description: Short-lived proof bound to the actor and booking choices }
+                      expires_at: { type: string, format: date-time }
+        '401': { description: Authentication required }
+        '403': { description: Actor cannot book for this practitioner }
+        '422': { description: Address is incomplete, unrouteable, outside coverage, or the assignment is invalid }
+        '503': { description: Google validation is unavailable or server configuration is incomplete }
+components:
+  securitySchemes:
+    entraBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Destination:
+      type: object
+      required: [address_line1, city, province, postal_code, country]
+      properties:
+        address_line1: { type: string, maxLength: 190 }
+        address_line2: { type: string, maxLength: 190 }
+        city: { type: string, maxLength: 100 }
+        province: { type: string, maxLength: 80 }
+        postal_code: { type: string, maxLength: 20 }
+        country: { type: string, maxLength: 80 }
+        instructions: { type: string, maxLength: 500 }

@@ -13,13 +13,12 @@ use Wellness\Http\ApiException;
 
 final class BookingService
 {
-    public function __construct(private readonly Database $database,private readonly AuditLogger $audit) {}
+    public function __construct(private readonly Database $database,private readonly AuditLogger $audit,private readonly AddressCoverageService $addressCoverage) {}
 
     public function create(AuthContext $actor,array $body,string $correlationId): array
     {
         foreach(['client_id','location_id','practitioner_id','service_id','duration_option_id','starts_at','idempotency_key'] as $field) if(empty($body[$field])) throw new ApiException(422,'validation_error',"{$field} is required.",[$field=>'Required']);
         $mode=Delivery::mode($body);$destination=Delivery::destination($body);
-        if($mode==='mobile'&&($actor->userType!=='staff'||($body['coverage_confirmed']??false)!==true))throw new ApiException(422,'coverage_required','An authorized staff member must verify the visit address and coverage before booking.');
         $clientId=(int)$body['client_id'];
         if($actor->userType==='client'&&$actor->userId!==$clientId)throw new ApiException(403,'forbidden','Clients can only book for themselves.');
         if($actor->userType==='staff'&&!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot create appointments.');
@@ -35,6 +34,7 @@ final class BookingService
                 BookingRequest::assertReplay($row,$body,$actor->userId,$startsUtc);
                 $result=$this->getById($actor,(int)$row['id']);$pdo->commit();return $result;
             }
+            if($mode==='mobile')$this->addressCoverage->verifyBooking($actor,$body,$destination);
             $practitionerOnly=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception');
             $client=$pdo->prepare("SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'");$client->execute(['id'=>$clientId,'clinic'=>$actor->clinicId]);if(!$client->fetchColumn())throw new ApiException(422,'invalid_client','Select an active client in this clinic.');
             if($practitionerOnly){

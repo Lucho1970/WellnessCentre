@@ -27,6 +27,9 @@ final readonly class Config
         public string $customerSpaClientId = '',
         public bool $customerOnboardingEnabled = false,
         public int $customerClinicId = 0,
+        public string $googleMapsApiKey = '',
+        public string $addressValidationSigningKey = '',
+        public int $addressValidationTokenTtlSeconds = 900,
     ) {}
 
     public static function fromEnvironment(): self
@@ -58,6 +61,9 @@ final readonly class Config
             $value('CUSTOMER_ENTRA_SPA_CLIENT_ID'),
             filter_var($value('CUSTOMER_ONBOARDING_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             (int)$value('CUSTOMER_CLINIC_ID', '0'),
+            $value('GOOGLE_MAPS_API_KEY'),
+            $value('ADDRESS_VALIDATION_SIGNING_KEY'),
+            max(60, min(3600, (int)$value('ADDRESS_VALIDATION_TOKEN_TTL_SECONDS', '900'))),
         );
     }
 
