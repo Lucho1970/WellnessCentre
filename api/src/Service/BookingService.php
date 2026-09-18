@@ -36,9 +36,7 @@ final class BookingService
                 $result=$this->getById($actor,(int)$row['id']);$pdo->commit();return $result;
             }
             $practitionerOnly=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception');
-            $clientSql="SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'".($practitionerOnly?' AND EXISTS(SELECT 1 FROM appointments prior WHERE prior.client_id=users.id AND prior.practitioner_id=:practitioner)':'');
-            $clientParams=['id'=>$clientId,'clinic'=>$actor->clinicId];if($practitionerOnly)$clientParams['practitioner']=(int)$body['practitioner_id'];
-            $client=$pdo->prepare($clientSql);$client->execute($clientParams);if(!$client->fetchColumn())throw new ApiException(422,'invalid_client','Select an active client available to you in this clinic.');
+            $client=$pdo->prepare("SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'");$client->execute(['id'=>$clientId,'clinic'=>$actor->clinicId]);if(!$client->fetchColumn())throw new ApiException(422,'invalid_client','Select an active client in this clinic.');
             if($practitionerOnly){
                 $owner=$pdo->prepare("SELECT id FROM practitioners WHERE id=:id AND user_id=:user AND active=1 AND booking_mode='practitioner_managed'");$owner->execute(['id'=>(int)$body['practitioner_id'],'user'=>$actor->userId]);if(!$owner->fetchColumn())throw new ApiException(403,'forbidden','Practitioners can only book their own practitioner-managed appointments.');
             }
@@ -107,7 +105,6 @@ final class BookingService
         $term=trim((string)($query['q']??''));if(strlen($term)<2||strlen($term)>190)throw new ApiException(422,'validation_error','Search must contain between 2 and 190 characters.');
         $sql="SELECT DISTINCT u.id,u.display_name,u.email,p.phone FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND u.status='active'";
         $params=['clinic'=>$actor->clinicId];
-        if($practitionerScope){$sql.=" AND EXISTS(SELECT 1 FROM appointments a JOIN practitioners own ON own.id=a.practitioner_id WHERE a.client_id=u.id AND own.user_id=:user)";$params['user']=$actor->userId;}
         $escaped='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';$sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR p.phone LIKE :phone ESCAPE '!') ORDER BY u.display_name,u.id LIMIT 26";$params+=['name'=>$escaped,'email'=>$escaped,'phone'=>$escaped];
         $statement=$this->database->connection()->prepare($sql);$statement->execute($params);$rows=$statement->fetchAll();$more=count($rows)>25;
         return ['items'=>array_slice($rows,0,25),'has_more'=>$more];

@@ -6,7 +6,8 @@ Practitioners configured as **Practitioner managed** can use **Practitioner work
 Appointments** to:
 
 - view only their own appointment schedule;
-- search active clients with whom they already have an appointment relationship;
+- search all active clinic clients inside the booking workflow using only minimal scheduling
+  details (name, email, and phone);
 - create their own appointments using assigned services, durations, locations, delivery
   modes, rooms, pricing, travel buffers, and current availability;
 - reschedule an upcoming requested/confirmed/rescheduled appointment into another valid
@@ -14,8 +15,10 @@ Appointments** to:
 - cancel an upcoming appointment while retaining its history.
 
 Clinic-managed practitioners remain read-only in the practitioner workflow. Administrators
-and reception retain their existing clinic booking flow. Practitioner access does not grant
-the general client directory or permit changing another practitioner's appointment.
+and reception retain their existing clinic booking flow. Selecting a client and creating an
+appointment establishes the care relationship for later authorized workflows. Practitioner
+access does not grant the general client directory, clinical records before an authorized
+care relationship, or permission to change another practitioner's appointment.
 
 ## Safety and consistency
 
@@ -53,7 +56,8 @@ Before production use, verify against deployed MySQL and signed-in Entra users:
 
 1. Set one practitioner to **Practitioner managed** and another to **Clinic managed**.
 2. Confirm the managed practitioner sees only their schedule and assigned booking options.
-3. Confirm client search includes an existing related client but not an unrelated client.
+3. Confirm booking search includes a newly added active clinic client while the general
+   client-management page and clinical records remain unavailable.
 4. Create a clinic and a mobile appointment, including room/address behavior as applicable.
 5. Reschedule into an available time and confirm the prior appointment no longer blocks itself.
 6. Attempt the same time from another session and confirm the conflict is rejected.

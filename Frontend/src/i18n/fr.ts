@@ -178,6 +178,8 @@ const fr: Record<string, string> = {
   'Matching active clients appear automatically.': 'Les clients actifs correspondants apparaissent automatiquement.',
   'Searching active clients…': 'Recherche de clients actifs…',
   'No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.': 'Aucun client actif ne correspond. Essayez un nom, un courriel ou un numéro de téléphone, ou ajoutez le client depuis la page Clients.',
+  'No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.': 'Aucun client actif ne correspond. Essayez un nom, un courriel ou un numéro de téléphone, ou demandez au personnel de la clinique d’ajouter le client.',
+  'That practitioner does not offer this service at the selected location.': 'Ce rendez-vous utilise une configuration de service qui n’est plus active pour ce praticien et cet emplacement. Annulez-le et réservez-le de nouveau avec un service actif, ou demandez à un administrateur de rétablir l’affectation.',
   'Matching active clients': 'Clients actifs correspondants',
   'Select': 'Sélectionner',
   'Showing the first 25 matches. Continue typing to narrow the results.': 'Les 25 premiers résultats sont affichés. Continuez à saisir pour les préciser.',

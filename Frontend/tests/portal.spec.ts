@@ -239,7 +239,7 @@ test('practitioner mobile navigation can book and change only the scoped schedul
   const appointment = { id: 10, client_id: 5, practitioner_id: 3, service_id: 2, duration_option_id: 4, room_id: null, delivery_mode: 'mobile', destination_snapshot: null, travel_buffer_minutes: 30, base_price_cents: 10000, mobile_fee_cents: 0, client_name: 'Existing Client', service_name: 'Massage', practitioner_name: 'Test Practitioner', location_name: 'Holland Landing', timezone: 'America/Toronto', room_name: null, starts_at: '2030-10-01 14:00:00', ends_at: '2030-10-01 15:00:00', status: 'confirmed', version: 2 };
   await page.route('**/api/v1/appointments?**', route => { scopedRequests.push(route.request().url()); return route.fulfill({ json: { data: [appointment] } }); });
   await page.route('**/api/v1/booking-options?**', route => { scopedRequests.push(route.request().url()); return route.fulfill({ json: { data: { rooms: [], combinations: [{ location_id: 1, location_name: 'Mobile area', timezone: 'America/Toronto', service_id: 2, service_name: 'Massage', requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 3, practitioner_name: 'Test Practitioner', duration_option_id: 4, duration_minutes: 60 }] } } }); });
-  await page.route('**/api/v1/booking-clients?**', route => { scopedRequests.push(route.request().url()); return route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Existing Client', email: 'client@example.test', phone: '905-555-0110' }], has_more: false } } }); });
+  await page.route('**/api/v1/booking-clients?**', route => { scopedRequests.push(route.request().url()); return route.fulfill({ json: { data: { items: [{ id: 6, display_name: 'New Clinic Client', email: 'new-client@example.test', phone: '905-555-0110' }], has_more: false } } }); });
   await page.route('**/api/v1/appointments/10/availability?**', route => route.fulfill({ json: { data: { availability: [{ duration_option_id: 4, starts_at: '2030-10-02T10:00:00-04:00', ends_at: '2030-10-02T11:00:00-04:00', available_room_ids: [] }] } } }));
   await page.route('**/api/v1/appointments/10', route => { changes.push(route.request().postDataJSON()); return route.fulfill({ json: { data: { ...appointment, version: 3 } } }); });
   await page.goto(portalHost); await expect(page).toHaveURL(`${portalHost}/practitioner`);
@@ -249,9 +249,12 @@ test('practitioner mobile navigation can book and change only the scoped schedul
   await expect(page.getByRole('button', { name: 'Book appointment', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Book appointment', exact: true }).click();
   await expect.poll(() => scopedRequests.some(url => url.includes('/booking-options?scope=practitioner'))).toBe(true);
-  await page.getByRole('textbox', { name: 'Find an active client' }).fill('Existing');
-  await expect(page.getByRole('button', { name: 'Select Existing Client' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Find an active client' }).fill('New Clinic');
+  await expect(page.getByRole('button', { name: 'Select New Clinic Client' })).toBeVisible();
   expect(scopedRequests.some(url => url.includes('/booking-clients?') && url.includes('scope=practitioner'))).toBe(true);
+  await page.getByRole('button', { name: 'Select New Clinic Client' }).click();
+  await expect(page.getByText('Selected client')).toBeVisible();
+  await expect(page.getByText('New Clinic Client')).toBeVisible();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByRole('button', { name: 'Change appointment' }).click();
   await page.getByRole('button', { name: 'Reschedule', exact: true }).click();

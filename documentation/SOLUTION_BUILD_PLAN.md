@@ -523,7 +523,7 @@ Every job type must have:
 | Security tests | Token validation, role/resource isolation, IDOR attempts, injection, rate limits, CORS, headers, and secret scanning |
 | Operational tests | Deployment, health checks, worker retries, provider outage, backup/restore, and rollback |
 
-Production-critical appointment and financial paths require automated regression coverage. Tests must prove that practitioners cannot access unrelated clients and accountants cannot access clinical information by default.
+Production-critical appointment and financial paths require automated regression coverage. Tests must prove that practitioners cannot access unrelated clinical records or the general client directory; the minimal booking-only client projection is the explicit exception. Accountants cannot access clinical information by default.
 
 ## 14 Environment strategy
 

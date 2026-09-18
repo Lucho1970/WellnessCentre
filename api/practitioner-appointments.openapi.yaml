@@ -71,7 +71,7 @@ paths:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 190 } }
         - { name: scope, in: query, schema: { type: string, enum: [practitioner] } }
       responses:
-        '200': { description: Practitioners receive only active clients with an existing appointment relationship }
+        '200': { description: Authorized scheduling roles receive minimal booking details for matching active clinic clients; this does not grant client-directory or clinical-record access }
         '403': { $ref: '#/components/responses/Forbidden' }
 components:
   securitySchemes:

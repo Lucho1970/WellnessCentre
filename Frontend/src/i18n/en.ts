@@ -178,6 +178,8 @@ const en = {
   'Matching active clients appear automatically.': 'Matching active clients appear automatically.',
   'Searching active clients…': 'Searching active clients…',
   'No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.': 'No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.',
+  'No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.': 'No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.',
+  'That practitioner does not offer this service at the selected location.': 'This appointment uses a service configuration that is no longer active for this practitioner and location. Cancel and rebook it with an active service, or ask an administrator to restore the assignment.',
   'Matching active clients': 'Matching active clients',
   'Select': 'Select',
   'Showing the first 25 matches. Continue typing to narrow the results.': 'Showing the first 25 matches. Continue typing to narrow the results.',
