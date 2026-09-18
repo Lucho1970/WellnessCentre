@@ -8,5 +8,13 @@ function appUrl(configured: string | undefined, fallback: string) {
 }
 export const publicUrl = appUrl(import.meta.env.VITE_PUBLIC_URL, import.meta.env.DEV ? 'http://localhost:5173/' : '/');
 export const portalUrl = appUrl(import.meta.env.VITE_PORTAL_URL, import.meta.env.DEV ? 'http://localhost:5174/' : '/portal/');
-export const portalLink = (path = '') => new URL(path.replace(/^\/+/, ''), portalUrl).href;
-export const publicLink = (path = '') => new URL(path.replace(/^\/+/, ''), publicUrl).href;
+
+function localizedLink(path: string, base: URL) {
+  const url = new URL(path.replace(/^\/+/, ''), base);
+  const language = document.documentElement.lang.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+  url.searchParams.set('lang', language);
+  return url.href;
+}
+
+export const portalLink = (path = '') => localizedLink(path, portalUrl);
+export const publicLink = (path = '') => localizedLink(path, publicUrl);

@@ -8,6 +8,13 @@ export type SupportedLanguage = typeof supportedLanguages[number];
 const storageKey = 'wellness.language';
 
 function initialLanguage(): SupportedLanguage {
+  const requested = new URLSearchParams(window.location.search).get('lang')?.toLowerCase().split('-')[0];
+  if (supportedLanguages.includes(requested as SupportedLanguage)) {
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('lang');
+    window.history.replaceState(window.history.state, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+    return requested as SupportedLanguage;
+  }
   try {
     const saved = localStorage.getItem(storageKey)?.toLowerCase().split('-')[0];
     if (supportedLanguages.includes(saved as SupportedLanguage)) return saved as SupportedLanguage;

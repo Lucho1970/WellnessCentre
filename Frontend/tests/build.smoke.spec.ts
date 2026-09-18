@@ -62,9 +62,14 @@ test('language selection switches to French and persists across reloads', async 
   await page.getByRole('button', { name: 'Switch language to French' }).click();
   await expect(page.getByRole('heading', { name: 'Communiquer avec Build Smoke Clinic' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+  await expect(page.getByRole('link', { name: 'Connexion', exact: true })).toHaveAttribute('href', /\/client\?lang=fr$/);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Communiquer avec Build Smoke Clinic' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Passer la langue au Anglais' })).toBeVisible();
+  await page.goto(`${portalOrigin}${info.config.metadata.portalBase}client?lang=fr`);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
 });
 
 test('API failures are presented in the selected language', async ({ page }, info) => {
