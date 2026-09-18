@@ -1,2 +1,59 @@
-import{useCallback,useEffect,useState}from'react';import{Alert,Button,Checkbox,Dialog,DialogActions,DialogContent,DialogTitle,FormControlLabel,MenuItem,Paper,Stack,TextField,Typography}from'@mui/material';import{Pencil,Save}from'lucide-react';import{useStaffAuth}from'../auth/AuthProvider';const api=import.meta.env.VITE_API_BASE_URL??'http://localhost:8080/api/v1';const roleOptions=['super_admin','clinic_admin','reception','practitioner','accountant'];type Staff={id:number;display_name:string;email:string;status:string;roles:string[]};
-export function StaffAdmin(){const{account,getAccessToken}=useStaffAuth();const[staff,setStaff]=useState<Staff[]>([]),[editing,setEditing]=useState<Staff|null>(null),[error,setError]=useState(''),[saved,setSaved]=useState('');const load=useCallback(async()=>{try{const t=await getAccessToken(),r=await fetch(`${api}/admin/staff`,{headers:{Authorization:`Bearer ${t}`}}),b=await r.json();if(!r.ok)throw new Error(b?.error?.message??'Unable to load staff.');setStaff(b.data)}catch(c){setError(c instanceof Error?c.message:'Unable to load staff.')}},[getAccessToken]);useEffect(()=>{void load()},[load]);const set=<K extends keyof Staff>(k:K,v:Staff[K])=>setEditing(s=>s?{...s,[k]:v}:null);const save=async()=>{if(!editing)return;setError('');try{const t=await getAccessToken(),r=await fetch(`${api}/admin/staff/${editing.id}`,{method:'PATCH',headers:{Authorization:`Bearer ${t}`,'Content-Type':'application/json'},body:JSON.stringify(editing)}),b=await r.json();if(!r.ok)throw new Error(b?.error?.message??'Unable to save staff member.');setEditing(null);await load();setSaved('Staff access updated.')}catch(c){setError(c instanceof Error?c.message:'Unable to save staff member.')}};return <Paper variant="outlined" sx={{p:3}}><Typography variant="h5">Staff access</Typography><Typography color="text.secondary" mb={2}>Manage local application roles after the Microsoft Entra account and app roles have been configured.</Typography>{error&&<Alert severity="error" sx={{mb:2}}>{error}</Alert>}{saved&&<Alert severity="success" sx={{mb:2}}>{saved}</Alert>}<Stack spacing={1}>{staff.map(s=><Stack key={s.id} direction={{xs:'column',sm:'row'}} justifyContent="space-between" alignItems={{sm:'center'}} sx={{p:2,border:'1px solid',borderColor:'divider',borderRadius:2}}><span><Typography fontWeight={700}>{s.display_name}{s.email===account?.username?' (you)':''}</Typography><Typography variant="body2" color="text.secondary">{s.email} · {s.roles.join(', ')||'No role'} · {s.status}</Typography></span><Button startIcon={<Pencil size={16}/>} disabled={s.email===account?.username} onClick={()=>setEditing({...s})}>Edit access</Button></Stack>)}</Stack><Dialog open={Boolean(editing)} onClose={()=>setEditing(null)} fullWidth><DialogTitle>Edit staff access</DialogTitle>{editing&&<DialogContent><Stack spacing={2} pt={1}><TextField label="Display name" value={editing.display_name} onChange={e=>set('display_name',e.target.value)}/><TextField type="email" label="Email" value={editing.email} onChange={e=>set('email',e.target.value)}/><TextField select label="Status" value={editing.status} onChange={e=>set('status',e.target.value)}><MenuItem value="active">Active</MenuItem><MenuItem value="inactive">Inactive</MenuItem><MenuItem value="locked">Locked</MenuItem></TextField><Typography fontWeight={700}>Local roles</Typography>{roleOptions.map(role=><FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={e=>set('roles',e.target.checked?[...editing.roles,role]:editing.roles.filter(x=>x!==role))}/>} label={role.replaceAll('_',' ')}/>)}</Stack></DialogContent>}<DialogActions><Button onClick={()=>setEditing(null)}>Cancel</Button><Button variant="contained" startIcon={<Save size={16}/>} onClick={save}>Save</Button></DialogActions></Dialog></Paper>}
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Pencil, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useStaffAuth } from '../auth/AuthProvider';
+
+const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
+const roleOptions = ['super_admin', 'clinic_admin', 'reception', 'practitioner', 'accountant'];
+type Staff = { id: number; display_name: string; email: string; status: string; roles: string[] };
+
+export function StaffAdmin() {
+  const { t } = useTranslation();
+  const { account, getAccessToken } = useStaffAuth();
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [editing, setEditing] = useState<Staff | null>(null);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
+  const load = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to load staff.'));
+      setStaff(body.data);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load staff.')); }
+  }, [getAccessToken, t]);
+  useEffect(() => { void load(); }, [load]);
+  const set = <K extends keyof Staff>(key: K, value: Staff[K]) => setEditing(current => current ? { ...current, [key]: value } : null);
+  const save = async () => {
+    if (!editing) return;
+    setError('');
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`${api}/admin/staff/${editing.id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(editing) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to save staff member.'));
+      setEditing(null); await load(); setSaved(t('Staff access updated.'));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save staff member.')); }
+  };
+  return <Paper variant="outlined" sx={{ p: 3 }}>
+    <Typography variant="h5">{t('Staff access')}</Typography>
+    <Typography color="text.secondary" mb={2}>{t('Manage local application roles after the Microsoft Entra account and app roles have been configured.')}</Typography>
+    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{saved && <Alert severity="success" sx={{ mb: 2 }}>{saved}</Alert>}
+    <Stack spacing={1}>{staff.map(member => <Stack key={member.id} direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+      <span><Typography fontWeight={700}>{member.display_name}{member.email === account?.username ? t(' (you)') : ''}</Typography><Typography variant="body2" color="text.secondary">{member.email} · {member.roles.join(', ') || t('No role')} · {member.status}</Typography></span>
+      <Button startIcon={<Pencil size={16}/>} disabled={member.email === account?.username} onClick={() => setEditing({ ...member })}>{t('Edit access')}</Button>
+    </Stack>)}</Stack>
+    <Dialog open={Boolean(editing)} onClose={() => setEditing(null)} fullWidth>
+      <DialogTitle>{t('Edit staff access')}</DialogTitle>
+      {editing && <DialogContent><Stack spacing={2} pt={1}>
+        <TextField label={t('Display name')} value={editing.display_name} onChange={event => set('display_name', event.target.value)}/>
+        <TextField type="email" label={t('Email')} value={editing.email} onChange={event => set('email', event.target.value)}/>
+        <TextField select label={t('Status')} value={editing.status} onChange={event => set('status', event.target.value)}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem><MenuItem value="locked">{t('Locked')}</MenuItem></TextField>
+        <Typography fontWeight={700}>{t('Local roles')}</Typography>
+        {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => set('roles', event.target.checked ? [...editing.roles, role] : editing.roles.filter(item => item !== role))}/>} label={role.replaceAll('_', ' ')}/>)}</Stack></DialogContent>}
+      <DialogActions><Button onClick={() => setEditing(null)}>{t('Cancel')}</Button><Button variant="contained" startIcon={<Save size={16}/>} onClick={save}>{t('Save')}</Button></DialogActions>
+    </Dialog>
+  </Paper>;
+}
