@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, Checkbox, FormControlLabel, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
-import { CalendarPlus, RefreshCw, Search } from 'lucide-react';
+import { Alert, Box, Button, ButtonBase, Checkbox, FormControlLabel, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
+import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
-type Client = { id: number; display_name: string; email: string };
+type Client = { id: number; display_name: string; email: string; phone: string | null };
 type Combination = { location_id: number; location_name: string; timezone: string; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
@@ -90,7 +90,7 @@ function BookingForm({ request, cancel, complete }: FormProps) {
   const [clientBusy, setClientBusy] = useState(false);
   const [clientMore, setClientMore] = useState(false);
   const [clientError, setClientError] = useState('');
-  const clientSearch = useRef<AbortController | null>(null);
+  const [clientSearched, setClientSearched] = useState(false);
   const [mode,setMode]=useState<'clinic'|'mobile'>('mobile');
   const [destination,setDestination]=useState<Destination>({address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',country:'Canada',instructions:''});
   const [coverage,setCoverage]=useState(false);
@@ -122,19 +122,25 @@ function BookingForm({ request, cancel, complete }: FormProps) {
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [request]);
-  useEffect(() => () => clientSearch.current?.abort(), []);
+  useEffect(() => {
+    const term = clientQuery.trim();
+    setClients([]); setClientMore(false); setClientError(''); setClientSearched(false);
+    if (client || term.length < 2) { setClientBusy(false); return; }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setClientBusy(true);
+      void request(`/clients?status=active&q=${encodeURIComponent(term)}`, { signal: controller.signal })
+        .then(data => { if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); setClientSearched(true); } })
+        .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : 'Unable to search clients.'); })
+        .finally(() => { if (!controller.signal.aborted) setClientBusy(false); });
+    }, 300);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [clientQuery, client, request]);
   useEffect(() => {
     if (!pending) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
     window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
   }, [pending]);
-  const searchClients = async (event: FormEvent) => {
-    event.preventDefault(); clientSearch.current?.abort(); const controller = new AbortController(); clientSearch.current = controller;
-    setClientBusy(true); setClientError('');
-    try { const data = await request(`/clients?status=active&q=${encodeURIComponent(clientQuery)}`, { signal: controller.signal }); if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); } }
-    catch (cause) { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : 'Unable to search clients.'); }
-    finally { if (!controller.signal.aborted) setClientBusy(false); }
-  };
   const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); setError(''); };
   const findSlots = async (event: FormEvent) => {
     event.preventDefault(); if (!selected) return; setBusy(true); clearSlots();
@@ -163,11 +169,21 @@ function BookingForm({ request, cancel, complete }: FormProps) {
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
     {loading ? <CircularProgress aria-label="Loading booking options" /> : options.length === 0 ? <Alert severity="info">No booking combinations are configured. Check active services, durations, practitioners, and location assignments in administration.</Alert> : <>
       {step === 0 && <Stack spacing={3}>
-        <Box component="form" onSubmit={searchClients}><Stack direction="row" gap={1}><TextField fullWidth label="Find an active client" value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => setClientQuery(event.target.value)} /><Button type="submit" disabled={clientBusy} startIcon={<Search size={16} />}>Search</Button></Stack></Box>
+        {!client && <TextField fullWidth label="Find an active client" value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => { setClient(null); setClientQuery(event.target.value); }} helperText={clientQuery.trim().length < 2 ? 'Enter at least 2 characters from the client’s name, email, or phone.' : 'Matching active clients appear automatically.'} />}
+        {clientBusy && <Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20} /><Typography>Searching active clients…</Typography></Stack>}
         {clientError && <Alert severity="error">{clientError}</Alert>}
-        <TextField select fullWidth label="Client" value={client ? String(client.id) : ''} onChange={event => setClient(clients.find(item => String(item.id) === event.target.value) ?? null)} helperText={clientMore ? 'Showing the first 25 matches. Refine your search to find the client.' : 'Search above, then select a client. Add new clients from the Clients page.'}>
-          {(client && !clients.some(item => item.id === client.id) ? [client, ...clients] : clients).map(item => <MenuItem value={String(item.id)} key={item.id}>{item.display_name} · {item.email}</MenuItem>)}
-        </TextField>
+        {!client && clientSearched && clients.length === 0 && <Alert severity="info">No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.</Alert>}
+        {!client && clients.length > 0 && <Stack spacing={1} role="list" aria-label="Matching active clients">
+          {clients.map(item => <Box key={item.id} role="listitem"><ButtonBase aria-label={`Select ${item.display_name}`} onClick={() => setClient(item)} sx={{ width: '100%', p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, textAlign: 'left' }}><Stack width="100%" direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+            <Box><Typography fontWeight={700}>{item.display_name}</Typography><Typography variant="body2">{item.email}</Typography><Typography variant="body2" color="text.secondary">{item.phone || 'No phone number on file'}</Typography></Box>
+            <Typography color="primary" fontWeight={700}>Select</Typography>
+          </Stack></ButtonBase></Box>)}
+          {clientMore && <Alert severity="info">Showing the first 25 matches. Continue typing to narrow the results.</Alert>}
+        </Stack>}
+        {client && <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main', borderWidth: 2 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+          <Box><Typography variant="overline" color="primary">Selected client</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || 'No phone number on file'}</Typography></Box>
+          <Button onClick={() => { setClient(null); setClientQuery(''); setClients([]); }}>Change client</Button>
+        </Stack></Paper>}
         <TextField select label="Visit type" value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');clearSlots();}}><MenuItem value="mobile">At client location</MenuItem><MenuItem value="clinic">In clinic</MenuItem></TextField>
         {eligibleOptions.length===0&&<Alert severity="info">No services are configured for this visit type. Enable it under Service assignments and choose a base location.</Alert>}
         <Grid container spacing={2}>

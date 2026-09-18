@@ -104,7 +104,7 @@ test('mobile-only booking captures destination and price without requesting a ro
   let booking: Record<string, any> | undefined;
   let availabilityMode = '';
   await page.route('**/api/v1/booking-options', route => route.fulfill({ json: { data: { rooms: [], combinations: [{ location_id: 1, location_name: 'Mobile service area', timezone: 'America/Toronto', service_id: 2, service_name: 'Massage', requires_room: 1, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 2500, base_price_cents: 12000, practitioner_id: 3, practitioner_name: 'Therapist', duration_option_id: 4, duration_minutes: 60 }] } } }));
-  await page.route('**/api/v1/clients?**', route => route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Test Client', email: 'test@example.test' }], has_more: false } } }));
+  await page.route('**/api/v1/clients?**', route => route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Test Client', email: 'test@example.test', phone: '905-555-0100' }], has_more: false } } }));
   await page.route('**/api/v1/availability?**', route => {
     availabilityMode = new URL(route.request().url()).searchParams.get('delivery_mode') ?? '';
     return route.fulfill({ json: { data: { availability: [{ duration_option_id: 4, starts_at: '2030-10-01T10:00:00-04:00', ends_at: '2030-10-01T11:00:00-04:00', available_room_ids: [] }] } } });
@@ -112,9 +112,10 @@ test('mobile-only booking captures destination and price without requesting a ro
   await page.route('**/api/v1/appointments', route => { booking=route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 99 } } }); });
   await page.goto(`${portalHost}/admin/appointments`);
   await page.getByRole('button', { name: 'Book appointment', exact: true }).click();
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
   const select = async (label: RegExp, option: string) => { await page.getByRole('combobox', { name: label }).click(); await page.getByRole('option', { name: option, exact: true }).click(); };
-  await select(/^Client/, 'Test Client · test@example.test');
+  await page.getByRole('textbox', { name: 'Find an active client' }).fill('Test');
+  await page.getByRole('button', { name: 'Select Test Client' }).click();
+  await expect(page.getByText('Selected client')).toBeVisible();
   await select(/^Base location/, 'Mobile service area');
   await select(/^Service/, 'Massage');
   await select(/^Practitioner/, 'Therapist');
@@ -136,6 +137,31 @@ test('mobile-only booking captures destination and price without requesting a ro
   expect(availabilityMode).toBe('mobile');
   expect(booking).toMatchObject({ delivery_mode: 'mobile', destination: { address_line1: '123 Test Street' }, coverage_confirmed: true, quoted_base_price_cents: 12000, quoted_mobile_fee_cents: 2500 });
   expect(booking).not.toHaveProperty('room_id');
+});
+
+test('appointment client finder debounces name, email, or phone searches and uses a details list', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/booking-options', route => route.fulfill({ json: { data: { rooms: [], combinations: [{ location_id: 1, location_name: 'Test area', timezone: 'America/Toronto', service_id: 2, service_name: 'Massage', requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 0, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 3, practitioner_name: 'Therapist', duration_option_id: 4, duration_minutes: 60 }] } } }));
+  const terms: string[] = [];
+  await page.route('**/api/v1/clients?**', route => {
+    terms.push(new URL(route.request().url()).searchParams.get('q') ?? '');
+    return route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Test Client', email: 'test@example.test', phone: '905-555-0100' }], has_more: false } } });
+  });
+  await page.goto(`${portalHost}/admin/appointments`);
+  await page.getByRole('button', { name: 'Book appointment', exact: true }).click();
+  const search = page.getByRole('textbox', { name: 'Find an active client' });
+  await search.fill('T'); await page.waitForTimeout(400); expect(terms).toEqual([]);
+  await search.fill('Te'); await page.waitForTimeout(100); expect(terms).toEqual([]);
+  await search.fill('Test');
+  await expect(page.getByRole('button', { name: 'Select Test Client' })).toBeVisible();
+  expect(terms).toEqual(['Test']);
+  await expect(page.getByText('test@example.test')).toBeVisible();
+  await expect(page.getByText('905-555-0100')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Client', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Select Test Client' }).click();
+  await expect(page.getByText('Selected client')).toBeVisible();
+  await page.getByRole('button', { name: 'Change client' }).click();
+  await expect(search).toHaveValue('');
 });
 
 test('role policies preserve current access without broadening permissions', () => {
