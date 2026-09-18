@@ -498,6 +498,23 @@ const en = {
   'completed': 'completed',
   'invoiced': 'invoiced',
   'paid': 'paid',
+  'API error: unauthorized': 'Your sign-in is no longer valid. Please sign in again.',
+  'API error: forbidden': 'You do not have permission to perform this action.',
+  'API error: not found': 'The requested item could not be found.',
+  'API error: conflict': 'The information changed or conflicts with another update. Refresh and try again.',
+  'API error: validation': 'Review the information entered and correct any invalid fields.',
+  'API error: rate limited': 'Too many attempts. Please wait before trying again.',
+  'API error: server': 'The service is temporarily unavailable. Please try again.',
+  'API error: request failed': 'The request could not be completed (HTTP {{status}}).',
+  'Reference: {{reference}}': 'Reference: {{reference}}',
+  'The client service is unavailable. Please retry.': 'The client service is unavailable. Please retry.',
+  'The client service returned an unexpected response.': 'The client service returned an unexpected response.',
+  'Unable to start a secure sign-in.': 'Unable to start a secure sign-in.',
+  'Client onboarding is not enabled.': 'Client onboarding is not enabled.',
+  'Please sign in again to start a secure client session.': 'Please sign in again to start a secure client session.',
+  'Your client record is not linked yet.': 'Your client record is not linked yet.',
+  'This account is not active.': 'This account is not active.',
+  'The access token is invalid or expired.': 'The access token is invalid or expired.',
 } as const;
 
 export default en;

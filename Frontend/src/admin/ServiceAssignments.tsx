@@ -3,6 +3,7 @@ import { Alert, Button, Checkbox, FormControlLabel, MenuItem, Paper, Stack, Text
 import { Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Named = { id: number; name: string };
@@ -94,7 +95,7 @@ export function ServiceAssignments({ catalogueVersion = 0 }: { catalogueVersion?
         body: JSON.stringify({ location_ids: selectedLocations, practitioners: selectedPeople }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to save assignments.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save assignments.')));
       setLinks((current) => [...current.filter((link) => link.service_id !== Number(service)), ...selectedPeople]);
       setLocationLinks((current) => [...current.filter((link) => link.service_id !== Number(service)), ...selectedLocations.map((location_id) => ({ service_id: Number(service), location_id, active: 1 }))]);
       setMessage(t('Service assignments saved.'));

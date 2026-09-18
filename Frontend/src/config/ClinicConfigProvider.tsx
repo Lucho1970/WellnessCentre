@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { apiErrorMessage } from '../shared/api';
 
 export type ClinicConfig = {
   name: string;
@@ -26,7 +27,7 @@ export function ClinicConfigProvider({ children }: PropsWithChildren) {
     try {
       const response = await fetch(`${apiBaseUrl}/site-config`);
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? 'Unable to load clinic settings.');
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
       setConfig(body.data);
       document.title = body.data.name;
     } catch {

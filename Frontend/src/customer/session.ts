@@ -1,4 +1,6 @@
 import { customerToken, selectCustomerAccount } from './auth';
+import { apiErrorMessage } from '../shared/api';
+import i18n from '../i18n';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 const key = 'wellness.customer.session.v1';
@@ -24,9 +26,9 @@ export async function customerFetch(path: string, init: RequestInit = {}, authen
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     if (response.status === 401) { clearCustomerSession(); window.dispatchEvent(new Event('customer-session-ended')); }
-    throw new Error(body?.error?.message ?? 'The client service is unavailable. Please retry.');
+    throw new Error(apiErrorMessage(body, response.status, i18n.t('The client service is unavailable. Please retry.')));
   }
-  if (!body?.data) throw new Error('The client service returned an unexpected response.');
+  if (!body?.data) throw new Error(i18n.t('The client service returned an unexpected response.'));
   return body.data;
 }
 export async function beginCustomerLogin(): Promise<string | null> {
@@ -35,7 +37,7 @@ export async function beginCustomerLogin(): Promise<string | null> {
   if (savedSession()) await endCustomerSession();
   clearCustomerSession();
   const challenge = await customerFetch('/auth/challenge', { method: 'POST', body: '{}' }, false);
-  if (!/^[a-f0-9]{64}$/.test(challenge.nonce)) throw new Error('Unable to start a secure sign-in.');
+  if (!/^[a-f0-9]{64}$/.test(challenge.nonce)) throw new Error(i18n.t('Unable to start a secure sign-in.'));
   sessionStorage.setItem(challengeKey, 'pending');
   return challenge.nonce;
 }

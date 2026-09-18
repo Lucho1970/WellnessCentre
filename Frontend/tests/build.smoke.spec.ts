@@ -60,3 +60,13 @@ test('language selection switches to French and persists across reloads', async 
   await expect(page.getByRole('heading', { name: 'Communiquer avec Build Smoke Clinic' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Passer la langue au Anglais' })).toBeVisible();
 });
+
+test('API failures are presented in the selected language', async ({ page }, info) => {
+  await page.route('**/api/v1/site-config', route => route.fulfill({ json: { data: { name: 'Build Smoke Clinic', email: null, phone: null, legal_name: null } } }));
+  await page.route('**/api/v1/locations', route => route.fulfill({ status: 422, json: { error: { code: 'validation_error', message: 'Untranslated server detail.', correlation_id: 'build-smoke-reference' } } }));
+  await page.route('**/api/v1/services', route => route.fulfill({ json: { data: [] } }));
+  await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
+  await page.getByRole('button', { name: 'Switch language to French' }).click();
+  await page.goto(`${publicOrigin}${info.config.metadata.publicBase}book`);
+  await expect(page.getByText('Vérifiez les renseignements saisis et corrigez les champs non valides. Référence : build-smoke-reference')).toBeVisible();
+});

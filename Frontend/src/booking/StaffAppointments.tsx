@@ -4,6 +4,7 @@ import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
+import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
@@ -40,7 +41,7 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
     const text = await response.text();
     let body;
     try { body = JSON.parse(text); } catch { throw new RequestError(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.', { status: response.status }), response.status, 'invalid_response'); }
-    if (!response.ok) throw new RequestError(body?.error?.message ?? t('Request failed (HTTP {{status}}).', { status: response.status }), response.status, body?.error?.code ?? 'request_failed');
+    if (!response.ok) throw new RequestError(apiErrorMessage(body, response.status, t('Request failed (HTTP {{status}}).', { status: response.status })), response.status, body?.error?.code ?? 'request_failed');
     return body.data;
   }, [getAccessToken, t]);
   useEffect(() => {

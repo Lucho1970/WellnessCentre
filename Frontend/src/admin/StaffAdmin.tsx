@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { Pencil, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { apiErrorMessage } from '../shared/api';
 import { useStaffAuth } from '../auth/AuthProvider';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
@@ -20,7 +21,7 @@ export function StaffAdmin() {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to load staff.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load staff.')));
       setStaff(body.data);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load staff.')); }
   }, [getAccessToken, t]);
@@ -33,7 +34,7 @@ export function StaffAdmin() {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/staff/${editing.id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(editing) });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to save staff member.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save staff member.')));
       setEditing(null); await load(); setSaved(t('Staff access updated.'));
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save staff member.')); }
   };

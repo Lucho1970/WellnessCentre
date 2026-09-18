@@ -3,6 +3,8 @@ import { Alert, Button, Grid, MenuItem, Paper, Stack, TextField, Typography } fr
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStaffAuth } from "../auth/AuthProvider";
+import { apiErrorMessage } from "../shared/api";
+import { formatDateTime } from "../i18n/format";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
@@ -83,7 +85,7 @@ export function ScheduleExceptions() {
         body: JSON.stringify(payload),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t("Unable to save schedule change."));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t("Unable to save schedule change.")));
       setSaved(t(kind === "override" ? "Availability override added." : "Time off added."));
       await load();
     } catch (cause) {
@@ -98,13 +100,13 @@ export function ScheduleExceptions() {
       const path = item.kind === "override" ? "availability-overrides" : "time-off";
       const response = await fetch(`${apiBaseUrl}/admin/${path}/${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t("Unable to remove schedule change."));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t("Unable to remove schedule change.")));
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : t("Unable to remove schedule change.")); }
   };
 
   const selectedLocation = locations.find((location) => String(location.id) === form.location_id);
-  const showUtc = (value: string) => new Date(`${value.replace(" ", "T")}Z`).toLocaleString(i18n.resolvedLanguage === "fr" ? "fr-CA" : "en-CA");
+  const showUtc = (value: string) => formatDateTime(`${value.replace(" ", "T")}Z`, i18n.resolvedLanguage, { dateStyle: "medium", timeStyle: "short" });
   return <Stack spacing={3} mt={3}>
     <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" spacing={1.5} alignItems="center"><CalendarOff color="#176b62"/><Typography variant="h5">{t("Schedule changes and time off")}</Typography></Stack>

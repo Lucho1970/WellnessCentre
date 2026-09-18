@@ -4,6 +4,7 @@ import { Save } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useClinicConfig, type ClinicConfig } from '../config/ClinicConfigProvider';
 import { useTranslation } from 'react-i18next';
+import { apiErrorMessage } from '../shared/api';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
@@ -25,7 +26,7 @@ export function BusinessSettings() {
       const token = await getAccessToken();
       const response = await fetch(`${apiBaseUrl}/admin/clinic`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to save business settings.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save business settings.')));
       await refresh();setSaved(true);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save business settings.')); }
     finally { setSaving(false); }

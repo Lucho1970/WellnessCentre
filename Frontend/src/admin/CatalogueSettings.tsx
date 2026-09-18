@@ -3,6 +3,7 @@ import { Alert, Button, Grid, Paper, Stack, TextField, Typography } from '@mui/m
 import { Plus, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
@@ -41,7 +42,7 @@ export function CatalogueSettings() {
       body: body ? JSON.stringify(body) : undefined,
     });
     const responseBody = await response.json();
-    if (!response.ok) throw new Error(responseBody?.error?.message ?? t('Unable to save settings.'));
+    if (!response.ok) throw new Error(apiErrorMessage(responseBody, response.status, t('Unable to save settings.')));
     return responseBody.data;
   };
 

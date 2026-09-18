@@ -498,6 +498,23 @@ const fr: Record<string, string> = {
   'completed': 'terminé',
   'invoiced': 'facturé',
   'paid': 'payé',
+  'API error: unauthorized': 'Votre connexion n’est plus valide. Veuillez vous reconnecter.',
+  'API error: forbidden': 'Vous n’avez pas l’autorisation d’effectuer cette action.',
+  'API error: not found': 'L’élément demandé est introuvable.',
+  'API error: conflict': 'Les renseignements ont changé ou entrent en conflit avec une autre mise à jour. Actualisez la page et réessayez.',
+  'API error: validation': 'Vérifiez les renseignements saisis et corrigez les champs non valides.',
+  'API error: rate limited': 'Trop de tentatives. Veuillez patienter avant de réessayer.',
+  'API error: server': 'Le service est temporairement indisponible. Veuillez réessayer.',
+  'API error: request failed': 'La requête n’a pas pu être effectuée (HTTP {{status}}).',
+  'Reference: {{reference}}': 'Référence : {{reference}}',
+  'The client service is unavailable. Please retry.': 'Le service client est indisponible. Veuillez réessayer.',
+  'The client service returned an unexpected response.': 'Le service client a retourné une réponse inattendue.',
+  'Unable to start a secure sign-in.': 'Impossible de démarrer une connexion sécurisée.',
+  'Client onboarding is not enabled.': 'L’accueil des nouveaux clients n’est pas activé.',
+  'Please sign in again to start a secure client session.': 'Veuillez vous reconnecter pour démarrer une session client sécurisée.',
+  'Your client record is not linked yet.': 'Votre dossier client n’est pas encore associé.',
+  'This account is not active.': 'Ce compte n’est pas actif.',
+  'The access token is invalid or expired.': 'Le jeton d’accès est non valide ou expiré.',
 };
 
 export default fr;

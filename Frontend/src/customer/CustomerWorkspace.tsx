@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Alert, Button, Divider, Grid, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { customerFetch } from './session';
 import { useTranslation } from 'react-i18next';
+import { formatDateTime } from '../i18n/format';
 
 export type CustomerStatus = { onboarding_status: 'not_linked' | 'pending_review' | 'linked'; review_code?: string };
 const emptyAddress = { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' };
@@ -57,7 +58,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
     {loading ? <Typography role="status">{t('Loading your information…')}</Typography> : mode === 'appointments' ? <>
       <Typography>{t('Most recent 100 appointments. Contact the clinic to book or make changes.')}</Typography>
       {appointments.length === 0 ? <Typography>{t('No appointments yet.')}</Typography> : appointments.map(a => <Stack key={a.id} spacing={0.5} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}>
-        <Typography fontWeight={700}>{a.service}</Typography><Typography>{new Date(a.starts_at.replace(' ', 'T') + 'Z').toLocaleString(i18n.resolvedLanguage, { timeZone: a.timezone })} ({a.timezone})</Typography>
+        <Typography fontWeight={700}>{a.service}</Typography><Typography>{formatDateTime(a.starts_at.replace(' ', 'T') + 'Z', i18n.resolvedLanguage, { timeZone: a.timezone, dateStyle: 'medium', timeStyle: 'short' })} ({a.timezone})</Typography>
         <Typography>{a.practitioner} · {a.delivery_mode === 'mobile' ? t('At client location') : a.location} · {a.status.replaceAll('_', ' ')}</Typography>
       </Stack>)}
     </> : mode !== 'choose' && <Stack component="form" spacing={2} onSubmit={save}>

@@ -3,6 +3,7 @@ import { Alert, Button, Grid, MenuItem, Paper, Stack, TextField, Typography } fr
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -50,7 +51,7 @@ export function AvailabilityAdmin() {
         body: JSON.stringify({ ...form, practitioner_id: Number(form.practitioner_id), location_id: Number(form.location_id), weekday: Number(form.weekday), valid_until: form.valid_until || null }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to add hours.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to add hours.')));
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t('Unable to add hours.'));

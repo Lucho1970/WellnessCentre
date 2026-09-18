@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Plus, Search, Users } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { ClientInvitations } from './ClientInvitations';
 import { useTranslation } from 'react-i18next';
+import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Summary = { id: number; display_name: string; email: string; phone: string | null; status: string };
@@ -35,7 +36,7 @@ export function ClientManagement() {
     const token = await getAccessToken();
     const response = await fetch(`${api}/clients${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const body = await response.json();
-    if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to complete the client request.'));
+    if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to complete the client request.')));
     return body.data;
   }, [getAccessToken, t]);
 

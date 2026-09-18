@@ -3,6 +3,8 @@ import { Alert, Button, FormControlLabel, Grid, IconButton, Paper, Stack, Switch
 import { Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { apiErrorMessage } from '../shared/api';
+import { formatCad } from '../i18n/format';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type DurationOption = { minutes: number; price_cents: number };
@@ -40,7 +42,7 @@ export function ServiceAdmin({ onSaved }: { onSaved?: () => void }) {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/services`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to load services.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load services.')));
       setItems(body.data);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load services.')); }
     finally { setBusy(false); }
@@ -70,13 +72,13 @@ export function ServiceAdmin({ onSaved }: { onSaved?: () => void }) {
       const token = await getAccessToken();
       const response = await fetch(editing ? `${api}/admin/services/${editing}` : `${api}/admin/services`, { method: editing ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to save service.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save service.')));
       const message = t('{{name}} was {{action}}.', { name: form.name, action: t(editing ? 'updated' : 'created') });
       reset(); onSaved?.(); await load(); setSaved(message);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save service.')); }
     finally { setBusy(false); }
   };
-  const money = (cents: number) => new Intl.NumberFormat(i18n.resolvedLanguage === 'fr' ? 'fr-CA' : 'en-CA', { style: 'currency', currency: 'CAD' }).format(cents / 100);
+  const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   return <Stack spacing={3}>
     <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" justifyContent="space-between">

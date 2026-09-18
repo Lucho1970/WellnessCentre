@@ -3,6 +3,7 @@ import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormC
 import { Pencil, Save, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { apiErrorMessage } from '../shared/api';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const tenantId = import.meta.env.VITE_ENTRA_TENANT_ID ?? '';
@@ -34,8 +35,8 @@ export function PractitionerAdmin() {
         fetch(`${apiBaseUrl}/admin/practitioners`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const [locationBody, practitionerBody] = await Promise.all([locationResponse.json(), practitionerResponse.json()]);
-      if (!locationResponse.ok) throw new Error(locationBody?.error?.message ?? t('Unable to load locations.'));
-      if (!practitionerResponse.ok) throw new Error(practitionerBody?.error?.message ?? t('Unable to load practitioners.'));
+      if (!locationResponse.ok) throw new Error(apiErrorMessage(locationBody, locationResponse.status, t('Unable to load locations.')));
+      if (!practitionerResponse.ok) throw new Error(apiErrorMessage(practitionerBody, practitionerResponse.status, t('Unable to load practitioners.')));
       setLocations(locationBody.data);setPractitioners(practitionerBody.data);
       setForm(current => ({ ...current, location_id: current.location_id || String(locationBody.data[0]?.id ?? '') }));
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load practitioner administration.')); }
@@ -50,7 +51,7 @@ export function PractitionerAdmin() {
       const token = await getAccessToken();
       const response = await fetch(`${apiBaseUrl}/admin/practitioners/onboard`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, location_id: Number(form.location_id) }) });
       const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message ?? t('Unable to add practitioner.'));
+      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to add practitioner.')));
       setSaved(t('{{name}} was added as a practitioner.', { name: form.display_name }));setForm({ ...emptyForm, location_id: form.location_id });await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to add practitioner.')); }
     finally { setSaving(false); }
@@ -66,7 +67,7 @@ export function PractitionerAdmin() {
     try {
       const token=await getAccessToken();
       const response=await fetch(`${apiBaseUrl}/admin/practitioners/${editing.practitioner_id}`,{method:'PATCH',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({...editing,location_id:Number(editing.location_id)})});
-      const body=await response.json();if(!response.ok)throw new Error(body?.error?.message??t('Unable to update practitioner.'));
+      const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to update practitioner.')));
       const name=editing.display_name;setEditing(null);await load();setSaved(t('{{name}} was {{action}}.', { name, action: t('updated') }));
     } catch(cause){setError(cause instanceof Error?cause.message:t('Unable to update practitioner.'));}
     finally{setSaving(false);}

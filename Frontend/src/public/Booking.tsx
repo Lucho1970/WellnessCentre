@@ -3,6 +3,7 @@ import { Alert, Box, Button, CircularProgress, Container, Grid, MenuItem, Paper,
 import { apiRequest } from '../shared/api';
 import { portalLink } from '../shared/urls';
 import { useTranslation } from 'react-i18next';
+import { formatCad, formatDateTime } from '../i18n/format';
 
 type Location = { id: number; name: string; timezone?: string };
 type Service = { id: number; name: string; description: string | null; price_cents: number; durations: { id: number; minutes: number; price_cents: number }[] };
@@ -12,7 +13,7 @@ type Availability = { timezone: string; availability: Slot[] };
 export function Booking() {
   const { t, i18n } = useTranslation();
   const message = (cause: unknown) => cause instanceof Error ? cause.message : t('Unable to load online booking.');
-  const money = (cents: number) => new Intl.NumberFormat(i18n.resolvedLanguage ?? 'en', { style: 'currency', currency: 'CAD' }).format(cents / 100);
+  const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [mode,setMode]=useState('mobile');
   const [locations, setLocations] = useState<Location[]>([]), [services, setServices] = useState<Service[]>([]), [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [locationId, setLocationId] = useState(''), [serviceId, setServiceId] = useState(''), [practitionerId, setPractitionerId] = useState('');
@@ -80,7 +81,7 @@ export function Booking() {
         {!slotBusy && <><Typography variant="body2" color="text.secondary">{t('Times shown in {{timezone}}. Showing up to 24 available options.', { timezone: availability.timezone })}</Typography>
           <Grid container spacing={1}>{availability.availability.slice(0, 24).map(time => <Grid size={{ xs: 12, sm: 6 }} key={`${time.duration_option_id}-${time.starts_at}`}>
             <Button fullWidth aria-pressed={slot === time} variant={slot === time ? 'contained' : 'outlined'} onClick={() => setSlot(time)}>
-              {new Date(time.starts_at).toLocaleString(i18n.resolvedLanguage, { timeZone: availability.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {t('{{minutes}} min — {{price}}', { minutes: Math.round((Date.parse(time.ends_at) - Date.parse(time.starts_at)) / 60000), price: durationOption(time.duration_option_id) ? money(Number(durationOption(time.duration_option_id)!.price_cents)) : '' }).replace(/ — $/, '')}
+              {formatDateTime(time.starts_at, i18n.resolvedLanguage, { timeZone: availability.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {t('{{minutes}} min — {{price}}', { minutes: Math.round((Date.parse(time.ends_at) - Date.parse(time.starts_at)) / 60000), price: durationOption(time.duration_option_id) ? money(Number(durationOption(time.duration_option_id)!.price_cents)) : '' }).replace(/ — $/, '')}
             </Button></Grid>)}</Grid></>}
         <Button href={slot ? handoff.href : undefined} disabled={!slot || slotBusy || practitionerBusy} variant="contained">{t('View client booking information')}</Button>
       </Stack></Paper></Grid>
