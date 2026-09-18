@@ -154,8 +154,10 @@ export default function App() {
               <Button component={Link} to="/contact">
                 {t("Contact")}
               </Button>
-              <LanguageSwitcher />
-              <ClientLoginLink />
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                <LanguageSwitcher />
+                <ClientLoginLink />
+              </Stack>
             </Stack>
           </Toolbar>
         </Container>

@@ -149,6 +149,8 @@ test("client verification stays stable across rerenders, refresh and public navi
     });
   });
   await page.goto("http://localhost:5184/client");
+  const globeBox=await page.getByRole("button", { name: "Language and region" }).boundingBox(),accountBox=await page.getByRole("button", { name: "Open client account menu" }).boundingBox();
+  expect(globeBox&&accountBox?accountBox.x-(globeBox.x+globeBox.width):Number.POSITIVE_INFINITY).toBeLessThanOrEqual(8);
   await expect(
     page.getByText("Customer sign-in verified.", { exact: true }),
   ).toBeVisible();

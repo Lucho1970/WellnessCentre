@@ -1,17 +1,52 @@
-import { Button } from '@mui/material';
-import { Languages } from 'lucide-react';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogTitle, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Typography } from '@mui/material';
+import { Check, Globe2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
+const languages = [
+  { code: 'en', name: 'English', regionalName: 'English (Canada)' },
+  { code: 'fr', name: 'French', regionalName: 'Français (Canada)' },
+] as const;
 
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
-  const french = i18n.resolvedLanguage === 'fr';
-  const next = french ? 'en' : 'fr';
-  const nextName = t(french ? 'English' : 'French');
-  return <Button
-    color="inherit"
-    size="small"
-    startIcon={<Languages size={16} />}
-    aria-label={t('Switch language to {{language}}', { language: nextName })}
-    onClick={() => void i18n.changeLanguage(next)}
-  >{french ? 'EN' : 'FR'}</Button>;
+  const [open, setOpen] = useState(false);
+  const selected = i18n.resolvedLanguage === 'fr' ? 'fr' : 'en';
+  const choose = async (language: 'en' | 'fr') => {
+    await i18n.changeLanguage(language);
+    setOpen(false);
+  };
+
+  return <>
+    <IconButton
+      color="inherit"
+      aria-label={t('Language and region')}
+      aria-haspopup="dialog"
+      aria-expanded={open ? 'true' : undefined}
+      title={t('Language and region')}
+      onClick={() => setOpen(true)}
+      sx={{ flexShrink: 0 }}
+    >
+      <Globe2 size={20} />
+    </IconButton>
+    <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs" aria-labelledby="language-region-title">
+      <DialogTitle id="language-region-title">{t('Language and region')}</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="overline" color="text.secondary" fontWeight={800}>{t('Language')}</Typography>
+        <List disablePadding sx={{ mt: 1 }} aria-label={t('Choose a language')}>
+          {languages.map(language => <ListItemButton
+            key={language.code}
+            selected={selected === language.code}
+            aria-current={selected === language.code ? 'true' : undefined}
+            onClick={() => void choose(language.code)}
+            sx={{ borderRadius: 2 }}
+          >
+            <ListItemText primary={language.regionalName} secondary={t(language.name)} />
+            <ListItemIcon sx={{ minWidth: 32, justifyContent: 'flex-end' }}>{selected === language.code && <Check size={19} aria-hidden="true" />}</ListItemIcon>
+          </ListItemButton>)}
+        </List>
+        <Typography variant="body2" color="text.secondary" mt={2}>{t('Additional regional preferences can be added here later.')}</Typography>
+      </DialogContent>
+    </Dialog>
+  </>;
 }

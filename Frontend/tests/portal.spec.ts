@@ -650,6 +650,9 @@ test("public home has client-first login and no workforce authentication or fake
   await expect(
     page.getByRole("link", { name: "Sign In", exact: true }),
   ).toHaveAttribute("href", `${portalHost}/client?lang=en`);
+  await expect(page.getByRole("button", { name: "Language and region" })).toBeVisible();
+  const globeBox=await page.getByRole("button", { name: "Language and region" }).boundingBox(),signInBox=await page.getByRole("link", { name: "Sign In", exact: true }).boundingBox();
+  expect(globeBox&&signInBox?signInBox.x-(globeBox.x+globeBox.width):Number.POSITIVE_INFINITY).toBeLessThanOrEqual(8);
   await expect(
     page.getByRole("link", { name: "Staff Sign In", exact: true }),
   ).toHaveAttribute("href", `${portalHost}/staff/login?lang=en`);

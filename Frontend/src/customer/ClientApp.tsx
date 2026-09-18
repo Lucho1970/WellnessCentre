@@ -216,23 +216,25 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
                 alignItems: "center",
               }}
             >
-              <LanguageSwitcher />
               <Button href={publicLink()}>{t("Public website")}</Button>
               <Button href={`${import.meta.env.BASE_URL}staff/login`}>
                 {t("StaffSignIn")}
               </Button>
-              {account && (
-                <IconButton
-                  aria-label={t("Open client account menu")}
-                  onClick={(event) => setAnchor(event.currentTarget)}
-                >
-                  <Avatar
-                    sx={{ width: 36, height: 36, bgcolor: "primary.main" }}
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                <LanguageSwitcher />
+                {account && (
+                  <IconButton
+                    aria-label={t("Open client account menu")}
+                    onClick={(event) => setAnchor(event.currentTarget)}
                   >
-                    {initials}
-                  </Avatar>
-                </IconButton>
-              )}
+                    <Avatar
+                      sx={{ width: 36, height: 36, bgcolor: "primary.main" }}
+                    >
+                      {initials}
+                    </Avatar>
+                  </IconButton>
+                )}
+              </Stack>
             </Stack>
             <Menu
               anchorEl={anchor}

@@ -87,11 +87,13 @@ export function PortalApp() {
                 justifyContent: { xs: "space-between", sm: "flex-start" },
               }}
             >
-              <LanguageSwitcher />
               <Button href={publicLink()} size="small">
                 {t("Public website")}
               </Button>
-              <UserAccountMenu />
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                <LanguageSwitcher />
+                <UserAccountMenu />
+              </Stack>
             </Stack>
           </Toolbar>
         </Container>
