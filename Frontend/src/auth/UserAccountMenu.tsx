@@ -1,33 +1,191 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
-import { Avatar, Box, Button, CircularProgress, Divider, IconButton, ListItemIcon, Menu, MenuItem, Typography } from '@mui/material';
-import { ExternalLink, LogIn, LogOut, ShieldCheck, UserRound } from 'lucide-react';
-import { useStaffAuth } from './AuthProvider';
-import { Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
+import {
+  Avatar,
+  Box,
+  Button,
+  CircularProgress,
+  Divider,
+  IconButton,
+  ListItemIcon,
+  Menu,
+  MenuItem,
+  Typography,
+} from "@mui/material";
+import {
+  ExternalLink,
+  LogIn,
+  LogOut,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
+import { useStaffAuth } from "./AuthProvider";
+import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
-function initials(name:string){return name.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()||'?';}
+function initials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
 
-export function UserAccountMenu(){
-  const {t}=useTranslation();
-  const navigate=useNavigate();
-  const avatarRequest=useRef(0);
-  const {account,configured,isAuthenticated,signOut,getAccessToken}=useStaffAuth();const [anchor,setAnchor]=useState<HTMLElement|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [avatar,setAvatar]=useState<string>();
-  const loadAvatar=useCallback(async()=>{const request=++avatarRequest.current;if(!isAuthenticated)return;try{const token=await getAccessToken(),r=await fetch(`${import.meta.env.VITE_API_BASE_URL??'http://localhost:8080/api/v1'}/profile/avatar`,{headers:{Authorization:`Bearer ${token}`}}),b=await r.json();if(r.ok&&request===avatarRequest.current)setAvatar(b.data.image_base64?`data:${b.data.mime_type};base64,${b.data.image_base64}`:undefined);}catch{/* Initials remain the safe fallback. */}},[getAccessToken,isAuthenticated]);
-  useEffect(()=>{setAvatar(undefined);void loadAvatar();window.addEventListener('avatar-updated',loadAvatar);return()=>{avatarRequest.current++;window.removeEventListener('avatar-updated',loadAvatar);};},[loadAvatar]);
-  const run=async(action:()=>Promise<void>)=>{setBusy(true);setError('');try{await action();}catch(cause){setError(cause instanceof Error?cause.message:t('Account action failed.'));setBusy(false);}};
-  if(!isAuthenticated)return <Button component={Link} to="/staff/login" variant="contained" size="small" startIcon={<LogIn size={17}/>}>{t('Staff sign in')}</Button>;
-  const name=account?.name??account?.username??t('Staff member');
-  const choose=(page:string)=>{setAnchor(null);navigate(page==='profile'?'/profile':'/');};
-  return <>
-    <IconButton aria-label={t('Open account menu for {{name}}',{name})} aria-controls={anchor?'staff-account-menu':undefined} aria-haspopup="menu" aria-expanded={anchor?'true':undefined} onClick={(event:MouseEvent<HTMLElement>)=>setAnchor(event.currentTarget)} sx={{p:.5}}>
-      <Avatar src={avatar} sx={{width:36,height:36,bgcolor:'primary.main',fontSize:14,fontWeight:800}}>{initials(name)}</Avatar>
-    </IconButton>
-    <Menu id="staff-account-menu" anchorEl={anchor} open={Boolean(anchor)} onClose={()=>setAnchor(null)} slotProps={{paper:{sx:{width:285,mt:1}}}}>
-      <Box px={2} py={1}><Typography fontWeight={750}>{name}</Typography><Typography variant="body2" color="text.secondary" noWrap>{account?.username}</Typography>{error&&<Typography variant="caption" color="error">{error}</Typography>}</Box><Divider/>
-      <MenuItem onClick={()=>choose('profile')}><ListItemIcon><UserRound size={18}/></ListItemIcon>{t('My profile')}</MenuItem>
-      <MenuItem onClick={()=>choose('dashboard')}><ListItemIcon><ShieldCheck size={18}/></ListItemIcon>{t('Staff portal')}</MenuItem>
-      <MenuItem component="a" href="https://myaccount.microsoft.com/" target="_blank" rel="noreferrer"><ListItemIcon><ExternalLink size={18}/></ListItemIcon>{t('Microsoft account & security')}</MenuItem>
-      <Divider/><MenuItem disabled={busy||!configured} onClick={()=>void run(signOut)}><ListItemIcon>{busy?<CircularProgress size={18}/>:<LogOut size={18}/>}</ListItemIcon>{t('Sign out')}</MenuItem>
-    </Menu>
-  </>;
+export function UserAccountMenu() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const avatarRequest = useRef(0);
+  const { account, configured, isAuthenticated, signOut, getAccessToken } =
+    useStaffAuth();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [avatar, setAvatar] = useState<string>();
+  const loadAvatar = useCallback(async () => {
+    const request = ++avatarRequest.current;
+    if (!isAuthenticated) return;
+    try {
+      const token = await getAccessToken(),
+        r = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1"}/profile/avatar`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        ),
+        b = await r.json();
+      if (r.ok && request === avatarRequest.current)
+        setAvatar(
+          b.data.image_base64
+            ? `data:${b.data.mime_type};base64,${b.data.image_base64}`
+            : undefined,
+        );
+    } catch {
+      /* Initials remain the safe fallback. */
+    }
+  }, [getAccessToken, isAuthenticated]);
+  useEffect(() => {
+    setAvatar(undefined);
+    void loadAvatar();
+    window.addEventListener("avatar-updated", loadAvatar);
+    return () => {
+      avatarRequest.current++;
+      window.removeEventListener("avatar-updated", loadAvatar);
+    };
+  }, [loadAvatar]);
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : t("Account action failed."),
+      );
+      setBusy(false);
+    }
+  };
+  if (!isAuthenticated)
+    return (
+      <Button
+        component={Link}
+        to="/staff/login"
+        variant="contained"
+        size="small"
+        startIcon={<LogIn size={17} />}
+      >
+        {t("Staff sign in")}
+      </Button>
+    );
+  const name = account?.name ?? account?.username ?? t("Staff member");
+  const choose = (page: string) => {
+    setAnchor(null);
+    navigate(page === "profile" ? "/profile" : "/");
+  };
+  return (
+    <>
+      <IconButton
+        aria-label={t("Open account menu for {{name}}", { name })}
+        aria-controls={anchor ? "staff-account-menu" : undefined}
+        aria-haspopup="menu"
+        aria-expanded={anchor ? "true" : undefined}
+        onClick={(event: MouseEvent<HTMLElement>) =>
+          setAnchor(event.currentTarget)
+        }
+        sx={{ p: 0.5 }}
+      >
+        <Avatar
+          src={avatar}
+          sx={{
+            width: 36,
+            height: 36,
+            bgcolor: "primary.main",
+            fontSize: 14,
+            fontWeight: 800,
+          }}
+        >
+          {initials(name)}
+        </Avatar>
+      </IconButton>
+      <Menu
+        id="staff-account-menu"
+        anchorEl={anchor}
+        open={Boolean(anchor)}
+        onClose={() => setAnchor(null)}
+        slotProps={{ paper: { sx: { width: 285, mt: 1 } } }}
+      >
+        <Box px={2} py={1}>
+          <Typography fontWeight={750}>{name}</Typography>
+          <Typography variant="body2" color="text.secondary" noWrap>
+            {account?.username}
+          </Typography>
+          {error && (
+            <Typography variant="caption" color="error">
+              {error}
+            </Typography>
+          )}
+        </Box>
+        <Divider />
+        <MenuItem onClick={() => choose("profile")}>
+          <ListItemIcon>
+            <UserRound size={18} />
+          </ListItemIcon>
+          {t("My profile")}
+        </MenuItem>
+        <MenuItem onClick={() => choose("dashboard")}>
+          <ListItemIcon>
+            <ShieldCheck size={18} />
+          </ListItemIcon>
+          {t("Staff portal")}
+        </MenuItem>
+        <MenuItem
+          component="a"
+          href="https://myaccount.microsoft.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <ListItemIcon>
+            <ExternalLink size={18} />
+          </ListItemIcon>
+          {t("Microsoft account & security")}
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          disabled={busy || !configured}
+          onClick={() => void run(signOut)}
+        >
+          <ListItemIcon>
+            {busy ? <CircularProgress size={18} /> : <LogOut size={18} />}
+          </ListItemIcon>
+          {t("SignOut")}
+        </MenuItem>
+      </Menu>
+    </>
+  );
 }
