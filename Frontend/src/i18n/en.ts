@@ -515,6 +515,7 @@ const en = {
   'Your client record is not linked yet.': 'Your client record is not linked yet.',
   'This account is not active.': 'This account is not active.',
   'The access token is invalid or expired.': 'The access token is invalid or expired.',
+  'Portal navigation': 'Portal navigation',
 } as const;
 
 export default en;

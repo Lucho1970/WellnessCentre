@@ -515,6 +515,7 @@ const fr: Record<string, string> = {
   'Your client record is not linked yet.': 'Votre dossier client n’est pas encore associé.',
   'This account is not active.': 'Ce compte n’est pas actif.',
   'The access token is invalid or expired.': 'Le jeton d’accès est non valide ou expiré.',
+  'Portal navigation': 'Navigation du portail',
 };
 
 export default fr;

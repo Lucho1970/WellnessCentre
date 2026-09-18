@@ -23,9 +23,11 @@ export function PortalApp() {
   const { t } = useTranslation();
   return <>
     <Box component="a" href="#main-content" className="skip-link">{t('Skip to content')}</Box>
-    <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}><Container maxWidth="xl"><Toolbar disableGutters sx={{ gap: 2 }}>
+    <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}><Container maxWidth="xl"><Toolbar disableGutters sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
       <HeartPulse color="#176b62" style={{ flexShrink: 0 }} /><Typography component={Link} to="/" title={config.name} noWrap color="inherit" sx={{ textDecoration: 'none', flexGrow: 1, minWidth: 0 }} fontWeight={800}>{config.name}</Typography>
-      <LanguageSwitcher /><Button href={publicLink()} size="small">{t('Public website')}</Button><UserAccountMenu />
+      <Stack component="nav" aria-label={t('Portal navigation')} direction="row" spacing={1} flexWrap="wrap" sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-start' } }}>
+        <LanguageSwitcher /><Button href={publicLink()} size="small">{t('Public website')}</Button><UserAccountMenu />
+      </Stack>
     </Toolbar></Container></AppBar>
     <Container component="main" id="main-content" tabIndex={-1} maxWidth="xl" sx={{ py: { xs: 3, md: 5 }, minHeight: '85vh' }}>
       <Routes>

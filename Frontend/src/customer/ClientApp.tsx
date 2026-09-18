@@ -73,11 +73,13 @@ export function ClientApp({ initialError = '' }: { initialError?: string }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   return <>
     <Box component="a" href="#main-content" className="skip-link">{t('Skip to content')}</Box>
-    <AppBar position="sticky" color="inherit" elevation={0}><Container maxWidth="xl"><Toolbar disableGutters sx={{ gap: 2 }}>
-      <Typography fontWeight={800} sx={{ flexGrow: 1 }}>{config.name}</Typography>
-      <LanguageSwitcher /><Button href={publicLink()}>{t('Public website')}</Button>
-      <Button href={`${import.meta.env.BASE_URL}staff/login`}>{t('Staff login')}</Button>
-      {account && <IconButton aria-label={t('Open client account menu')} onClick={event => setAnchor(event.currentTarget)}><Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>{initials}</Avatar></IconButton>}
+    <AppBar position="sticky" color="inherit" elevation={0}><Container maxWidth="xl"><Toolbar disableGutters sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
+      <Typography fontWeight={800} noWrap sx={{ flexGrow: 1, minWidth: 0 }}>{config.name}</Typography>
+      <Stack component="nav" aria-label={t('Portal navigation')} direction="row" spacing={1} flexWrap="wrap" sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-start' }, alignItems: 'center' }}>
+        <LanguageSwitcher /><Button href={publicLink()}>{t('Public website')}</Button>
+        <Button href={`${import.meta.env.BASE_URL}staff/login`}>{t('Staff login')}</Button>
+        {account && <IconButton aria-label={t('Open client account menu')} onClick={event => setAnchor(event.currentTarget)}><Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>{initials}</Avatar></IconButton>}
+      </Stack>
       <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
         <MenuItem disabled>{name}</MenuItem>
         <MenuItem disabled={busy} onClick={() => { setVerified(false); void run(customerSignOut); }}>{t('Sign out')}</MenuItem>
