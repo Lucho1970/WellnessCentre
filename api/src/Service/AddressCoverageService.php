@@ -55,15 +55,13 @@ final class AddressCoverageService
             throw new ApiException(422, 'outside_mobile_coverage', sprintf('This address is %.1f km away by road and is outside the %.1f km service area.', $distanceMeters / 1000, $radius));
         }
 
-        $normalized = $validatedDestination['address'];
-        $normalized['instructions'] = $destination['instructions'];
         $proof = [
             'clinic_id' => $actor->clinicId,
             'user_id' => $actor->userId,
             'location_id' => (int)$body['location_id'],
             'service_id' => (int)$body['service_id'],
             'practitioner_id' => (int)$body['practitioner_id'],
-            'destination_hash' => self::destinationHash($normalized),
+            'destination_hash' => self::destinationHash($destination),
             'distance_meters' => $distanceMeters,
             'radius_meters' => $radiusMeters,
             'iat' => time(),
@@ -71,7 +69,7 @@ final class AddressCoverageService
         ];
 
         return [
-            'destination' => $normalized,
+            'destination' => $destination,
             'distance_km' => round($distanceMeters / 1000, 1),
             'radius_km' => round($radius, 1),
             'token' => $this->sign($proof),

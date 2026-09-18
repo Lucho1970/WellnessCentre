@@ -3,6 +3,7 @@ import { Alert, Button, Divider, Grid, MenuItem, Stack, TextField, Typography } 
 import { customerFetch } from './session';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../i18n/format';
+import { AddressEntry } from '../shared/AddressEntry';
 
 export type CustomerStatus = { onboarding_status: 'not_linked' | 'pending_review' | 'linked'; review_code?: string };
 const emptyAddress = { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' };
@@ -67,7 +68,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
         {field('email',t('Contact email'),190)}{field('phone',t('Phone'),40)}
         <TextField select label={t('Preferred contact')} value={profile.preferred_contact} disabled={saving} onChange={e => setProfile(p => ({ ...p, preferred_contact: e.target.value }))}><MenuItem value="email">{t('Email:').replace(':','')}</MenuItem><MenuItem value="phone">{t('Phone')}</MenuItem></TextField>
         <Typography variant="subtitle1">{t('Mobile visit address')}</Typography>
-        {(Object.keys(emptyAddress) as (keyof typeof emptyAddress)[]).map(key => <TextField key={key} fullWidth label={t(({ address_line1: 'Street address', address_line2: 'Unit (optional)', city: 'City', province: 'Province / region', postal_code: 'Postal code', country: 'Country', instructions: 'Access instructions (optional)' })[key])} required={!['address_line2','instructions'].includes(key)} disabled={saving} value={profile.address[key]} inputProps={{ maxLength: key === 'instructions' ? 500 : key === 'postal_code' ? 20 : key === 'city' ? 100 : ['province','country'].includes(key) ? 80 : 190 }} onChange={e => setProfile(p => ({ ...p, address: { ...p.address, [key]: e.target.value } }))} />)}
+        <AddressEntry required showInstructions disabled={saving} value={profile.address} onChange={address => setProfile(p => ({ ...p, address: { ...emptyAddress, ...address, instructions: address.instructions ?? '' } }))} />
         <Typography variant="body2">{t('Contact details do not change your sign-in identity. Do not enter clinical notes here.')}</Typography>
       </>}
       <Button type="submit" variant="contained" disabled={saving}>{t(saving ? 'Saving…' : mode === 'invite' ? 'Accept invitation' : status.onboarding_status === 'linked' ? 'Save profile' : 'Create my client record')}</Button>

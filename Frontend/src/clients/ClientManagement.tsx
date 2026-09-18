@@ -5,10 +5,12 @@ import { useStaffAuth } from '../auth/AuthProvider';
 import { ClientInvitations } from './ClientInvitations';
 import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '../shared/api';
+import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Summary = { id: number; display_name: string; email: string; phone: string | null; status: string };
-const empty = { given_name: '', family_name: '', email: '', phone: '', preferred_contact: 'email', date_of_birth: '', emergency_contact_name: '', emergency_contact_phone: '', administrative_notes: '', status: 'active', revision: '' };
+const emptyAddress: AddressValue = { address_line1: '', address_line2: '', city: '', province: 'Ontario', postal_code: '', country: 'Canada', instructions: '' };
+const empty = { given_name: '', family_name: '', email: '', phone: '', preferred_contact: 'email', date_of_birth: '', emergency_contact_name: '', emergency_contact_phone: '', administrative_notes: '', status: 'active', revision: '', address: emptyAddress };
 type Form = typeof empty;
 type Detail = Summary & Form;
 
@@ -50,12 +52,12 @@ export function ClientManagement() {
     return () => controller.abort();
   }, [request, search, page, refresh]);
 
-  const newClient = () => { setId(null); setForm({ ...empty }); setOriginal({ ...empty }); setFormError(''); setOpen(true); };
+  const newClient = () => { const values={ ...empty, address:{...emptyAddress} }; setId(null); setForm(values); setOriginal(values); setFormError(''); setOpen(true); };
   const edit = async (clientId: number) => {
     setOpening(true); setError('');
     try {
       const client: Detail = await request(`/${clientId}`);
-      const values = Object.fromEntries(Object.keys(empty).map(key => [key, client[key as keyof Form] ?? ''])) as Form;
+      const values = { ...empty, ...Object.fromEntries(Object.keys(empty).filter(key=>key!=='address').map(key => [key, client[key as keyof Form] ?? ''])), address: client.address ? { ...emptyAddress, ...client.address } : { ...emptyAddress } } as Form;
       setId(clientId); setForm(values); setOriginal(values); setFormError(''); setOpen(true);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to open client.')); }
     finally { setOpening(false); }
@@ -114,6 +116,7 @@ export function ClientManagement() {
             <Grid size={{ xs: 12, sm: 6 }}>{field('phone', t('Phone'), { type: 'tel', maxLength: 40, required: form.preferred_contact === 'phone' })}</Grid>
             <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth select label={t('Preferred contact')} disabled={saving} value={form.preferred_contact} onChange={event => setForm(current => ({ ...current, preferred_contact: event.target.value }))}><MenuItem value="email">{t('Email')}</MenuItem><MenuItem value="phone">{t('Phone')}</MenuItem></TextField></Grid>
             <Grid size={{ xs: 12, sm: 6 }}>{field('date_of_birth', t('Date of birth (optional)'), { type: 'date' })}</Grid>
+            <Grid size={12}><Typography variant="subtitle1" fontWeight={700}>{t('Service address (optional)')}</Typography><Typography variant="body2" color="text.secondary" mb={1}>{t('Used for mobile visits. Existing appointment destination snapshots do not change when this address is edited.')}</Typography><AddressEntry showInstructions disabled={saving} value={form.address} onChange={address=>setForm(current=>({...current,address}))}/></Grid>
             <Grid size={12}><Typography variant="subtitle1" fontWeight={700}>{t('Emergency contact')}</Typography></Grid>
             <Grid size={{ xs: 12, sm: 6 }}>{field('emergency_contact_name', t('Contact name (optional)'), { maxLength: 150 })}</Grid>
             <Grid size={{ xs: 12, sm: 6 }}>{field('emergency_contact_phone', t('Contact phone (optional)'), { type: 'tel', maxLength: 40 })}</Grid>

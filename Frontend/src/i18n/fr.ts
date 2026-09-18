@@ -539,6 +539,17 @@ const fr: Record<string, string> = {
   '{{distance}} km driving distance within a {{radius}} km service area.': 'Distance routière de {{distance}} km dans une zone de service de {{radius}} km.',
   'Unable to validate this address.': 'Impossible de valider cette adresse.',
   'Driving coverage radius (km)': 'Rayon routier desservi (km)',
+  'Find address with Google Maps': 'Rechercher une adresse avec Google Maps',
+  'Start typing a Canadian address': 'Commencez à saisir une adresse canadienne',
+  'Choose an address suggestion to fill the address fields. You can also enter the fields manually.': 'Choisissez une suggestion pour remplir les champs d’adresse. Vous pouvez aussi les saisir manuellement.',
+  'Google could not fill this address. Enter it manually or try another suggestion.': 'Google n’a pas pu remplir cette adresse. Saisissez-la manuellement ou essayez une autre suggestion.',
+  'Address suggestions are temporarily unavailable. Enter the address manually.': 'Les suggestions d’adresse sont temporairement indisponibles. Saisissez l’adresse manuellement.',
+  'Address suggestions are not configured. Enter the address manually.': 'Les suggestions d’adresse ne sont pas configurées. Saisissez l’adresse manuellement.',
+  'Address suggestions and validation by': 'Suggestions et validation d’adresse par',
+  'Google privacy': 'Confidentialité de Google',
+  'Google Maps terms': 'Conditions de Google Maps',
+  'Service address (optional)': 'Adresse de service (facultative)',
+  'Used for mobile visits. Existing appointment destination snapshots do not change when this address is edited.': 'Utilisée pour les visites mobiles. Les adresses enregistrées dans les rendez-vous existants ne changent pas lorsque cette adresse est modifiée.',
 };
 
 export default fr;

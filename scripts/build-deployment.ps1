@@ -7,18 +7,21 @@ if (Test-Path -LiteralPath $destination) { throw "Release already exists: $desti
 $stage = Join-Path $repo ('.tmp/deployment-' + [guid]::NewGuid().ToString('N'))
 $private = Join-Path $stage 'private'
 New-Item -ItemType Directory -Path $private -Force | Out-Null
-$productionEnv = Join-Path $repo 'Frontend/.env.production'
 $productionSettings = @{}
-foreach ($line in Get-Content -LiteralPath $productionEnv) {
-    if ($line -match '^\s*([^#][^=]*)=(.*)$') {
-        $productionSettings[$matches[1].Trim()] = $matches[2].Trim()
+foreach ($productionEnv in @((Join-Path $repo 'Frontend/.env.production'),(Join-Path $repo 'Frontend/.env.production.local'))) {
+    if (-not (Test-Path -LiteralPath $productionEnv)) { continue }
+    foreach ($line in Get-Content -LiteralPath $productionEnv) {
+        if ($line -match '^\s*([^#][^=]*)=(.*)$') {
+            $productionSettings[$matches[1].Trim()] = $matches[2].Trim()
+        }
     }
 }
 $requiredFrontendSettings = @(
     'VITE_CUSTOMER_ENTRA_TENANT_ID',
     'VITE_CUSTOMER_ENTRA_SUBDOMAIN',
     'VITE_CUSTOMER_ENTRA_API_CLIENT_ID',
-    'VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID'
+    'VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID',
+    'VITE_GOOGLE_MAPS_BROWSER_API_KEY'
 )
 $resolvedFrontendSettings = @{}
 foreach ($name in $requiredFrontendSettings) {

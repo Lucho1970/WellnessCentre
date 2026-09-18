@@ -10,7 +10,7 @@ to the private PHP API. The API:
 2. confirms the base location and destination with Google Address Validation;
 3. obtains driving distance from Google Routes;
 4. compares that distance with `practitioner_services.mobile_radius_km`; and
-5. returns a 15-minute signed proof bound to the actor, clinic, normalized destination,
+5. returns a 15-minute signed proof bound to the actor, clinic, user-supplied destination,
    base location, practitioner and service.
 
 Appointment creation verifies that proof again. Editing an address or changing any bound
@@ -21,7 +21,8 @@ never sent to the React application.
 Google receives only the two postal addresses needed to validate and route the trip. The
 request does not include client name, email, phone, treatment, appointment time, access
 instructions or clinical information. Coordinates are used transiently and are not stored.
-The existing immutable appointment destination snapshot stores the normalized address.
+The existing immutable appointment destination snapshot stores the user-supplied address;
+Google's normalized response and coordinates are not persisted.
 
 ## Google Cloud setup
 
@@ -66,6 +67,20 @@ Before validation can succeed:
 The current rule compares the Google driving-route distance to the configured radius.
 Travel buffer remains a separate fixed scheduling allowance before and after the visit;
 distance validation does not yet calculate a dynamic travel-time buffer.
+
+## Reusable address entry
+
+The React `AddressEntry` control uses Google's current Place Autocomplete element with
+Canada-only suggestions and automatic session handling. A separate browser key is limited
+to approved HTTP referrers, Maps JavaScript API and Places API (New); it must never be the
+private Address Validation/Routes key. The control fills structured fields but preserves
+manual editing and a provider-outage fallback. It is used by mobile booking, staff client
+create/edit, customer profile/onboarding and clinic location administration.
+
+Google attribution remains visible beside Google-derived suggestions/validation results.
+The public privacy notice and terms must disclose the Google Maps processing and link to
+Google's applicable privacy policy and terms before production launch; business/privacy
+review of the clinic's own wording remains required.
 
 ## Failure and acceptance behavior
 

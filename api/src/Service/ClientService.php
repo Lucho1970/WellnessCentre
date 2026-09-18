@@ -44,9 +44,10 @@ final class ClientService
 
     private function find(AuthContext $actor,int $id,bool $lock=false): array
     {
-        $s=$this->database->connection()->prepare("SELECT u.id,u.display_name,u.given_name,u.family_name,u.email,u.status,p.phone,p.preferred_contact,p.date_of_birth,p.emergency_contact_name,p.emergency_contact_phone,p.administrative_notes FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.id=:id AND u.clinic_id=:clinic AND u.user_type='client'".($lock?' FOR UPDATE':''));
+        $s=$this->database->connection()->prepare("SELECT u.id,u.display_name,u.given_name,u.family_name,u.email,u.status,p.phone,p.preferred_contact,p.date_of_birth,p.emergency_contact_name,p.emergency_contact_phone,p.administrative_notes,a.address_json FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id LEFT JOIN client_contact_addresses a ON a.client_id=u.id WHERE u.id=:id AND u.clinic_id=:clinic AND u.user_type='client'".($lock?' FOR UPDATE':''));
         $s->execute(['id'=>$id,'clinic'=>$actor->clinicId]);$row=$s->fetch();
         if (!$row) throw new ApiException(404,'client_not_found','Client not found.');
+        $row['address']=$row['address_json']?json_decode($row['address_json'],true,32,JSON_THROW_ON_ERROR):null;unset($row['address_json']);
         $row['revision']=hash('sha256',json_encode($row,JSON_THROW_ON_ERROR));return $row;
     }
 
@@ -75,7 +76,10 @@ final class ClientService
             $date=is_string($dob)?\DateTimeImmutable::createFromFormat('!Y-m-d',$dob):false;
             if(!$date||$date->format('Y-m-d')!==$dob||$dob>gmdate('Y-m-d'))throw new ApiException(422,'validation_error','Enter a valid date of birth that is not in the future.');
         }
-        $data['date_of_birth']=$dob?:null;return $data;
+        $data['date_of_birth']=$dob?:null;
+        $address=$body['address']??null;$hasAddress=is_array($address)&&trim((string)($address['address_line1']??''))!=='';
+        $data['address']=$hasAddress?Delivery::destination(['delivery_mode'=>'mobile','destination'=>$address]):null;
+        return $data;
     }
 
     public function save(AuthContext $actor,array $body,string $cid,?int $id=null): array
@@ -97,6 +101,8 @@ final class ClientService
             }
             $s=$pdo->prepare('INSERT INTO client_profiles(user_id,phone,preferred_contact,date_of_birth,emergency_contact_name,emergency_contact_phone,administrative_notes) VALUES(:id,:phone,:preferred,:dob,:emergency_name,:emergency_phone,:notes) ON DUPLICATE KEY UPDATE phone=VALUES(phone),preferred_contact=VALUES(preferred_contact),date_of_birth=VALUES(date_of_birth),emergency_contact_name=VALUES(emergency_contact_name),emergency_contact_phone=VALUES(emergency_contact_phone),administrative_notes=VALUES(administrative_notes)');
             $s->execute(['id'=>$id,'phone'=>$data['phone'],'preferred'=>$data['preferred_contact'],'dob'=>$data['date_of_birth'],'emergency_name'=>$data['emergency_contact_name'],'emergency_phone'=>$data['emergency_contact_phone'],'notes'=>$data['administrative_notes']]);
+            if($data['address']){$s=$pdo->prepare('INSERT INTO client_contact_addresses(client_id,address_json) VALUES(:id,:address) ON DUPLICATE KEY UPDATE address_json=VALUES(address_json)');$s->execute(['id'=>$id,'address'=>json_encode($data['address'],JSON_THROW_ON_ERROR)]);}
+            else{$s=$pdo->prepare('DELETE FROM client_contact_addresses WHERE client_id=:id');$s->execute(['id'=>$id]);}
             $this->audit->write($actor->clinicId,$actor,$cid,$action,'client',$id);
             $result=$this->find($actor,$id);$pdo->commit();return $result;
         }catch(\Throwable $e){

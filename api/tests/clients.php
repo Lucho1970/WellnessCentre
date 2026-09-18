@@ -8,7 +8,7 @@ use Wellness\Http\ApiException;
 $count=0;
 $valid=['given_name'=>' Esther ','family_name'=>' Vanderpoel ','email'=>'ESTHER@example.com'];
 $data=ClientService::validate($valid);
-if($data['display_name']!=='Esther Vanderpoel'||$data['email']!=='esther@example.com'||$data['date_of_birth']!==null)throw new RuntimeException('Normalization failed');$count++;
+if($data['display_name']!=='Esther Vanderpoel'||$data['email']!=='esther@example.com'||$data['date_of_birth']!==null||$data['address']!==null)throw new RuntimeException('Normalization failed');$count++;
 foreach([
     ['given_name'=>' '],['family_name'=>[]],['email'=>'invalid'],['phone'=>str_repeat('1',41)],
     ['preferred_contact'=>'phone'],['preferred_contact'=>'invalid'],['status'=>'locked'],
@@ -19,6 +19,9 @@ foreach([
     catch(ApiException $e){if($e->status!==422)throw $e;$count++;}
 }
 ClientService::validate($valid+['date_of_birth'=>'2000-02-29','preferred_contact'=>'phone','phone'=>'+1 905 555 0100']);$count++;
+$address=['address_line1'=>'123 Test Street','address_line2'=>'','city'=>'Test City','province'=>'Ontario','postal_code'=>'A1A 1A1','country'=>'Canada','instructions'=>''];
+if(ClientService::validate($valid+['address'=>$address])['address']['postal_code']!=='A1A 1A1')throw new RuntimeException('Address normalization failed');$count++;
+try{ClientService::validate($valid+['address'=>array_replace($address,['city'=>''])]);throw new RuntimeException('Incomplete address accepted');}catch(ApiException $e){if($e->status!==422)throw $e;$count++;}
 foreach(['super_admin','clinic_admin','reception'] as $role){ClientService::authorize(new AuthContext(1,1,'','test@example.com','Test','staff',[$role]));$count++;}
 foreach([['staff',['practitioner']],['staff',['accounting']],['client',['super_admin']],['staff',[]]] as [$type,$roles]){
     try{ClientService::authorize(new AuthContext(1,1,'','test@example.com','Test',$type,$roles));throw new RuntimeException('Unauthorized client access accepted');}

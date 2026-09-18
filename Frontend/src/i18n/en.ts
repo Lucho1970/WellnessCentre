@@ -539,6 +539,17 @@ const en = {
   '{{distance}} km driving distance within a {{radius}} km service area.': '{{distance}} km driving distance within a {{radius}} km service area.',
   'Unable to validate this address.': 'Unable to validate this address.',
   'Driving coverage radius (km)': 'Driving coverage radius (km)',
+  'Find address with Google Maps': 'Find address with Google Maps',
+  'Start typing a Canadian address': 'Start typing a Canadian address',
+  'Choose an address suggestion to fill the address fields. You can also enter the fields manually.': 'Choose an address suggestion to fill the address fields. You can also enter the fields manually.',
+  'Google could not fill this address. Enter it manually or try another suggestion.': 'Google could not fill this address. Enter it manually or try another suggestion.',
+  'Address suggestions are temporarily unavailable. Enter the address manually.': 'Address suggestions are temporarily unavailable. Enter the address manually.',
+  'Address suggestions are not configured. Enter the address manually.': 'Address suggestions are not configured. Enter the address manually.',
+  'Address suggestions and validation by': 'Address suggestions and validation by',
+  'Google privacy': 'Google privacy',
+  'Google Maps terms': 'Google Maps terms',
+  'Service address (optional)': 'Service address (optional)',
+  'Used for mobile visits. Existing appointment destination snapshots do not change when this address is edited.': 'Used for mobile visits. Existing appointment destination snapshots do not change when this address is edited.',
 } as const;
 
 export default en;

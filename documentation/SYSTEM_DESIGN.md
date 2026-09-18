@@ -212,9 +212,15 @@ destination, travel and price snapshots. Existing base locations remain scheduli
 mobile booking skips rooms but applies travel buffers through the same availability engine.
 Coverage is validated server-side using Google Address Validation and Routes. The API
 compares driving distance with the practitioner/service radius and signs a short-lived
-proof bound to the exact actor, normalized destination and booking choices. The browser
+proof bound to the exact actor, user-supplied destination and booking choices. The browser
 never receives the Google key. Fixed travel buffers remain separate; there is still no
 dynamic travel-time scheduling, tax computation or real-time practitioner tracking.
+
+A reusable address-entry control uses Places API (New) through Google Maps JavaScript with
+a separate HTTP-referrer-restricted browser key. It requests address components only,
+restricts suggestions to Canada, keeps manual entry available, and shows Google attribution.
+The server key remains separate. Provider-normalized address responses and coordinates are
+transient; persisted destination/contact records remain the user-supplied operational data.
 
 Introduce protected address records, appointment destination snapshots, delivery-mode validation, travel blocks and check-in/out/escalation events. Existing mobile flags/radius/fee fields do not yet provide this workflow. Store base clinic/location even when no room is used. Default to configurable travel buffers until a routing provider is chosen; enforce adjacent appointment feasibility and revalidate after changes. Do not publish destinations through public responses, logs, notification previews or external calendar sync.
 

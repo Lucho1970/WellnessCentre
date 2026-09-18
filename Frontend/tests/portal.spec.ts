@@ -99,6 +99,26 @@ test('new services can be assigned without reloading or losing assignment select
   expect(savedAssignment).toMatchObject({ location_ids: [1], practitioners: [{ practitioner_id: 3, service_id: 2 }] });
 });
 
+test('staff client creation saves a reusable service address with manual fallback', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let saved: Record<string, any> | undefined;
+  await page.route('**/api/v1/clients**', route => {
+    if (route.request().method() === 'POST') { saved = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 8, ...saved } } }); }
+    return route.fulfill({ json: { data: { items: [], has_more: false } } });
+  });
+  await page.goto(`${portalHost}/admin/clients`);
+  await page.getByRole('button', { name: 'Add client', exact: true }).click();
+  await page.getByRole('textbox', { name: 'First name' }).fill('Mobile');
+  await page.getByRole('textbox', { name: 'Last name' }).fill('Client');
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill('mobile@example.test');
+  await page.getByRole('textbox', { name: 'Street address' }).fill('123 Test Street');
+  await page.getByRole('textbox', { name: 'City', exact: true }).fill('Test City');
+  await page.getByRole('textbox', { name: 'Postal code' }).fill('A1A 1A1');
+  await page.getByRole('button', { name: 'Save client' }).click();
+  await expect(page.getByText('Client created. The record is ready for booking.')).toBeVisible();
+  expect(saved).toMatchObject({ given_name: 'Mobile', family_name: 'Client', address: { address_line1: '123 Test Street', city: 'Test City', province: 'Ontario', postal_code: 'A1A 1A1', country: 'Canada' } });
+});
+
 test('mobile-only booking captures destination and price without requesting a room', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   let booking: Record<string, any> | undefined;
