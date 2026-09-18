@@ -165,7 +165,7 @@ Baseline: source reviewed on 16 September 2026, combining `origin/main` at `9b5f
 | Profile and business setup | Application avatars, profile menu, SuperAdmin configuration/practitioner management | Broader delegated operational permissions, personal email preferences, media hardening verification |
 | Catalogue | Locations, rooms, capabilities, services/durations, assignments, taxes/settings and mobile metadata | Hosted acceptance; practitioner self-service permissions where not yet exposed |
 | Availability | Recurring rules/overrides, buffers, room constraints and server slot calculation | Complete practitioner UI, shared mutation locking, database concurrency/DST acceptance |
-| Staff booking | Client/slot selection, transaction/idempotency, scoped lists; feature-branch source exists | End-to-end hosted verification, lifecycle management and price/policy snapshots |
+| Staff/practitioner booking | Administrator/reception client and slot selection plus practitioner-scoped own booking, rescheduling and cancellation; transaction/idempotency, optimistic versions, history/audit and scoped lists | End-to-end hosted MySQL verification, full lifecycle/fees/recurrence and notification delivery |
 | Client management | Staff search/create/edit, role checks, stale-edit handling and audit | Client sign-in/claiming, self-service, addresses, full history/forms/privacy flows |
 | Public booking | Catalogue/availability browsing and presentation flow | Replace local-only confirmation with authenticated server booking; never claim a slot is held without a hold |
 | Notifications | Durable event/schema foundation | Sender worker, provider/templates, reminders, delivery/failure handling |

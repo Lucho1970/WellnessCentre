@@ -1,8 +1,13 @@
 # Staff booking checkpoint
 
+Superseding note (18 September 2026): practitioner-managed providers can now book,
+reschedule, and cancel their own upcoming appointments using scoped client relationships.
+See [Practitioner appointment management](PRACTITIONER_APPOINTMENTS.md). The administrator
+and reception workflow below remains applicable.
+
 ## What is available
 
-Open **Staff portal → Appointments**. Super Admin, Clinic Admin, and reception can select **Book appointment**. Practitioners can view their own appointments but cannot use the booking form until assigned-client access is implemented. Accounting and unrelated roles cannot list appointments through this endpoint.
+Open **Staff portal → Appointments**. Super Admin, Clinic Admin, and reception can select **Book appointment**. Accounting and unrelated roles cannot list appointments through this endpoint.
 
 The form supports in-clinic bookings using active client records:
 
@@ -28,7 +33,7 @@ The confirm button is guarded against duplicate clicks. A failed or unreadable r
 
 No database migration is needed. Deploy the new frontend and private API together. Preserve the private `.env` and public `api/` folder. If installing a full private-API package, replace its complete `vendor` folder together: do not mix generated Composer files from different packages. The public API entry files are included for completeness.
 
-Email confirmation is queued by the API, but email delivery remains disabled. The interface tells staff to arrange confirmation directly. Mobile destinations, public client sign-in/booking, practitioner booking, appointment editing/cancellation, and payments are not part of this checkpoint.
+Email confirmation is queued by the API, but email delivery remains disabled. The interface tells staff to arrange confirmation directly. Public client confirmation and payments are not part of this checkpoint; later practitioner appointment capabilities are documented separately.
 
 ## Verification and development acceptance
 

@@ -95,7 +95,7 @@ test('public login ignores spoofed account messages and works without the bridge
   await page.route('**/client/session', route => route.abort());
   await page.goto('http://localhost:5183/');
   await page.evaluate(() => window.postMessage({ type: 'wellness:account-display', initials: 'XX', nonce: '' }, '*'));
-  await expect(page.getByRole('link', { name: 'Login', exact: true })).toHaveAttribute('href', 'http://localhost:5184/client');
+  await expect(page.getByRole('link', { name: 'Login', exact: true })).toHaveAttribute('href', 'http://localhost:5184/client?lang=en');
   await expect(page.getByRole('link', { name: 'Open client account' })).toHaveCount(0);
 });
 for (const status of [401, 403, 500]) {

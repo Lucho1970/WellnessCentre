@@ -104,7 +104,7 @@ test('mobile-only booking captures destination and price without requesting a ro
   let booking: Record<string, any> | undefined;
   let availabilityMode = '';
   await page.route('**/api/v1/booking-options', route => route.fulfill({ json: { data: { rooms: [], combinations: [{ location_id: 1, location_name: 'Mobile service area', timezone: 'America/Toronto', service_id: 2, service_name: 'Massage', requires_room: 1, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 2500, base_price_cents: 12000, practitioner_id: 3, practitioner_name: 'Therapist', duration_option_id: 4, duration_minutes: 60 }] } } }));
-  await page.route('**/api/v1/clients?**', route => route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Test Client', email: 'test@example.test', phone: '905-555-0100' }], has_more: false } } }));
+  await page.route('**/api/v1/booking-clients?**', route => route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Test Client', email: 'test@example.test', phone: '905-555-0100' }], has_more: false } } }));
   await page.route('**/api/v1/availability?**', route => {
     availabilityMode = new URL(route.request().url()).searchParams.get('delivery_mode') ?? '';
     return route.fulfill({ json: { data: { availability: [{ duration_option_id: 4, starts_at: '2030-10-01T10:00:00-04:00', ends_at: '2030-10-01T11:00:00-04:00', available_room_ids: [] }] } } });
@@ -121,9 +121,9 @@ test('mobile-only booking captures destination and price without requesting a ro
   await select(/^Practitioner/, 'Therapist');
   await select(/^Duration/, '60 minutes — $120.00');
   await expect(page.getByRole('button', { name: 'Find a time', exact: true })).toBeDisabled();
-  await page.getByRole('textbox', { name: 'address line1' }).fill('123 Test Street');
-  await page.getByRole('textbox', { name: 'city', exact: true }).fill('Test City');
-  await page.getByRole('textbox', { name: 'postal code' }).fill('A1A 1A1');
+  await page.getByRole('textbox', { name: 'Street address' }).fill('123 Test Street');
+  await page.getByRole('textbox', { name: 'City', exact: true }).fill('Test City');
+  await page.getByRole('textbox', { name: 'Postal code' }).fill('A1A 1A1');
   await page.getByRole('checkbox', { name: /I verified this address/ }).check();
   await page.getByRole('button', { name: 'Find a time', exact: true }).click();
   await page.getByLabel('Appointment date').fill('2030-10-01');
@@ -143,7 +143,7 @@ test('appointment client finder debounces name, email, or phone searches and use
   await fixtures(page, ['super_admin']);
   await page.route('**/api/v1/booking-options', route => route.fulfill({ json: { data: { rooms: [], combinations: [{ location_id: 1, location_name: 'Test area', timezone: 'America/Toronto', service_id: 2, service_name: 'Massage', requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 0, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 3, practitioner_name: 'Therapist', duration_option_id: 4, duration_minutes: 60 }] } } }));
   const terms: string[] = [];
-  await page.route('**/api/v1/clients?**', route => {
+  await page.route('**/api/v1/booking-clients?**', route => {
     terms.push(new URL(route.request().url()).searchParams.get('q') ?? '');
     return route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Test Client', email: 'test@example.test', phone: '905-555-0100' }], has_more: false } } });
   });
@@ -182,8 +182,8 @@ test('public home has client-first login and no workforce authentication or fake
   const requests: string[] = []; page.on('request', request => requests.push(request.url()));
   await fixtures(page); await page.goto(publicHost);
   await expect(page.getByRole('heading', { name: 'Feel better, on your schedule.' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Login', exact: true })).toHaveAttribute('href', `${portalHost}/client`);
-  await expect(page.getByRole('link', { name: 'Staff login', exact: true })).toHaveAttribute('href', `${portalHost}/staff/login`);
+  await expect(page.getByRole('link', { name: 'Login', exact: true })).toHaveAttribute('href', `${portalHost}/client?lang=en`);
+  await expect(page.getByRole('link', { name: 'Staff login', exact: true })).toHaveAttribute('href', `${portalHost}/staff/login?lang=en`);
   await expect(page.getByText('240 Queen Street')).toHaveCount(0);
   expect(requests.some(url => url.includes('AuthProvider') || url.includes('login.microsoftonline.com') || url.includes('/auth/me'))).toBe(false);
 });
@@ -204,7 +204,7 @@ test('public infrastructure errors have a readable retry state', async ({ page }
   await fixtures(page);
   await page.route('**/api/v1/services', route => route.fulfill({ status: 500, body: '', contentType: 'text/html' }));
   await page.goto(`${publicHost}/book`);
-  await expect(page.getByRole('alert').filter({ hasText: 'unexpected response (500)' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'The service is temporarily unavailable. Please try again.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
   await expect(page.getByText('Unexpected end of JSON')).toHaveCount(0);
 });
@@ -233,13 +233,40 @@ test('reception routes support refresh, back, profile menu and restricted deep l
   await expect(page.getByText('You do not have permission to access this page.')).toBeVisible();
 });
 
-test('practitioner mobile navigation retains own schedule, not client administration', async ({ page }) => {
+test('practitioner mobile navigation can book and change only the scoped schedule', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await fixtures(page, ['practitioner']);
+  const scopedRequests: string[] = []; const changes: Record<string, unknown>[] = [];
+  const appointment = { id: 10, client_id: 5, practitioner_id: 3, service_id: 2, duration_option_id: 4, room_id: null, delivery_mode: 'mobile', destination_snapshot: null, travel_buffer_minutes: 30, base_price_cents: 10000, mobile_fee_cents: 0, client_name: 'Existing Client', service_name: 'Massage', practitioner_name: 'Test Practitioner', location_name: 'Holland Landing', timezone: 'America/Toronto', room_name: null, starts_at: '2030-10-01 14:00:00', ends_at: '2030-10-01 15:00:00', status: 'confirmed', version: 2 };
+  await page.route('**/api/v1/appointments?**', route => { scopedRequests.push(route.request().url()); return route.fulfill({ json: { data: [appointment] } }); });
+  await page.route('**/api/v1/booking-options?**', route => { scopedRequests.push(route.request().url()); return route.fulfill({ json: { data: { rooms: [], combinations: [{ location_id: 1, location_name: 'Mobile area', timezone: 'America/Toronto', service_id: 2, service_name: 'Massage', requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 3, practitioner_name: 'Test Practitioner', duration_option_id: 4, duration_minutes: 60 }] } } }); });
+  await page.route('**/api/v1/booking-clients?**', route => { scopedRequests.push(route.request().url()); return route.fulfill({ json: { data: { items: [{ id: 5, display_name: 'Existing Client', email: 'client@example.test', phone: '905-555-0110' }], has_more: false } } }); });
+  await page.route('**/api/v1/appointments/10/availability?**', route => route.fulfill({ json: { data: { availability: [{ duration_option_id: 4, starts_at: '2030-10-02T10:00:00-04:00', ends_at: '2030-10-02T11:00:00-04:00', available_room_ids: [] }] } } }));
+  await page.route('**/api/v1/appointments/10', route => { changes.push(route.request().postDataJSON()); return route.fulfill({ json: { data: { ...appointment, version: 3 } } }); });
   await page.goto(portalHost); await expect(page).toHaveURL(`${portalHost}/practitioner`);
   await page.getByRole('button', { name: 'Open portal menu' }).click();
   await page.getByRole('link', { name: /Appointments Bookings/ }).click();
   await expect(page).toHaveURL(`${portalHost}/practitioner/schedule`);
-  await expect(page.getByRole('button', { name: 'Book appointment', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Book appointment', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Book appointment', exact: true }).click();
+  await expect.poll(() => scopedRequests.some(url => url.includes('/booking-options?scope=practitioner'))).toBe(true);
+  await page.getByRole('textbox', { name: 'Find an active client' }).fill('Existing');
+  await expect(page.getByRole('button', { name: 'Select Existing Client' })).toBeVisible();
+  expect(scopedRequests.some(url => url.includes('/booking-clients?') && url.includes('scope=practitioner'))).toBe(true);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Change appointment' }).click();
+  await page.getByRole('button', { name: 'Reschedule', exact: true }).click();
+  await page.getByLabel('Appointment date').fill('2030-10-02');
+  await page.getByRole('button', { name: 'Find times', exact: true }).click();
+  await page.getByRole('button', { name: /Oct 2, 2030/ }).click();
+  await page.getByRole('button', { name: 'Confirm reschedule' }).click();
+  await expect(page.getByText('Appointment #10 was rescheduled.')).toBeVisible();
+  expect(changes[0]).toMatchObject({ action: 'reschedule', version: 2, starts_at: '2030-10-02T10:00:00-04:00' });
+  await page.getByRole('button', { name: 'Change appointment' }).click();
+  await page.getByRole('button', { name: 'Cancel appointment' }).click();
+  await page.getByRole('button', { name: 'Confirm cancellation' }).click();
+  await expect(page.getByText('Appointment #10 was canceled.')).toBeVisible();
+  expect(changes[1]).toMatchObject({ action: 'cancel', version: 2 });
+  expect(scopedRequests.some(url => url.includes('/appointments?') && url.includes('scope=practitioner'))).toBe(true);
   await page.goto(`${portalHost}/admin/clients`);
   await expect(page.getByText('You do not have permission to access this page.')).toBeVisible();
 });
@@ -262,7 +289,7 @@ test('failed authorization never renders protected screens and allows retry', as
   await fixtures(page, ['super_admin']);
   await page.route('**/api/v1/auth/me', route => route.fulfill({ status: 401, json: { error: { message: 'Token expired', correlation_id: 'test-reference' } } }));
   await page.goto(`${portalHost}/admin/clients`);
-  await expect(page.getByRole('alert')).toContainText('Token expired');
+  await expect(page.getByRole('alert')).toContainText('Your sign-in is no longer valid. Please sign in again.');
   await expect(page.getByRole('button', { name: 'Add client' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
 });

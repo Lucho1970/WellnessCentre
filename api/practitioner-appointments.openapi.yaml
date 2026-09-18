@@ -1,0 +1,98 @@
+openapi: 3.0.3
+info:
+  title: Wellness Centre Practitioner Appointments
+  version: 1.0.0
+  description: Practitioner-scoped booking, rescheduling, and cancellation contract.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /appointments:
+    get:
+      summary: List authorized appointments
+      parameters:
+        - { name: view, in: query, schema: { type: string, enum: [all, upcoming, past] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: scope, in: query, schema: { type: string, enum: [practitioner] } }
+      responses:
+        '200': { description: Appointments visible to the authenticated role }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      summary: Confirm an appointment
+      description: A practitioner may create only their own active practitioner-managed appointment. Existing booking validation, availability, pricing, room, travel, and idempotency rules apply.
+      responses:
+        '200': { description: Confirmed appointment }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Schedule, room, price, or replay conflict }
+        '422': { description: Validation failure }
+  /appointments/{id}:
+    patch:
+      summary: Reschedule or cancel an appointment
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/RescheduleRequest'
+                - $ref: '#/components/schemas/CancelRequest'
+      responses:
+        '200': { description: Updated appointment; exact retries return the existing result }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Appointment not found }
+        '409': { description: Stale version, non-editable state, or scheduling conflict }
+        '422': { description: Validation failure }
+  /appointments/{id}/availability:
+    get:
+      summary: Search replacement times for an authorized appointment
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Availability calculated while excluding only this appointment }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Appointment not found }
+  /booking-options:
+    get:
+      summary: Get active booking combinations
+      parameters:
+        - { name: scope, in: query, schema: { type: string, enum: [practitioner] } }
+      responses:
+        '200': { description: Practitioner scope contains only the signed-in practitioner and requires practitioner-managed booking }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /booking-clients:
+    get:
+      summary: Search minimal client details for booking
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 190 } }
+        - { name: scope, in: query, schema: { type: string, enum: [practitioner] } }
+      responses:
+        '200': { description: Practitioners receive only active clients with an existing appointment relationship }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Forbidden:
+      description: Role or resource relationship does not permit the operation
+  schemas:
+    RescheduleRequest:
+      type: object
+      required: [action, version, starts_at]
+      properties:
+        action: { type: string, enum: [reschedule] }
+        version: { type: integer, minimum: 1 }
+        starts_at: { type: string, format: date-time }
+        room_id: { type: integer, nullable: true }
+        reason: { type: string, maxLength: 1000 }
+    CancelRequest:
+      type: object
+      required: [action, version]
+      properties:
+        action: { type: string, enum: [cancel] }
+        version: { type: integer, minimum: 1 }
+        reason: { type: string, maxLength: 1000 }

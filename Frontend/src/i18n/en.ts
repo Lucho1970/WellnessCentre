@@ -516,6 +516,20 @@ const en = {
   'This account is not active.': 'This account is not active.',
   'The access token is invalid or expired.': 'The access token is invalid or expired.',
   'Portal navigation': 'Portal navigation',
+  'Change appointment': 'Change appointment',
+  'Change appointment #{{id}}': 'Change appointment #{{id}}',
+  'Reschedule': 'Reschedule',
+  'Cancel appointment': 'Cancel appointment',
+  'Choose a new available time. The client, service, location, delivery mode, duration, and price remain unchanged.': 'Choose a new available time. The client, service, location, delivery mode, duration, and price remain unchanged.',
+  'Reason or note (optional)': 'Reason or note (optional)',
+  'Confirm reschedule': 'Confirm reschedule',
+  'Canceling releases the time and room. The appointment remains in history.': 'Canceling releases the time and room. The appointment remains in history.',
+  'Cancellation reason (optional)': 'Cancellation reason (optional)',
+  'Confirm cancellation': 'Confirm cancellation',
+  'Appointment #{{id}} was canceled.': 'Appointment #{{id}} was canceled.',
+  'Appointment #{{id}} was rescheduled.': 'Appointment #{{id}} was rescheduled.',
+  'Unable to change the appointment.': 'Unable to change the appointment.',
+  'Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.': 'Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.',
 } as const;
 
 export default en;

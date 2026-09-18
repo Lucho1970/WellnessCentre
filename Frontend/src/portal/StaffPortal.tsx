@@ -93,7 +93,7 @@ const navigation: NavigationItem[] = [
 function Dashboard() {
   const { t } = useTranslation();
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>{t('Your clinic workspace')}</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>{t('Use the portal menu to view appointments and access the tools available to your role. Administrators and reception can manage clients and book appointments; practitioners can view their own appointments.')}</Typography></Paper>
+    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>{t('Your clinic workspace')}</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>{t('Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.')}</Typography></Paper>
   );
 }
 
@@ -165,7 +165,7 @@ export function StaffPortal({ roles }: { roles: string[] }) {
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
         {page === "dashboard" && <Dashboard />}
         {page === "clients" && <ClientManagement />}
-        {page === "appointments" && <StaffAppointments canBook={workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))} />}
+        {page === "appointments" && <StaffAppointments practitionerMode={workspace === 'practitioner'} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}

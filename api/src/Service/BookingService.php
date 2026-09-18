@@ -35,9 +35,12 @@ final class BookingService
                 BookingRequest::assertReplay($row,$body,$actor->userId,$startsUtc);
                 $result=$this->getById($actor,(int)$row['id']);$pdo->commit();return $result;
             }
-            $client=$pdo->prepare("SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'");$client->execute(['id'=>$clientId,'clinic'=>$actor->clinicId]);if(!$client->fetchColumn())throw new ApiException(422,'invalid_client','Select an active client in this clinic.');
-            if($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')){
-                $owner=$pdo->prepare('SELECT id FROM practitioners WHERE id=:id AND user_id=:user');$owner->execute(['id'=>(int)$body['practitioner_id'],'user'=>$actor->userId]);if(!$owner->fetchColumn())throw new ApiException(403,'forbidden','Practitioners can only book their own appointments.');
+            $practitionerOnly=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception');
+            $clientSql="SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'".($practitionerOnly?' AND EXISTS(SELECT 1 FROM appointments prior WHERE prior.client_id=users.id AND prior.practitioner_id=:practitioner)':'');
+            $clientParams=['id'=>$clientId,'clinic'=>$actor->clinicId];if($practitionerOnly)$clientParams['practitioner']=(int)$body['practitioner_id'];
+            $client=$pdo->prepare($clientSql);$client->execute($clientParams);if(!$client->fetchColumn())throw new ApiException(422,'invalid_client','Select an active client available to you in this clinic.');
+            if($practitionerOnly){
+                $owner=$pdo->prepare("SELECT id FROM practitioners WHERE id=:id AND user_id=:user AND active=1 AND booking_mode='practitioner_managed'");$owner->execute(['id'=>(int)$body['practitioner_id'],'user'=>$actor->userId]);if(!$owner->fetchColumn())throw new ApiException(403,'forbidden','Practitioners can only book their own practitioner-managed appointments.');
             }
             $location=$pdo->prepare('SELECT timezone FROM locations WHERE id=:id AND clinic_id=:clinic AND is_bookable=1');$location->execute(['id'=>(int)$body['location_id'],'clinic'=>$actor->clinicId]);$timezone=$location->fetchColumn();if(!$timezone)throw new ApiException(422,'invalid_location','Select a bookable location in this clinic.');
             $sql="SELECT ps.offers_mobile,ps.offers_clinic,ps.travel_buffer_minutes,ps.mobile_fee_cents,COALESCE(ps.price_override_cents,d.price_cents,s.price_cents) base_price_cents,s.buffer_before_minutes,s.buffer_after_minutes,s.lead_time_minutes,s.booking_horizon_days,s.requires_room,d.duration_minutes
@@ -76,9 +79,11 @@ final class BookingService
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
 
-    public function options(AuthContext $actor): array
+    public function options(AuthContext $actor,array $query=[]): array
     {
-        ClientService::authorize($actor);
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot view booking options.');
+        $practitionerScope=($query['scope']??'')==='practitioner'||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception'));
+        if($practitionerScope&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
         $pdo=$this->database->connection();
         $s=$pdo->prepare("SELECT l.id location_id,l.name location_name,l.timezone,s.id service_id,s.name service_name,s.requires_room,ps.offers_mobile,ps.offers_clinic,ps.travel_buffer_minutes,ps.mobile_fee_cents,ps.mobile_radius_km,COALESCE(ps.price_override_cents,d.price_cents,s.price_cents) base_price_cents,p.id practitioner_id,u.display_name practitioner_name,d.id duration_option_id,d.duration_minutes
             FROM services s JOIN service_locations sl ON sl.service_id=s.id AND sl.active=1
@@ -88,10 +93,69 @@ final class BookingService
             JOIN users u ON u.id=p.user_id AND u.clinic_id=s.clinic_id AND u.status='active'
             JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=l.id AND pl.active=1
             JOIN service_duration_options d ON d.service_id=s.id AND d.active=1
-            WHERE s.clinic_id=:clinic AND s.active=1 AND (ps.offers_clinic=1 OR ps.offers_mobile=1) ORDER BY l.name,s.name,u.display_name,d.duration_minutes");
-        $s->execute(['clinic'=>$actor->clinicId]);$combinations=$s->fetchAll();
+            WHERE s.clinic_id=:clinic AND s.active=1 AND (ps.offers_clinic=1 OR ps.offers_mobile=1)".($practitionerScope?" AND p.user_id=:user AND p.booking_mode='practitioner_managed'":'')." ORDER BY l.name,s.name,u.display_name,d.duration_minutes");
+        $params=['clinic'=>$actor->clinicId];if($practitionerScope)$params['user']=$actor->userId;$s->execute($params);$combinations=$s->fetchAll();
         $s=$pdo->prepare('SELECT r.id,r.name,r.location_id FROM rooms r JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic AND r.is_bookable=1 ORDER BY r.name');$s->execute(['clinic'=>$actor->clinicId]);
         return ['combinations'=>$combinations,'rooms'=>$s->fetchAll()];
+    }
+
+    public function bookingClients(AuthContext $actor,array $query=[]): array
+    {
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot search booking clients.');
+        $practitionerScope=($query['scope']??'')==='practitioner'||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception'));
+        if($practitionerScope&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
+        $term=trim((string)($query['q']??''));if(strlen($term)<2||strlen($term)>190)throw new ApiException(422,'validation_error','Search must contain between 2 and 190 characters.');
+        $sql="SELECT DISTINCT u.id,u.display_name,u.email,p.phone FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND u.status='active'";
+        $params=['clinic'=>$actor->clinicId];
+        if($practitionerScope){$sql.=" AND EXISTS(SELECT 1 FROM appointments a JOIN practitioners own ON own.id=a.practitioner_id WHERE a.client_id=u.id AND own.user_id=:user)";$params['user']=$actor->userId;}
+        $escaped='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';$sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR p.phone LIKE :phone ESCAPE '!') ORDER BY u.display_name,u.id LIMIT 26";$params+=['name'=>$escaped,'email'=>$escaped,'phone'=>$escaped];
+        $statement=$this->database->connection()->prepare($sql);$statement->execute($params);$rows=$statement->fetchAll();$more=count($rows)>25;
+        return ['items'=>array_slice($rows,0,25),'has_more'=>$more];
+    }
+
+    public function updateAvailability(AuthContext $actor,int $id,array $query): array
+    {
+        $appointment=$this->appointment($actor,$id,false);$this->assertManage($actor,$appointment);
+        return (new AvailabilityService($this->database))->search([
+            'delivery_mode'=>$appointment['delivery_mode'],'service_id'=>$appointment['service_id'],'practitioner_id'=>$appointment['practitioner_id'],'location_id'=>$appointment['location_id'],
+            'date_from'=>$query['date_from']??null,'date_to'=>$query['date_to']??null,
+        ],$id);
+    }
+
+    public function update(AuthContext $actor,int $id,array $body,string $correlationId): array
+    {
+        $action=$body['action']??'';if(!in_array($action,['reschedule','cancel'],true))throw new ApiException(422,'validation_error','Select reschedule or cancel.');
+        $version=(int)($body['version']??0);if($version<1)throw new ApiException(422,'validation_error','version is required.',['version'=>'Required']);
+        $reason=trim((string)($body['reason']??''));if(strlen($reason)>1000)throw new ApiException(422,'validation_error','Reason must be at most 1000 characters.');
+        $requested=null;if($action==='reschedule'){if(empty($body['starts_at']))throw new ApiException(422,'validation_error','starts_at is required.',['starts_at'=>'Required']);$requested=BookingRequest::timestamp($body['starts_at'])->setTimezone(new DateTimeZone('UTC'));}
+        $pdo=$this->database->connection();
+        try{
+            $pdo->beginTransaction();$lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $appointment=$this->appointment($actor,$id,true);$this->assertManage($actor,$appointment);
+            if((int)$appointment['version']!==$version){
+                $replayed=(int)$appointment['version']===$version+1&&(($action==='cancel'&&$appointment['status']==='canceled_by_clinic')||($action==='reschedule'&&$appointment['status']==='rescheduled'&&(new DateTimeImmutable($appointment['starts_at'],new DateTimeZone('UTC')))->getTimestamp()===$requested?->getTimestamp()));
+                if($replayed){$pdo->commit();return $appointment;}throw new ApiException(409,'appointment_changed','This appointment changed. Refresh it before making another change.');
+            }
+            if(!in_array($appointment['status'],['requested','confirmed','rescheduled'],true))throw new ApiException(409,'appointment_not_editable','This appointment can no longer be changed.');
+            if(new DateTimeImmutable($appointment['ends_at'],new DateTimeZone('UTC'))<=new DateTimeImmutable('now',new DateTimeZone('UTC')))throw new ApiException(409,'appointment_not_editable','Past appointments cannot be rescheduled or canceled.');
+            $from=$appointment['status'];
+            if($action==='cancel'){
+                $statement=$pdo->prepare("UPDATE appointments SET status='canceled_by_clinic',version=version+1 WHERE id=:id AND version=:version");$statement->execute(['id'=>$id,'version'=>$version]);
+                $this->history($id,$from,'canceled_by_clinic',$actor->userId,$reason);$event='booking_cancellation';$audit='appointment.cancel';
+            }else{
+                $location=$pdo->prepare('SELECT timezone FROM locations WHERE id=:id AND clinic_id=:clinic AND is_bookable=1');$location->execute(['id'=>$appointment['location_id'],'clinic'=>$actor->clinicId]);$timezone=$location->fetchColumn();if(!$timezone)throw new ApiException(422,'invalid_location','The appointment location is unavailable.');
+                $date=$requested->setTimezone(new DateTimeZone($timezone))->format('Y-m-d');$availability=(new AvailabilityService($this->database))->search(['delivery_mode'=>$appointment['delivery_mode'],'service_id'=>$appointment['service_id'],'practitioner_id'=>$appointment['practitioner_id'],'location_id'=>$appointment['location_id'],'date_from'=>$date,'date_to'=>$date],$id);
+                $slot=null;foreach($availability['availability'] as $candidate)if((int)$candidate['duration_option_id']===(int)$appointment['duration_option_id']&&(new DateTimeImmutable($candidate['starts_at']))->getTimestamp()===$requested->getTimestamp()){$slot=$candidate;break;}
+                if(!$slot)throw new ApiException(409,'schedule_conflict','The requested time is no longer bookable. Refresh availability and choose another time.');
+                $roomId=array_key_exists('room_id',$body)&&$body['room_id']!==null?(int)$body['room_id']:null;
+                if($appointment['room_id']!==null){if(!$roomId)throw new ApiException(422,'validation_error','room_id is required for this appointment.',['room_id'=>'Required']);if(!in_array($roomId,$slot['available_room_ids'],true))throw new ApiException(409,'room_conflict','The selected room is unavailable or unsuitable.');}elseif($roomId!==null)throw new ApiException(422,'validation_error','This appointment does not use a room.');
+                $newEnd=(new DateTimeImmutable($slot['ends_at']))->setTimezone(new DateTimeZone('UTC'));$oldStart=new DateTimeImmutable($appointment['starts_at'],new DateTimeZone('UTC'));$oldEnd=new DateTimeImmutable($appointment['ends_at'],new DateTimeZone('UTC'));$oldBufferStart=new DateTimeImmutable($appointment['buffer_starts_at'],new DateTimeZone('UTC'));$oldBufferEnd=new DateTimeImmutable($appointment['buffer_ends_at'],new DateTimeZone('UTC'));$before=max(0,$oldStart->getTimestamp()-$oldBufferStart->getTimestamp());$after=max(0,$oldBufferEnd->getTimestamp()-$oldEnd->getTimestamp());
+                $statement=$pdo->prepare("UPDATE appointments SET room_id=:room,starts_at=:starts,ends_at=:ends,buffer_starts_at=:buffer_start,buffer_ends_at=:buffer_end,status='rescheduled',version=version+1 WHERE id=:id AND version=:version");$statement->execute(['room'=>$roomId,'starts'=>$requested->format('Y-m-d H:i:s'),'ends'=>$newEnd->format('Y-m-d H:i:s'),'buffer_start'=>$requested->modify('-'.$before.' seconds')->format('Y-m-d H:i:s'),'buffer_end'=>$newEnd->modify('+'.$after.' seconds')->format('Y-m-d H:i:s'),'id'=>$id,'version'=>$version]);
+                $this->history($id,$from,'rescheduled',$actor->userId,$reason);$event='booking_change';$audit='appointment.reschedule';
+            }
+            $notify=$pdo->prepare("INSERT INTO notification_events(clinic_id,appointment_id,recipient_user_id,recipient_address,event_code,channel,status,scheduled_at,payload) SELECT :clinic,:appointment,u.id,u.email,:event,'email','queued',UTC_TIMESTAMP(),JSON_OBJECT('appointment_id',:payload_id) FROM users u WHERE u.id=:client");$notify->execute(['clinic'=>$actor->clinicId,'appointment'=>$id,'event'=>$event,'payload_id'=>$id,'client'=>$appointment['client_id']]);
+            $this->audit->write($actor->clinicId,$actor,$correlationId,$audit,'appointment',$id,'success',$reason===''?[]:['reason'=>$reason]);$result=$this->appointment($actor,$id,false);$pdo->commit();return $result;
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
 
     public static function authorizeList(AuthContext $actor): void
@@ -103,8 +167,10 @@ final class BookingService
     public function list(AuthContext $actor,array $query=[]): array
     {
         self::authorizeList($actor);
-        $sql="SELECT a.delivery_mode,a.destination_snapshot,a.travel_buffer_minutes,a.base_price_cents,a.mobile_fee_cents,a.currency,a.id,a.client_id,a.practitioner_id,a.service_id,a.room_id,a.starts_at,a.ends_at,a.status,s.name service_name,u.display_name client_name,pu.display_name practitioner_name,l.name location_name,l.timezone,r.name room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN practitioners p ON p.id=a.practitioner_id JOIN users pu ON pu.id=p.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.clinic_id=:clinic";$params=['clinic'=>$actor->clinicId];
-        if($actor->userType==='client'){$sql.=' AND a.client_id=:user';$params['user']=$actor->userId;}elseif($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')){$sql.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user)';$params['user']=$actor->userId;}
+        $sql="SELECT a.delivery_mode,a.destination_snapshot,a.travel_buffer_minutes,a.base_price_cents,a.mobile_fee_cents,a.currency,a.id,a.client_id,a.practitioner_id,a.service_id,a.duration_option_id,a.room_id,a.starts_at,a.ends_at,a.status,a.version,s.name service_name,u.display_name client_name,pu.display_name practitioner_name,l.name location_name,l.timezone,r.name room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN practitioners p ON p.id=a.practitioner_id JOIN users pu ON pu.id=p.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.clinic_id=:clinic";$params=['clinic'=>$actor->clinicId];
+        $practitionerScope=($query['scope']??'')==='practitioner'||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception'));
+        if(($query['scope']??'')==='practitioner'&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
+        if($actor->userType==='client'){$sql.=' AND a.client_id=:user';$params['user']=$actor->userId;}elseif($practitionerScope){$sql.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user)';$params['user']=$actor->userId;}
         $view=$query['view']??'all';
         if(!in_array($view,['all','upcoming','past'],true))throw new ApiException(422,'validation_error','Invalid appointment view.');
         if($view==='upcoming')$sql.=' AND a.ends_at>=UTC_TIMESTAMP()';
@@ -116,8 +182,27 @@ final class BookingService
         return $rows;
     }
 
-    private function getById(AuthContext $actor,int $id): array
+    private function appointment(AuthContext $actor,int $id,bool $lock): array
     {
-        $statement=$this->database->connection()->prepare('SELECT id,client_id,practitioner_id,service_id,room_id,starts_at,ends_at,status,created_at FROM appointments WHERE id=:id AND clinic_id=:clinic');$statement->execute(['id'=>$id,'clinic'=>$actor->clinicId]);return $statement->fetch()?:[];
+        $statement=$this->database->connection()->prepare('SELECT id,clinic_id,location_id,client_id,practitioner_id,service_id,duration_option_id,room_id,delivery_mode,starts_at,ends_at,buffer_starts_at,buffer_ends_at,status,version,created_at FROM appointments WHERE id=:id AND clinic_id=:clinic'.($lock?' FOR UPDATE':''));$statement->execute(['id'=>$id,'clinic'=>$actor->clinicId]);$row=$statement->fetch();if(!$row)throw new ApiException(404,'appointment_not_found','Appointment not found.');return $row;
+    }
+
+    public static function authorizeChange(AuthContext $actor,bool $ownsPractitioner,string $bookingMode): void
+    {
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot change appointments.');
+        if($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')&&(!$ownsPractitioner||$bookingMode!=='practitioner_managed'))throw new ApiException(403,'forbidden','Practitioners can only change their own practitioner-managed appointments.');
+    }
+
+    private function getById(AuthContext $actor,int $id): array{return $this->appointment($actor,$id,false);}
+
+    private function assertManage(AuthContext $actor,array $appointment): void
+    {
+        $statement=$this->database->connection()->prepare('SELECT booking_mode FROM practitioners WHERE id=:practitioner AND user_id=:user AND active=1');$statement->execute(['practitioner'=>$appointment['practitioner_id'],'user'=>$actor->userId]);$mode=$statement->fetchColumn();
+        self::authorizeChange($actor,$mode!==false,(string)($mode?:''));
+    }
+
+    private function history(int $appointmentId,string $from,string $to,int $actorUserId,string $reason): void
+    {
+        $statement=$this->database->connection()->prepare('INSERT INTO appointment_status_history(appointment_id,from_status,to_status,actor_user_id,reason) VALUES(:appointment,:from_status,:to_status,:actor,:reason)');$statement->execute(['appointment'=>$appointmentId,'from_status'=>$from,'to_status'=>$to,'actor'=>$actorUserId,'reason'=>$reason===''?null:$reason]);
     }
 }

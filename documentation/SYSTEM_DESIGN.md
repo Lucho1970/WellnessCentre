@@ -310,14 +310,20 @@ and owner-tested on the development hosts. This is development evidence, not pro
 acceptance of all R1–R3 requirements; account recovery/linking, real client confirmation,
 communications and remaining authorization/privacy gates retain their own acceptance work.
 
-The next public-site slice is the R3 publishing foundation: inspect the existing service,
-practitioner and location schema; add only the publication fields, stable slugs and approved
-profile/content fields that are missing; expose allowlisted public projections; then build
-service and practitioner directory/detail routes with direct handoff to the existing booking
-flow. Deliver New Clients/FAQ/static resources after that foundation. Guided discovery,
-analytics and search metadata follow once the owner has approved the content taxonomy and
-measurement policy. Do not start reviews/testimonials or classes/workshops as part of this
-slice.
+Practitioner-scoped appointment creation, rescheduling and cancellation are implemented in
+source as the current R4 slice. Deploy and verify the signed-in practitioner, clinic-managed
+denial, MySQL conflict, exact-retry and notification-record scenarios in
+[Practitioner appointment management](PRACTITIONER_APPOINTMENTS.md) before extending its
+lifecycle scope.
+
+After that acceptance, the next public-site slice is the R3 publishing foundation: inspect
+the existing service, practitioner and location schema; add only the publication fields,
+stable slugs and approved profile/content fields that are missing; expose allowlisted public
+projections; then build service and practitioner directory/detail routes with direct handoff
+to the existing booking flow. Deliver New Clients/FAQ/static resources after that
+foundation. Guided discovery, analytics and search metadata follow once the owner has
+approved the content taxonomy and measurement policy. Do not start reviews/testimonials or
+classes/workshops as part of this slice.
 
 Before each later domain, refine its detailed endpoint/data/test design against stable
 requirement IDs. This document owns cross-system decisions; module runbooks can supply

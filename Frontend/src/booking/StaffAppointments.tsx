@@ -13,7 +13,7 @@ type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type Destination = { address_line1: string; address_line2: string; city: string; province: string; postal_code: string; country: string; instructions: string };
 function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
-type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_name: string | null; starts_at: string; ends_at: string; status: string };
+type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; coverage_confirmed: boolean; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
@@ -24,7 +24,7 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
   return [...new Map(rows.map(row => [String(row[key]), row])).values()];
 }
 
-export function StaffAppointments({ canBook }: { canBook: boolean }) {
+export function StaffAppointments({ canBook, practitionerMode = false }: { canBook: boolean; practitionerMode?: boolean }) {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -35,6 +35,7 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
   const [listError, setListError] = useState('');
   const [notice, setNotice] = useState('');
   const [creating, setCreating] = useState(false);
+  const [managing, setManaging] = useState<Appointment | null>(null);
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
     const response = await fetch(`${api}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
@@ -46,19 +47,20 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
   }, [getAccessToken, t]);
   useEffect(() => {
     const controller = new AbortController(); setListBusy(true); setListError('');
-    void request(`/appointments?view=${view}&page=${page}`, { signal: controller.signal })
+    void request(`/appointments?view=${view}&page=${page}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) setAppointments(data); })
       .catch(error => { if (!controller.signal.aborted) setListError(error.message); })
       .finally(() => { if (!controller.signal.aborted) setListBusy(false); });
     return () => controller.abort();
-  }, [request, view, page, refresh]);
+  }, [request, view, page, refresh, practitionerMode]);
   return <Stack spacing={3}>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between">
       <Box><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Times are shown in each clinic location’s timezone.')}</Typography></Box>
       {canBook && !creating && <Button variant="contained" startIcon={<CalendarPlus size={18} />} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-    {creating && <BookingForm request={request} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} practitionerMode={practitionerMode} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {managing && <ManageAppointment appointment={managing} request={request} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" gap={2} justifyContent="space-between" mb={2}>
         <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
@@ -73,6 +75,7 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
           {item.delivery_mode==='mobile'&&<><Chip label={t('At client location')} color="info" size="small"/><Typography>{addressText(item.destination_snapshot, t('Address unavailable'))}</Typography><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after',{minutes:item.travel_buffer_minutes})}</Typography></>}
           {item.base_price_cents!==null&&item.base_price_cents!==undefined&&<Typography variant="body2">{t('Treatment {{treatment}} + mobile fee {{mobile}} (before applicable taxes)', { treatment: formatCad(Number(item.base_price_cents), i18n.resolvedLanguage), mobile: formatCad(Number(item.mobile_fee_cents), i18n.resolvedLanguage) })}</Typography>}
           <Typography color="text.secondary">{item.practitioner_name} · {item.location_name}{item.room_name ? ` · ${item.room_name}` : ''} · #{item.id}</Typography>
+          {practitionerMode && ['requested','confirmed','rescheduled'].includes(item.status) && new Date(`${item.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now() && <Button size="small" onClick={() => { setCreating(false); setManaging(item); }}>{t('Change appointment')}</Button>}
         </Box>)}
         <Stack direction="row" justifyContent="space-between" alignItems="center"><Button disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}',{page})}</Typography><Button disabled={appointments.length < 50} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
       </Stack>}
@@ -80,8 +83,66 @@ export function StaffAppointments({ canBook }: { canBook: boolean }) {
   </Stack>;
 }
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; cancel: () => void; complete: (id: number) => void };
-function BookingForm({ request, cancel, complete }: FormProps) {
+type ManageProps = { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; close: () => void; complete: (message: string) => void };
+function ManageAppointment({ appointment, request, close, complete }: ManageProps) {
+  const { t, i18n } = useTranslation();
+  const appointmentDate = new Intl.DateTimeFormat('en-CA', { timeZone: appointment.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(`${appointment.starts_at.replace(' ', 'T')}Z`));
+  const [action, setAction] = useState<'choose'|'reschedule'|'cancel'>('choose');
+  const [date, setDate] = useState(appointmentDate);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [slot, setSlot] = useState<Slot | null>(null);
+  const [room, setRoom] = useState(appointment.room_id ? String(appointment.room_id) : '');
+  const [reason, setReason] = useState('');
+  const [searched, setSearched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const needsRoom = appointment.room_id !== null;
+  const loadSlots = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(''); setSlots([]); setSlot(null); setSearched(false);
+    try {
+      const data = await request(`/appointments/${appointment.id}/availability?date_from=${date}&date_to=${date}`);
+      setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(appointment.duration_option_id))); setSearched(true);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
+    finally { setBusy(false); }
+  };
+  const submit = async () => {
+    if (action === 'reschedule' && (!slot || (needsRoom && !room))) return;
+    setBusy(true); setError('');
+    try {
+      const body = action === 'cancel'
+        ? { action, version: Number(appointment.version), reason }
+        : { action, version: Number(appointment.version), starts_at: slot!.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), reason };
+      await request(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      complete(t(action === 'cancel' ? 'Appointment #{{id}} was canceled.' : 'Appointment #{{id}} was rescheduled.', { id: appointment.id }));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to change the appointment.')); }
+    finally { setBusy(false); }
+  };
+  return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2} mb={2}>
+      <Box><Typography variant="h5">{t('Change appointment #{{id}}', { id: appointment.id })}</Typography><Typography color="text.secondary">{appointment.client_name} · {appointment.service_name}</Typography></Box>
+      <Button disabled={busy} onClick={close}>{t('Close')}</Button>
+    </Stack>
+    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    {action === 'choose' && <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}><Button variant="contained" onClick={() => setAction('reschedule')}>{t('Reschedule')}</Button><Button color="error" variant="outlined" onClick={() => setAction('cancel')}>{t('Cancel appointment')}</Button></Stack>}
+    {action === 'reschedule' && <Stack spacing={2}>
+      <Typography>{t('Choose a new available time. The client, service, location, delivery mode, duration, and price remain unchanged.')}</Typography>
+      <Stack component="form" direction={{ xs: 'column', sm: 'row' }} gap={2} onSubmit={loadSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(appointment.timezone) }} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(null); setSearched(false); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
+      {searched && slots.length === 0 && <Alert severity="info">{t('No bookable times on this day. Try another day or check working hours and room assignments.')}</Alert>}
+      <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, appointment.timezone, i18n.resolvedLanguage)}</Button>)}</Stack>
+      {slot && needsRoom && <TextField select required label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(id => <MenuItem key={id} value={String(id)}>{id === Number(appointment.room_id) && appointment.room_name ? appointment.room_name : t('Room {{number}}', { number: id })}</MenuItem>)}</TextField>}
+      <TextField label={t('Reason or note (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
+      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('choose')}>{t('Back')}</Button><Button variant="contained" disabled={busy || !slot || (needsRoom && !room)} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm reschedule')}</Button></Stack>
+    </Stack>}
+    {action === 'cancel' && <Stack spacing={2}>
+      <Alert severity="warning">{t('Canceling releases the time and room. The appointment remains in history.')}</Alert>
+      <TextField label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
+      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('choose')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
+    </Stack>}
+  </Paper>;
+}
+
+type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; cancel: () => void; complete: (id: number) => void };
+function BookingForm({ request, practitionerMode, cancel, complete }: FormProps) {
   const { t, i18n } = useTranslation();
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
@@ -123,7 +184,7 @@ function BookingForm({ request, cancel, complete }: FormProps) {
   const practitionerRows = serviceRows.filter(row => String(row.practitioner_id) === practitioner);
   useEffect(() => {
     const controller = new AbortController();
-    void request('/booking-options', { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); } })
+    void request(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); } })
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [request]);
@@ -134,13 +195,13 @@ function BookingForm({ request, cancel, complete }: FormProps) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setClientBusy(true);
-      void request(`/clients?status=active&q=${encodeURIComponent(term)}`, { signal: controller.signal })
+      void request(`/booking-clients?q=${encodeURIComponent(term)}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
         .then(data => { if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); setClientSearched(true); } })
         .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : t('Unable to search clients.')); })
         .finally(() => { if (!controller.signal.aborted) setClientBusy(false); });
     }, 300);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [clientQuery, client, request]);
+  }, [clientQuery, client, request, practitionerMode, t]);
   useEffect(() => {
     if (!pending) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };

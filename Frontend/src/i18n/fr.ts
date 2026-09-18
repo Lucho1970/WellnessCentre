@@ -516,6 +516,20 @@ const fr: Record<string, string> = {
   'This account is not active.': 'Ce compte n’est pas actif.',
   'The access token is invalid or expired.': 'Le jeton d’accès est non valide ou expiré.',
   'Portal navigation': 'Navigation du portail',
+  'Change appointment': 'Modifier le rendez-vous',
+  'Change appointment #{{id}}': 'Modifier le rendez-vous no {{id}}',
+  'Reschedule': 'Reporter',
+  'Cancel appointment': 'Annuler le rendez-vous',
+  'Choose a new available time. The client, service, location, delivery mode, duration, and price remain unchanged.': 'Choisissez une nouvelle heure disponible. Le client, le service, le lieu, le mode de prestation, la durée et le prix demeurent inchangés.',
+  'Reason or note (optional)': 'Motif ou note (facultatif)',
+  'Confirm reschedule': 'Confirmer le report',
+  'Canceling releases the time and room. The appointment remains in history.': 'L’annulation libère l’heure et la salle. Le rendez-vous demeure dans l’historique.',
+  'Cancellation reason (optional)': 'Motif de l’annulation (facultatif)',
+  'Confirm cancellation': 'Confirmer l’annulation',
+  'Appointment #{{id}} was canceled.': 'Le rendez-vous no {{id}} a été annulé.',
+  'Appointment #{{id}} was rescheduled.': 'Le rendez-vous no {{id}} a été reporté.',
+  'Unable to change the appointment.': 'Impossible de modifier le rendez-vous.',
+  'Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.': 'Utilisez le menu du portail pour accéder aux outils associés à votre rôle. Les administrateurs et la réception peuvent gérer les rendez-vous de la clinique; les praticiens autonomes peuvent réserver, reporter et annuler leurs propres rendez-vous.',
 };
 
 export default fr;

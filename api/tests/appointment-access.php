@@ -15,6 +15,12 @@ foreach([['staff',[]],['staff',['accounting']],['unknown',['super_admin']]] as [
     try{BookingService::authorizeList(new AuthContext(1,1,'','','',$type,$roles));throw new RuntimeException('Appointment listing accepted an unauthorized actor.');}
     catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}
 }
+foreach(['super_admin','clinic_admin','reception'] as $role){BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',[$role]),false,'');$checks++;}
+BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',['practitioner']),true,'practitioner_managed');$checks++;
+foreach([[false,'practitioner_managed'],[true,'clinic_managed']] as [$owns,$mode]){
+    try{BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',['practitioner']),$owns,$mode);throw new RuntimeException('Practitioner changed an unauthorized appointment.');}
+    catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}
+}
 // The booking form uses the client-directory boundary: practitioner listing access must not grant directory access.
 try{ClientService::authorize(new AuthContext(1,1,'','','','staff',['practitioner']));throw new RuntimeException('Practitioner gained client-directory access.');}
 catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}

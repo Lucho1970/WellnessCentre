@@ -14,7 +14,7 @@ final class AvailabilityService
 {
     public function __construct(private readonly Database $database) {}
 
-    public function search(array $query): array
+    public function search(array $query,?int $excludeAppointmentId=null): array
     {
         $mode=Delivery::mode($query);
         $serviceId=(int)($query['service_id']??0); $practitionerId=(int)($query['practitioner_id']??0); $locationId=(int)($query['location_id']??0);
@@ -46,8 +46,8 @@ final class AvailabilityService
                     $slotEnd=$cursor->setTimestamp($cursor->getTimestamp()+(int)$option['duration_minutes']*60);
                     $utcStart=$cursor->setTimezone(new DateTimeZone('UTC'));$utcEnd=$slotEnd->setTimezone(new DateTimeZone('UTC'));
                     $bufferStart=$utcStart->modify('-'.((int)$option['buffer_before_minutes']+$terms['travel']).' minutes');$bufferEnd=$utcEnd->modify('+'.((int)$option['buffer_after_minutes']+$terms['travel']).' minutes');
-                    if($utcStart>=$now->modify('+'.$option['lead_time_minutes'].' minutes')&&$utcStart<=$now->modify('+'.$option['booking_horizon_days'].' days')&&$bufferStart>=(new DateTimeImmutable($day->format('Y-m-d').' '.$rule['start_time'],$timezone))&&$bufferEnd<=$end&&!$this->blocked($practitionerId,$locationId,$bufferStart,$bufferEnd)){
-                        $rooms=$terms['requires_room']?$this->rooms($serviceId,$practitionerId,$locationId,$bufferStart,$bufferEnd):[];
+                    if($utcStart>=$now->modify('+'.$option['lead_time_minutes'].' minutes')&&$utcStart<=$now->modify('+'.$option['booking_horizon_days'].' days')&&$bufferStart>=(new DateTimeImmutable($day->format('Y-m-d').' '.$rule['start_time'],$timezone))&&$bufferEnd<=$end&&!$this->blocked($practitionerId,$locationId,$bufferStart,$bufferEnd,$excludeAppointmentId)){
+                        $rooms=$terms['requires_room']?$this->rooms($serviceId,$practitionerId,$locationId,$bufferStart,$bufferEnd,$excludeAppointmentId):[];
                         if(!$terms['requires_room']||$rooms)$slots[$option['duration_option_id'].':'.$utcStart->getTimestamp()]=['duration_option_id'=>(int)$option['duration_option_id'],'starts_at'=>$cursor->format(DATE_ATOM),'ends_at'=>$slotEnd->format(DATE_ATOM),'available_room_ids'=>$rooms];
                     }
                     $cursor=$cursor->setTimestamp($cursor->getTimestamp()+900);
@@ -69,25 +69,26 @@ final class AvailabilityService
         return ScheduleIntervals::merge($rules);
     }
 
-    private function rooms(int $serviceId,int $practitionerId,int $locationId,DateTimeImmutable $start,DateTimeImmutable $end): array
+    private function rooms(int $serviceId,int $practitionerId,int $locationId,DateTimeImmutable $start,DateTimeImmutable $end,?int $excludeAppointmentId=null): array
     {
         $sql="SELECT r.id FROM rooms r WHERE r.location_id=:l AND r.is_bookable=1
             AND NOT EXISTS(SELECT 1 FROM room_practitioner_restrictions x WHERE x.room_id=r.id AND x.practitioner_id=:p AND x.allowed=0)
             AND NOT EXISTS(SELECT 1 FROM service_room_capability_requirements req WHERE req.service_id=:s AND NOT EXISTS(SELECT 1 FROM room_capability_assignments a WHERE a.room_id=r.id AND a.capability_id=req.capability_id))
-            AND NOT EXISTS(SELECT 1 FROM appointments a WHERE a.room_id=r.id AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.buffer_starts_at<DATE_ADD(:end,INTERVAL r.turnover_minutes MINUTE) AND DATE_ADD(a.buffer_ends_at,INTERVAL r.turnover_minutes MINUTE)>:start) ORDER BY r.id";
-        $statement=$this->database->connection()->prepare($sql);$statement->execute(['l'=>$locationId,'p'=>$practitionerId,'s'=>$serviceId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')]);return array_map('intval',$statement->fetchAll(\PDO::FETCH_COLUMN));
+            AND NOT EXISTS(SELECT 1 FROM appointments a WHERE a.room_id=r.id AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.buffer_starts_at<DATE_ADD(:end,INTERVAL r.turnover_minutes MINUTE) AND DATE_ADD(a.buffer_ends_at,INTERVAL r.turnover_minutes MINUTE)>:start".($excludeAppointmentId!==null?' AND a.id<>:exclude':'').") ORDER BY r.id";
+        $params=['l'=>$locationId,'p'=>$practitionerId,'s'=>$serviceId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];if($excludeAppointmentId!==null)$params['exclude']=$excludeAppointmentId;
+        $statement=$this->database->connection()->prepare($sql);$statement->execute($params);return array_map('intval',$statement->fetchAll(\PDO::FETCH_COLUMN));
     }
 
-    private function blocked(int $practitionerId,int $locationId,DateTimeImmutable $start,DateTimeImmutable $end): bool
+    private function blocked(int $practitionerId,int $locationId,DateTimeImmutable $start,DateTimeImmutable $end,?int $excludeAppointmentId=null): bool
     {
         $pdo=$this->database->connection();$params=['p'=>$practitionerId,'l'=>$locationId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];
         $queries=[
-            "SELECT 1 FROM appointments WHERE practitioner_id=:p AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start LIMIT 1",
+            "SELECT 1 FROM appointments WHERE practitioner_id=:p AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start".($excludeAppointmentId!==null?' AND id<>:exclude':'')." LIMIT 1",
             "SELECT 1 FROM time_off WHERE practitioner_id=:p AND starts_at<:end AND ends_at>:start LIMIT 1",
             "SELECT 1 FROM availability_overrides WHERE practitioner_id=:p AND location_id=:l AND override_type='blocked' AND starts_at<:end AND ends_at>:start LIMIT 1",
             "SELECT 1 FROM imported_calendar_entries WHERE practitioner_id=:p AND blocks_booking=1 AND starts_at<:end AND ends_at>:start LIMIT 1",
         ];
-        foreach($queries as $sql){$statement=$pdo->prepare($sql);$used=str_contains($sql,'location_id')?$params:array_diff_key($params,['l'=>true]);$statement->execute($used);if($statement->fetchColumn())return true;} return false;
+        foreach($queries as $sql){$statement=$pdo->prepare($sql);$used=str_contains($sql,'location_id')?$params:array_diff_key($params,['l'=>true]);if(str_contains($sql,':exclude'))$used['exclude']=$excludeAppointmentId;$statement->execute($used);if($statement->fetchColumn())return true;} return false;
     }
 
     private function date(string $value,string $field): DateTimeImmutable
