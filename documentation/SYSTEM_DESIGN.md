@@ -73,7 +73,7 @@ Current libraries include React 19, TypeScript, Vite, MUI, Lucide, date-fns and 
 
 | Surface | Target paths | Access and behavior |
 | --- | --- | --- |
-| Public | `/`, `/services`, `/practitioners`, `/resources`, `/about`, `/contact`, `/book` | Anonymous sanitized content/discovery; no operational dashboard |
+| Public | `/`, `/services`, `/services/:slug`, `/practitioners`, `/practitioners/:slug`, `/new-clients`, `/faq`, `/resources`, `/resources/:slug`, `/about`, `/locations`, `/contact`, `/book` | Anonymous published content/discovery; no operational dashboard. Conditions/goals routes are enabled only for reviewed non-diagnostic content. |
 | Portal entry | `/login`, provider callback routes, workspace selection | Choose staff/customer flow; authenticated return path must be allowlisted |
 | Client | `/client`, `/client/appointments`, `/client/book`, `/client/forms`, `/client/messages`, `/client/invoices`, `/client/profile` | Own records; show only released routes |
 | Practitioner | `/practitioner`, `/practitioner/schedule`, `/practitioner/clients`, `/practitioner/notes`, `/practitioner/availability`, related messages/reports/profile | Active practitioner and authorized care relationships |
@@ -82,6 +82,20 @@ Current libraries include React 19, TypeScript, Vite, MUI, Lucide, date-fns and 
 Portal initialization waits for identity initialization, obtains a token for the chosen API, calls the authenticated current-user endpoint and receives server-derived roles/scopes/personas. Pick an eligible remembered workspace, otherwise present a chooser or safe default. Route guards improve UX; every API call independently checks authorization. Handle forbidden, inactive/unlinked account, expired identity and unavailable API separately.
 
 On public-to-portal booking navigation, transfer only service/practitioner/location/duration/date preferences. Avoid personal data in URLs; allowlist return paths to prevent open redirects. A slot selection is advisory. Re-fetch availability and a server quote after login. Never move tokens between domains through query strings, fragments, localStorage copying or postMessage shortcuts.
+
+Public service, practitioner, location and facility views use dedicated allowlisted
+projections from the same catalogue records that drive booking. Publication state and
+stable slugs are explicit; internal notes, personal contact data, raw calendar entries,
+private addresses and operational-only fields never enter a public serializer. Curated
+New Clients, FAQ and resource content may remain version-controlled initially. Do not
+introduce a CMS until editing roles, review/publishing state, localization, media handling
+and audit requirements justify it.
+
+Public media stores consent/provenance, alt text, crop/variant metadata and publication
+state; serve optimized responsive formats while preserving a controlled original outside
+the public document root. Conversion events use an allowlist of non-sensitive event names
+and coarse page/flow context. Do not send search terms about health goals, identity,
+addresses, form answers, tokens, appointment details or free text to analytics providers.
 
 Dedicated callback behavior must match the chosen identity SDK; do not allow the general router to consume/rewrite authorization responses before processing. Test popup and redirect flows under real production-style headers. Public and portal deep-link refreshes need separate SPA fallbacks; `/api/*` must never fall back to frontend HTML.
 
@@ -291,6 +305,20 @@ Stage gates follow R0–R9 in Master Requirements. Keep deployment acceptance se
 | Database remains schedule authority | Retained; all conflicting writers must join lock protocol |
 | Existing phases are not erased | Mapped to R stages; code-complete and production-accepted remain distinct |
 
-**R1 foundations are implemented in source; hosted acceptance is next.** Configure the chosen portal subdomain, callback and CORS; build/upload both surfaces and verify existing staff workflows. This extraction requires no SQL migration. Keep customer auth as a separate R2 proof/implementation branch; the client route is currently an explicit unavailable-information page, not an authenticated customer portal.
+The public/portal split, staff sign-in, customer sign-in and language handoff are implemented
+and owner-tested on the development hosts. This is development evidence, not production
+acceptance of all R1–R3 requirements; account recovery/linking, real client confirmation,
+communications and remaining authorization/privacy gates retain their own acceptance work.
 
-Before implementing R2–R3, resolve the remaining decisions in Master Requirements and the provider/account-claim/session proof. Provider sequencing and separate role permissions are already confirmed. Before each later domain, refine its detailed endpoint/data/test design against stable requirement IDs. This document owns cross-system decisions; module runbooks can supply procedural details without becoming a third master specification.
+The next public-site slice is the R3 publishing foundation: inspect the existing service,
+practitioner and location schema; add only the publication fields, stable slugs and approved
+profile/content fields that are missing; expose allowlisted public projections; then build
+service and practitioner directory/detail routes with direct handoff to the existing booking
+flow. Deliver New Clients/FAQ/static resources after that foundation. Guided discovery,
+analytics and search metadata follow once the owner has approved the content taxonomy and
+measurement policy. Do not start reviews/testimonials or classes/workshops as part of this
+slice.
+
+Before each later domain, refine its detailed endpoint/data/test design against stable
+requirement IDs. This document owns cross-system decisions; module runbooks can supply
+procedural details without becoming a third master specification.

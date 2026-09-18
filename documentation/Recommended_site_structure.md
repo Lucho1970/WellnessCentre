@@ -1,5 +1,11 @@
 # What the Best Wellness Sites Do Well
 
+Status: supporting public-experience guidance, reviewed 18 September 2026. The accepted
+requirements and delivery sequencing are incorporated into
+[Master Requirements](MASTER_REQUIREMENTS.md); technical boundaries are incorporated into
+[System Design](SYSTEM_DESIGN.md). If this guidance conflicts with either authoritative
+document, those documents govern.
+
 ## 1. Put Booking Everywhere
 
 The strongest sites do not make users hunt for scheduling. They commonly place a **Book appointment** or **Schedule consultation** button:
