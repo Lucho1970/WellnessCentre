@@ -769,6 +769,18 @@ const fr: Record<string, string> = {
   "{{before}} min before · {{after}} min after": "{{before}} min avant · {{after}} min après",
   "Allowed": "Autorisé",
   "Not allowed": "Non autorisé",
+  "Practitioners & locations": "Praticiens et emplacements",
+  "Current assignments": "Affectations actuelles",
+  "These locations and practitioners determine where and how this service can be booked.": "Ces emplacements et praticiens déterminent où et comment ce service peut être réservé.",
+  "Edit assignments": "Modifier les affectations",
+  "Add assignment": "Ajouter une affectation",
+  "This service has no current assignments and cannot be booked.": "Ce service n’a aucune affectation actuelle et ne peut pas être réservé.",
+  "Unknown location": "Emplacement inconnu",
+  "No base locations assigned.": "Aucun emplacement de base attribué.",
+  "Unknown practitioner": "Praticien inconnu",
+  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} mobile fee": "Rayon de {{radius}} km · {{minutes}} min de déplacement dans chaque sens · frais mobiles de {{fee}}",
+  "Not set": "Non défini",
+  "No practitioners assigned.": "Aucun praticien attribué.",
 };
 
 export default fr;

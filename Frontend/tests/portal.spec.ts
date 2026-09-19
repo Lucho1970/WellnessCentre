@@ -179,7 +179,10 @@ test("services use a list-first command bar and selected services can be assigne
         data = services;
       }
     } else if (path.endsWith("/service-assignments"))
-      data = { practitioners: [], locations: [] };
+      data = {
+        practitioners: [{ practitioner_id: 3, service_id: 1, active: 1, offers_mobile: 1, offers_clinic: 0, mobile_radius_km: 25, travel_buffer_minutes: 30, mobile_fee_cents: 1500 }],
+        locations: [{ service_id: 1, location_id: 1, active: 1 }],
+      };
     else if (path.endsWith("/locations"))
       data = [{ id: 1, name: "Test location" }];
     else if (path.endsWith("/practitioners"))
@@ -198,6 +201,12 @@ test("services use a list-first command bar and selected services can be assigne
   await expect(page.getByText("Service details", { exact: true })).toBeVisible();
   await expect(page.getByText("60 min — $100.00", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("button", { name: "Practitioners & locations", exact: true }).click();
+  await expect(page.getByText("Current assignments", { exact: true })).toBeVisible();
+  await expect(page.getByText("Test location", { exact: true })).toBeVisible();
+  await expect(page.getByText("Test Therapist", { exact: true })).toBeVisible();
+  await expect(page.getByText(/25 km radius.*30 min travel each way.*\$15\.00 mobile fee/)).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "New service", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Service name", exact: true })
@@ -215,7 +224,9 @@ test("services use a list-first command bar and selected services can be assigne
     { minutes: 90, price_cents: 16500 },
   ]);
   await page.getByRole("button", { name: /New massage.*120\.00/ }).click();
-  await page.getByRole("button", { name: "Assignments", exact: true }).click();
+  await page.getByRole("button", { name: "Practitioners & locations", exact: true }).click();
+  await expect(page.getByText("This service has no current assignments and cannot be booked.")).toBeVisible();
+  await page.getByRole("button", { name: "Add assignment", exact: true }).click();
   await expect(page.getByRole("combobox", { name: /^Service / })).toHaveText("New massage");
   await expect(page.getByRole("combobox", { name: /^Service / })).toBeDisabled();
   await page

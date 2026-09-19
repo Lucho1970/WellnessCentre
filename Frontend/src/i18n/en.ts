@@ -742,6 +742,18 @@ const en = {
   "{{before}} min before · {{after}} min after": "{{before}} min before · {{after}} min after",
   "Allowed": "Allowed",
   "Not allowed": "Not allowed",
+  "Practitioners & locations": "Practitioners & locations",
+  "Current assignments": "Current assignments",
+  "These locations and practitioners determine where and how this service can be booked.": "These locations and practitioners determine where and how this service can be booked.",
+  "Edit assignments": "Edit assignments",
+  "Add assignment": "Add assignment",
+  "This service has no current assignments and cannot be booked.": "This service has no current assignments and cannot be booked.",
+  "Unknown location": "Unknown location",
+  "No base locations assigned.": "No base locations assigned.",
+  "Unknown practitioner": "Unknown practitioner",
+  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} mobile fee": "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} mobile fee",
+  "Not set": "Not set",
+  "No practitioners assigned.": "No practitioners assigned.",
 } as const;
 
 export default en;

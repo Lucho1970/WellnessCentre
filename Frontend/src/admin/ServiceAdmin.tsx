@@ -128,7 +128,7 @@ export function ServiceAdmin() {
         <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: 0.5 }}/>
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
         <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
-        <Button startIcon={<Settings2 size={17}/>} disabled={!selected} onClick={() => openAssignments()}>{t('Assignments')}</Button>
+        <Button startIcon={<Settings2 size={17}/>} disabled={!selected} onClick={() => openAssignments()}>{t('Practitioners & locations')}</Button>
         <TextField size="small" label={t('Filter services')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
       </Stack>
     </Paper>
@@ -164,7 +164,7 @@ export function ServiceAdmin() {
     </Drawer>
 
     <Dialog open={assignmentServiceId !== null} onClose={closeAssignments} fullWidth maxWidth="lg">
-      <DialogTitle>{t('Service assignments')}</DialogTitle>
+      <DialogTitle>{t('Practitioners & locations')}</DialogTitle>
       <DialogContent dividers>{assignmentServiceId !== null && <ServiceAssignments initialServiceId={assignmentServiceId} lockService onDirtyChange={setAssignmentsDirty}/>}</DialogContent>
       <DialogActions><Button onClick={closeAssignments}>{t('Close')}</Button></DialogActions>
     </Dialog>
@@ -186,7 +186,7 @@ function ServiceDetails({ service, options, money, edit, assignments }: { servic
     {service.description && <Box><Typography variant="overline" color="text.secondary">{t('Description')}</Typography><Typography>{service.description}</Typography></Box>}
     <Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack>
     {service.preparation_instructions && <Box><Typography variant="overline" color="text.secondary">{t('Preparation instructions')}</Typography><Typography>{service.preparation_instructions}</Typography></Box>}
-    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><Button variant="outlined" startIcon={<Settings2 size={17}/>} onClick={assignments}>{t('Assignments')}</Button></Stack>
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><Button variant="outlined" startIcon={<Settings2 size={17}/>} onClick={assignments}>{t('Practitioners & locations')}</Button></Stack>
   </Stack>;
 }
 
