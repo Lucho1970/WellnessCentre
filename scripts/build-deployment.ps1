@@ -68,6 +68,7 @@ Write-DeploymentZip $portalStage (Join-Path $destination 'wellness-portal.zip')
 Write-DeploymentZip $private (Join-Path $destination 'wellness-api-private.zip')
 Write-DeploymentZip (Join-Path $repo 'api/deploy/netfirms/public') (Join-Path $destination 'wellness-api-public.zip')
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/migrations') -Destination (Join-Path $destination 'sql-updates') -Recurse
+Copy-Item -LiteralPath (Join-Path $repo 'api/database/maintenance') -Destination (Join-Path $destination 'sql-maintenance') -Recurse
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
 $manifest = [ordered]@{ source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-and-portal'; deployment_guide='documentation/PORTAL_SEPARATION.md'; archives=@() }

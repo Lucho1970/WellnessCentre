@@ -12,6 +12,24 @@ SELECT 'service_categories', id, name FROM service_categories WHERE BINARY name 
 UNION ALL
 SELECT 'services', id, name FROM services WHERE BINARY name = BINARY 'Remote';
 
+-- Review free-text uses separately. These are never changed automatically,
+-- because "remote" may correctly describe virtual care or unrelated notes.
+SELECT 'rooms' AS source_table, id, name AS record_name,
+       CONCAT_WS(' | ', room_type, equipment_notes) AS matched_text
+FROM rooms
+WHERE LOWER(COALESCE(room_type, '')) LIKE '%remote%'
+   OR LOWER(COALESCE(equipment_notes, '')) LIKE '%remote%'
+UNION ALL
+SELECT 'service_categories', id, name, description
+FROM service_categories
+WHERE LOWER(COALESCE(description, '')) LIKE '%remote%'
+UNION ALL
+SELECT 'services', id, name,
+       CONCAT_WS(' | ', description, preparation_instructions)
+FROM services
+WHERE LOWER(COALESCE(description, '')) LIKE '%remote%'
+   OR LOWER(COALESCE(preparation_instructions, '')) LIKE '%remote%';
+
 -- Each update skips a row when "On-Site" already exists in the same unique
 -- naming scope. Resolve any skipped duplicate manually instead of merging it.
 UPDATE locations legacy
