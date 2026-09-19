@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Checkbox, Divider, FormControlLabel, Stack, TextField, Typography } from '@mui/material';
 import { portalLink } from '../shared/urls';
 import { useTranslation } from 'react-i18next';
+import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 type Invitation = { id: number; expires_at: string; revoked_at: string | null; consumed_at: string | null; claim_status: string | null; claimant_name: string | null };
 export function ClientInvitations({ clientId, request }: { clientId: number; request: (path: string, init?: RequestInit) => Promise<any> }) {
@@ -10,6 +11,7 @@ export function ClientInvitations({ clientId, request }: { clientId: number; req
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [link, setLink] = useState('');
   const [code, setCode] = useState(''), [verified, setVerified] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  useUnsavedChanges(code.trim() !== '' || verified);
   useEffect(() => {
     const controller = new AbortController(); setReady(false); setError('');
     void request(`/${clientId}/invitations`, { signal: controller.signal }).then(data => {

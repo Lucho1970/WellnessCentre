@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useStaffAuth } from "../auth/AuthProvider";
 import { apiErrorMessage } from "../shared/api";
 import { formatDateTime } from "../i18n/format";
+import { useUnsavedForm } from "../shared/UnsavedChanges";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
@@ -40,6 +41,7 @@ export function ScheduleExceptions() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const { markDirty, markClean } = useUnsavedForm();
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +88,7 @@ export function ScheduleExceptions() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t("Unable to save schedule change.")));
+      markClean();
       setSaved(t(kind === "override" ? "Availability override added." : "Time off added."));
       await load();
     } catch (cause) {
@@ -108,7 +111,7 @@ export function ScheduleExceptions() {
   const selectedLocation = locations.find((location) => String(location.id) === form.location_id);
   const showUtc = (value: string) => formatDateTime(`${value.replace(" ", "T")}Z`, i18n.resolvedLanguage, { dateStyle: "medium", timeStyle: "short" });
   return <Stack spacing={3} mt={3}>
-    <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: 3 }}>
+    <Paper component="form" onSubmit={submit} onChange={markDirty} variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" spacing={1.5} alignItems="center"><CalendarOff color="#176b62"/><Typography variant="h5">{t("Schedule changes and time off")}</Typography></Stack>
       <Typography color="text.secondary" mt={1}>{t("Add a one-time opening, blocked period, vacation, illness, or personal absence. Enter times in {{timezone}}.", { timezone: selectedLocation?.timezone ?? t("the selected location's timezone") })}</Typography>
       <Grid container spacing={2} mt={1}>

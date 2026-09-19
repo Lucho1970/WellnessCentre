@@ -1,33 +1,339 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Alert, Button, FormControlLabel, Grid, Paper, Stack, Switch, TextField, Typography } from '@mui/material';
-import { MapPin, Pencil, Plus, Save, X } from 'lucide-react';
-import { useStaffAuth } from '../auth/AuthProvider';
-import { useTranslation } from 'react-i18next';
-import { apiErrorMessage } from '../shared/api';
-import { AddressEntry } from '../shared/AddressEntry';
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  Alert,
+  Button,
+  FormControlLabel,
+  Grid,
+  Paper,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { MapPin, Pencil, Plus, Save, X } from "lucide-react";
+import { useStaffAuth } from "../auth/AuthProvider";
+import { useTranslation } from "react-i18next";
+import { apiErrorMessage } from "../shared/api";
+import { AddressEntry } from "../shared/AddressEntry";
+import { useUnsavedForm } from "../shared/UnsavedChanges";
 
-const apiBaseUrl=import.meta.env.VITE_API_BASE_URL??'http://localhost:8080/api/v1';
-type Location={id:number;name:string;timezone:string;address_line1:string|null;address_line2:string|null;city:string|null;province:string|null;postal_code:string|null;phone:string|null;is_bookable:number|boolean};
-type LocationForm={name:string;timezone:string;address_line1:string;address_line2:string;city:string;province:string;postal_code:string;phone:string;is_bookable:boolean};
-const emptyForm:LocationForm={name:'',timezone:'America/Toronto',address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',phone:'',is_bookable:true};
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
+type Location = {
+  id: number;
+  name: string;
+  timezone: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  province: string | null;
+  postal_code: string | null;
+  phone: string | null;
+  is_bookable: number | boolean;
+};
+type LocationForm = {
+  name: string;
+  timezone: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  province: string;
+  postal_code: string;
+  phone: string;
+  is_bookable: boolean;
+};
+const emptyForm: LocationForm = {
+  name: "",
+  timezone: "America/Toronto",
+  address_line1: "",
+  address_line2: "",
+  city: "",
+  province: "Ontario",
+  postal_code: "",
+  phone: "",
+  is_bookable: true,
+};
 
-export function LocationAdmin(){
-  const {t}=useTranslation();
-  const {getAccessToken}=useStaffAuth();const [locations,setLocations]=useState<Location[]>([]);const [form,setForm]=useState<LocationForm>(emptyForm);const [editingId,setEditingId]=useState<number|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [saved,setSaved]=useState('');
-  const load=useCallback(async()=>{setBusy(true);setError('');try{const token=await getAccessToken();const response=await fetch(`${apiBaseUrl}/admin/locations`,{headers:{Authorization:`Bearer ${token}`}});const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to load locations.')));setLocations(body.data);}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to load locations.'));}finally{setBusy(false);}},[getAccessToken,t]);
-  useEffect(()=>{void load();},[load]);
-  const field=<K extends keyof LocationForm>(name:K,value:LocationForm[K])=>setForm(current=>({...current,[name]:value}));
-  const edit=(location:Location)=>{setEditingId(location.id);setForm({name:location.name,timezone:location.timezone,address_line1:location.address_line1??'',address_line2:location.address_line2??'',city:location.city??'',province:location.province??'',postal_code:location.postal_code??'',phone:location.phone??'',is_bookable:Boolean(Number(location.is_bookable))});setError('');setSaved('');};
-  const reset=()=>{setEditingId(null);setForm(emptyForm);setError('');};
-  const submit=async(event:FormEvent)=>{event.preventDefault();setBusy(true);setError('');setSaved('');try{const token=await getAccessToken();const response=await fetch(editingId?`${apiBaseUrl}/admin/locations/${editingId}`:`${apiBaseUrl}/admin/locations`,{method:editingId?'PATCH':'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(form)});const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to save location.')));const name=form.name,action=t(editingId?'updated':'created');reset();await load();setSaved(t('{{name}} was {{action}}.',{name,action}));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to save location.'));}finally{setBusy(false);}};
-  return <Stack spacing={3}>
-    <Paper component="form" onSubmit={submit} variant="outlined" sx={{p:{xs:2,md:3}}}><Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}><BoxTitle editing={editingId!==null}/>{editingId&&<Button startIcon={<X size={16}/>} onClick={reset}>{t('Cancel')}</Button>}</Stack><Grid container spacing={2}>
-      <Grid size={{xs:12,md:6}}><TextField required fullWidth label={t('Location name')} value={form.name} onChange={e=>field('name',e.target.value)} inputProps={{maxLength:150}}/></Grid><Grid size={{xs:12,md:6}}><TextField required fullWidth label={t('Timezone')} value={form.timezone} onChange={e=>field('timezone',e.target.value)} helperText={t('IANA timezone, for example America/Toronto')}/></Grid>
-      <Grid size={12}><AddressEntry disabled={busy} value={{address_line1:form.address_line1,address_line2:form.address_line2,city:form.city,province:form.province,postal_code:form.postal_code,country:'Canada'}} onChange={address=>setForm(current=>({...current,address_line1:address.address_line1,address_line2:address.address_line2,city:address.city,province:address.province,postal_code:address.postal_code}))}/></Grid>
-      <Grid size={{xs:12,md:6}}><TextField fullWidth label={t('Phone')} value={form.phone} onChange={e=>field('phone',e.target.value)}/></Grid><Grid size={{xs:12,md:6}}><FormControlLabel control={<Switch checked={form.is_bookable} onChange={e=>field('is_bookable',e.target.checked)}/>} label={t('Accepting bookings at this location')}/></Grid>
-    </Grid>{error&&<Alert severity="error" sx={{mt:2}}>{error}</Alert>}{saved&&<Alert severity="success" sx={{mt:2}}>{saved}</Alert>}<Button type="submit" variant="contained" startIcon={editingId?<Save size={17}/>:<Plus size={17}/>} disabled={busy} sx={{mt:2}}>{t(busy?'Saving…':editingId?'Save changes':'Add location')}</Button></Paper>
-    <Paper variant="outlined" sx={{p:{xs:2,md:3}}}><Typography variant="h5" mb={2}>{t('Clinic locations')}</Typography><Stack spacing={1.5}>{locations.map(location=><Stack key={location.id} direction={{xs:'column',sm:'row'}} justifyContent="space-between" alignItems={{sm:'center'}} sx={{p:2,border:'1px solid',borderColor:'divider',borderRadius:2}}><Stack direction="row" spacing={1.5}><MapPin color="#176b62"/><span><Typography fontWeight={700}>{location.name}</Typography><Typography variant="body2" color="text.secondary">{[location.address_line1,location.city,location.province,location.postal_code].filter(Boolean).join(', ')||t('Address not set')} · {t(Boolean(Number(location.is_bookable))?'Bookable':'Not bookable')}</Typography></span></Stack><Button startIcon={<Pencil size={16}/>} onClick={()=>edit(location)}>{t('Edit')}</Button></Stack>)}{!busy&&locations.length===0&&<Typography color="text.secondary">{t('No locations have been configured.')}</Typography>}</Stack></Paper>
-  </Stack>;
+export function LocationAdmin() {
+  const { t } = useTranslation();
+  const { getAccessToken } = useStaffAuth();
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [form, setForm] = useState<LocationForm>(emptyForm);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const { markDirty, markClean } = useUnsavedForm();
+  const load = useCallback(async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`${apiBaseUrl}/admin/locations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await response.json();
+      if (!response.ok)
+        throw new Error(
+          apiErrorMessage(
+            body,
+            response.status,
+            t("Unable to load locations."),
+          ),
+        );
+      setLocations(body.data);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : t("Unable to load locations."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [getAccessToken, t]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const field = <K extends keyof LocationForm>(
+    name: K,
+    value: LocationForm[K],
+  ) => setForm((current) => ({ ...current, [name]: value }));
+  const edit = (location: Location) => {
+    setEditingId(location.id);
+    setForm({
+      name: location.name,
+      timezone: location.timezone,
+      address_line1: location.address_line1 ?? "",
+      address_line2: location.address_line2 ?? "",
+      city: location.city ?? "",
+      province: location.province ?? "",
+      postal_code: location.postal_code ?? "",
+      phone: location.phone ?? "",
+      is_bookable: Boolean(Number(location.is_bookable)),
+    });
+    setError("");
+    setSaved("");
+  };
+  const reset = () => {
+    markClean();
+    setEditingId(null);
+    setForm(emptyForm);
+    setError("");
+  };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setSaved("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(
+        editingId
+          ? `${apiBaseUrl}/admin/locations/${editingId}`
+          : `${apiBaseUrl}/admin/locations`,
+        {
+          method: editingId ? "PATCH" : "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(form),
+        },
+      );
+      const body = await response.json();
+      if (!response.ok)
+        throw new Error(
+          apiErrorMessage(body, response.status, t("Unable to save location.")),
+        );
+      const name = form.name,
+        action = t(editingId ? "updated" : "created");
+      reset();
+      await load();
+      setSaved(t("{{name}} was {{action}}.", { name, action }));
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : t("Unable to save location."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Stack spacing={3}>
+      <Paper
+      component="form"
+      onSubmit={submit}
+      onChange={markDirty}
+        variant="outlined"
+        sx={{ p: { xs: 2, md: 3 } }}
+      >
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={2}
+        >
+          <BoxTitle editing={editingId !== null} />
+          {editingId && (
+            <Button startIcon={<X size={16} />} onClick={reset}>
+              {t("Cancel")}
+            </Button>
+          )}
+        </Stack>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              required
+              fullWidth
+              label={t("Location name")}
+              value={form.name}
+              onChange={(e) => field("name", e.target.value)}
+              inputProps={{ maxLength: 150 }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              required
+              fullWidth
+              label={t("Timezone")}
+              value={form.timezone}
+              onChange={(e) => field("timezone", e.target.value)}
+              helperText={t("IANA timezone, for example America/Toronto")}
+            />
+          </Grid>
+          <Grid size={12}>
+            <AddressEntry
+              disabled={busy}
+              value={{
+                address_line1: form.address_line1,
+                address_line2: form.address_line2,
+                city: form.city,
+                province: form.province,
+                postal_code: form.postal_code,
+                country: "Canada",
+              }}
+              onChange={(address) =>
+                setForm((current) => ({
+                  ...current,
+                  address_line1: address.address_line1,
+                  address_line2: address.address_line2,
+                  city: address.city,
+                  province: address.province,
+                  postal_code: address.postal_code,
+                }))
+              }
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label={t("Phone")}
+              value={form.phone}
+              onChange={(e) => field("phone", e.target.value)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.is_bookable}
+                  onChange={(e) => field("is_bookable", e.target.checked)}
+                />
+              }
+              label={t("Accepting bookings at this location")}
+            />
+          </Grid>
+        </Grid>
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
+        {saved && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {saved}
+          </Alert>
+        )}
+        <Button
+          type="submit"
+          variant="contained"
+          startIcon={editingId ? <Save size={17} /> : <Plus size={17} />}
+          disabled={busy}
+          sx={{ mt: 2 }}
+        >
+          {t(busy ? "Saving…" : editingId ? "Save changes" : "Add location")}
+        </Button>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+        <Typography variant="h5" mb={2}>
+          {t("Clinic locations")}
+        </Typography>
+        <Stack spacing={1.5}>
+          {locations.map((location) => (
+            <Stack
+              key={location.id}
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              alignItems={{ sm: "center" }}
+              sx={{
+                p: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 2,
+              }}
+            >
+              <Stack direction="row" spacing={1.5}>
+                <MapPin color="#176b62" />
+                <span>
+                  <Typography fontWeight={700}>{location.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {[
+                      location.address_line1,
+                      location.city,
+                      location.province,
+                      location.postal_code,
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || t("Address not set")}{" "}
+                    ·{" "}
+                    {t(
+                      Boolean(Number(location.is_bookable))
+                        ? "Bookable"
+                        : "Not bookable",
+                    )}
+                  </Typography>
+                </span>
+              </Stack>
+              <Button
+                startIcon={<Pencil size={16} />}
+                onClick={() => edit(location)}
+              >
+                {t("Edit")}
+              </Button>
+            </Stack>
+          ))}
+          {!busy && locations.length === 0 && (
+            <Typography color="text.secondary">
+              {t("No locations have been configured.")}
+            </Typography>
+          )}
+        </Stack>
+      </Paper>
+    </Stack>
+  );
 }
 
-function BoxTitle({editing}:{editing:boolean}){const{t}=useTranslation();return <span><Typography variant="h5">{t(editing?'Edit location':'Add a location')}</Typography><Typography color="text.secondary">{t('Clinic address, timezone, contact details, and booking availability.')}</Typography></span>;}
+function BoxTitle({ editing }: { editing: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <span>
+      <Typography variant="h5">
+        {t(editing ? "Edit location" : "Add a location")}
+      </Typography>
+      <Typography color="text.secondary">
+        {t(
+          "Clinic address, timezone, contact details, and booking availability.",
+        )}
+      </Typography>
+    </span>
+  );
+}

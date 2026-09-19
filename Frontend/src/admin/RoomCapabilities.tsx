@@ -1,2 +1,274 @@
-import{useEffect,useState}from'react';import{Alert,Button,Checkbox,FormControlLabel,Grid,MenuItem,Paper,Stack,TextField,Typography}from'@mui/material';import{Plus,Save}from'lucide-react';import{useTranslation}from'react-i18next';import{useStaffAuth}from'../auth/AuthProvider';import{apiErrorMessage}from'../shared/api';const api=import.meta.env.VITE_API_BASE_URL??'http://localhost:8080/api/v1';type Named={id:number;name:string};type State={capabilities:Named[];rooms:{room_id:number;capability_id:number}[];services:{service_id:number;capability_id:number}[]};
-export function RoomCapabilities(){const{t}=useTranslation();const{getAccessToken}=useStaffAuth();const[catalog,setCatalog]=useState<State>({capabilities:[],rooms:[],services:[]}),[rooms,setRooms]=useState<Named[]>([]),[services,setServices]=useState<Named[]>([]),[room,setRoom]=useState(''),[service,setService]=useState(''),[roomCaps,setRoomCaps]=useState<number[]>([]),[serviceCaps,setServiceCaps]=useState<number[]>([]),[name,setName]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');const load=async()=>{const token=await getAccessToken(),h={Authorization:`Bearer ${token}`},rs=await Promise.all([fetch(`${api}/admin/room-capabilities`,{headers:h}),fetch(`${api}/admin/rooms`,{headers:h}),fetch(`${api}/admin/services`,{headers:h})]),b=await Promise.all(rs.map(r=>r.json()));const failed=rs.findIndex(r=>!r.ok);if(failed>=0)throw new Error(apiErrorMessage(b[failed],rs[failed].status,t('Unable to load room capabilities.')));setCatalog(b[0].data);setRooms(b[1].data);setServices(b[2].data);setRoom(v=>v||String(b[1].data[0]?.id??''));setService(v=>v||String(b[2].data[0]?.id??''));};useEffect(()=>{void load().catch(c=>setError(c.message))},[]);useEffect(()=>setRoomCaps(catalog.rooms.filter(x=>x.room_id===Number(room)).map(x=>x.capability_id)),[room,catalog]);useEffect(()=>setServiceCaps(catalog.services.filter(x=>x.service_id===Number(service)).map(x=>x.capability_id)),[service,catalog]);const toggle=(list:number[],set:(v:number[])=>void,id:number,on:boolean)=>set(on?[...list,id]:list.filter(x=>x!==id));const add=async()=>{setBusy(true);setError('');try{const token=await getAccessToken(),r=await fetch(`${api}/admin/room-capabilities`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({name})}),b=await r.json();if(!r.ok)throw new Error(apiErrorMessage(b,r.status,t('Unable to add capability.')));setName('');await load();setMessage(t('Capability added.'))}catch(c){setError(c instanceof Error?c.message:t('Unable to add capability.'))}finally{setBusy(false)}};const save=async()=>{setBusy(true);setError('');try{const token=await getAccessToken(),r=await fetch(`${api}/admin/room-capability-assignments`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({room_id:Number(room),service_id:Number(service),room_capability_ids:roomCaps,service_capability_ids:serviceCaps})}),b=await r.json();if(!r.ok)throw new Error(apiErrorMessage(b,r.status,t('Unable to save requirements.')));await load();setMessage(t('Room capabilities and service requirements saved.'))}catch(c){setError(c instanceof Error?c.message:t('Unable to save requirements.'))}finally{setBusy(false)}};return <Paper variant="outlined" sx={{p:3}}><Typography variant="h5">{t('Capabilities and requirements')}</Typography><Typography color="text.secondary" mb={2}>{t('Match services only with rooms containing the equipment or features they require.')}</Typography><Stack direction={{xs:'column',sm:'row'}} spacing={1}><TextField fullWidth label={t('New capability')} placeholder={t('e.g. Massage table')} value={name} onChange={e=>setName(e.target.value)}/><Button variant="outlined" startIcon={<Plus size={17}/>} disabled={busy||!name.trim()} onClick={add}>{t('Add')}</Button></Stack><Grid container spacing={3} mt={1}><Grid size={{xs:12,md:6}}><TextField select fullWidth label={t('Room')} value={room} onChange={e=>setRoom(e.target.value)}>{rooms.map(x=><MenuItem key={x.id} value={String(x.id)}>{x.name}</MenuItem>)}</TextField><Typography fontWeight={700} mt={2}>{t('This room provides')}</Typography>{catalog.capabilities.map(c=><FormControlLabel key={c.id} control={<Checkbox checked={roomCaps.includes(c.id)} onChange={e=>toggle(roomCaps,setRoomCaps,c.id,e.target.checked)}/>} label={c.name}/>)}</Grid><Grid size={{xs:12,md:6}}><TextField select fullWidth label={t('Service')} value={service} onChange={e=>setService(e.target.value)}>{services.map(x=><MenuItem key={x.id} value={String(x.id)}>{x.name}</MenuItem>)}</TextField><Typography fontWeight={700} mt={2}>{t('This service requires')}</Typography>{catalog.capabilities.map(c=><FormControlLabel key={c.id} control={<Checkbox checked={serviceCaps.includes(c.id)} onChange={e=>toggle(serviceCaps,setServiceCaps,c.id,e.target.checked)}/>} label={c.name}/>)}</Grid></Grid>{error&&<Alert severity="error" sx={{mt:2}}>{error}</Alert>}{message&&<Alert severity="success" sx={{mt:2}}>{message}</Alert>}<Button variant="contained" startIcon={<Save size={17}/>} disabled={busy||!room||!service} onClick={save} sx={{mt:2}}>{t('Save requirements')}</Button></Paper>}
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  Grid,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { Plus, Save } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useStaffAuth } from "../auth/AuthProvider";
+import { apiErrorMessage } from "../shared/api";
+import { useUnsavedChanges } from "../shared/UnsavedChanges";
+const api = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
+type Named = { id: number; name: string };
+type State = {
+  capabilities: Named[];
+  rooms: { room_id: number; capability_id: number }[];
+  services: { service_id: number; capability_id: number }[];
+};
+export function RoomCapabilities() {
+  const { t } = useTranslation();
+  const { getAccessToken } = useStaffAuth();
+  const [catalog, setCatalog] = useState<State>({
+      capabilities: [],
+      rooms: [],
+      services: [],
+    }),
+    [rooms, setRooms] = useState<Named[]>([]),
+    [services, setServices] = useState<Named[]>([]),
+    [room, setRoom] = useState(""),
+    [service, setService] = useState(""),
+    [roomCaps, setRoomCaps] = useState<number[]>([]),
+    [serviceCaps, setServiceCaps] = useState<number[]>([]),
+    [name, setName] = useState(""),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState(""),
+    [error, setError] = useState("");
+  const savedRoomCaps = catalog.rooms.filter((item) => item.room_id === Number(room)).map((item) => item.capability_id).sort((a, b) => a - b);
+  const savedServiceCaps = catalog.services.filter((item) => item.service_id === Number(service)).map((item) => item.capability_id).sort((a, b) => a - b);
+  useUnsavedChanges(
+    name.trim() !== "" ||
+    JSON.stringify([...roomCaps].sort((a, b) => a - b)) !== JSON.stringify(savedRoomCaps) ||
+    JSON.stringify([...serviceCaps].sort((a, b) => a - b)) !== JSON.stringify(savedServiceCaps),
+  );
+  const load = async () => {
+    const token = await getAccessToken(),
+      h = { Authorization: `Bearer ${token}` },
+      rs = await Promise.all([
+        fetch(`${api}/admin/room-capabilities`, { headers: h }),
+        fetch(`${api}/admin/rooms`, { headers: h }),
+        fetch(`${api}/admin/services`, { headers: h }),
+      ]),
+      b = await Promise.all(rs.map((r) => r.json()));
+    const failed = rs.findIndex((r) => !r.ok);
+    if (failed >= 0)
+      throw new Error(
+        apiErrorMessage(
+          b[failed],
+          rs[failed].status,
+          t("Unable to load room capabilities."),
+        ),
+      );
+    setCatalog(b[0].data);
+    setRooms(b[1].data);
+    setServices(b[2].data);
+    setRoom((v) => v || String(b[1].data[0]?.id ?? ""));
+    setService((v) => v || String(b[2].data[0]?.id ?? ""));
+  };
+  useEffect(() => {
+    void load().catch((c) => setError(c.message));
+  }, []);
+  useEffect(
+    () =>
+      setRoomCaps(
+        catalog.rooms
+          .filter((x) => x.room_id === Number(room))
+          .map((x) => x.capability_id),
+      ),
+    [room, catalog],
+  );
+  useEffect(
+    () =>
+      setServiceCaps(
+        catalog.services
+          .filter((x) => x.service_id === Number(service))
+          .map((x) => x.capability_id),
+      ),
+    [service, catalog],
+  );
+  const toggle = (
+    list: number[],
+    set: (v: number[]) => void,
+    id: number,
+    on: boolean,
+  ) => set(on ? [...list, id] : list.filter((x) => x !== id));
+  const add = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getAccessToken(),
+        r = await fetch(`${api}/admin/room-capabilities`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name }),
+        }),
+        b = await r.json();
+      if (!r.ok)
+        throw new Error(
+          apiErrorMessage(b, r.status, t("Unable to add capability.")),
+        );
+      setName("");
+      await load();
+      setMessage(t("Capability added."));
+    } catch (c) {
+      setError(c instanceof Error ? c.message : t("Unable to add capability."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getAccessToken(),
+        r = await fetch(`${api}/admin/room-capability-assignments`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            room_id: Number(room),
+            service_id: Number(service),
+            room_capability_ids: roomCaps,
+            service_capability_ids: serviceCaps,
+          }),
+        }),
+        b = await r.json();
+      if (!r.ok)
+        throw new Error(
+          apiErrorMessage(b, r.status, t("Unable to save requirements.")),
+        );
+      await load();
+      setMessage(t("Room capabilities and service requirements saved."));
+    } catch (c) {
+      setError(
+        c instanceof Error ? c.message : t("Unable to save requirements."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Paper variant="outlined" sx={{ p: 3 }}>
+      <Typography variant="h5">{t("Capabilities and requirements")}</Typography>
+      <Typography color="text.secondary" mb={2}>
+        {t(
+          "Match services only with rooms containing the equipment or features they require.",
+        )}
+      </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+        <TextField
+          fullWidth
+          label={t("New capability")}
+          placeholder={t("e.g. Massage table")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button
+          variant="outlined"
+          startIcon={<Plus size={17} />}
+          disabled={busy || !name.trim()}
+          onClick={add}
+        >
+          {t("Add")}
+        </Button>
+      </Stack>
+      <Grid container spacing={3} mt={1}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <TextField
+            select
+            fullWidth
+            label={t("Room")}
+            value={room}
+            onChange={(e) => setRoom(e.target.value)}
+          >
+            {rooms.map((x) => (
+              <MenuItem key={x.id} value={String(x.id)}>
+                {x.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Typography fontWeight={700} mt={2}>
+            {t("This room provides")}
+          </Typography>
+          {catalog.capabilities.map((c) => (
+            <FormControlLabel
+              key={c.id}
+              control={
+                <Checkbox
+                  checked={roomCaps.includes(c.id)}
+                  onChange={(e) =>
+                    toggle(roomCaps, setRoomCaps, c.id, e.target.checked)
+                  }
+                />
+              }
+              label={c.name}
+            />
+          ))}
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <TextField
+            select
+            fullWidth
+            label={t("Service")}
+            value={service}
+            onChange={(e) => setService(e.target.value)}
+          >
+            {services.map((x) => (
+              <MenuItem key={x.id} value={String(x.id)}>
+                {x.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Typography fontWeight={700} mt={2}>
+            {t("This service requires")}
+          </Typography>
+          {catalog.capabilities.map((c) => (
+            <FormControlLabel
+              key={c.id}
+              control={
+                <Checkbox
+                  checked={serviceCaps.includes(c.id)}
+                  onChange={(e) =>
+                    toggle(serviceCaps, setServiceCaps, c.id, e.target.checked)
+                  }
+                />
+              }
+              label={c.name}
+            />
+          ))}
+        </Grid>
+      </Grid>
+      {error && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {message && (
+        <Alert severity="success" sx={{ mt: 2 }}>
+          {message}
+        </Alert>
+      )}
+      <Button
+        variant="contained"
+        startIcon={<Save size={17} />}
+        disabled={busy || !room || !service}
+        onClick={save}
+        sx={{ mt: 2 }}
+      >
+        {t("Save requirements")}
+      </Button>
+    </Paper>
+  );
+}

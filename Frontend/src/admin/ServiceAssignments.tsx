@@ -4,6 +4,7 @@ import { Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { apiErrorMessage } from '../shared/api';
+import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Named = { id: number; name: string };
@@ -24,6 +25,13 @@ export function ServiceAssignments({ catalogueVersion = 0 }: { catalogueVersion?
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const savedLocations = locationLinks.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))).map((item) => item.location_id).sort((a, b) => a - b);
+  const savedPeople = links.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))).sort((a, b) => a.practitioner_id - b.practitioner_id);
+  const currentPeople = [...selectedPeople].sort((a, b) => a.practitioner_id - b.practitioner_id);
+  useUnsavedChanges(
+    JSON.stringify([...selectedLocations].sort((a, b) => a - b)) !== JSON.stringify(savedLocations) ||
+    JSON.stringify(currentPeople) !== JSON.stringify(savedPeople),
+  );
 
   useEffect(() => {
     void (async () => {

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { apiErrorMessage } from '../shared/api';
 import { formatCad } from '../i18n/format';
+import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type DurationOption = { minutes: number; price_cents: number };
@@ -36,6 +37,7 @@ export function ServiceAdmin({ onSaved }: { onSaved?: () => void }) {
   const [items, setItems] = useState<Service[]>([]), [form, setForm] = useState<Form>(() => blank());
   const [editing, setEditing] = useState<number | null>(null), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [saved, setSaved] = useState('');
+  const { markDirty, markClean } = useUnsavedForm();
   const load = useCallback(async () => {
     setBusy(true);
     try {
@@ -49,7 +51,7 @@ export function ServiceAdmin({ onSaved }: { onSaved?: () => void }) {
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
-  const reset = () => { setEditing(null); setForm(blank()); };
+  const reset = () => { markClean(); setEditing(null); setForm(blank()); };
   const options = (service: Service): DurationOption[] => service.duration_options?.length ? service.duration_options : service.durations.map(minutes => ({ minutes, price_cents: Number(service.price_cents) }));
   const edit = (service: Service) => {
     setEditing(service.id);
@@ -80,7 +82,7 @@ export function ServiceAdmin({ onSaved }: { onSaved?: () => void }) {
   };
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   return <Stack spacing={3}>
-    <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: 3 }}>
+    <Paper component="form" onSubmit={submit} onChange={markDirty} variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" justifyContent="space-between">
         <span><Typography variant="h5">{t(editing ? 'Edit service' : 'Add a service')}</Typography><Typography color="text.secondary" mb={2}>{t('Define one service with one or more duration-and-price choices. Travel fees and buffers are configured separately.')}</Typography></span>
         {editing && <Button startIcon={<X size={16} />} onClick={reset}>{t('Cancel')}</Button>}

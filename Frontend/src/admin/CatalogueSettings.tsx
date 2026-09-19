@@ -4,6 +4,7 @@ import { Plus, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { apiErrorMessage } from '../shared/api';
+import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
@@ -33,6 +34,9 @@ export function CatalogueSettings() {
   const [tax, setTax] = useState({ code: 'HST', name: 'Harmonized Sales Tax', rate: '13' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const settingsGuard = useUnsavedForm();
+  const categoryGuard = useUnsavedForm();
+  const taxGuard = useUnsavedForm();
 
   const request = async (path: string, method = 'GET', body?: unknown) => {
     const token = await getAccessToken();
@@ -59,10 +63,11 @@ export function CatalogueSettings() {
 
   useEffect(() => { void load(); }, []);
 
-  const done = async (action: () => Promise<unknown>, text: string) => {
+  const done = async (action: () => Promise<unknown>, text: string, markClean: () => void) => {
     setError('');
     try {
       await action();
+      markClean();
       await load();
       setMessage(text);
     } catch (cause) {
@@ -72,7 +77,7 @@ export function CatalogueSettings() {
 
   return (
     <Stack spacing={3} mt={3}>
-      <Paper variant="outlined" sx={{ p: 3 }}>
+      <Paper variant="outlined" sx={{ p: 3 }} onChange={settingsGuard.markDirty}>
         <Typography variant="h5">{t('Booking defaults')}</Typography>
         <Grid container spacing={2} mt={0.5}>
           {(Object.keys(settingLabels) as (keyof Settings)[]).map((key) => (
@@ -81,7 +86,7 @@ export function CatalogueSettings() {
             </Grid>
           ))}
         </Grid>
-        <Button variant="contained" startIcon={<Save size={17} />} sx={{ mt: 2 }} onClick={() => done(() => request('/admin/booking-settings', 'PATCH', settings), t('Booking defaults saved.'))}>
+        <Button variant="contained" startIcon={<Save size={17} />} sx={{ mt: 2 }} onClick={() => done(() => request('/admin/booking-settings', 'PATCH', settings), t('Booking defaults saved.'), settingsGuard.markClean)}>
           {t('Save defaults')}
         </Button>
       </Paper>
@@ -90,9 +95,9 @@ export function CatalogueSettings() {
         <Grid size={{ xs: 12, md: 6 }}>
           <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
             <Typography variant="h5">{t('Service categories')}</Typography>
-            <Stack direction="row" spacing={1} my={2}>
+            <Stack direction="row" spacing={1} my={2} onChange={categoryGuard.markDirty}>
               <TextField fullWidth label={t('Category name')} value={category} onChange={(event) => setCategory(event.target.value)} />
-              <Button startIcon={<Plus size={16} />} onClick={() => done(() => request('/admin/service-categories', 'POST', { name: category }), t('Category added.'))}>{t('Add')}</Button>
+              <Button startIcon={<Plus size={16} />} onClick={() => done(() => request('/admin/service-categories', 'POST', { name: category }), t('Category added.'), categoryGuard.markClean)}>{t('Add')}</Button>
             </Stack>
             {categories.map((item) => <Typography key={item.id} sx={{ py: 0.5 }}>{item.name}</Typography>)}
           </Paper>
@@ -101,11 +106,11 @@ export function CatalogueSettings() {
         <Grid size={{ xs: 12, md: 6 }}>
           <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
             <Typography variant="h5">{t('Taxes')}</Typography>
-            <Stack spacing={1} my={2}>
+            <Stack spacing={1} my={2} onChange={taxGuard.markDirty}>
               <TextField label={t('Code')} value={tax.code} onChange={(event) => setTax((current) => ({ ...current, code: event.target.value }))} />
               <TextField label={t('Name')} value={tax.name} onChange={(event) => setTax((current) => ({ ...current, name: event.target.value }))} />
               <TextField type="number" label={t('Rate %')} value={tax.rate} onChange={(event) => setTax((current) => ({ ...current, rate: event.target.value }))} />
-              <Button startIcon={<Plus size={16} />} onClick={() => done(() => request('/admin/taxes', 'POST', { code: tax.code, name: tax.name, rate_basis_points: Math.round(Number(tax.rate) * 100) }), t('Tax added.'))}>{t('Add tax')}</Button>
+              <Button startIcon={<Plus size={16} />} onClick={() => done(() => request('/admin/taxes', 'POST', { code: tax.code, name: tax.name, rate_basis_points: Math.round(Number(tax.rate) * 100) }), t('Tax added.'), taxGuard.markClean)}>{t('Add tax')}</Button>
             </Stack>
             {taxes.map((item) => <Typography key={item.id}>{item.name} ({(item.rate_basis_points / 100).toFixed(2)}%)</Typography>)}
           </Paper>

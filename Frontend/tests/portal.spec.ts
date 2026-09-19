@@ -738,6 +738,44 @@ test("anonymous portal deep link is gated behind staff sign-in", async ({
   ).toHaveCount(0);
 });
 
+test("warns before unsaved form work is lost through navigation or browser unload", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  await page.route("**/api/v1/admin/catalogue-settings", (route) => route.fulfill({ json: { data: {
+    categories: [], taxes: [], settings: { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 },
+  } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  const operatingName = page.getByRole("textbox", { name: "Operating name" });
+  await expect(operatingName).toHaveValue("Test Wellness");
+  await operatingName.fill("Unsaved Wellness Name");
+
+  expect(await page.evaluate(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    return !window.dispatchEvent(event);
+  })).toBe(true);
+
+  await page.getByRole("link", { name: /Dashboard Today at a glance/ }).click();
+  await expect(page.getByRole("heading", { name: "Leave this page?" })).toBeVisible();
+  await page.getByRole("button", { name: "Stay" }).click();
+  await expect(page).toHaveURL(`${portalHost}/admin/settings`);
+  await expect(operatingName).toHaveValue("Unsaved Wellness Name");
+
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Business settings saved.")).toBeVisible();
+  expect(await page.evaluate(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    return !window.dispatchEvent(event);
+  })).toBe(false);
+  await page.getByRole("link", { name: /Dashboard Today at a glance/ }).click();
+  await expect(page).toHaveURL(`${portalHost}/admin`);
+  await expect(page.getByRole("heading", { name: "Leave this page?" })).toHaveCount(0);
+
+  await page.getByRole("link", { name: /Business settings Clinic identity and defaults/ }).click();
+  await page.getByRole("textbox", { name: "Business phone" }).fill("905-555-0199");
+  await page.getByRole("link", { name: /Dashboard Today at a glance/ }).click();
+  await page.getByRole("button", { name: "Leave without saving" }).click();
+  await expect(page).toHaveURL(`${portalHost}/admin`);
+});
+
 test("reception routes support refresh, back, profile menu and restricted deep links", async ({
   page,
 }) => {

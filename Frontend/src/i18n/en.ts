@@ -716,6 +716,11 @@ const en = {
     "This client has no saved service address. Find an address with Google or enter it manually.",
   "The saved client address could not be loaded. Find an address with Google or enter it manually.":
     "The saved client address could not be loaded. Find an address with Google or enter it manually.",
+  "Leave this page?": "Leave this page?",
+  "You have unsaved changes. If you leave now, the information you entered will be lost.":
+    "You have unsaved changes. If you leave now, the information you entered will be lost.",
+  "Stay": "Stay",
+  "Leave without saving": "Leave without saving",
 } as const;
 
 export default en;

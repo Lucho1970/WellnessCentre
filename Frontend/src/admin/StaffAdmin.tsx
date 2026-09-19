@@ -4,6 +4,7 @@ import { Pencil, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '../shared/api';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const roleOptions = ['super_admin', 'clinic_admin', 'reception', 'practitioner', 'accountant'];
@@ -15,8 +16,10 @@ export function StaffAdmin() {
   const { account, getAccessToken } = useStaffAuth();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [editing, setEditing] = useState<Staff | null>(null);
+  const [original, setOriginal] = useState<Staff | null>(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
+  useUnsavedChanges(Boolean(editing && original && JSON.stringify(editing) !== JSON.stringify(original)));
   const load = useCallback(async () => {
     try {
       const token = await getAccessToken();
@@ -36,7 +39,7 @@ export function StaffAdmin() {
       const response = await fetch(`${api}/admin/staff/${editing.id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(editing) });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save staff member.')));
-      setEditing(null); await load(); setSaved(t('Staff access updated.'));
+      setEditing(null); setOriginal(null); await load(); setSaved(t('Staff access updated.'));
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save staff member.')); }
   };
   return <Paper variant="outlined" sx={{ p: 3 }}>
@@ -45,9 +48,9 @@ export function StaffAdmin() {
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{saved && <Alert severity="success" sx={{ mb: 2 }}>{saved}</Alert>}
     <Stack spacing={1}>{staff.map(member => <Stack key={member.id} direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
       <span><Typography fontWeight={700}>{member.display_name}{member.email === account?.username ? t(' (you)') : ''}</Typography><Typography variant="body2" color="text.secondary">{member.email} · {member.roles.join(', ') || t('No role')} · {member.status}</Typography></span>
-      <Button startIcon={<Pencil size={16}/>} disabled={member.email === account?.username} onClick={() => setEditing({ ...member })}>{t('Edit access')}</Button>
+      <Button startIcon={<Pencil size={16}/>} disabled={member.email === account?.username} onClick={() => { const value={...member,roles:[...member.roles],permissions:[...member.permissions]};setEditing(value);setOriginal(value); }}>{t('Edit access')}</Button>
     </Stack>)}</Stack>
-    <Dialog open={Boolean(editing)} onClose={() => setEditing(null)} fullWidth>
+    <Dialog open={Boolean(editing)} onClose={() => { setEditing(null);setOriginal(null); }} fullWidth>
       <DialogTitle>{t('Edit staff access')}</DialogTitle>
       {editing && <DialogContent><Stack spacing={2} pt={1}>
         <TextField label={t('Display name')} value={editing.display_name} onChange={event => set('display_name', event.target.value)}/>
@@ -64,7 +67,7 @@ export function StaffAdmin() {
           <Typography variant="body2" color="text.secondary">{t('Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.')}</Typography>
         </>}
       </Stack></DialogContent>}
-      <DialogActions><Button onClick={() => setEditing(null)}>{t('Cancel')}</Button><Button variant="contained" startIcon={<Save size={16}/>} onClick={save}>{t('Save')}</Button></DialogActions>
+      <DialogActions><Button onClick={() => { setEditing(null);setOriginal(null); }}>{t('Cancel')}</Button><Button variant="contained" startIcon={<Save size={16}/>} onClick={save}>{t('Save')}</Button></DialogActions>
     </Dialog>
   </Paper>;
 }

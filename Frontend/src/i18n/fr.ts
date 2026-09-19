@@ -743,6 +743,11 @@ const fr: Record<string, string> = {
     "Ce client n’a aucune adresse de service enregistrée. Recherchez une adresse avec Google ou saisissez-la manuellement.",
   "The saved client address could not be loaded. Find an address with Google or enter it manually.":
     "L’adresse enregistrée du client n’a pas pu être chargée. Recherchez une adresse avec Google ou saisissez-la manuellement.",
+  "Leave this page?": "Quitter cette page?",
+  "You have unsaved changes. If you leave now, the information you entered will be lost.":
+    "Vous avez des modifications non enregistrées. Si vous quittez maintenant, les renseignements saisis seront perdus.",
+  "Stay": "Rester",
+  "Leave without saving": "Quitter sans enregistrer",
 };
 
 export default fr;

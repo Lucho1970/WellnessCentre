@@ -4,6 +4,7 @@ import { customerFetch } from './session';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../i18n/format';
 import { AddressEntry } from '../shared/AddressEntry';
+import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 export type CustomerStatus = { onboarding_status: 'not_linked' | 'pending_review' | 'linked'; review_code?: string };
 const emptyAddress = { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' };
@@ -19,6 +20,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
   const [claimantName, setClaimantName] = useState('');
   const [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [reload, setReload] = useState(0);
+  const { markDirty, markClean } = useUnsavedForm();
   useEffect(() => {
     if (status.onboarding_status !== 'linked' || !['profile','appointments'].includes(mode)) return;
     const controller = new AbortController(); setLoading(true); setError('');
@@ -34,12 +36,12 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
     try {
       if (mode === 'invite') {
         await customerFetch('/invitations/accept', { method: 'POST', body: JSON.stringify({ token, claimant_name: claimantName }) });
-        sessionStorage.removeItem('wellness.customer.invitation'); setToken(''); onRefresh();
+        markClean(); sessionStorage.removeItem('wellness.customer.invitation'); setToken(''); onRefresh();
       } else if (status.onboarding_status === 'linked') {
         const data = await customerFetch('/profile', { method: 'PATCH', body: JSON.stringify(profile) });
-        setProfile(data); setNotice(t('Profile saved. Existing appointment destinations have not changed.'));
+        markClean(); setProfile(data); setNotice(t('Profile saved. Existing appointment destinations have not changed.'));
       } else {
-        await customerFetch('/register', { method: 'POST', body: JSON.stringify(profile) }); onRefresh();
+        await customerFetch('/register', { method: 'POST', body: JSON.stringify(profile) }); markClean(); onRefresh();
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save.')); }
     finally { setSaving(false); }
@@ -62,7 +64,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
         <Typography fontWeight={700}>{a.service}</Typography><Typography>{formatDateTime(a.starts_at.replace(' ', 'T') + 'Z', i18n.resolvedLanguage, { timeZone: a.timezone, dateStyle: 'medium', timeStyle: 'short' })} ({a.timezone})</Typography>
         <Typography>{a.practitioner} · {a.delivery_mode === 'mobile' ? t('At client location') : a.location} · {a.status.replaceAll('_', ' ')}</Typography>
       </Stack>)}
-    </> : mode !== 'choose' && <Stack component="form" spacing={2} onSubmit={save}>
+    </> : mode !== 'choose' && <Stack component="form" spacing={2} onSubmit={save} onChange={markDirty}>
       {mode === 'invite' ? <><TextField required label={t('Your full name')} inputProps={{ maxLength: 150 }} value={claimantName} onChange={e => setClaimantName(e.target.value)} /><TextField required label={t('Invitation code')} value={token} inputProps={{ maxLength: 64 }} onChange={e => setToken(e.target.value.trim())} /><Typography>{t('Accepting submits a claim for staff review; it does not reveal or change an existing client record.')}</Typography></> : <>
         <Grid container spacing={2}><Grid size={{ xs: 12, sm: 6 }}>{field('given_name',t('First name'),100)}</Grid><Grid size={{ xs: 12, sm: 6 }}>{field('family_name',t('Last name'),100)}</Grid></Grid>
         {field('email',t('Contact email'),190)}{field('phone',t('Phone'),40)}

@@ -6,6 +6,7 @@ import { ClientInvitations } from './ClientInvitations';
 import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
+import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Summary = { id: number; display_name: string; email: string; phone: string | null; status: string };
@@ -50,6 +51,10 @@ export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
   const [mergeConfirmation,setMergeConfirmation]=useState('');
   const [mergeBusy,setMergeBusy]=useState(false);
   const [mergeError,setMergeError]=useState('');
+  useUnsavedChanges(
+    (open && JSON.stringify(form) !== JSON.stringify(original)) ||
+    (mergeOpen && mergePreview !== null && (mergeReason.trim() !== '' || mergeConfirmation.trim() !== '' || primaryEmailSource !== 'survivor' || profileSource !== 'survivor' || addressSource !== 'survivor')),
+  );
 
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();

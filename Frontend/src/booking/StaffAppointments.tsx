@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
 import { apiErrorMessage } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
+import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
@@ -99,6 +100,7 @@ function ManageAppointment({ appointment, request, close, complete }: ManageProp
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useUnsavedChanges(date !== appointmentDate || slot !== null || room !== (appointment.room_id ? String(appointment.room_id) : '') || reason.trim() !== '');
   const needsRoom = appointment.room_id !== null;
   const loadSlots = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(''); setSlots([]); setSlot(null); setSearched(false);
@@ -191,6 +193,10 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   const practitionerRows = serviceRows.filter(row => String(row.practitioner_id) === practitioner);
   const practitionerLocked=practitionerMode&&!canScheduleOthers;
   const assignedPractitioner=practitionerLocked?unique(options,'practitioner_id')[0]:undefined;
+  useUnsavedChanges(Boolean(
+    clientQuery.trim() || clientBirthdate || client || location || service || duration || date || slot || room || pending ||
+    destination.address_line1 || destination.address_line2 || destination.city || destination.postal_code || destination.instructions
+  ));
   useEffect(() => {
     const controller = new AbortController();
     void request(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); } })
@@ -225,11 +231,6 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
       .catch(()=>{if(!controller.signal.aborted)setClientAddressState('error');});
     return()=>controller.abort();
   },[client?.id,mode,request]);
-  useEffect(() => {
-    if (!pending) return;
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
-    window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
-  }, [pending]);
   const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); setError(''); };
   const findSlots = async (event: FormEvent) => {
     event.preventDefault(); if (!selected) return; setBusy(true); clearSlots();

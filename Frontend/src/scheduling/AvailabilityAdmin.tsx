@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { apiErrorMessage } from '../shared/api';
+import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -18,6 +19,7 @@ export function AvailabilityAdmin() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [form, setForm] = useState({ practitioner_id: '', location_id: '', weekday: '1', start_time: '09:00', end_time: '17:00', valid_from: new Date().toISOString().slice(0, 10), valid_until: '' });
   const [error, setError] = useState('');
+  const { markDirty, markClean } = useUnsavedForm();
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +54,7 @@ export function AvailabilityAdmin() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to add hours.')));
+      markClean();
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t('Unable to add hours.'));
@@ -65,7 +68,7 @@ export function AvailabilityAdmin() {
   };
 
   return <Stack spacing={3}>
-    <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: 3 }}>
+    <Paper component="form" onSubmit={submit} onChange={markDirty} variant="outlined" sx={{ p: 3 }}>
       <Typography variant="h5">{t('Add recurring working hours')}</Typography>
       <Grid container spacing={2} mt={1}>
         {([['practitioner_id', 'Practitioner', people], ['location_id', 'Location', locations]] as const).map(([key, label, items]) => <Grid size={{ xs: 12, md: 6 }} key={key}><TextField required select fullWidth label={t(label)} value={form[key]} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}>{items.map((item) => <MenuItem key={item.practitioner_id ?? item.id} value={String(item.practitioner_id ?? item.id)}>{item.display_name ?? item.name}</MenuItem>)}</TextField></Grid>)}

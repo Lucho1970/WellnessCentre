@@ -1,7 +1,8 @@
-import type { PropsWithChildren } from 'react';
+import { useState, type PropsWithChildren } from 'react';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { ClinicConfigProvider } from '../config/ClinicConfigProvider';
+import { UnsavedChangesProvider } from './UnsavedChanges';
 import '../i18n';
 
 const theme = createTheme({
@@ -10,7 +11,11 @@ const theme = createTheme({
   shape: { borderRadius: 14 },
 });
 export function AppProviders({ children }: PropsWithChildren) {
+  const [router] = useState(() => createBrowserRouter([{
+    path: '*',
+    element: <UnsavedChangesProvider>{children}</UnsavedChangesProvider>,
+  }], { basename: import.meta.env.BASE_URL }));
   return <ThemeProvider theme={theme}><CssBaseline /><ClinicConfigProvider>
-    <BrowserRouter basename={import.meta.env.BASE_URL}>{children}</BrowserRouter>
+    <RouterProvider router={router} />
   </ClinicConfigProvider></ThemeProvider>;
 }

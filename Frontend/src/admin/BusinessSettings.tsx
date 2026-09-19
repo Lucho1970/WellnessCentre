@@ -5,6 +5,7 @@ import { useStaffAuth } from '../auth/AuthProvider';
 import { useClinicConfig, type ClinicConfig } from '../config/ClinicConfigProvider';
 import { useTranslation } from 'react-i18next';
 import { apiErrorMessage } from '../shared/api';
+import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
@@ -16,6 +17,7 @@ export function BusinessSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const { markDirty, markClean } = useUnsavedForm();
 
   useEffect(() => { setForm(config); }, [config]);
 
@@ -27,12 +29,12 @@ export function BusinessSettings() {
       const response = await fetch(`${apiBaseUrl}/admin/clinic`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save business settings.')));
-      await refresh();setSaved(true);
+      markClean(); await refresh();setSaved(true);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save business settings.')); }
     finally { setSaving(false); }
   };
 
-  return <Paper component="form" onSubmit={submit} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+  return <Paper component="form" onSubmit={submit} onChange={markDirty} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
     <Typography variant="h5">{t('Clinic identity')}</Typography>
     <Typography color="text.secondary" mb={3}>{t('These values update public branding and clinic contact information without rebuilding the site.')}</Typography>
     <Stack spacing={2} maxWidth={680}>

@@ -4,6 +4,7 @@ import { Pencil, Save, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { apiErrorMessage } from '../shared/api';
+import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const tenantId = import.meta.env.VITE_ENTRA_TENANT_ID ?? '';
@@ -25,6 +26,8 @@ export function PractitionerAdmin() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [editing, setEditing] = useState<EditState | null>(null);
+  const addGuard = useUnsavedForm();
+  const editGuard = useUnsavedForm();
 
   const load = useCallback(async () => {
     setLoading(true);setError('');
@@ -52,12 +55,13 @@ export function PractitionerAdmin() {
       const response = await fetch(`${apiBaseUrl}/admin/practitioners/onboard`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, location_id: Number(form.location_id) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to add practitioner.')));
-      setSaved(t('{{name}} was added as a practitioner.', { name: form.display_name }));setForm({ ...emptyForm, location_id: form.location_id });await load();
+      addGuard.markClean();setSaved(t('{{name}} was added as a practitioner.', { name: form.display_name }));setForm({ ...emptyForm, location_id: form.location_id });await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to add practitioner.')); }
     finally { setSaving(false); }
   };
 
   const startEditing = (practitioner: Practitioner) => {
+    editGuard.markClean();
     setError('');setSaved('');
     setEditing({ practitioner_id: practitioner.practitioner_id, display_name: practitioner.display_name, email: practitioner.email, location_id: String(practitioner.location_id ?? locations[0]?.id ?? ''), discipline: practitioner.discipline, credentials: practitioner.credentials ?? '', booking_mode: practitioner.booking_mode, status: practitioner.status, active: Boolean(Number(practitioner.active)) });
   };
@@ -68,7 +72,7 @@ export function PractitionerAdmin() {
       const token=await getAccessToken();
       const response=await fetch(`${apiBaseUrl}/admin/practitioners/${editing.practitioner_id}`,{method:'PATCH',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({...editing,location_id:Number(editing.location_id)})});
       const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to update practitioner.')));
-      const name=editing.display_name;setEditing(null);await load();setSaved(t('{{name}} was {{action}}.', { name, action: t('updated') }));
+      const name=editing.display_name;editGuard.markClean();setEditing(null);await load();setSaved(t('{{name}} was {{action}}.', { name, action: t('updated') }));
     } catch(cause){setError(cause instanceof Error?cause.message:t('Unable to update practitioner.'));}
     finally{setSaving(false);}
   };
@@ -77,7 +81,7 @@ export function PractitionerAdmin() {
     <Typography variant="h5">{t('Add a practitioner')}</Typography>
     <Typography color="text.secondary" mb={2}>{t('Create the Microsoft Entra account and assign its Wellness Practitioner app role first, then link that identity here.')}</Typography>
     <Alert severity="info" sx={{ mb: 3 }}>{t('Use the immutable Entra Object ID, not an email address, as the identity key.')}</Alert>
-    <Stack component="form" onSubmit={submit} spacing={2} mb={4}>
+    <Stack component="form" onSubmit={submit} onChange={addGuard.markDirty} spacing={2} mb={4}>
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Display name')} value={form.display_name} onChange={event => setField('display_name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
         <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth type="email" label={t('Microsoft sign-in email')} value={form.email} onChange={event => setField('email', event.target.value)} inputProps={{ maxLength: 190 }}/></Grid>
@@ -99,7 +103,7 @@ export function PractitionerAdmin() {
         <TableBody>{practitioners.map(practitioner => <TableRow key={practitioner.practitioner_id} hover><TableCell><Typography fontWeight={600}>{practitioner.display_name}</Typography><Typography variant="caption" color="text.secondary">{practitioner.email}</Typography></TableCell><TableCell>{practitioner.credentials || practitioner.discipline}</TableCell><TableCell>{practitioner.locations || '—'}</TableCell><TableCell>{t(practitioner.booking_mode === 'practitioner_managed' ? 'Practitioner' : 'Clinic')}</TableCell><TableCell>{t(practitioner.status === 'active' && Boolean(Number(practitioner.active)) ? 'Active' : 'Inactive')}</TableCell><TableCell align="right"><Button size="small" startIcon={<Pencil size={16}/>} onClick={()=>startEditing(practitioner)}>{t('Edit')}</Button></TableCell></TableRow>)}</TableBody>
       </Table>
     </TableContainer>
-    <Dialog open={editing!==null} onClose={()=>!saving&&setEditing(null)} fullWidth maxWidth="sm" component="form" onSubmit={saveEdit}>
+    <Dialog open={editing!==null} onClose={()=>{if(!saving){editGuard.markClean();setEditing(null);}}} fullWidth maxWidth="sm" component="form" onSubmit={saveEdit} onChange={editGuard.markDirty}>
       <DialogTitle>{t('Edit practitioner')}</DialogTitle>
       {editing&&<DialogContent><Stack spacing={2} pt={1}>
         <TextField required label={t('Display name')} value={editing.display_name} onChange={event=>setEditField('display_name',event.target.value)} inputProps={{maxLength:150}}/>
@@ -112,7 +116,7 @@ export function PractitionerAdmin() {
         <FormControlLabel control={<Switch checked={editing.active} onChange={event=>setEditField('active',event.target.checked)}/>} label={t('Available as a practitioner')}/>
         {error&&<Alert severity="error">{error}</Alert>}
       </Stack></DialogContent>}
-      <DialogActions><Button onClick={()=>setEditing(null)} disabled={saving}>{t('Cancel')}</Button><Button type="submit" variant="contained" startIcon={<Save size={17}/>} disabled={saving}>{saving?t('Saving…'):t('Save changes')}</Button></DialogActions>
+      <DialogActions><Button onClick={()=>{editGuard.markClean();setEditing(null);}} disabled={saving}>{t('Cancel')}</Button><Button type="submit" variant="contained" startIcon={<Save size={17}/>} disabled={saving}>{saving?t('Saving…'):t('Save changes')}</Button></DialogActions>
     </Dialog>
   </Paper>;
 }
