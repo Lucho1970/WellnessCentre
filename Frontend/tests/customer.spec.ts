@@ -377,13 +377,13 @@ test("new customer registers once and pending invitation never exposes a profile
   expect(checks).toBeLessThanOrEqual(3);
 });
 
-test("linked client sees own information and idle expiry removes private UI without polling", async ({
+test("linked client sees only their appointments and idle expiry removes private UI without polling", async ({
   page,
 }) => {
   await fixture(page, true);
   await page.clock.install();
   const now = Date.now() / 1000;
-  let checks = 0;
+  let checks = 0, appointmentReads = 0;
   await page.route("**/api/v1/customer/auth/me", (route) => {
     checks++;
     return route.fulfill({
@@ -414,7 +414,29 @@ test("linked client sees own information and idle expiry removes private UI with
       },
     }),
   );
+  await page.route("**/api/v1/customer/appointments", (route) => {
+    appointmentReads++;
+    expect(route.request().url()).not.toContain("client_id");
+    return route.fulfill({
+      json: {
+        data: {
+          items: [
+            { id: 41, starts_at: "2099-09-20 14:00:00", ends_at: "2099-09-20 15:30:00", status: "confirmed", service: "Therapeutic Massage", practitioner: "Esther Vanderpoel", location: "Holland Landing Clinic", timezone: "America/Toronto", delivery_mode: "mobile" },
+            { id: 12, starts_at: "2020-01-10 16:00:00", ends_at: "2020-01-10 17:00:00", status: "completed", service: "Massage", practitioner: "Esther Vanderpoel", location: "Holland Landing Clinic", timezone: "America/Toronto", delivery_mode: "clinic" },
+          ],
+        },
+      },
+    });
+  });
   await page.goto("http://localhost:5184/client");
+  await expect(page.getByText("Therapeutic Massage", { exact: true })).toBeVisible();
+  await expect(page.getByText(/On-Site \(client location\).*Appointment #41/)).toBeVisible();
+  await expect(page.getByText("Massage", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Show").click();
+  await page.getByRole("option", { name: "Past", exact: true }).click();
+  await expect(page.getByText("Massage", { exact: true })).toBeVisible();
+  await expect(page.getByText(/In clinic · Holland Landing Clinic/)).toBeVisible();
+  await page.getByRole("button", { name: "My profile", exact: true }).click();
   await expect(
     page.getByRole("textbox", { name: "First name", exact: true }),
   ).toHaveValue("Private");
@@ -429,6 +451,7 @@ test("linked client sees own information and idle expiry removes private UI with
     page.getByRole("button", { name: "Sign in again", exact: true }),
   ).toBeVisible();
   expect(checks).toBeLessThanOrEqual(2);
+  expect(appointmentReads).toBe(1);
 });
 
 test("invitation fragment is removed and acceptance remains pending until manual refresh", async ({

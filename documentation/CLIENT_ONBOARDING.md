@@ -26,6 +26,9 @@ MASTER_REQUIREMENTS.md; SYSTEM_DESIGN.md remains the architecture authority.
 - Existing client: request an invitation from staff; accept it while signed in, then
   complete the approved review process. Do not search or disclose records by email.
 - Returning linked client: view their own contact profile and their own appointments.
+  The appointment page opens by default and provides Upcoming, Past, and All views.
+  It shows the service, scheduled start/end, status, practitioner, visit type/location,
+  and appointment reference. Booking and changes remain staff-assisted in this slice.
   No clinical notes, staff administrative notes, other attendees' information, financial
   records or other clients' addresses are returned. Booking mutations remain disabled.
 - Preserve all current user IDs and appointment references. Preserve existing unique

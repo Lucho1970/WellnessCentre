@@ -2,6 +2,12 @@
 
 This is the living, non-technical guide for staff using the Wellness Centre portal. Screens may be available only when the signed-in user has the required role or permission.
 
+## Client appointments
+
+After a linked client signs in, **My appointments** opens by default. The client can switch between **Upcoming**, **Past**, and **All appointments**, and can refresh the list. Each item shows the service, start and end time in the clinic location's timezone, status, practitioner, visit type or clinic location, and appointment number.
+
+The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Clients must currently contact the clinic to book, cancel, or reschedule.
+
 ## Common administration pattern
 
 Administration pages are moving to a list-first layout:

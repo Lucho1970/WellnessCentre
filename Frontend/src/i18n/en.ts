@@ -206,6 +206,9 @@ const en = {
   Refresh: "Refresh",
   "Loading appointments": "Loading appointments",
   "No appointments in this view.": "No appointments in this view.",
+  "Contact the clinic to book or make changes.":
+    "Contact the clinic to book or make changes.",
+  "Appointment #{{id}}": "Appointment #{{id}}",
   "Travel reserved: {{minutes}} minutes before and after":
     "Travel reserved: {{minutes}} minutes before and after",
   Previous: "Previous",

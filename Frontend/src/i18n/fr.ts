@@ -213,6 +213,9 @@ const fr: Record<string, string> = {
   Refresh: "Actualiser",
   "Loading appointments": "Chargement des rendez-vous",
   "No appointments in this view.": "Aucun rendez-vous dans cette vue.",
+  "Contact the clinic to book or make changes.":
+    "Communiquez avec la clinique pour réserver ou apporter des changements.",
+  "Appointment #{{id}}": "Rendez-vous no {{id}}",
   "Travel reserved: {{minutes}} minutes before and after":
     "Déplacement réservé : {{minutes}} minutes avant et après",
   Previous: "Précédent",
