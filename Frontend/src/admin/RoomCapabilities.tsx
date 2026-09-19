@@ -23,7 +23,7 @@ type State = {
   rooms: { room_id: number; capability_id: number }[];
   services: { service_id: number; capability_id: number }[];
 };
-export function RoomCapabilities() {
+export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void } = {}) {
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [catalog, setCatalog] = useState<State>({
@@ -43,11 +43,12 @@ export function RoomCapabilities() {
     [error, setError] = useState("");
   const savedRoomCaps = catalog.rooms.filter((item) => item.room_id === Number(room)).map((item) => item.capability_id).sort((a, b) => a - b);
   const savedServiceCaps = catalog.services.filter((item) => item.service_id === Number(service)).map((item) => item.capability_id).sort((a, b) => a - b);
-  useUnsavedChanges(
+  const dirty =
     name.trim() !== "" ||
     JSON.stringify([...roomCaps].sort((a, b) => a - b)) !== JSON.stringify(savedRoomCaps) ||
-    JSON.stringify([...serviceCaps].sort((a, b) => a - b)) !== JSON.stringify(savedServiceCaps),
-  );
+    JSON.stringify([...serviceCaps].sort((a, b) => a - b)) !== JSON.stringify(savedServiceCaps);
+  useUnsavedChanges(dirty);
+  useEffect(() => { onDirtyChange?.(dirty); return () => onDirtyChange?.(false); }, [dirty, onDirtyChange]);
   const load = async () => {
     const token = await getAccessToken(),
       h = { Authorization: `Bearer ${token}` },

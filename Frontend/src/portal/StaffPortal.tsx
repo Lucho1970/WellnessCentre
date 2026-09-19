@@ -39,7 +39,6 @@ const PractitionerAdmin = lazy(() => import('../admin/PractitionerAdmin').then(m
 const LocationAdmin = lazy(() => import('../admin/LocationAdmin').then(module => ({ default: module.LocationAdmin })));
 const ProfileSettings = lazy(() => import('../profile/ProfileSettings').then(module => ({ default: module.ProfileSettings })));
 const RoomAdmin = lazy(() => import('../admin/RoomAdmin').then(module => ({ default: module.RoomAdmin })));
-const RoomCapabilities = lazy(() => import('../admin/RoomCapabilities').then(module => ({ default: module.RoomCapabilities })));
 const ServiceAdmin = lazy(() => import('../admin/ServiceAdmin').then(module => ({ default: module.ServiceAdmin })));
 const CatalogueSettings = lazy(() => import('../admin/CatalogueSettings').then(module => ({ default: module.CatalogueSettings })));
 const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ default: module.StaffAdmin })));
@@ -167,7 +166,6 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
-        {page === "rooms" && <Box mt={3}><RoomCapabilities /></Box>}
         {page === "services" && <ServiceAdmin />}
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}

@@ -57,6 +57,12 @@ If the summary says the service has no current assignments, clients and staff ca
 
 Use the service's **Active** setting to stop future bookings while preserving historical appointment records. Permanent deletion is intentionally not the normal workflow.
 
+## Locations and rooms
+
+The **Locations** and **Rooms** administration pages use the same list-first pattern as Services. Select a record to enable **Details** and **Edit**, or use **New location** and **New room** from the command bar. The details panel is read-only; choose **Edit** when a value must change.
+
+Locations store the clinic or service-area name, address, timezone, phone number, and whether bookings are accepted. Rooms belong to a location and store the room type, equipment notes, turnover time, and booking status. A location must exist before a room can be created. Use **Capabilities** from the Rooms command bar to manage capability definitions and room/service capability assignments without cluttering the room list. Deactivate booking instead of removing records that may be referenced by appointment history.
+
 ## Quick verification after changing a service
 
 - Reopen **Assignments** and confirm the saved practitioner and location are listed.

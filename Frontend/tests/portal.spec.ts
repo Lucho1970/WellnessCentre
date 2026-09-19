@@ -252,6 +252,67 @@ test("services use a list-first command bar and selected services can be assigne
   });
 });
 
+test("locations and rooms use list-first actions with ID-safe create and edit panels", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  const locations = [
+    { id: "11", name: "Holland Landing", timezone: "America/Toronto", address_line1: "1 Main Street", address_line2: null, city: "Holland Landing", province: "Ontario", postal_code: "L9N 1A1", phone: "905-555-0100", is_bookable: "1" },
+    { id: "12", name: "Mobile Service Area", timezone: "America/Toronto", address_line1: null, address_line2: null, city: null, province: "Ontario", postal_code: null, phone: null, is_bookable: "0" },
+  ];
+  const rooms = [
+    { id: "21", location_id: "11", location_name: "Holland Landing", name: "Room Birch", room_type: "Treatment room", equipment_notes: "Massage table", turnover_minutes: "15", is_bookable: "1" },
+  ];
+  let updatedLocation: Record<string, unknown> | undefined;
+  let createdRoom: Record<string, unknown> | undefined;
+  await page.route("**/api/v1/admin/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = {};
+    if (path.endsWith("/locations/12") && route.request().method() === "PATCH") {
+      updatedLocation = route.request().postDataJSON();
+      locations[1] = { ...locations[1], ...updatedLocation } as typeof locations[number];
+      data = { id: "12" };
+    } else if (path.endsWith("/locations")) data = locations;
+    else if (path.endsWith("/rooms") && route.request().method() === "POST") {
+      createdRoom = route.request().postDataJSON();
+      rooms.push({ id: "22", location_name: "Holland Landing", room_type: null, equipment_notes: null, ...createdRoom } as typeof rooms[number]);
+      data = { id: "22" };
+    } else if (path.endsWith("/rooms")) data = rooms;
+    else if (path.endsWith("/room-capabilities")) data = { capabilities: [], rooms: [], services: [] };
+    else if (path.endsWith("/services")) data = [];
+    await route.fulfill({ json: { data } });
+  });
+
+  await page.goto(`${portalHost}/admin/locations`);
+  await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
+  await page.getByRole("button", { name: /Mobile Service Area.*Not bookable/ }).click();
+  await page.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByText("Location details", { exact: true })).toBeVisible();
+  await expect(page.getByText("Ontario", { exact: true }).last()).toBeVisible();
+  await page.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("textbox", { name: "Phone", exact: true }).fill("905-555-0199");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Mobile Service Area was updated.")).toBeVisible();
+  expect(updatedLocation?.phone).toBe("905-555-0199");
+
+  await page.goto(`${portalHost}/admin/rooms`);
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Room capabilities" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Capabilities", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Room capabilities" })).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("button", { name: /Room Birch.*15 min turnover/ }).click();
+  await page.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByText("Room details", { exact: true })).toBeVisible();
+  await expect(page.getByText("Massage table", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("button", { name: "New room", exact: true }).click();
+  await page.getByRole("textbox", { name: "Room name", exact: true }).fill("Room Cedar");
+  await page.getByRole("spinbutton", { name: "Turnover time (minutes)" }).fill("20");
+  await page.getByRole("button", { name: "Add room", exact: true }).click();
+  await expect(page.getByText("Room Cedar was created.")).toBeVisible();
+  expect(createdRoom).toMatchObject({ location_id: 11, name: "Room Cedar", turnover_minutes: 20 });
+});
+
 test("staff client creation saves a reusable service address with manual fallback", async ({
   page,
 }) => {
