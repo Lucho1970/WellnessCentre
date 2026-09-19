@@ -142,14 +142,14 @@ const fr: Record<string, string> = {
     "Les services et emplacements en ligne ne sont pas encore configurés.",
   "Choose care": "Choisir les soins",
   "Visit type": "Type de visite",
-  "At client location": "Chez le client",
+  "On-Site (client location)": "Sur place (chez le client)",
   "In clinic": "En clinique",
   "Base location / service area": "Emplacement de base / zone de service",
   Service: "Service",
   "Treatment options before taxes": "Options de traitement avant taxes",
   "{{minutes}} min — {{price}}": "{{minutes}} min — {{price}}",
-  "A separate mobile surcharge may apply; staff will confirm coverage and travel time.":
-    "Des frais de déplacement distincts peuvent s’appliquer; le personnel confirmera la zone desservie et le temps de déplacement.",
+  "A separate On-Site surcharge may apply; staff will confirm coverage and travel time.":
+    "Un supplément pour la visite sur place peut s’appliquer; le personnel confirmera la zone desservie et le temps de déplacement.",
   "Choose a time": "Choisir une heure",
   "Loading available times": "Chargement des heures disponibles",
   "No practitioner is assigned to this service yet.":
@@ -189,7 +189,7 @@ const fr: Record<string, string> = {
   "Contact email": "Courriel de contact",
   Phone: "Téléphone",
   "Preferred contact": "Mode de communication préféré",
-  "Mobile visit address": "Adresse de la visite mobile",
+  "On-Site visit address": "Adresse de la visite sur place",
   "Street address": "Adresse municipale",
   "Unit (optional)": "Appartement ou unité (facultatif)",
   City: "Ville",
@@ -387,8 +387,8 @@ const fr: Record<string, string> = {
   "Availability in {{timezone}}. Choose a day to see current openings.":
     "Disponibilités selon le fuseau {{timezone}}. Choisissez une journée pour voir les ouvertures actuelles.",
   "{{minutes}} minutes": "{{minutes}} minutes",
-  "Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD":
-    "Traitement : {{treatment}} · Supplément mobile : {{mobile}} · Sous-total : {{subtotal}} CAD",
+  "Treatment: {{treatment}} · On-Site surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD":
+    "Traitement : {{treatment}} · Supplément sur place : {{mobile}} · Sous-total : {{subtotal}} CAD",
   "Confirming…": "Confirmation…",
   "Retry confirmation": "Réessayer la confirmation",
   "Confirm appointment": "Confirmer le rendez-vous",
@@ -478,15 +478,15 @@ const fr: Record<string, string> = {
   "Unable to save assignments.": "Impossible d’enregistrer les affectations.",
   "Service assignments saved.": "Affectations de services enregistrées.",
   "Service assignments": "Affectations de services",
-  "Choose a base location and practitioner. For a mobile-only practice, enable Mobile visits and disable Clinic visits. The base location supplies working hours and timezone; no room is needed.":
-    "Choisissez un emplacement de base et un praticien. Pour une pratique entièrement mobile, activez les visites mobiles et désactivez les visites en clinique. L’emplacement de base fournit les heures de travail et le fuseau horaire; aucune salle n’est nécessaire.",
+  "Choose a base location and practitioner. For an On-Site-only practice, enable On-Site visits and disable Clinic visits. The base location supplies working hours and timezone; no room is needed.":
+    "Choisissez un emplacement de base et un praticien. Pour une pratique entièrement sur place chez le client, activez les visites sur place et désactivez les visites en clinique. L’emplacement de base fournit les heures de travail et le fuseau horaire; aucune salle n’est nécessaire.",
   "Base locations / service areas": "Emplacements de base / zones de service",
   "Clinic visits": "Visites en clinique",
-  "Mobile visits": "Visites mobiles",
+  "On-Site visits": "Visites sur place",
   "Coverage radius km (staff verified)":
     "Rayon desservi en km (vérifié par le personnel)",
   "Travel minutes each way": "Minutes de déplacement dans chaque direction",
-  "Mobile fee CAD": "Frais mobiles en CAD",
+  "On-Site fee CAD": "Frais de visite sur place (CAD)",
   "Save assignments": "Enregistrer les affectations",
   "Unable to load services.": "Impossible de charger les services.",
   "Unable to save service.": "Impossible d’enregistrer le service.",
@@ -605,8 +605,8 @@ const fr: Record<string, string> = {
   "Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.":
     "Rendez-vous no {{id}} confirmé. Le courriel de confirmation est en attente; l’envoi n’est pas encore activé.",
   "Address unavailable": "Adresse non disponible",
-  "Treatment {{treatment}} + mobile fee {{mobile}} (before applicable taxes)":
-    "Traitement {{treatment}} + frais mobiles {{mobile}} (avant les taxes applicables)",
+  "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)":
+    "Traitement {{treatment}} + frais de visite sur place {{mobile}} (avant les taxes applicables)",
   "Unable to search clients.": "Impossible de rechercher les clients.",
   "Unable to load times.": "Impossible de charger les heures.",
   "Select {{name}}": "Sélectionner {{name}}",
@@ -671,8 +671,8 @@ const fr: Record<string, string> = {
   "Unable to change the appointment.": "Impossible de modifier le rendez-vous.",
   "Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.":
     "Utilisez le menu du portail pour accéder aux outils associés à votre rôle. Les administrateurs et la réception peuvent gérer les rendez-vous de la clinique; les praticiens autonomes peuvent réserver, reporter et annuler leurs propres rendez-vous.",
-  "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.":
-    "Google valide l’adresse et calcule la distance routière depuis le lieu de départ sélectionné. L’adresse doit se trouver dans la zone de service mobile configurée.",
+  "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.":
+    "Google valide l’adresse et calcule la distance routière depuis le lieu de départ sélectionné. L’adresse doit se trouver dans la zone de service sur place configurée.",
   "Validate address and coverage": "Valider l’adresse et la zone desservie",
   "Validating address…": "Validation de l’adresse…",
   "Address confirmed: {{distance}} km driving distance ({{radius}} km limit).":
@@ -697,8 +697,8 @@ const fr: Record<string, string> = {
   "Google privacy": "Confidentialité de Google",
   "Google Maps terms": "Conditions de Google Maps",
   "Service address (optional)": "Adresse de service (facultative)",
-  "Used for mobile visits. Existing appointment destination snapshots do not change when this address is edited.":
-    "Utilisée pour les visites mobiles. Les adresses enregistrées dans les rendez-vous existants ne changent pas lorsque cette adresse est modifiée.",
+  "Used for On-Site visits. Existing appointment destination snapshots do not change when this address is edited.":
+    "Utilisée pour les visites sur place. Les adresses enregistrées dans les rendez-vous existants ne changent pas lorsque cette adresse est modifiée.",
   "Merge duplicate": "Fusionner un doublon",
   "Merge duplicate client": "Fusionner un client en double",
   "This permanently reassigns the duplicate client’s records to the survivor and makes the duplicate inactive. It does not delete audit history.":
@@ -778,7 +778,7 @@ const fr: Record<string, string> = {
   "Unknown location": "Emplacement inconnu",
   "No base locations assigned.": "Aucun emplacement de base attribué.",
   "Unknown practitioner": "Praticien inconnu",
-  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} mobile fee": "Rayon de {{radius}} km · {{minutes}} min de déplacement dans chaque sens · frais mobiles de {{fee}}",
+  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee": "Rayon de {{radius}} km · {{minutes}} min de déplacement dans chaque sens · frais sur place de {{fee}}",
   "Not set": "Non défini",
   "No practitioners assigned.": "Aucun praticien attribué.",
 };

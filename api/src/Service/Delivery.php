@@ -9,7 +9,7 @@ final class Delivery
     public static function mode(array $input): string
     {
         $mode=$input['delivery_mode']??'clinic';
-        if(!in_array($mode,['clinic','mobile'],true))throw new ApiException(422,'invalid_delivery','Choose clinic or mobile delivery.');
+        if(!in_array($mode,['clinic','mobile'],true))throw new ApiException(422,'invalid_delivery','Choose In-Clinic or On-Site delivery.');
         return $mode;
     }
 

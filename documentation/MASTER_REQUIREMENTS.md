@@ -106,6 +106,8 @@ booking or clinical access is enabled by it. AUTH-04/05/06 and R3 remain open.
 
 ## 7. Mobile appointments and practitioner safety
 
+The user-facing term for a practitioner travelling to the client is **On-Site**. Existing implementation fields and API values retain `mobile` for backward compatibility; “Remote” is not used for this appointment mode because it can imply a virtual session.
+
 - **MOB-01:** Clients can maintain private service addresses: recipient, address lines, city, province, postal code, country, optional access instructions and preferred/active designation. Collect only necessary information with an identified purpose.
 - **MOB-02:** A mobile booking stores its delivery mode, base clinic/location and an immutable destination snapshot. Editing a client's address must not silently change an existing visit. Mobile appointments do not consume a clinic room unless explicitly configured to do so.
 - **MOB-03:** Enforce practitioner/service eligibility, coverage areas/radius, travel charges, lead time, travel buffers and feasibility against both preceding and following appointments. Google Address Validation and Routes provide server-side address confirmation and driving-distance radius enforcement. The Google key remains server-side, only required postal addresses are disclosed, and booking requires a short-lived signed proof bound to the actor and booking choices. Fixed travel buffers remain authoritative until dynamic travel-time scheduling is delivered.

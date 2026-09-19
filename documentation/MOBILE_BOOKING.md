@@ -69,8 +69,8 @@ does not enforce mobile-only eligibility: disable bookings during rollback/recov
 
 ## Initial mobile-only setup
 
-Services → Service assignments → select the massage service and base location → tick
-the practitioner → enable Mobile visits → disable Clinic visits → set fee, travel minutes
+Services → Assignments → select the massage service and base location → tick
+the practitioner → enable On-Site visits → disable Clinic visits → set fee, travel minutes
 each way and a driving coverage radius → Save assignments. Repeat for each offered service.
 The practitioner's hours must belong to that base location. Room creation is unnecessary.
 

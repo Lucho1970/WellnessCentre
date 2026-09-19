@@ -39,10 +39,10 @@ An assignment answers two questions: who provides this service, and from which b
 
 1. Select the service in the Services list.
 2. Choose **Assignments**.
-3. Review **Current assignments**. This summary shows base locations, practitioners, clinic/mobile delivery modes, travel radius, travel time, and mobile fee.
+3. Review **Current assignments**. This summary shows base locations, practitioners, In-Clinic/On-Site delivery modes, travel radius, travel time, and the On-Site fee.
 4. Choose **Edit assignments** (or **Add assignment** when none exist).
 5. Select at least one base location or service area and the practitioners who provide the service.
-6. For each practitioner, enable **Clinic visits**, **Mobile visits**, or both. Mobile visits also require a coverage radius; review the travel buffer and mobile fee.
+6. For each practitioner, enable **Clinic visits**, **On-Site visits**, or both. On-Site means the practitioner travels to the client’s location. On-Site visits also require a coverage radius; review the travel buffer and On-Site fee.
 7. Choose **Save assignments**.
 
 If the summary says the service has no current assignments, clients and staff cannot book it yet. Assigning only a location or only a practitioner is incomplete: a bookable service needs a compatible service, practitioner, location, delivery mode, working schedule, and—when applicable—room.
@@ -57,4 +57,3 @@ Use the service's **Active** setting to stop future bookings while preserving hi
 - Start a test booking and confirm the service appears only for the expected practitioner, location, and delivery mode.
 - Check each configured duration shows the correct price.
 - Confirm an inactive service or a service without assignments cannot be booked.
-

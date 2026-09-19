@@ -32,7 +32,7 @@ final class AddressCoverageService
         $destination = Delivery::destination(['delivery_mode' => 'mobile', 'destination' => $body['destination'] ?? null]);
         $rule = $this->rule($actor, $body);
         $radius = (float)($rule['mobile_radius_km'] ?? 0);
-        if ($radius <= 0) throw new ApiException(422, 'coverage_radius_not_configured', 'Mobile coverage is not configured for this practitioner and service.');
+        if ($radius <= 0) throw new ApiException(422, 'coverage_radius_not_configured', 'On-Site coverage is not configured for this practitioner and service.');
 
         $origin = [
             'address_line1' => trim((string)($rule['address_line1'] ?? '')),
@@ -44,7 +44,7 @@ final class AddressCoverageService
             'instructions' => '',
         ];
         foreach (['address_line1', 'city', 'province', 'postal_code'] as $field) {
-            if ($origin[$field] === '') throw new ApiException(422, 'base_address_incomplete', 'The base location needs a complete address before mobile coverage can be calculated.');
+            if ($origin[$field] === '') throw new ApiException(422, 'base_address_incomplete', 'The base location needs a complete address before On-Site coverage can be calculated.');
         }
 
         $validatedOrigin = $this->validateAddress($origin);
@@ -119,7 +119,7 @@ final class AddressCoverageService
         $statement = $this->database->connection()->prepare($sql);
         $statement->execute(['clinic' => $actor->clinicId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id']]);
         $rule = $statement->fetch();
-        if (!$rule) throw new ApiException(422, 'delivery_unavailable', 'This practitioner does not offer mobile visits for the selected service and location.');
+        if (!$rule) throw new ApiException(422, 'delivery_unavailable', 'This practitioner does not offer On-Site visits for the selected service and location.');
         $practitionerOnly = $actor->hasAnyRole('practitioner') && !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception') && !$actor->hasPermission('schedule_for_other_practitioners');
         if ($practitionerOnly && ((int)$rule['user_id'] !== $actor->userId || $rule['booking_mode'] !== 'practitioner_managed')) {
             throw new ApiException(403, 'forbidden', 'Practitioners can only validate addresses for their own practitioner-managed appointments.');
@@ -186,7 +186,7 @@ final class AddressCoverageService
 
     private function assertStaffCanBook(AuthContext $actor): void
     {
-        if ($actor->userType !== 'staff' || !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception', 'practitioner')) throw new ApiException(403, 'forbidden', 'Your role cannot validate mobile visit addresses.');
+        if ($actor->userType !== 'staff' || !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception', 'practitioner')) throw new ApiException(403, 'forbidden', 'Your role cannot validate On-Site visit addresses.');
     }
 
     private function assertConfigured(): void

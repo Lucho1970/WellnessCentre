@@ -62,14 +62,14 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
       <Typography>{t('Most recent 100 appointments. Contact the clinic to book or make changes.')}</Typography>
       {appointments.length === 0 ? <Typography>{t('No appointments yet.')}</Typography> : appointments.map(a => <Stack key={a.id} spacing={0.5} sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}>
         <Typography fontWeight={700}>{a.service}</Typography><Typography>{formatDateTime(a.starts_at.replace(' ', 'T') + 'Z', i18n.resolvedLanguage, { timeZone: a.timezone, dateStyle: 'medium', timeStyle: 'short' })} ({a.timezone})</Typography>
-        <Typography>{a.practitioner} · {a.delivery_mode === 'mobile' ? t('At client location') : a.location} · {a.status.replaceAll('_', ' ')}</Typography>
+        <Typography>{a.practitioner} · {a.delivery_mode === 'mobile' ? t('On-Site (client location)') : a.location} · {a.status.replaceAll('_', ' ')}</Typography>
       </Stack>)}
     </> : mode !== 'choose' && <Stack component="form" spacing={2} onSubmit={save} onChange={markDirty}>
       {mode === 'invite' ? <><TextField required label={t('Your full name')} inputProps={{ maxLength: 150 }} value={claimantName} onChange={e => setClaimantName(e.target.value)} /><TextField required label={t('Invitation code')} value={token} inputProps={{ maxLength: 64 }} onChange={e => setToken(e.target.value.trim())} /><Typography>{t('Accepting submits a claim for staff review; it does not reveal or change an existing client record.')}</Typography></> : <>
         <Grid container spacing={2}><Grid size={{ xs: 12, sm: 6 }}>{field('given_name',t('First name'),100)}</Grid><Grid size={{ xs: 12, sm: 6 }}>{field('family_name',t('Last name'),100)}</Grid></Grid>
         {field('email',t('Contact email'),190)}{field('phone',t('Phone'),40)}
         <TextField select label={t('Preferred contact')} value={profile.preferred_contact} disabled={saving} onChange={e => setProfile(p => ({ ...p, preferred_contact: e.target.value }))}><MenuItem value="email">{t('Email:').replace(':','')}</MenuItem><MenuItem value="phone">{t('Phone')}</MenuItem></TextField>
-        <Typography variant="subtitle1">{t('Mobile visit address')}</Typography>
+        <Typography variant="subtitle1">{t('On-Site visit address')}</Typography>
         <AddressEntry required showInstructions disabled={saving} value={profile.address} onChange={address => setProfile(p => ({ ...p, address: { ...emptyAddress, ...address, instructions: address.instructions ?? '' } }))} />
         <Typography variant="body2">{t('Contact details do not change your sign-in identity. Do not enter clinical notes here.')}</Typography>
       </>}

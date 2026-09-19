@@ -136,14 +136,14 @@ const en = {
     "Online services and locations have not been configured yet.",
   "Choose care": "Choose care",
   "Visit type": "Visit type",
-  "At client location": "At client location",
+  "On-Site (client location)": "On-Site (client location)",
   "In clinic": "In clinic",
   "Base location / service area": "Base location / service area",
   Service: "Service",
   "Treatment options before taxes": "Treatment options before taxes",
   "{{minutes}} min — {{price}}": "{{minutes}} min — {{price}}",
-  "A separate mobile surcharge may apply; staff will confirm coverage and travel time.":
-    "A separate mobile surcharge may apply; staff will confirm coverage and travel time.",
+  "A separate On-Site surcharge may apply; staff will confirm coverage and travel time.":
+    "A separate On-Site surcharge may apply; staff will confirm coverage and travel time.",
   "Choose a time": "Choose a time",
   "Loading available times": "Loading available times",
   "No practitioner is assigned to this service yet.":
@@ -182,7 +182,7 @@ const en = {
   "Contact email": "Contact email",
   Phone: "Phone",
   "Preferred contact": "Preferred contact",
-  "Mobile visit address": "Mobile visit address",
+  "On-Site visit address": "On-Site visit address",
   "Street address": "Street address",
   "Unit (optional)": "Unit (optional)",
   City: "City",
@@ -374,8 +374,8 @@ const en = {
   "Availability in {{timezone}}. Choose a day to see current openings.":
     "Availability in {{timezone}}. Choose a day to see current openings.",
   "{{minutes}} minutes": "{{minutes}} minutes",
-  "Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD":
-    "Treatment: {{treatment}} · Mobile surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD",
+  "Treatment: {{treatment}} · On-Site surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD":
+    "Treatment: {{treatment}} · On-Site surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD",
   "Confirming…": "Confirming…",
   "Retry confirmation": "Retry confirmation",
   "Confirm appointment": "Confirm appointment",
@@ -461,14 +461,14 @@ const en = {
   "Unable to save assignments.": "Unable to save assignments.",
   "Service assignments saved.": "Service assignments saved.",
   "Service assignments": "Service assignments",
-  "Choose a base location and practitioner. For a mobile-only practice, enable Mobile visits and disable Clinic visits. The base location supplies working hours and timezone; no room is needed.":
-    "Choose a base location and practitioner. For a mobile-only practice, enable Mobile visits and disable Clinic visits. The base location supplies working hours and timezone; no room is needed.",
+  "Choose a base location and practitioner. For an On-Site-only practice, enable On-Site visits and disable Clinic visits. The base location supplies working hours and timezone; no room is needed.":
+    "Choose a base location and practitioner. For an On-Site-only practice, enable On-Site visits and disable Clinic visits. The base location supplies working hours and timezone; no room is needed.",
   "Base locations / service areas": "Base locations / service areas",
   "Clinic visits": "Clinic visits",
-  "Mobile visits": "Mobile visits",
+  "On-Site visits": "On-Site visits",
   "Coverage radius km (staff verified)": "Coverage radius km (staff verified)",
   "Travel minutes each way": "Travel minutes each way",
-  "Mobile fee CAD": "Mobile fee CAD",
+  "On-Site fee CAD": "On-Site fee CAD",
   "Save assignments": "Save assignments",
   "Unable to load services.": "Unable to load services.",
   "Unable to save service.": "Unable to save service.",
@@ -584,8 +584,8 @@ const en = {
   "Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.":
     "Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.",
   "Address unavailable": "Address unavailable",
-  "Treatment {{treatment}} + mobile fee {{mobile}} (before applicable taxes)":
-    "Treatment {{treatment}} + mobile fee {{mobile}} (before applicable taxes)",
+  "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)":
+    "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)",
   "Unable to search clients.": "Unable to search clients.",
   "Unable to load times.": "Unable to load times.",
   "Select {{name}}": "Select {{name}}",
@@ -647,8 +647,8 @@ const en = {
   "Unable to change the appointment.": "Unable to change the appointment.",
   "Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.":
     "Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.",
-  "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.":
-    "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.",
+  "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.":
+    "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.",
   "Validate address and coverage": "Validate address and coverage",
   "Validating address…": "Validating address…",
   "Address confirmed: {{distance}} km driving distance ({{radius}} km limit).":
@@ -672,8 +672,8 @@ const en = {
   "Google privacy": "Google privacy",
   "Google Maps terms": "Google Maps terms",
   "Service address (optional)": "Service address (optional)",
-  "Used for mobile visits. Existing appointment destination snapshots do not change when this address is edited.":
-    "Used for mobile visits. Existing appointment destination snapshots do not change when this address is edited.",
+  "Used for On-Site visits. Existing appointment destination snapshots do not change when this address is edited.":
+    "Used for On-Site visits. Existing appointment destination snapshots do not change when this address is edited.",
   "Merge duplicate": "Merge duplicate",
   "Merge duplicate client": "Merge duplicate client",
   "This permanently reassigns the duplicate client’s records to the survivor and makes the duplicate inactive. It does not delete audit history.":
@@ -751,7 +751,7 @@ const en = {
   "Unknown location": "Unknown location",
   "No base locations assigned.": "No base locations assigned.",
   "Unknown practitioner": "Unknown practitioner",
-  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} mobile fee": "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} mobile fee",
+  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee": "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee",
   "Not set": "Not set",
   "No practitioners assigned.": "No practitioners assigned.",
 } as const;

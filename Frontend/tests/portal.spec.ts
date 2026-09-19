@@ -214,7 +214,7 @@ test("services use a list-first command bar and selected services can be assigne
   await expect(page.getByText("Current assignments", { exact: true })).toBeVisible();
   await expect(page.getByText("Test location", { exact: true })).toBeVisible();
   await expect(page.getByText("Test Therapist", { exact: true })).toBeVisible();
-  await expect(page.getByText(/25 km radius.*30 min travel each way.*\$15\.00 mobile fee/)).toBeVisible();
+  await expect(page.getByText(/25 km radius.*30 min travel each way.*\$15\.00 On-Site fee/)).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "New service", exact: true }).click();
   await page

@@ -213,6 +213,8 @@ Maintain explicit transition rules with allowed actors, prerequisite state, fee 
 
 ### Mobile and safety
 
+Portal and public copy call this delivery mode **On-Site (client location)**. The internal `mobile` delivery-mode value and `mobile_*` database columns remain stable compatibility identifiers and must not be renamed casually.
+
 Implemented mobile-first staff booking slice: [MOBILE_BOOKING.md](MOBILE_BOOKING.md).
 Migration 004 adds practitioner/service clinic eligibility and appointment delivery,
 destination, travel and price snapshots. Existing base locations remain scheduling scopes;
