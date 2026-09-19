@@ -150,7 +150,7 @@ test("staff client invitation approval requires review code and verification che
   expect(posts).toBe(1);
 });
 
-test("new services can be assigned without reloading or losing assignment selections", async ({
+test("services use a list-first command bar and selected services can be assigned", async ({
   page,
 }) => {
   await fixtures(page, ["super_admin"]);
@@ -174,8 +174,10 @@ test("new services can be assigned without reloading or losing assignment select
       if (route.request().method() === "POST") {
         createdService = route.request().postDataJSON();
         services.push({ ...services[0], ...createdService, id: 2 });
+        data = { id: 2, status: "active" };
+      } else {
+        data = services;
       }
-      data = services;
     } else if (path.endsWith("/service-assignments"))
       data = { practitioners: [], locations: [] };
     else if (path.endsWith("/locations"))
@@ -188,12 +190,15 @@ test("new services can be assigned without reloading or losing assignment select
     await route.fulfill({ json: { data } });
   });
   await page.goto(`${portalHost}/admin/services`);
-  await expect(page.getByRole("combobox", { name: /^Service / })).toHaveText(
-    "Existing massage",
-  );
-  await page
-    .getByRole("checkbox", { name: "Test Therapist", exact: true })
-    .check();
+  await expect(page.getByText("Existing massage", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: /Existing massage.*100\.00/ }).click();
+  await page.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByText("Service details", { exact: true })).toBeVisible();
+  await expect(page.getByText("60 min — $100.00", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("button", { name: "New service", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Service name", exact: true })
     .fill("New massage");
@@ -209,11 +214,10 @@ test("new services can be assigned without reloading or losing assignment select
     { minutes: 60, price_cents: 12000 },
     { minutes: 90, price_cents: 16500 },
   ]);
-  await expect(
-    page.getByRole("checkbox", { name: "Test Therapist", exact: true }),
-  ).toBeChecked();
-  await page.getByRole("combobox", { name: /^Service / }).click();
-  await page.getByRole("option", { name: "New massage", exact: true }).click();
+  await page.getByRole("button", { name: /New massage.*120\.00/ }).click();
+  await page.getByRole("button", { name: "Assignments", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: /^Service / })).toHaveText("New massage");
+  await expect(page.getByRole("combobox", { name: /^Service / })).toBeDisabled();
   await page
     .getByRole("checkbox", { name: "Test Therapist", exact: true })
     .check();

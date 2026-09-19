@@ -41,7 +41,6 @@ const ProfileSettings = lazy(() => import('../profile/ProfileSettings').then(mod
 const RoomAdmin = lazy(() => import('../admin/RoomAdmin').then(module => ({ default: module.RoomAdmin })));
 const RoomCapabilities = lazy(() => import('../admin/RoomCapabilities').then(module => ({ default: module.RoomCapabilities })));
 const ServiceAdmin = lazy(() => import('../admin/ServiceAdmin').then(module => ({ default: module.ServiceAdmin })));
-const ServiceAssignments = lazy(() => import('../admin/ServiceAssignments').then(module => ({ default: module.ServiceAssignments })));
 const CatalogueSettings = lazy(() => import('../admin/CatalogueSettings').then(module => ({ default: module.CatalogueSettings })));
 const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ default: module.StaffAdmin })));
 const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
@@ -99,7 +98,6 @@ function Dashboard() {
 
 export function StaffPortal({ roles, permissions = [] }: { roles: string[]; permissions?: string[] }) {
   const { t } = useTranslation();
-  const [catalogueVersion, setCatalogueVersion] = useState(0);
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up("md"));
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -170,8 +168,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}
         {page === "rooms" && <Box mt={3}><RoomCapabilities /></Box>}
-        {page === "services" && <ServiceAdmin onSaved={() => setCatalogueVersion(version => version + 1)} />}
-        {page === "services" && <Box mt={3}><ServiceAssignments catalogueVersion={catalogueVersion} /></Box>}
+        {page === "services" && <ServiceAdmin />}
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}

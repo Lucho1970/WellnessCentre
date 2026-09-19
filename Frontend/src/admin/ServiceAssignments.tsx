@@ -11,7 +11,7 @@ type Named = { id: number; name: string };
 type Practitioner = { practitioner_id: number; display_name: string };
 type Link = { practitioner_id: number; service_id: number; active: number; offers_mobile: number; offers_clinic: number; mobile_radius_km: number | null; travel_buffer_minutes: number; mobile_fee_cents: number };
 
-export function ServiceAssignments({ catalogueVersion = 0 }: { catalogueVersion?: number }) {
+export function ServiceAssignments({ initialServiceId, lockService = false, onDirtyChange }: { initialServiceId?: number; lockService?: boolean; onDirtyChange?: (dirty: boolean) => void }) {
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [services, setServices] = useState<Named[]>([]);
@@ -28,10 +28,11 @@ export function ServiceAssignments({ catalogueVersion = 0 }: { catalogueVersion?
   const savedLocations = locationLinks.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))).map((item) => item.location_id).sort((a, b) => a - b);
   const savedPeople = links.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))).sort((a, b) => a.practitioner_id - b.practitioner_id);
   const currentPeople = [...selectedPeople].sort((a, b) => a.practitioner_id - b.practitioner_id);
-  useUnsavedChanges(
+  const dirty =
     JSON.stringify([...selectedLocations].sort((a, b) => a - b)) !== JSON.stringify(savedLocations) ||
-    JSON.stringify(currentPeople) !== JSON.stringify(savedPeople),
-  );
+    JSON.stringify(currentPeople) !== JSON.stringify(savedPeople);
+  useUnsavedChanges(dirty);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     void (async () => {
@@ -51,34 +52,17 @@ export function ServiceAssignments({ catalogueVersion = 0 }: { catalogueVersion?
         setPeople(bodies[2].data);
         setLinks(bodies[3].data.practitioners);
         setLocationLinks(bodies[3].data.locations);
-        setService(String(bodies[0].data[0]?.id ?? ''));
+        const selectedServiceId = Number(bodies[0].data.some((item: Named) => item.id === initialServiceId) ? initialServiceId : bodies[0].data[0]?.id ?? 0);
+        setService(selectedServiceId ? String(selectedServiceId) : '');
+        setSelectedPeople(bodies[3].data.practitioners.filter((item: Link) => item.service_id === selectedServiceId && Boolean(Number(item.active))));
+        setSelectedLocations(bodies[3].data.locations.filter((item: { service_id: number; location_id: number; active: number }) => item.service_id === selectedServiceId && Boolean(Number(item.active))).map((item: { location_id: number }) => item.location_id));
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : t('Unable to load assignments.'));
       } finally {
         setBusy(false);
       }
     })();
-  }, [getAccessToken, t]);
-
-  useEffect(() => {
-    if (!catalogueVersion) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const token = await getAccessToken();
-        const response = await fetch(`${api}/admin/services`, { headers: { Authorization: `Bearer ${token}` } });
-        const body = await response.json();
-        if (!response.ok) throw new Error(t('Unable to refresh services. Please reload the page.'));
-        if (!cancelled) {
-          setServices(body.data);
-          setService((current) => current || String(body.data[0]?.id ?? ''));
-        }
-      } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : t('Unable to refresh services.'));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [catalogueVersion, getAccessToken, t]);
+  }, [getAccessToken, initialServiceId, t]);
 
   useEffect(() => {
     const id = Number(service);
@@ -118,7 +102,7 @@ export function ServiceAssignments({ catalogueVersion = 0 }: { catalogueVersion?
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Typography variant="h5">{t('Service assignments')}</Typography>
       <Typography color="text.secondary" mb={2}>{t('Choose a base location and practitioner. For a mobile-only practice, enable Mobile visits and disable Clinic visits. The base location supplies working hours and timezone; no room is needed.')}</Typography>
-      <TextField select fullWidth label={t('Service')} value={service} onChange={(event) => setService(event.target.value)}>
+      <TextField select fullWidth label={t('Service')} value={service} disabled={lockService} onChange={(event) => setService(event.target.value)}>
         {services.map((item) => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}
       </TextField>
       <Typography fontWeight={700} mt={3}>{t('Base locations / service areas')}</Typography>
