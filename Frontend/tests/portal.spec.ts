@@ -180,13 +180,13 @@ test("services use a list-first command bar and selected services can be assigne
       }
     } else if (path.endsWith("/service-assignments"))
       data = {
-        practitioners: [{ practitioner_id: 3, service_id: 1, active: 1, offers_mobile: 1, offers_clinic: 0, mobile_radius_km: 25, travel_buffer_minutes: 30, mobile_fee_cents: 1500 }],
-        locations: [{ service_id: 1, location_id: 1, active: 1 }],
+        practitioners: [{ practitioner_id: "3", service_id: "1", active: "1", offers_mobile: "1", offers_clinic: "0", mobile_radius_km: "25", travel_buffer_minutes: "30", mobile_fee_cents: "1500" }],
+        locations: [{ service_id: "1", location_id: "1", active: "1" }],
       };
     else if (path.endsWith("/locations"))
-      data = [{ id: 1, name: "Test location" }];
+      data = [{ id: "1", name: "Test location" }];
     else if (path.endsWith("/practitioners"))
-      data = [{ practitioner_id: 3, display_name: "Test Therapist" }];
+      data = [{ practitioner_id: "3", display_name: "Test Therapist" }];
     else if (path.endsWith("/assignments"))
       savedAssignment = route.request().postDataJSON();
     else data = {};

@@ -11,6 +11,27 @@ const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Named = { id: number; name: string };
 type Practitioner = { practitioner_id: number; display_name: string };
 type Link = { practitioner_id: number; service_id: number; active: number; offers_mobile: number; offers_clinic: number; mobile_radius_km: number | null; travel_buffer_minutes: number; mobile_fee_cents: number };
+type LocationLink = { service_id: number; location_id: number; active: number };
+
+const named = (item: Named): Named => ({ ...item, id: Number(item.id) });
+const practitioner = (item: Practitioner): Practitioner => ({ ...item, practitioner_id: Number(item.practitioner_id) });
+const assignment = (item: Link): Link => ({
+  ...item,
+  practitioner_id: Number(item.practitioner_id),
+  service_id: Number(item.service_id),
+  active: Number(item.active),
+  offers_mobile: Number(item.offers_mobile),
+  offers_clinic: Number(item.offers_clinic),
+  mobile_radius_km: item.mobile_radius_km === null ? null : Number(item.mobile_radius_km),
+  travel_buffer_minutes: Number(item.travel_buffer_minutes),
+  mobile_fee_cents: Number(item.mobile_fee_cents),
+});
+const locationAssignment = (item: LocationLink): LocationLink => ({
+  ...item,
+  service_id: Number(item.service_id),
+  location_id: Number(item.location_id),
+  active: Number(item.active),
+});
 
 export function ServiceAssignments({ initialServiceId, lockService = false, onDirtyChange }: { initialServiceId?: number; lockService?: boolean; onDirtyChange?: (dirty: boolean) => void }) {
   const { t, i18n } = useTranslation();
@@ -19,7 +40,7 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
   const [locations, setLocations] = useState<Named[]>([]);
   const [people, setPeople] = useState<Practitioner[]>([]);
   const [links, setLinks] = useState<Link[]>([]);
-  const [locationLinks, setLocationLinks] = useState<{ service_id: number; location_id: number; active: number }[]>([]);
+  const [locationLinks, setLocationLinks] = useState<LocationLink[]>([]);
   const [service, setService] = useState('');
   const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<Link[]>([]);
@@ -49,15 +70,20 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
         ]);
         const bodies = await Promise.all(responses.map((response) => response.json()));
         if (responses.some((response) => !response.ok)) throw new Error(t('Unable to load assignments.'));
-        setServices(bodies[0].data);
-        setLocations(bodies[1].data);
-        setPeople(bodies[2].data);
-        setLinks(bodies[3].data.practitioners);
-        setLocationLinks(bodies[3].data.locations);
-        const selectedServiceId = Number(bodies[0].data.some((item: Named) => item.id === initialServiceId) ? initialServiceId : bodies[0].data[0]?.id ?? 0);
+        const loadedServices = bodies[0].data.map(named);
+        const loadedLocations = bodies[1].data.map(named);
+        const loadedPeople = bodies[2].data.map(practitioner);
+        const loadedLinks = bodies[3].data.practitioners.map(assignment);
+        const loadedLocationLinks = bodies[3].data.locations.map(locationAssignment);
+        setServices(loadedServices);
+        setLocations(loadedLocations);
+        setPeople(loadedPeople);
+        setLinks(loadedLinks);
+        setLocationLinks(loadedLocationLinks);
+        const selectedServiceId = Number(loadedServices.some((item: Named) => item.id === initialServiceId) ? initialServiceId : loadedServices[0]?.id ?? 0);
         setService(selectedServiceId ? String(selectedServiceId) : '');
-        setSelectedPeople(bodies[3].data.practitioners.filter((item: Link) => item.service_id === selectedServiceId && Boolean(Number(item.active))));
-        setSelectedLocations(bodies[3].data.locations.filter((item: { service_id: number; location_id: number; active: number }) => item.service_id === selectedServiceId && Boolean(Number(item.active))).map((item: { location_id: number }) => item.location_id));
+        setSelectedPeople(loadedLinks.filter((item: Link) => item.service_id === selectedServiceId && Boolean(item.active)));
+        setSelectedLocations(loadedLocationLinks.filter((item: LocationLink) => item.service_id === selectedServiceId && Boolean(item.active)).map((item: LocationLink) => item.location_id));
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : t('Unable to load assignments.'));
       } finally {
