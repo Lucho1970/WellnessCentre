@@ -707,6 +707,15 @@ const en = {
   "Use an exact birthdate to narrow the search first.": "Use an exact birthdate to narrow the search first.",
   "Optionally enter at least 2 characters to narrow the birthdate matches.":
     "Optionally enter at least 2 characters to narrow the birthdate matches.",
+  "Loading saved client address…": "Loading saved client address…",
+  "The saved client address is loaded. You can replace it using Google address suggestions. Changes apply only to this appointment.":
+    "The saved client address is loaded. You can replace it using Google address suggestions. Changes apply only to this appointment.",
+  "Visit address changes apply only to this appointment and do not update the client profile.":
+    "Visit address changes apply only to this appointment and do not update the client profile.",
+  "This client has no saved service address. Find an address with Google or enter it manually.":
+    "This client has no saved service address. Find an address with Google or enter it manually.",
+  "The saved client address could not be loaded. Find an address with Google or enter it manually.":
+    "The saved client address could not be loaded. Find an address with Google or enter it manually.",
 } as const;
 
 export default en;

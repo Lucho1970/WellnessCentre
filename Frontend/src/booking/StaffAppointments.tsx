@@ -14,6 +14,7 @@ type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type Destination = AddressValue & { instructions: string };
 type CoverageValidation = { destination: Destination; distance_km: number; radius_km: number; token: string; expires_at: string };
+const emptyDestination = (): Destination => ({address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',country:'Canada',instructions:''});
 function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
 type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
@@ -161,7 +162,8 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   const [clientError, setClientError] = useState('');
   const [clientSearched, setClientSearched] = useState(false);
   const [mode,setMode]=useState<'clinic'|'mobile'>('mobile');
-  const [destination,setDestination]=useState<Destination>({address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',country:'Canada',instructions:''});
+  const [destination,setDestination]=useState<Destination>(emptyDestination);
+  const [clientAddressState,setClientAddressState]=useState<'idle'|'loading'|'saved'|'missing'|'custom'|'error'>('idle');
   const [coverage,setCoverage]=useState<CoverageValidation|null>(null);
   const [coverageBusy,setCoverageBusy]=useState(false);
   const addressComplete=(['address_line1','city','province','postal_code','country'] as const).every(key=>destination[key].trim());
@@ -215,6 +217,14 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
     }, term.length >= 2 ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [clientQuery, clientBirthdate, client, request, practitionerMode, t]);
+  useEffect(() => {
+    if(!client||mode!=='mobile'){setClientAddressState('idle');return;}
+    const controller=new AbortController();setClientAddressState('loading');setCoverage(null);setDestination(emptyDestination());
+    void request(`/booking-clients/${client.id}/address`,{signal:controller.signal})
+      .then(data=>{if(controller.signal.aborted)return;if(data.address){setDestination({...data.address,instructions:data.address.instructions??''});setClientAddressState('saved');}else setClientAddressState('missing');})
+      .catch(()=>{if(!controller.signal.aborted)setClientAddressState('error');});
+    return()=>controller.abort();
+  },[client?.id,mode,request]);
   useEffect(() => {
     if (!pending) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
@@ -274,7 +284,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
         </Stack>}
         {client && <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main', borderWidth: 2 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
           <Box><Typography variant="overline" color="primary">{t('Selected client')}</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || t('No phone number on file')}</Typography></Box>
-          <Button onClick={() => { setClient(null); setClientQuery(''); setClientBirthdate(''); setClients([]); }}>{t('Change client')}</Button>
+          <Button onClick={() => { setClient(null); setClientQuery(''); setClientBirthdate(''); setClients([]); setDestination(emptyDestination()); setClientAddressState('idle'); setCoverage(null); }}>{t('Change client')}</Button>
         </Stack></Paper>}
         <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);clearSlots();}}><MenuItem value="mobile">{t('At client location')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
@@ -286,7 +296,13 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
             : comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, practitionerRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
         </Grid>
-        {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography><AddressEntry required showInstructions disabled={coverageBusy} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setCoverage(null);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.')}</Alert><Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}</Stack>}
+        {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography>
+          {clientAddressState==='loading'&&<Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20}/><Typography>{t('Loading saved client address…')}</Typography></Stack>}
+          {clientAddressState==='saved'&&<Alert severity="info">{t('The saved client address is loaded. You can replace it using Google address suggestions. Changes apply only to this appointment.')}</Alert>}
+          {clientAddressState==='custom'&&<Alert severity="info">{t('Visit address changes apply only to this appointment and do not update the client profile.')}</Alert>}
+          {clientAddressState==='missing'&&<Alert severity="info">{t('This client has no saved service address. Find an address with Google or enter it manually.')}</Alert>}
+          {clientAddressState==='error'&&<Alert severity="warning">{t('The saved client address could not be loaded. Find an address with Google or enter it manually.')}</Alert>}
+          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured mobile service area.')}</Alert><Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}</Stack>}
         <Button variant="contained" disabled={!client || !selected || !addressReady} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
       </Stack>}
       {step === 1 && <Stack spacing={2}>

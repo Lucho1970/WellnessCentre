@@ -70,6 +70,7 @@ final class Api
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/availability','appointmentAvailability');
                 $routes->addRoute('GET','/api/v1/booking-options','bookingOptions');
                 $routes->addRoute('GET','/api/v1/booking-clients','bookingClients');
+                $routes->addRoute('GET','/api/v1/booking-clients/{id:\\d+}/address','bookingClientAddress');
                 $routes->addRoute('POST','/api/v1/address-coverage/validate','validateAddressCoverage');
                 $routes->addRoute('GET','/api/v1/clients','clients');
                 $routes->addRoute('POST','/api/v1/clients','createClient');
@@ -139,6 +140,7 @@ final class Api
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
+                'bookingClientAddress'=>$this->bookings->bookingClientAddress($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'validateAddressCoverage'=>$this->addressCoverage->validate($this->user($request),$request->body),
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
                 'updateAppointment'=>$this->bookings->update($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),

@@ -115,6 +115,27 @@ final class BookingService
         return ['items'=>array_slice($rows,0,25),'has_more'=>$more];
     }
 
+    public function bookingClientAddress(AuthContext $actor,int $clientId,string $correlationId): array
+    {
+        self::authorizeBookingClientAddress($actor);
+        $statement=$this->database->connection()->prepare("SELECT a.address_json FROM users u LEFT JOIN client_contact_addresses a ON a.client_id=u.id WHERE u.id=:client AND u.clinic_id=:clinic AND u.user_type='client' AND u.status='active'");
+        $statement->execute(['client'=>$clientId,'clinic'=>$actor->clinicId]);$row=$statement->fetch();
+        if(!$row)throw new ApiException(404,'client_not_found','The active client was not found.');
+        $address=null;
+        if(is_string($row['address_json']??null)&&$row['address_json']!==''){
+            $decoded=json_decode($row['address_json'],true);
+            if(is_array($decoded))$address=Delivery::destination(['delivery_mode'=>'mobile','destination'=>$decoded]);
+            else error_log("Invalid saved client address correlation_id={$correlationId}");
+        }
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'client.booking_address.view','client',$clientId);
+        return ['address'=>$address];
+    }
+
+    public static function authorizeBookingClientAddress(AuthContext $actor): void
+    {
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot view a booking address.');
+    }
+
     public function updateAvailability(AuthContext $actor,int $id,array $query): array
     {
         $appointment=$this->appointment($actor,$id,false);$this->assertManage($actor,$appointment);

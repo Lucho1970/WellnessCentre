@@ -734,6 +734,15 @@ const fr: Record<string, string> = {
   "Use an exact birthdate to narrow the search first.": "Utilisez une date de naissance exacte pour commencer à préciser la recherche.",
   "Optionally enter at least 2 characters to narrow the birthdate matches.":
     "Saisissez facultativement au moins 2 caractères pour préciser les résultats correspondant à cette date de naissance.",
+  "Loading saved client address…": "Chargement de l’adresse enregistrée du client…",
+  "The saved client address is loaded. You can replace it using Google address suggestions. Changes apply only to this appointment.":
+    "L’adresse enregistrée du client est chargée. Vous pouvez la remplacer à l’aide des suggestions d’adresse Google. Les modifications s’appliquent uniquement à ce rendez-vous.",
+  "Visit address changes apply only to this appointment and do not update the client profile.":
+    "Les modifications de l’adresse de visite s’appliquent uniquement à ce rendez-vous et ne mettent pas à jour le profil du client.",
+  "This client has no saved service address. Find an address with Google or enter it manually.":
+    "Ce client n’a aucune adresse de service enregistrée. Recherchez une adresse avec Google ou saisissez-la manuellement.",
+  "The saved client address could not be loaded. Find an address with Google or enter it manually.":
+    "L’adresse enregistrée du client n’a pas pu être chargée. Recherchez une adresse avec Google ou saisissez-la manuellement.",
 };
 
 export default fr;

@@ -388,6 +388,7 @@ test("mobile-only booking captures destination and price without requesting a ro
   await fixtures(page, ["super_admin"]);
   let booking: Record<string, any> | undefined;
   let availabilityMode = "";
+  let addressFetches = 0;
   await page.route("**/api/v1/booking-options", (route) =>
     route.fulfill({
       json: {
@@ -433,6 +434,10 @@ test("mobile-only booking captures destination and price without requesting a ro
       },
     }),
   );
+  await page.route("**/api/v1/booking-clients/5/address", (route) => {
+    addressFetches += 1;
+    return route.fulfill({ json: { data: { address: { address_line1: "123 Test Street", address_line2: "", city: "Test City", province: "Ontario", postal_code: "A1A 1A1", country: "Canada", instructions: "Side entrance" } } } });
+  });
   await page.route("**/api/v1/availability?**", (route) => {
     availabilityMode =
       new URL(route.request().url()).searchParams.get("delivery_mode") ?? "";
@@ -491,6 +496,9 @@ test("mobile-only booking captures destination and price without requesting a ro
     .fill("Test");
   await page.getByRole("button", { name: "Select Test Client" }).click();
   await expect(page.getByText("Selected client")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Street address" })).toHaveValue("123 Test Street");
+  await expect(page.getByText(/saved client address is loaded/i)).toBeVisible();
+  expect(addressFetches).toBe(1);
   await select(/^Base location/, "Mobile service area");
   await select(/^Service/, "Massage");
   await select(/^Practitioner/, "Therapist");
@@ -498,13 +506,6 @@ test("mobile-only booking captures destination and price without requesting a ro
   await expect(
     page.getByRole("button", { name: "Find a time", exact: true }),
   ).toBeDisabled();
-  await page
-    .getByRole("textbox", { name: "Street address" })
-    .fill("123 Test Street");
-  await page
-    .getByRole("textbox", { name: "City", exact: true })
-    .fill("Test City");
-  await page.getByRole("textbox", { name: "Postal code" }).fill("A1A 1A1");
   await page
     .getByRole("button", { name: "Validate address and coverage" })
     .click();
