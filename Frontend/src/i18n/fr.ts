@@ -730,6 +730,10 @@ const fr: Record<string, string> = {
     "Permet à ce praticien de réserver, reporter et annuler des rendez-vous attribués à un autre praticien.",
   "Appointments booked in your practitioner workspace are assigned to you.":
     "Les rendez-vous réservés dans votre espace praticien vous sont automatiquement attribués.",
+  "Birthdate (optional)": "Date de naissance (facultative)",
+  "Use an exact birthdate to narrow the search first.": "Utilisez une date de naissance exacte pour commencer à préciser la recherche.",
+  "Optionally enter at least 2 characters to narrow the birthdate matches.":
+    "Saisissez facultativement au moins 2 caractères pour préciser les résultats correspondant à cette date de naissance.",
 };
 
 export default fr;

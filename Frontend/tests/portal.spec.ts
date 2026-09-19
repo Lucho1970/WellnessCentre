@@ -536,7 +536,7 @@ test("mobile-only booking captures destination and price without requesting a ro
   expect(booking).not.toHaveProperty("room_id");
 });
 
-test("appointment client finder debounces name, email, or phone searches and uses a details list", async ({
+test("appointment client finder filters by exact birthdate and debounced contact details", async ({
   page,
 }) => {
   await fixtures(page, ["super_admin"]);
@@ -568,9 +568,10 @@ test("appointment client finder debounces name, email, or phone searches and use
       },
     }),
   );
-  const terms: string[] = [];
+  const searches: { q: string; dateOfBirth: string }[] = [];
   await page.route("**/api/v1/booking-clients?**", (route) => {
-    terms.push(new URL(route.request().url()).searchParams.get("q") ?? "");
+    const params = new URL(route.request().url()).searchParams;
+    searches.push({ q: params.get("q") ?? "", dateOfBirth: params.get("date_of_birth") ?? "" });
     return route.fulfill({
       json: {
         data: {
@@ -592,17 +593,24 @@ test("appointment client finder debounces name, email, or phone searches and use
     .getByRole("button", { name: "Book appointment", exact: true })
     .click();
   const search = page.getByRole("textbox", { name: "Find an active client" });
+  const birthdate = page.getByLabel("Birthdate (optional)");
   await search.fill("T");
   await page.waitForTimeout(400);
-  expect(terms).toEqual([]);
+  expect(searches).toEqual([]);
+  await birthdate.fill("1980-05-06");
+  await expect(page.getByRole("button", { name: "Select Test Client" })).toBeVisible();
+  expect(searches).toEqual([{ q: "", dateOfBirth: "1980-05-06" }]);
   await search.fill("Te");
   await page.waitForTimeout(100);
-  expect(terms).toEqual([]);
+  expect(searches).toHaveLength(1);
   await search.fill("Test");
   await expect(
     page.getByRole("button", { name: "Select Test Client" }),
   ).toBeVisible();
-  expect(terms).toEqual(["Test"]);
+  expect(searches).toEqual([
+    { q: "", dateOfBirth: "1980-05-06" },
+    { q: "Test", dateOfBirth: "1980-05-06" },
+  ]);
   await expect(page.getByText("test@example.test")).toBeVisible();
   await expect(page.getByText("905-555-0100")).toBeVisible();
   await expect(
@@ -612,6 +620,7 @@ test("appointment client finder debounces name, email, or phone searches and use
   await expect(page.getByText("Selected client")).toBeVisible();
   await page.getByRole("button", { name: "Change client" }).click();
   await expect(search).toHaveValue("");
+  await expect(birthdate).toHaveValue("");
 });
 
 test("role policies preserve current access without broadening permissions", () => {

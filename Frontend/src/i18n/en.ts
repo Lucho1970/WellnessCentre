@@ -703,6 +703,10 @@ const en = {
     "Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.",
   "Appointments booked in your practitioner workspace are assigned to you.":
     "Appointments booked in your practitioner workspace are assigned to you.",
+  "Birthdate (optional)": "Birthdate (optional)",
+  "Use an exact birthdate to narrow the search first.": "Use an exact birthdate to narrow the search first.",
+  "Optionally enter at least 2 characters to narrow the birthdate matches.":
+    "Optionally enter at least 2 characters to narrow the birthdate matches.",
 } as const;
 
 export default en;

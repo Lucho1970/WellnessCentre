@@ -153,6 +153,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   const [error, setError] = useState('');
   const [step, setStep] = useState(0);
   const [clientQuery, setClientQuery] = useState('');
+  const [clientBirthdate, setClientBirthdate] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [client, setClient] = useState<Client | null>(null);
   const [clientBusy, setClientBusy] = useState(false);
@@ -202,17 +203,18 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   useEffect(() => {
     const term = clientQuery.trim();
     setClients([]); setClientMore(false); setClientError(''); setClientSearched(false);
-    if (client || term.length < 2) { setClientBusy(false); return; }
+    if (client || (term.length < 2 && !clientBirthdate)) { setClientBusy(false); return; }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setClientBusy(true);
-      void request(`/booking-clients?q=${encodeURIComponent(term)}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
+      const params=new URLSearchParams();if(term.length>=2)params.set('q',term);if(clientBirthdate)params.set('date_of_birth',clientBirthdate);if(practitionerMode)params.set('scope','practitioner');
+      void request(`/booking-clients?${params.toString()}`, { signal: controller.signal })
         .then(data => { if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); setClientSearched(true); } })
         .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : t('Unable to search clients.')); })
         .finally(() => { if (!controller.signal.aborted) setClientBusy(false); });
-    }, 300);
+    }, term.length >= 2 ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [clientQuery, client, request, practitionerMode, t]);
+  }, [clientQuery, clientBirthdate, client, request, practitionerMode, t]);
   useEffect(() => {
     if (!pending) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
@@ -256,7 +258,10 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
     {loading ? <CircularProgress aria-label={t('Loading booking options')} /> : options.length === 0 ? <Alert severity="info">{t('No booking combinations are configured. Check active services, durations, practitioners, and location assignments in administration.')}</Alert> : <>
       {step === 0 && <Stack spacing={3}>
-        {!client && <TextField fullWidth label={t('Find an active client')} value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => { setClient(null); setClientQuery(event.target.value); }} helperText={t(clientQuery.trim().length < 2 ? 'Enter at least 2 characters from the client’s name, email, or phone.' : 'Matching active clients appear automatically.')} />}
+        {!client && <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="date" label={t('Birthdate (optional)')} value={clientBirthdate} InputLabelProps={{ shrink: true }} onChange={event=>{setClient(null);setClientBirthdate(event.target.value);}} helperText={t('Use an exact birthdate to narrow the search first.')} /></Grid>
+          <Grid size={{ xs: 12, sm: 8 }}><TextField fullWidth label={t('Find an active client')} value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => { setClient(null); setClientQuery(event.target.value); }} helperText={t(clientBirthdate ? 'Optionally enter at least 2 characters to narrow the birthdate matches.' : clientQuery.trim().length < 2 ? 'Enter at least 2 characters from the client’s name, email, or phone.' : 'Matching active clients appear automatically.')} /></Grid>
+        </Grid>}
         {clientBusy && <Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20} /><Typography>{t('Searching active clients…')}</Typography></Stack>}
         {clientError && <Alert severity="error">{clientError}</Alert>}
         {!client && clientSearched && clients.length === 0 && <Alert severity="info">{t(practitionerMode ? 'No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.' : 'No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.')}</Alert>}
@@ -269,7 +274,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
         </Stack>}
         {client && <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main', borderWidth: 2 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
           <Box><Typography variant="overline" color="primary">{t('Selected client')}</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || t('No phone number on file')}</Typography></Box>
-          <Button onClick={() => { setClient(null); setClientQuery(''); setClients([]); }}>{t('Change client')}</Button>
+          <Button onClick={() => { setClient(null); setClientQuery(''); setClientBirthdate(''); setClients([]); }}>{t('Change client')}</Button>
         </Stack></Paper>}
         <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);clearSlots();}}><MenuItem value="mobile">{t('At client location')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}

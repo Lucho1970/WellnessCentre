@@ -102,10 +102,15 @@ final class BookingService
         if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot search booking clients.');
         $practitionerScope=(($query['scope']??'')==='practitioner'||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')))&&!$actor->hasPermission('schedule_for_other_practitioners');
         if($practitionerScope&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
-        $term=trim((string)($query['q']??''));if(strlen($term)<2||strlen($term)>190)throw new ApiException(422,'validation_error','Search must contain between 2 and 190 characters.');
+        $term=trim((string)($query['q']??''));$birthdate=trim((string)($query['date_of_birth']??''));
+        if($term!==''&&(strlen($term)<2||strlen($term)>190))throw new ApiException(422,'validation_error','Search must contain between 2 and 190 characters.');
+        if($birthdate!==''&&!self::validDate($birthdate))throw new ApiException(422,'validation_error','Birthdate must be a valid date.',['date_of_birth'=>'Invalid date']);
+        if($term===''&&$birthdate==='')throw new ApiException(422,'validation_error','Enter a birthdate or at least 2 search characters.');
         $sql="SELECT DISTINCT u.id,u.display_name,u.email,p.phone FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND u.status='active'";
         $params=['clinic'=>$actor->clinicId];
-        $escaped='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';$sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR p.phone LIKE :phone ESCAPE '!') ORDER BY u.display_name,u.id LIMIT 26";$params+=['name'=>$escaped,'email'=>$escaped,'phone'=>$escaped];
+        if($birthdate!==''){$sql.=' AND p.date_of_birth=:birthdate';$params['birthdate']=$birthdate;}
+        if($term!==''){$escaped='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';$sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR p.phone LIKE :phone ESCAPE '!')";$params+=['name'=>$escaped,'email'=>$escaped,'phone'=>$escaped];}
+        $sql.=' ORDER BY u.display_name,u.id LIMIT 26';
         $statement=$this->database->connection()->prepare($sql);$statement->execute($params);$rows=$statement->fetchAll();$more=count($rows)>25;
         return ['items'=>array_slice($rows,0,25),'has_more'=>$more];
     }
@@ -201,5 +206,11 @@ final class BookingService
     private function history(int $appointmentId,string $from,string $to,int $actorUserId,string $reason): void
     {
         $statement=$this->database->connection()->prepare('INSERT INTO appointment_status_history(appointment_id,from_status,to_status,actor_user_id,reason) VALUES(:appointment,:from_status,:to_status,:actor,:reason)');$statement->execute(['appointment'=>$appointmentId,'from_status'=>$from,'to_status'=>$to,'actor'=>$actorUserId,'reason'=>$reason===''?null:$reason]);
+    }
+
+    private static function validDate(string $value): bool
+    {
+        $date=DateTimeImmutable::createFromFormat('!Y-m-d',$value,new DateTimeZone('UTC'));
+        return $date!==false&&$date->format('Y-m-d')===$value;
     }
 }
