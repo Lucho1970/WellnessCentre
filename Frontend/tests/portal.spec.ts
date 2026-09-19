@@ -156,13 +156,22 @@ test("services use a list-first command bar and selected services can be assigne
   await fixtures(page, ["super_admin"]);
   const services = [
     {
-      id: 1,
+      id: "1",
       name: "Existing massage",
       price_cents: 10000,
       durations: [60],
       duration_options: [{ minutes: 60, price_cents: 10000 }],
       active: 1,
       requires_room: 1,
+    },
+    {
+      id: "2",
+      name: "Second massage",
+      price_cents: 13000,
+      durations: [90],
+      duration_options: [{ minutes: 90, price_cents: 13000 }],
+      active: 1,
+      requires_room: 0,
     },
   ];
   let createdService: Record<string, any> | undefined;
@@ -173,15 +182,15 @@ test("services use a list-first command bar and selected services can be assigne
     if (path.endsWith("/services")) {
       if (route.request().method() === "POST") {
         createdService = route.request().postDataJSON();
-        services.push({ ...services[0], ...createdService, id: 2 });
-        data = { id: 2, status: "active" };
+        services.push({ ...services[0], ...createdService, id: "3" });
+        data = { id: "3", status: "active" };
       } else {
         data = services;
       }
     } else if (path.endsWith("/service-assignments"))
       data = {
-        practitioners: [{ practitioner_id: "3", service_id: "1", active: "1", offers_mobile: "1", offers_clinic: "0", mobile_radius_km: "25", travel_buffer_minutes: "30", mobile_fee_cents: "1500" }],
-        locations: [{ service_id: "1", location_id: "1", active: "1" }],
+        practitioners: [{ practitioner_id: "3", service_id: "2", active: "1", offers_mobile: "1", offers_clinic: "0", mobile_radius_km: "25", travel_buffer_minutes: "30", mobile_fee_cents: "1500" }],
+        locations: [{ service_id: "2", location_id: "1", active: "1" }],
       };
     else if (path.endsWith("/locations"))
       data = [{ id: "1", name: "Test location" }];
@@ -196,12 +205,12 @@ test("services use a list-first command bar and selected services can be assigne
   await expect(page.getByText("Existing massage", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: /Existing massage.*100\.00/ }).click();
+  await page.getByRole("button", { name: /Second massage.*130\.00/ }).click();
   await page.getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("Service details", { exact: true })).toBeVisible();
-  await expect(page.getByText("60 min — $100.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("90 min — $130.00", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
-  await page.getByRole("button", { name: "Practitioners & locations", exact: true }).click();
+  await page.getByRole("button", { name: "Assignments", exact: true }).click();
   await expect(page.getByText("Current assignments", { exact: true })).toBeVisible();
   await expect(page.getByText("Test location", { exact: true })).toBeVisible();
   await expect(page.getByText("Test Therapist", { exact: true })).toBeVisible();
@@ -224,7 +233,7 @@ test("services use a list-first command bar and selected services can be assigne
     { minutes: 90, price_cents: 16500 },
   ]);
   await page.getByRole("button", { name: /New massage.*120\.00/ }).click();
-  await page.getByRole("button", { name: "Practitioners & locations", exact: true }).click();
+  await page.getByRole("button", { name: "Assignments", exact: true }).click();
   await expect(page.getByText("This service has no current assignments and cannot be booked.")).toBeVisible();
   await page.getByRole("button", { name: "Add assignment", exact: true }).click();
   await expect(page.getByRole("combobox", { name: /^Service / })).toHaveText("New massage");
@@ -239,7 +248,7 @@ test("services use a list-first command bar and selected services can be assigne
   await expect(page.getByText("Service assignments saved.")).toBeVisible();
   expect(savedAssignment).toMatchObject({
     location_ids: [1],
-    practitioners: [{ practitioner_id: 3, service_id: 2 }],
+    practitioners: [{ practitioner_id: 3, service_id: 3 }],
   });
 });
 

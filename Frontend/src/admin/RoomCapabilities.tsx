@@ -14,7 +14,7 @@ import {
 import { Plus, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStaffAuth } from "../auth/AuthProvider";
-import { apiErrorMessage } from "../shared/api";
+import { apiErrorMessage, normalizeNumericIds } from "../shared/api";
 import { useUnsavedChanges } from "../shared/UnsavedChanges";
 const api = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 type Named = { id: number; name: string };
@@ -66,11 +66,13 @@ export function RoomCapabilities() {
           t("Unable to load room capabilities."),
         ),
       );
-    setCatalog(b[0].data);
-    setRooms(b[1].data);
-    setServices(b[2].data);
-    setRoom((v) => v || String(b[1].data[0]?.id ?? ""));
-    setService((v) => v || String(b[2].data[0]?.id ?? ""));
+    const loadedRooms = normalizeNumericIds<Named[]>(b[1].data);
+    const loadedServices = normalizeNumericIds<Named[]>(b[2].data);
+    setCatalog(normalizeNumericIds(b[0].data));
+    setRooms(loadedRooms);
+    setServices(loadedServices);
+    setRoom((v) => v || String(loadedRooms[0]?.id ?? ""));
+    setService((v) => v || String(loadedServices[0]?.id ?? ""));
   };
   useEffect(() => {
     void load().catch((c) => setError(c.message));

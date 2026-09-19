@@ -80,7 +80,8 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
         setPeople(loadedPeople);
         setLinks(loadedLinks);
         setLocationLinks(loadedLocationLinks);
-        const selectedServiceId = Number(loadedServices.some((item: Named) => item.id === initialServiceId) ? initialServiceId : loadedServices[0]?.id ?? 0);
+        const requestedServiceId = Number(initialServiceId ?? 0);
+        const selectedServiceId = Number(loadedServices.some((item: Named) => item.id === requestedServiceId) ? requestedServiceId : loadedServices[0]?.id ?? 0);
         setService(selectedServiceId ? String(selectedServiceId) : '');
         setSelectedPeople(loadedLinks.filter((item: Link) => item.service_id === selectedServiceId && Boolean(item.active)));
         setSelectedLocations(loadedLocationLinks.filter((item: LocationLink) => item.service_id === selectedServiceId && Boolean(item.active)).map((item: LocationLink) => item.location_id));

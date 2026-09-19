@@ -3,7 +3,7 @@ import { Alert, Button, Grid, MenuItem, Paper, Stack, TextField, Typography } fr
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage } from '../shared/api';
+import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
@@ -32,10 +32,12 @@ export function AvailabilityAdmin() {
       ]);
       const bodies = await Promise.all(responses.map((response) => response.json()));
       if (responses.some((response) => !response.ok)) throw new Error(t('Unable to load availability.'));
-      setPeople(bodies[0].data);
-      setLocations(bodies[1].data);
-      setRules(bodies[2].data);
-      setForm((current) => ({ ...current, practitioner_id: current.practitioner_id || String(bodies[0].data[0]?.practitioner_id ?? ''), location_id: current.location_id || String(bodies[1].data[0]?.id ?? '') }));
+      const loadedPeople = normalizeNumericIds<Named[]>(bodies[0].data);
+      const loadedLocations = normalizeNumericIds<Named[]>(bodies[1].data);
+      setPeople(loadedPeople);
+      setLocations(loadedLocations);
+      setRules(normalizeNumericIds(bodies[2].data));
+      setForm((current) => ({ ...current, practitioner_id: current.practitioner_id || String(loadedPeople[0]?.practitioner_id ?? ''), location_id: current.location_id || String(loadedLocations[0]?.id ?? '') }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t('Unable to load availability.'));
     }

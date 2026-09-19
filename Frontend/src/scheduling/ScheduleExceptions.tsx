@@ -3,7 +3,7 @@ import { Alert, Button, Grid, MenuItem, Paper, Stack, TextField, Typography } fr
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStaffAuth } from "../auth/AuthProvider";
-import { apiErrorMessage } from "../shared/api";
+import { apiErrorMessage, normalizeNumericIds } from "../shared/api";
 import { formatDateTime } from "../i18n/format";
 import { useUnsavedForm } from "../shared/UnsavedChanges";
 
@@ -54,13 +54,15 @@ export function ScheduleExceptions() {
       ]);
       const bodies = await Promise.all(responses.map((response) => response.json()));
       if (responses.some((response) => !response.ok)) throw new Error(t("Unable to load schedule changes."));
-      setPractitioners(bodies[0].data);
-      setLocations(bodies[1].data);
-      setExceptions(bodies[2].data);
+      const loadedPractitioners = normalizeNumericIds<Practitioner[]>(bodies[0].data);
+      const loadedLocations = normalizeNumericIds<Location[]>(bodies[1].data);
+      setPractitioners(loadedPractitioners);
+      setLocations(loadedLocations);
+      setExceptions(normalizeNumericIds(bodies[2].data));
       setForm((current) => ({
         ...current,
-        practitioner_id: current.practitioner_id || String(bodies[0].data[0]?.practitioner_id ?? ""),
-        location_id: current.location_id || String(bodies[1].data[0]?.id ?? ""),
+        practitioner_id: current.practitioner_id || String(loadedPractitioners[0]?.practitioner_id ?? ""),
+        location_id: current.location_id || String(loadedLocations[0]?.id ?? ""),
       }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("Unable to load schedule changes."));

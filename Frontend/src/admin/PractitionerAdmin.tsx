@@ -3,7 +3,7 @@ import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormC
 import { Pencil, Save, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage } from '../shared/api';
+import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
@@ -40,8 +40,9 @@ export function PractitionerAdmin() {
       const [locationBody, practitionerBody] = await Promise.all([locationResponse.json(), practitionerResponse.json()]);
       if (!locationResponse.ok) throw new Error(apiErrorMessage(locationBody, locationResponse.status, t('Unable to load locations.')));
       if (!practitionerResponse.ok) throw new Error(apiErrorMessage(practitionerBody, practitionerResponse.status, t('Unable to load practitioners.')));
-      setLocations(locationBody.data);setPractitioners(practitionerBody.data);
-      setForm(current => ({ ...current, location_id: current.location_id || String(locationBody.data[0]?.id ?? '') }));
+      const loadedLocations = normalizeNumericIds<Location[]>(locationBody.data);
+      setLocations(loadedLocations);setPractitioners(normalizeNumericIds(practitionerBody.data));
+      setForm(current => ({ ...current, location_id: current.location_id || String(loadedLocations[0]?.id ?? '') }));
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load practitioner administration.')); }
     finally { setLoading(false); }
   }, [getAccessToken, t]);

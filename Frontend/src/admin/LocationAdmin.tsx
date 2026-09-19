@@ -13,7 +13,7 @@ import {
 import { MapPin, Pencil, Plus, Save, X } from "lucide-react";
 import { useStaffAuth } from "../auth/AuthProvider";
 import { useTranslation } from "react-i18next";
-import { apiErrorMessage } from "../shared/api";
+import { apiErrorMessage, normalizeNumericIds } from "../shared/api";
 import { AddressEntry } from "../shared/AddressEntry";
 import { useUnsavedForm } from "../shared/UnsavedChanges";
 
@@ -81,7 +81,7 @@ export function LocationAdmin() {
             t("Unable to load locations."),
           ),
         );
-      setLocations(body.data);
+      setLocations(normalizeNumericIds(body.data));
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : t("Unable to load locations."),

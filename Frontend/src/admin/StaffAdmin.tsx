@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { Pencil, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { apiErrorMessage } from '../shared/api';
+import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
@@ -26,7 +26,7 @@ export function StaffAdmin() {
       const response = await fetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load staff.')));
-      setStaff(body.data.map((member: Staff) => ({ ...member, permissions: member.permissions ?? [] })));
+      setStaff(normalizeNumericIds<Staff[]>(body.data).map((member: Staff) => ({ ...member, permissions: member.permissions ?? [] })));
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load staff.')); }
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);

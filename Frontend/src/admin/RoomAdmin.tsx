@@ -14,7 +14,7 @@ import {
 import { DoorOpen, Pencil, Plus, Save, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStaffAuth } from "../auth/AuthProvider";
-import { apiErrorMessage } from "../shared/api";
+import { apiErrorMessage, normalizeNumericIds } from "../shared/api";
 import { useUnsavedForm } from "../shared/UnsavedChanges";
 const api = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 type Location = { id: number; name: string };
@@ -76,11 +76,12 @@ export function RoomAdmin() {
         throw new Error(
           apiErrorMessage(rb, rr.status, t("Unable to load rooms.")),
         );
-      setLocations(lb.data);
-      setRooms(rb.data);
+      const loadedLocations = normalizeNumericIds<Location[]>(lb.data);
+      setLocations(loadedLocations);
+      setRooms(normalizeNumericIds(rb.data));
       setForm((f) => ({
         ...f,
-        location_id: f.location_id || String(lb.data[0]?.id ?? ""),
+        location_id: f.location_id || String(loadedLocations[0]?.id ?? ""),
       }));
     } catch (c) {
       setError(c instanceof Error ? c.message : t("Unable to load rooms."));

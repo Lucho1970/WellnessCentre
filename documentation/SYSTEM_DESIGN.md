@@ -237,7 +237,7 @@ Block creation must identify impacted booked appointments and create an exceptio
 
 ## 7. API and frontend contracts
 
-Preserve `/api/v1` and the existing JSON success/error envelope, including safe error code/message/correlation ID. Use ISO-8601 timestamps with explicit zones at boundaries; avoid ambiguous local strings. Money uses integer cents and currency. Validate request size, supported content type, enumerations, ranges and nested resource scope. Lists need bounded pagination and stable sorting; preserve current page contracts unless versioning a change.
+Preserve `/api/v1` and the existing JSON success/error envelope, including safe error code/message/correlation ID. Integer database identifiers (`id`, `*_id` and `*_ids`) are JSON numbers at the API boundary even when PDO returns numeric strings; frontend request helpers defensively normalize the same fields before storing or comparing them. UUIDs, provider subjects, idempotency keys and other external identifiers remain strings. Use ISO-8601 timestamps with explicit zones at boundaries; avoid ambiguous local strings. Money uses integer cents and currency. Validate request size, supported content type, enumerations, ranges and nested resource scope. Lists need bounded pagination and stable sorting; preserve current page contracts unless versioning a change.
 
 Expected domain groups: auth/current user; public catalogue/availability; business/practitioner/room/service administration; clients/profiles; appointments/recurrence/cancellation; availability/time off; waitlists; forms/notes/files; messaging; notifications; finance/accounting; reports/audit/privacy. Not all groups are implemented. Produce an OpenAPI contract alongside each new group; do not document planned routes as live.
 

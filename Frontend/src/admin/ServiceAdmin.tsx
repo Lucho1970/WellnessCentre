@@ -31,6 +31,17 @@ type PanelMode = 'details' | 'new' | 'edit' | null;
 
 const duration = (minutes = '60', price = ''): DurationForm => ({ key: crypto.randomUUID(), minutes, price });
 const blank = (): Form => ({ name: '', description: '', preparation_instructions: '', duration_options: [duration()], lead_time_minutes: '0', booking_horizon_days: '365', buffer_before_minutes: '0', buffer_after_minutes: '0', requires_room: true, recurrence_allowed: false, active: true });
+const normalizeService = (service: Service): Service => ({
+  ...service,
+  id: Number(service.id),
+  price_cents: Number(service.price_cents),
+  durations: (service.durations ?? []).map(Number),
+  duration_options: service.duration_options?.map(option => ({ minutes: Number(option.minutes), price_cents: Number(option.price_cents) })),
+  lead_time_minutes: Number(service.lead_time_minutes),
+  booking_horizon_days: Number(service.booking_horizon_days),
+  buffer_before_minutes: Number(service.buffer_before_minutes),
+  buffer_after_minutes: Number(service.buffer_after_minutes),
+});
 const fieldLabels: Record<'lead_time_minutes' | 'booking_horizon_days' | 'buffer_before_minutes' | 'buffer_after_minutes', string> = {
   lead_time_minutes: 'Lead time minutes', booking_horizon_days: 'Booking horizon days', buffer_before_minutes: 'Buffer before minutes', buffer_after_minutes: 'Buffer after minutes',
 };
@@ -69,10 +80,11 @@ export function ServiceAdmin() {
       const response = await fetch(`${api}/admin/services`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load services.')));
-      setItems(body.data);
+      const loadedItems = body.data.map(normalizeService);
+      setItems(loadedItems);
       setSelectedId(current => {
-        const requested = preferredId ?? current;
-        return body.data.some((item: Service) => item.id === requested) ? requested : null;
+        const requested = Number(preferredId ?? current ?? 0) || null;
+        return loadedItems.some((item: Service) => item.id === requested) ? requested : null;
       });
     } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to load services.')); }
     finally { setBusy(false); }
@@ -128,7 +140,7 @@ export function ServiceAdmin() {
         <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: 0.5 }}/>
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
         <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
-        <Button startIcon={<Settings2 size={17}/>} disabled={!selected} onClick={() => openAssignments()}>{t('Practitioners & locations')}</Button>
+        <Button startIcon={<Settings2 size={17}/>} disabled={!selected} onClick={() => openAssignments()}>{t('Assignments')}</Button>
         <TextField size="small" label={t('Filter services')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
       </Stack>
     </Paper>
@@ -164,7 +176,7 @@ export function ServiceAdmin() {
     </Drawer>
 
     <Dialog open={assignmentServiceId !== null} onClose={closeAssignments} fullWidth maxWidth="lg">
-      <DialogTitle>{t('Practitioners & locations')}</DialogTitle>
+      <DialogTitle>{t('Assignments')}</DialogTitle>
       <DialogContent dividers>{assignmentServiceId !== null && <ServiceAssignments initialServiceId={assignmentServiceId} lockService onDirtyChange={setAssignmentsDirty}/>}</DialogContent>
       <DialogActions><Button onClick={closeAssignments}>{t('Close')}</Button></DialogActions>
     </Dialog>
@@ -186,7 +198,7 @@ function ServiceDetails({ service, options, money, edit, assignments }: { servic
     {service.description && <Box><Typography variant="overline" color="text.secondary">{t('Description')}</Typography><Typography>{service.description}</Typography></Box>}
     <Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack>
     {service.preparation_instructions && <Box><Typography variant="overline" color="text.secondary">{t('Preparation instructions')}</Typography><Typography>{service.preparation_instructions}</Typography></Box>}
-    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><Button variant="outlined" startIcon={<Settings2 size={17}/>} onClick={assignments}>{t('Practitioners & locations')}</Button></Stack>
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><Button variant="outlined" startIcon={<Settings2 size={17}/>} onClick={assignments}>{t('Assignments')}</Button></Stack>
   </Stack>;
 }
 

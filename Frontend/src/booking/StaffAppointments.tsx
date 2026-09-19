@@ -4,7 +4,7 @@ import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
-import { apiErrorMessage } from '../shared/api';
+import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
@@ -47,7 +47,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
     let body;
     try { body = JSON.parse(text); } catch { throw new RequestError(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.', { status: response.status }), response.status, 'invalid_response'); }
     if (!response.ok) throw new RequestError(apiErrorMessage(body, response.status, t('Request failed (HTTP {{status}}).', { status: response.status })), response.status, body?.error?.code ?? 'request_failed');
-    return body.data;
+    return normalizeNumericIds(body.data);
   }, [getAccessToken, t]);
   useEffect(() => {
     const controller = new AbortController(); setListBusy(true); setListError('');

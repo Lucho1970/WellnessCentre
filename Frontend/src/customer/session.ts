@@ -1,5 +1,5 @@
 import { customerToken, selectCustomerAccount } from './auth';
-import { apiErrorMessage } from '../shared/api';
+import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import i18n from '../i18n';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
@@ -29,7 +29,7 @@ export async function customerFetch(path: string, init: RequestInit = {}, authen
     throw new Error(apiErrorMessage(body, response.status, i18n.t('The client service is unavailable. Please retry.')));
   }
   if (!body?.data) throw new Error(i18n.t('The client service returned an unexpected response.'));
-  return body.data;
+  return normalizeNumericIds(body.data);
 }
 export async function beginCustomerLogin(): Promise<string | null> {
   const options = await customerFetch('/auth/options', {}, false);
