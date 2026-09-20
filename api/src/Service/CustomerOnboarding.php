@@ -119,7 +119,14 @@ final class CustomerOnboarding
         $link = $this->link($identity);
         $claim = $this->query("SELECT c.review_code FROM client_link_claims c JOIN client_link_invitations i ON i.id=c.invitation_id WHERE c.identity_id=? AND c.status='pending' AND i.clinic_id=? ORDER BY c.id DESC LIMIT 1", [$identity, $this->config->customerClinicId])->fetch();
         return ['authenticated' => true, 'authentication_context' => 'customer', 'onboarding_status' => $link ? 'linked' : ($claim ? 'pending_review' : 'not_linked'),
-            'review_code' => $claim['review_code'] ?? null, 'capabilities' => $link ? ['own_profile', 'own_appointments'] : []];
+            'review_code' => $claim['review_code'] ?? null, 'capabilities' => $link ? ['own_profile', 'own_appointments', 'book_own_appointments'] : []];
+    }
+    public function bookingActor(int $identity): AuthContext {
+        $link = $this->link($identity);
+        if (!$link) throw new ApiException(403, 'client_not_linked', 'Your client record is not linked yet.');
+        $row = $this->query("SELECT id,clinic_id,email,display_name FROM users WHERE id=? AND clinic_id=? AND user_type='client' AND status='active'", [$link['client_id'], $this->config->customerClinicId])->fetch();
+        if (!$row) throw new ApiException(403, 'client_unavailable', 'Client access is unavailable. Contact the clinic.');
+        return new AuthContext((int)$row['id'], (int)$row['clinic_id'], '', (string)$row['email'], (string)$row['display_name'], 'client', []);
     }
     public static function profileInput(array $body): array {
         $allowed = ['given_name','family_name','email','phone','preferred_contact','address','revision'];

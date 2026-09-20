@@ -15,6 +15,19 @@ final class BookingService
 {
     public function __construct(private readonly Database $database,private readonly AuditLogger $audit,private readonly AddressCoverageService $addressCoverage) {}
 
+    public function createForCustomer(AuthContext $actor,array $body,string $correlationId): array
+    {
+        return $this->create($actor,self::customerPayload($actor,$body),$correlationId);
+    }
+
+    public static function customerPayload(AuthContext $actor,array $body): array
+    {
+        if($actor->userType!=='client')throw new ApiException(403,'forbidden','Only a linked client can use this booking route.');
+        if(array_key_exists('client_id',$body))throw new ApiException(422,'validation_error','client_id is assigned from the signed-in client and must not be submitted.',['client_id'=>'Unexpected']);
+        $body['client_id']=$actor->userId;
+        return $body;
+    }
+
     public function create(AuthContext $actor,array $body,string $correlationId): array
     {
         foreach(['client_id','location_id','practitioner_id','service_id','duration_option_id','starts_at','idempotency_key'] as $field) if(empty($body[$field])) throw new ApiException(422,'validation_error',"{$field} is required.",[$field=>'Required']);
@@ -79,7 +92,7 @@ final class BookingService
 
     public function options(AuthContext $actor,array $query=[]): array
     {
-        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot view booking options.');
+        self::authorizeOptions($actor);
         $practitionerScope=(($query['scope']??'')==='practitioner'||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')))&&!$actor->hasPermission('schedule_for_other_practitioners');
         if($practitionerScope&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
         $pdo=$this->database->connection();
@@ -101,6 +114,24 @@ final class BookingService
         }
         if($defaultLocationId===null&&$locationIds)$defaultLocationId=min($locationIds);
         return ['combinations'=>$combinations,'rooms'=>$rooms,'default_location_id'=>$defaultLocationId];
+    }
+
+    public static function authorizeOptions(AuthContext $actor): void
+    {
+        if($actor->userType==='client')return;
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot view booking options.');
+    }
+
+    public function customerAvailability(AuthContext $actor,array $query): array
+    {
+        if($actor->userType!=='client')throw new ApiException(403,'forbidden','Only a linked client can use this availability route.');
+        $mode=Delivery::mode($query);$location=(int)($query['location_id']??0);$service=(int)($query['service_id']??0);$practitioner=(int)($query['practitioner_id']??0);
+        if(!$location||!$service||!$practitioner)throw new ApiException(422,'validation_error','service_id, practitioner_id, and location_id are required.');
+        $column=$mode==='mobile'?'offers_mobile':'offers_clinic';
+        $statement=$this->database->connection()->prepare("SELECT 1 FROM services s JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=:location AND sl.active=1 JOIN locations l ON l.id=sl.location_id AND l.clinic_id=s.clinic_id AND l.is_bookable=1 JOIN practitioner_services ps ON ps.service_id=s.id AND ps.practitioner_id=:practitioner AND ps.active=1 JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1 JOIN users u ON u.id=p.user_id AND u.clinic_id=s.clinic_id AND u.status='active' JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=l.id AND pl.active=1 WHERE s.id=:service AND s.clinic_id=:clinic AND s.active=1 AND ps.{$column}=1");
+        $statement->execute(['location'=>$location,'practitioner'=>$practitioner,'service'=>$service,'clinic'=>$actor->clinicId]);
+        if(!$statement->fetchColumn())throw new ApiException(404,'service_not_available','That practitioner does not offer this service at the selected location.');
+        return (new AvailabilityService($this->database))->search($query);
     }
 
     public function bookingClients(AuthContext $actor,array $query=[]): array

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --config vite.config.ts",
     "dev:portal": "vite --config vite.portal.config.ts",
-    "build": "tsc --noEmit && npm run build:public && npm run build:portal",
+    "validate:content": "node scripts/validate-content.mjs",
+    "build": "npm run validate:content && tsc --noEmit && npm run build:public && npm run build:portal",
     "build:public": "vite build --config vite.config.ts",
     "build:portal": "vite build --config vite.portal.config.ts",
     "preview:public": "vite preview --config vite.config.ts",
@@ -30,7 +31,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-i18next": "^17.0.14",
-    "react-router-dom": "^7.1.0"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.1.0",
+    "remark-gfm": "^4.0.1",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

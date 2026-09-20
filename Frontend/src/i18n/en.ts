@@ -24,6 +24,10 @@ const en = {
     "Online contact details have not been published yet.",
   "Public navigation": "Public navigation",
   "Book online": "Book online",
+  "New clients": "New clients",
+  About: "About",
+  FAQs: "FAQs",
+  "Content unavailable": "This content is not available in the selected language.",
   Contact: "Contact",
   SignIn: "Sign In",
   PageNotFound: "Page not found",
@@ -148,10 +152,10 @@ const en = {
   "Loading available times": "Loading available times",
   "No practitioner is assigned to this service yet.":
     "No practitioner is assigned to this service yet.",
-  "No available times were found in the next seven days.":
-    "No available times were found in the next seven days.",
-  "Times shown in {{timezone}}. Showing up to 24 available options.":
-    "Times shown in {{timezone}}. Showing up to 24 available options.",
+  "No available times were found on this date.":
+    "No available times were found on this date.",
+  "Times shown in {{timezone}}. Choose an available start time.":
+    "Times shown in {{timezone}}. Choose an available start time.",
   "View client booking information": "View client booking information",
   "Profile saved. Existing appointment destinations have not changed.":
     "Profile saved. Existing appointment destinations have not changed.",
@@ -809,6 +813,49 @@ const en = {
   "Link a practitioner": "Link a practitioner",
   "Practitioner availability": "Practitioner availability",
   "Unavailable": "Unavailable",
+  "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
+    "Choose a service, practitioner, and visit type. No time is reserved until you confirm.",
+  "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.":
+    "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.",
+  "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
+    "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.",
+  "Unable to load booking options.": "Unable to load booking options.",
+  "Sign in to continue booking. No appointment has been requested or reserved.":
+    "Sign in to continue booking. No appointment has been requested or reserved.",
+  "Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.":
+    "Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.",
+  "Our Team": "Our Team",
+  "People who care": "People who care",
+  "Meet the people who support your care and your experience with the clinic.": "Meet the people who support your care and your experience with the clinic.",
+  "Administration": "Administration",
+  "View profile for {{name}}": "View profile for {{name}}",
+  "Profile for {{name}}": "Profile for {{name}}",
+  "Book a session": "Book a session",
+  "Loading team": "Loading team",
+  "Unable to load the team.": "Unable to load the team.",
+  "Team profiles are being prepared.": "Team profiles are being prepared.",
+  "Public team": "Public team",
+  "Published staff profiles": "Published staff profiles",
+  "Only profiles you publish here appear on the public Contact page. Staff email and account details are never published.": "Only profiles you publish here appear on the public Contact page. Staff email and account details are never published.",
+  "Team profiles": "Team profiles",
+  "Published": "Published",
+  "Not published": "Not published",
+  "Profile image is ready to publish.": "Profile image is ready to publish.",
+  "No profile image has been uploaded. Initials will be shown.": "No profile image has been uploaded. Initials will be shown.",
+  "Public URL name": "Public URL name",
+  "Lowercase letters, numbers, and hyphens only.": "Lowercase letters, numbers, and hyphens only.",
+  "Team section": "Team section",
+  "Title (English)": "Title (English)",
+  "Title (French)": "Title (French)",
+  "Profile summary (English)": "Profile summary (English)",
+  "Profile summary (French)": "Profile summary (French)",
+  "Display order": "Display order",
+  "Show Book a session action": "Show Book a session action",
+  "Publish on the Contact page": "Publish on the Contact page",
+  "Save team profile": "Save team profile",
+  "Unable to load team profiles.": "Unable to load team profiles.",
+  "Unable to save team profile.": "Unable to save team profile.",
+  "Public team profile saved.": "Public team profile saved.",
 } as const;
 
 export default en;

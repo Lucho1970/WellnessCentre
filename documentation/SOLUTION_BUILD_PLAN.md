@@ -627,6 +627,12 @@ Client-management checkpoint: administrators and reception can search, create, a
 
 Progress: recurring practitioner/location working hours plus one-time availability overrides and time off are implemented in the API and Super Admin portal. The scheduling API restricts practitioner access to their own records; practitioner portal access still needs to be connected. Availability search now includes extra openings, recurrence intervals, merged hours, service buffers and horizons, cross-location practitioner conflicts, and eligible rooms with capabilities, restrictions, and turnover. These changes require deployed MySQL verification. Next: enforce the same rules during booking, add concurrency tests, and connect the booking interface. Phase 4 remains in progress.
 
+20 September checkpoint: linked clients can now carry public preferences into the client
+portal and confirm their own clinic or On-Site appointment through the same availability,
+coverage, price, locking and idempotency rules as staff booking. Client identity and clinic
+scope are derived server-side. Client cancellation/rescheduling, hosted MySQL race
+acceptance and notification delivery remain required before completing the phase.
+
 Build:
 
 - Recurring availability, overrides, time off, imported blocks, room constraints, buffers, lead times, cutoffs, and horizons.

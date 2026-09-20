@@ -4,8 +4,10 @@ import { AppProviders } from '../shared/AppProviders';
 import { ClientApp } from './ClientApp';
 import { customerConfigured, customerHome, customerInstance, selectCustomerAccount } from './auth';
 import { finishCustomerLogin } from './session';
+import { captureCustomerBookingIntent } from './bookingIntent';
 
 export async function bootstrap() {
+  captureCustomerBookingIntent();
   if (window.location.pathname.endsWith('/client/invite')) {
     const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
     if (token && /^[a-f0-9]{64}$/.test(token)) sessionStorage.setItem('wellness.customer.invitation', token);

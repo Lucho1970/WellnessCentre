@@ -294,11 +294,11 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
               )}
             </Typography>
           )}
-          <Alert severity="info" sx={{ my: 2 }}>
-            {t(
-              "Client booking is coming next. No appointment has been requested or reserved. Contact the clinic to book or change an appointment.",
-            )}
-          </Alert>
+          {!verified && (
+            <Alert severity="info" sx={{ my: 2 }}>
+              {t("Sign in to continue booking. No appointment has been requested or reserved.")}
+            </Alert>
+          )}
           {verified && !status && (
             <Typography>
               {t(

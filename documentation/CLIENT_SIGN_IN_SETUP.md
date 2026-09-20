@@ -27,6 +27,11 @@ hint is selected only from an allowlisted value of the signed cached `idp` claim
 fresh nonce, `prompt=login`, `max_age=0`, and `auth_time` proof remain mandatory, so this
 changes provider routing without weakening the onboarding/session freshness check. A
 first-time user, a missing claim, or an unsupported provider still sees the normal chooser.
+The portal supplies this through MSAL's supported `domainHint` request property and
+temporarily clears the active-account hint while the redirect starts. This prevents an
+External ID opaque `login_hint` or generated username from being combined with
+`domain_hint`, a combination rejected with `AADSTS1002014`. The cached account itself is
+not deleted and a failed redirect restores it as active.
 
 Public initials use a hidden portal `/client/session` page with exact-origin/source and
 nonce-checked postMessage replies. Only initials from an unexpired cached customer ID

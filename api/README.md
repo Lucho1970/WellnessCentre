@@ -44,6 +44,7 @@ Public:
 - `GET /api/v1/locations`
 - `GET /api/v1/services?practitioner_id=`
 - `GET /api/v1/practitioners?service_id=`
+- `GET /api/v1/team` and `GET /api/v1/team/{slug}/image` (published public profiles only)
 - `GET /api/v1/availability?location_id=&service_id=&practitioner_id=&date_from=&date_to=`
 
 Authenticated:
@@ -85,6 +86,7 @@ Clinic administration:
 - `POST|DELETE /api/v1/admin/availability-overrides[/{id}]`
 - `POST|DELETE /api/v1/admin/time-off[/{id}]`
 - `PATCH /api/v1/admin/clinic` (Super Admin only)
+- `GET /api/v1/admin/team-profiles` and `PUT /api/v1/admin/team-profiles/{userId}` (Super Admin only)
 
 Protected requests require an Entra access token with the configured audience and `access_as_user` scope. Identity is linked using the immutable tenant ID and `oid`, not email address. Effective permissions are the intersection of the user's Entra app roles and local database roles.
 

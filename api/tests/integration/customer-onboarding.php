@@ -37,6 +37,8 @@ $reject(fn()=>$c->session($bc,$as['session_token']),401);
 $assert($db->query("SELECT COUNT(*) FROM customer_sessions WHERE token_hash='".$as['session_token']."'")->fetchColumn()==0,'Raw session stored');
 $body=['given_name'=>'New','family_name'=>'Client','email'=>'new@example.test','phone'=>'555-0101','address'=>['address_line1'=>'1 Test Street','city'=>'Test City','province'=>'ON','postal_code'=>'A1A 1A1','country'=>'Canada']];
 $assert($c->register($a,$body,$cid)['onboarding_status']==='linked');
+$assert(in_array('book_own_appointments',$c->status($a)['capabilities'],true));
+$assert($c->bookingActor($a)->userId===(int)$db->query("SELECT id FROM users WHERE email='new@example.test'")->fetchColumn());
 $assert($c->register($a,$body,$cid)['onboarding_status']==='linked');
 $assert((int)$db->query("SELECT COUNT(*) FROM users WHERE email='new@example.test'")->fetchColumn()===1);
 $reject(fn()=>$c->register($d,$body,$cid),409);

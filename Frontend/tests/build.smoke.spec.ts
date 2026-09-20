@@ -38,6 +38,10 @@ test('built public and portal deep links load independently, including base path
   await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
   await expect(page.getByRole('heading', { name: 'Contact Build Smoke Clinic' })).toBeVisible();
   await page.reload(); await expect(page.getByRole('heading', { name: 'Contact Build Smoke Clinic' })).toBeVisible();
+  await page.goto(`${publicOrigin}${info.config.metadata.publicBase}about`);
+  await expect(page.getByRole('heading', { name: 'About our centre', level: 1 })).toBeVisible();
+  await page.reload();
+  await expect(page).toHaveTitle('About us | Build Smoke Clinic');
   const portalRequests: string[] = [];
   page.on('request', request => { if (request.url().includes('/api/v1/')) portalRequests.push(request.url()); });
   await page.goto(`${portalOrigin}${info.config.metadata.portalBase}admin/clients`);

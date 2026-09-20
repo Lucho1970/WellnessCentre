@@ -91,6 +91,20 @@ New Clients, FAQ and resource content may remain version-controlled initially. D
 introduce a CMS until editing roles, review/publishing state, localization, media handling
 and audit requirements justify it.
 
+**Implemented content checkpoint (20 September 2026):** public editorial pages and
+embeddable sections load from matching `Frontend/content/en` and `fr` Markdown trees.
+YAML metadata controls title, description and draft/published state; raw HTML and unsafe
+URLs are rejected, media is restricted to reviewed `/content-assets/`, and builds require
+matching bilingual files and publication status. Markdown rendering is code-split from
+the public bootstrap. Catalogue facts remain API-backed. See [Public website content](PUBLIC_CONTENT.md).
+
+**Public team checkpoint (20 September 2026):** the Contact page reads an allowlisted
+`GET /api/v1/team` projection ordered by practitioners then administration. SuperAdmin
+controls publication, section, bilingual title/summary, ordering and practitioner booking
+action in `/admin/team`; unpublished staff and account email are never returned. Approved
+application profile images are served through the published slug only, with bounded public
+caching. Migration `008_public_team_profiles.sql` is required. See [Public team profiles](PUBLIC_TEAM.md).
+
 Public media stores consent/provenance, alt text, crop/variant metadata and publication
 state; serve optimized responsive formats while preserving a controlled original outside
 the public document root. Conversion events use an allowlist of non-sensitive event names

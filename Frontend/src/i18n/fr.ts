@@ -25,6 +25,10 @@ const fr: Record<string, string> = {
     "Les coordonnées en ligne ne sont pas encore publiées.",
   "Public navigation": "Navigation publique",
   "Book online": "Réserver en ligne",
+  "New clients": "Nouveaux clients",
+  About: "À propos",
+  FAQs: "FAQ",
+  "Content unavailable": "Ce contenu n’est pas disponible dans la langue sélectionnée.",
   Contact: "Nous joindre",
   SignIn: "Connexion",
   PageNotFound: "Page introuvable",
@@ -154,10 +158,10 @@ const fr: Record<string, string> = {
   "Loading available times": "Chargement des heures disponibles",
   "No practitioner is assigned to this service yet.":
     "Aucun praticien n’est encore affecté à ce service.",
-  "No available times were found in the next seven days.":
-    "Aucune heure disponible n’a été trouvée au cours des sept prochains jours.",
-  "Times shown in {{timezone}}. Showing up to 24 available options.":
-    "Heures affichées selon le fuseau {{timezone}}. Jusqu’à 24 options disponibles sont affichées.",
+  "No available times were found on this date.":
+    "Aucune heure disponible n’a été trouvée à cette date.",
+  "Times shown in {{timezone}}. Choose an available start time.":
+    "Heures affichées selon le fuseau {{timezone}}. Choisissez une heure de début disponible.",
   "View client booking information":
     "Voir les renseignements de réservation du client",
   "Profile saved. Existing appointment destinations have not changed.":
@@ -836,6 +840,49 @@ const fr: Record<string, string> = {
   "Link a practitioner": "Associer un praticien",
   "Practitioner availability": "Disponibilité du praticien",
   "Unavailable": "Indisponible",
+  "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
+    "Choisissez un service, un praticien et un type de visite. Aucune plage horaire n’est réservée avant votre confirmation.",
+  "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.":
+    "La disponibilité est vérifiée de nouveau lors de la confirmation. L’envoi de courriels n’est pas encore activé; conservez donc le numéro de rendez-vous affiché après la confirmation.",
+  "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
+    "Réservez un nouveau rendez-vous ici. Communiquez avec la clinique si vous avez besoin d’aide pour modifier un rendez-vous existant.",
+  "Unable to load booking options.": "Impossible de charger les options de réservation.",
+  "Sign in to continue booking. No appointment has been requested or reserved.":
+    "Connectez-vous pour poursuivre la réservation. Aucun rendez-vous n’a été demandé ni réservé.",
+  "Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.":
+    "Consultez les heures disponibles, puis connectez-vous pour vérifier et confirmer. La sélection d’une heure ne la réserve pas.",
+  "Our Team": "Notre équipe",
+  "People who care": "Une équipe attentionnée",
+  "Meet the people who support your care and your experience with the clinic.": "Faites connaissance avec les personnes qui vous accompagnent dans vos soins et votre expérience à la clinique.",
+  "Administration": "Administration",
+  "View profile for {{name}}": "Voir le profil de {{name}}",
+  "Profile for {{name}}": "Profil de {{name}}",
+  "Book a session": "Réserver une séance",
+  "Loading team": "Chargement de l’équipe",
+  "Unable to load the team.": "Impossible de charger l’équipe.",
+  "Team profiles are being prepared.": "Les profils de l’équipe sont en préparation.",
+  "Public team": "Équipe publique",
+  "Published staff profiles": "Profils du personnel publiés",
+  "Only profiles you publish here appear on the public Contact page. Staff email and account details are never published.": "Seuls les profils que vous publiez ici apparaissent sur la page publique Nous joindre. Les courriels et les renseignements de compte du personnel ne sont jamais publiés.",
+  "Team profiles": "Profils de l’équipe",
+  "Published": "Publié",
+  "Not published": "Non publié",
+  "Profile image is ready to publish.": "La photo de profil est prête à être publiée.",
+  "No profile image has been uploaded. Initials will be shown.": "Aucune photo de profil n’a été téléversée. Les initiales seront affichées.",
+  "Public URL name": "Nom dans l’adresse publique",
+  "Lowercase letters, numbers, and hyphens only.": "Lettres minuscules, chiffres et traits d’union seulement.",
+  "Team section": "Section de l’équipe",
+  "Title (English)": "Titre (anglais)",
+  "Title (French)": "Titre (français)",
+  "Profile summary (English)": "Résumé du profil (anglais)",
+  "Profile summary (French)": "Résumé du profil (français)",
+  "Display order": "Ordre d’affichage",
+  "Show Book a session action": "Afficher l’action Réserver une séance",
+  "Publish on the Contact page": "Publier sur la page Nous joindre",
+  "Save team profile": "Enregistrer le profil",
+  "Unable to load team profiles.": "Impossible de charger les profils de l’équipe.",
+  "Unable to save team profile.": "Impossible d’enregistrer le profil de l’équipe.",
+  "Public team profile saved.": "Le profil public de l’équipe a été enregistré.",
 };
 
 export default fr;

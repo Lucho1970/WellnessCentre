@@ -876,20 +876,93 @@ test("public home has client-first login and no workforce authentication or fake
   ).toBe(false);
 });
 
+test("public Markdown pages follow the selected language and publish safe metadata", async ({ page }) => {
+  await fixtures(page);
+  await page.goto(`${publicHost}/about`);
+  await expect(page.getByRole("heading", { name: "About our centre", level: 1 })).toBeVisible();
+  await expect(page).toHaveTitle("About us | Test Wellness");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /approach to accessible wellness care/);
+  await expect(page.getByRole("link", { name: "New clients" }).first()).toHaveAttribute("href", "/new-clients");
+  await page.getByRole("button", { name: "Language and region" }).click();
+  await page.getByRole("button", { name: /Français \(Canada\)/ }).click();
+  await expect(page.getByRole("heading", { name: "À propos de notre centre", level: 1 })).toBeVisible();
+  await expect(page).toHaveTitle("À propos | Test Wellness");
+  await page.getByRole("link", { name: "Nouveaux clients" }).first().click();
+  await expect(page.getByRole("heading", { name: "Bienvenue aux nouveaux clients", level: 1 })).toBeVisible();
+  await page.getByRole("link", { name: "FAQ", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Foire aux questions", level: 1 })).toBeVisible();
+});
+
+test("contact page lists published practitioners first and carries a team booking choice", async ({ page }) => {
+  await fixtures(page);
+  await page.route("**/api/v1/team", route => route.fulfill({ json: { data: [
+    { slug: "test-practitioner", section: "practitioner", display_name: "Test Practitioner", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", display_order: 1, has_image: 0, image_version: null, practitioner_id: 3 },
+    { slug: "test-admin", section: "administration", display_name: "Test Administrator", public_title: "Clinic Administrator", public_title_fr: "Administration de la clinique", summary: null, summary_fr: null, display_order: 1, has_image: 0, image_version: null, practitioner_id: null },
+  ] } }));
+  await page.goto(`${publicHost}/contact`);
+  const practitionerHeading = page.getByRole('heading', { name: "Practitioners", level: 3 });
+  const administrationHeading = page.getByRole('heading', { name: "Administration", level: 3 });
+  await expect(practitionerHeading).toBeVisible();
+  await expect(administrationHeading).toBeVisible();
+  const practitionerBox = await practitionerHeading.boundingBox(), administrationBox = await administrationHeading.boundingBox();
+  expect(practitionerBox && administrationBox ? practitionerBox.y : Number.POSITIVE_INFINITY).toBeLessThan(administrationBox?.y ?? 0);
+  await page.getByRole('button', { name: "View profile for Test Practitioner" }).hover();
+  await expect(page.getByRole('dialog', { name: "Profile for Test Practitioner" })).toBeVisible();
+  await page.getByRole('link', { name: "Book a session" }).click();
+  await expect(page).toHaveURL(`${publicHost}/book?practitioner_id=3`);
+  await expect(page.getByRole('combobox', { name: "Practitioner" })).toContainText("Test Practitioner");
+});
+
+test("super admin deliberately publishes a bilingual public team profile", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  let saved: Record<string, unknown> | null = null;
+  await page.route("**/api/v1/admin/team-profiles", route => route.fulfill({ json: { data: [
+    { user_id: 7, display_name: "Esther Vanderpoel", status: "active", practitioner_id: 3, slug: null, section: null, public_title: null, public_title_fr: null, summary: null, summary_fr: null, display_order: null, published: null, show_booking_action: null, has_image: 1 },
+  ] } }));
+  await page.route("**/api/v1/admin/team-profiles/7", async route => {
+    saved = route.request().postDataJSON();
+    await route.fulfill({ json: { data: { user_id: 7, published: true } } });
+  });
+  await page.goto(`${portalHost}/admin/team`);
+  await expect(page.getByRole('heading', { name: "Public team" })).toBeVisible();
+  await page.getByLabel("Title (English)").fill("Registered Massage Therapist");
+  await page.getByLabel("Title (French)").fill("Massothérapeute agréée");
+  await page.getByLabel("Show Book a session action").check();
+  await page.getByLabel("Publish on the Contact page").check();
+  await page.getByRole('button', { name: "Save team profile" }).click();
+  await expect.poll(() => saved).toMatchObject({ slug: "esther-vanderpoel", section: "practitioner", published: true, show_booking_action: true });
+});
+
 test("public booking hands off preferences without reserving or creating an appointment", async ({
   page,
 }) => {
   const writes: string[] = [];
+  const availabilityQueries: URL[] = [];
   page.on("request", (request) => {
     if (request.method() !== "GET") writes.push(request.url());
   });
   await fixtures(page);
+  await page.route("**/api/v1/availability?**", (route) => {
+    availabilityQueries.push(new URL(route.request().url()));
+    const availability = Array.from({ length: 25 }, (_, index) => {
+      const starts = new Date(Date.UTC(2030, 9, 1, 13, index * 15));
+      return {
+        duration_option_id: 4,
+        starts_at: starts.toISOString(),
+        ends_at: new Date(starts.getTime() + 60 * 60000).toISOString(),
+      };
+    });
+    return route.fulfill({
+      json: { data: { timezone: "America/Toronto", availability } },
+    });
+  });
   await page.goto(`${publicHost}/book`);
+  await page.getByLabel("Appointment date").fill("2030-10-01");
+  await expect.poll(() => availabilityQueries.at(-1)?.searchParams.get("date_from")).toBe("2030-10-01");
+  expect(availabilityQueries.at(-1)?.searchParams.get("date_to")).toBe("2030-10-01");
   await expect(page.getByText("60 min — $100.00", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /Oct 1.*60 min.*\$100\.00/ }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Oct 1.*60 min/ }).click();
+  await expect(page.getByRole("button", { name: /60 min.*\$100\.00/ })).toHaveCount(25);
+  await page.getByRole("button", { name: /9:00.*60 min/ }).click();
   await page
     .getByRole("link", { name: "View client booking information" })
     .click();
@@ -901,6 +974,9 @@ test("public booking hands off preferences without reserving or creating an appo
       exact: false,
     }),
   ).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("wellness.customer.booking-intent.v1") ?? "null"))).toMatchObject({
+    delivery_mode: "mobile", location_id: "1", service_id: "2", practitioner_id: "3", duration_option_id: "4",
+  });
   expect(writes).toEqual([]);
 });
 

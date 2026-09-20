@@ -6,6 +6,14 @@ This is the living, non-technical guide for staff using the Wellness Centre port
 
 After a linked client signs in, **My appointments** opens by default. The client can switch between **Upcoming**, **Past**, and **All appointments**, and can refresh the list. Each item shows the service, start and end time in the clinic location's timezone, status, practitioner, visit type or clinic location, and appointment number.
 
+Choose **Book appointment** to select a visit type, service, practitioner and duration. For
+an On-Site visit, review the saved profile address (or replace it for this appointment),
+then validate the address and service radius. Choose a date, search current availability,
+select a time and any required room, and review the price before confirming. A selected
+time is not reserved until confirmation succeeds. Keep the appointment number because
+email delivery is not enabled yet. Use the same confirmation button to retry an uncertain
+network result; do not start a second booking until the appointment list has been checked.
+
 The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Clients must currently contact the clinic to book, cancel, or reschedule.
 
 After a duplicate client is merged, only the surviving client appears in client lists and booking searches. The merged record remains in protected history for audit purposes and is not deleted.

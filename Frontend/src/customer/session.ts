@@ -7,6 +7,9 @@ const key = 'wellness.customer.session.v1';
 export const challengeKey = 'wellness.customer.challenge.v1';
 export type SessionTimes = { idle_expires_at: number; absolute_expires_at: number };
 type StoredSession = SessionTimes & { session_token: string; account: string };
+export class CustomerRequestError extends Error {
+  constructor(message: string, readonly status: number, readonly code: string) { super(message); }
+}
 export function clearCustomerSession() { sessionStorage.removeItem(key); }
 export function savedSession(): StoredSession | null {
   try {
@@ -26,7 +29,7 @@ export async function customerFetch(path: string, init: RequestInit = {}, authen
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     if (response.status === 401) { clearCustomerSession(); window.dispatchEvent(new Event('customer-session-ended')); }
-    throw new Error(apiErrorMessage(body, response.status, i18n.t('The client service is unavailable. Please retry.')));
+    throw new CustomerRequestError(apiErrorMessage(body, response.status, i18n.t('The client service is unavailable. Please retry.')), response.status, body?.error?.code ?? 'request_failed');
   }
   if (!body?.data) throw new Error(i18n.t('The client service returned an unexpected response.'));
   return normalizeNumericIds(body.data);
