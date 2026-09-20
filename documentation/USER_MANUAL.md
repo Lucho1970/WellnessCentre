@@ -63,6 +63,12 @@ The **Locations** and **Rooms** administration pages use the same list-first pat
 
 Locations store the clinic or service-area name, address, timezone, phone number, and whether bookings are accepted. Rooms belong to a location and store the room type, equipment notes, turnover time, and booking status. A location must exist before a room can be created. Use **Capabilities** from the Rooms command bar to manage capability definitions and room/service capability assignments without cluttering the room list. Deactivate booking instead of removing records that may be referenced by appointment history.
 
+## Practitioners
+
+The **Practitioners** page is list-first. Select a practitioner to enable **Details** and **Edit**, or choose **New practitioner** to link a new Microsoft Entra staff identity. The details panel shows the practitioner’s availability status, discipline, credentials, active location, booking-management mode, and Microsoft sign-in email.
+
+Create the Microsoft Entra account and assign the required practitioner application role before linking it in the portal. The immutable Entra tenant and object IDs are required only when creating the link. Editing the portal email does not rename or relink the Microsoft account. Use the two status controls carefully: the account status controls portal access, while **Available as a practitioner** controls whether the practitioner is available operationally.
+
 ## Quick verification after changing a service
 
 - Reopen **Assignments** and confirm the saved practitioner and location are listed.

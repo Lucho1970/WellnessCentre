@@ -781,6 +781,20 @@ const en = {
   "Turnover time": "Turnover time",
   "Capabilities": "Capabilities",
   "Room capabilities": "Room capabilities",
+  "Practitioner actions": "Practitioner actions",
+  "New practitioner": "New practitioner",
+  "Filter practitioners": "Filter practitioners",
+  "Select a practitioner to view details or enable actions.": "Select a practitioner to view details or enable actions.",
+  "No active location": "No active location",
+  "No matching practitioners": "No matching practitioners",
+  "No practitioners yet": "No practitioners yet",
+  "Try a different name, email, discipline, or location.": "Try a different name, email, discipline, or location.",
+  "Link the first practitioner after creating their Microsoft Entra account.": "Link the first practitioner after creating their Microsoft Entra account.",
+  "Create a location before adding practitioners.": "Create a location before adding practitioners.",
+  "Practitioner details": "Practitioner details",
+  "Link a practitioner": "Link a practitioner",
+  "Practitioner availability": "Practitioner availability",
+  "Unavailable": "Unavailable",
 } as const;
 
 export default en;

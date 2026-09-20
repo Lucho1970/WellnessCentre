@@ -313,6 +313,51 @@ test("locations and rooms use list-first actions with ID-safe create and edit pa
   expect(createdRoom).toMatchObject({ location_id: 11, name: "Room Cedar", turnover_minutes: 20 });
 });
 
+test("practitioners use list-first details, edit, and identity-linking panels", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  const practitioners = [
+    { practitioner_id: "8", user_id: "18", display_name: "Esther Vanderpoel", email: "esther@example.test", status: "active", discipline: "Registered Massage Therapy", credentials: "RMT", booking_mode: "practitioner_managed", active: "1", location_id: "1", locations: "Holland Landing" },
+  ];
+  let updated: Record<string, unknown> | undefined;
+  let created: Record<string, unknown> | undefined;
+  await page.route("**/api/v1/admin/practitioners**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = practitioners;
+    if (path.endsWith("/practitioners/8") && route.request().method() === "PATCH") {
+      updated = route.request().postDataJSON();
+      practitioners[0] = { ...practitioners[0], ...updated } as typeof practitioners[number];
+      data = { id: "8" };
+    } else if (path.endsWith("/practitioners/onboard") && route.request().method() === "POST") {
+      created = route.request().postDataJSON();
+      practitioners.push({ practitioner_id: "9", user_id: "19", status: "active", active: "1", locations: "Holland Landing", ...created } as typeof practitioners[number]);
+      data = { id: "9", user_id: "19", status: "active" };
+    }
+    await route.fulfill({ json: { data } });
+  });
+
+  await page.goto(`${portalHost}/admin/practitioners`);
+  await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
+  await page.getByRole("button", { name: /Esther Vanderpoel.*RMT.*Holland Landing/ }).click();
+  await page.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByText("Practitioner details", { exact: true })).toBeVisible();
+  await expect(page.getByText("esther@example.test", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("textbox", { name: "Credentials", exact: true }).fill("RMT, BSc");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Esther Vanderpoel was updated.")).toBeVisible();
+  expect(updated).toMatchObject({ practitioner_id: 8, location_id: 1, credentials: "RMT, BSc" });
+
+  await page.getByRole("button", { name: "New practitioner", exact: true }).click();
+  await page.getByRole("textbox", { name: "Display name", exact: true }).fill("New Therapist");
+  await page.getByRole("textbox", { name: "Microsoft sign-in email" }).fill("new@example.test");
+  await page.getByRole("textbox", { name: "Entra Object ID" }).fill("11111111-1111-4111-8111-111111111111");
+  await page.getByRole("textbox", { name: "Entra Tenant ID" }).fill("22222222-2222-4222-8222-222222222222");
+  await page.getByRole("button", { name: "Add practitioner", exact: true }).click();
+  await expect(page.getByText("New Therapist was added as a practitioner.")).toBeVisible();
+  expect(created).toMatchObject({ location_id: 1, display_name: "New Therapist", object_id: "11111111-1111-4111-8111-111111111111" });
+});
+
 test("staff client creation saves a reusable service address with manual fallback", async ({
   page,
 }) => {

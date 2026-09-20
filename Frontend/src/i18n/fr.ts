@@ -808,6 +808,20 @@ const fr: Record<string, string> = {
   "Turnover time": "Temps de rotation",
   "Capabilities": "Capacités",
   "Room capabilities": "Capacités des salles",
+  "Practitioner actions": "Actions du praticien",
+  "New practitioner": "Nouveau praticien",
+  "Filter practitioners": "Filtrer les praticiens",
+  "Select a practitioner to view details or enable actions.": "Sélectionnez un praticien pour afficher ses détails ou activer les actions.",
+  "No active location": "Aucun emplacement actif",
+  "No matching practitioners": "Aucun praticien correspondant",
+  "No practitioners yet": "Aucun praticien pour le moment",
+  "Try a different name, email, discipline, or location.": "Essayez un autre nom, courriel, domaine ou emplacement.",
+  "Link the first practitioner after creating their Microsoft Entra account.": "Associez le premier praticien après avoir créé son compte Microsoft Entra.",
+  "Create a location before adding practitioners.": "Créez un emplacement avant d’ajouter des praticiens.",
+  "Practitioner details": "Détails du praticien",
+  "Link a practitioner": "Associer un praticien",
+  "Practitioner availability": "Disponibilité du praticien",
+  "Unavailable": "Indisponible",
 };
 
 export default fr;
