@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { selectAccount } from "../src/auth/accountSelection";
 import {
-  customerProviderHint,
   freshCustomerLoginParameters,
   shouldClearCustomerAccountHint,
 } from "../src/customer/providerRouting";
@@ -135,16 +134,7 @@ test("account restoration separates staff and customers even with a wrong active
   ).toBeNull();
 });
 
-test("fresh customer login returns a Google identity to Google without forwarding unknown providers", () => {
-  expect(
-    customerProviderHint({ idTokenClaims: { idp: "google.com" } }),
-  ).toBe("google");
-  expect(
-    customerProviderHint({ idTokenClaims: { idp: "https://accounts.google.com" } }),
-  ).toBe("google");
-  expect(
-    customerProviderHint({ idTokenClaims: { idp: "untrusted.example" } }),
-  ).toBeNull();
+test("fresh customer login clears cached account hints and lets the user flow select the provider", () => {
   expect(
     shouldClearCustomerAccountHint({
       idTokenClaims: {
@@ -157,26 +147,15 @@ test("fresh customer login returns a Google identity to Google without forwardin
     shouldClearCustomerAccountHint({
       idTokenClaims: { idp: "untrusted.example" },
     }),
-  ).toBe(false);
+  ).toBe(true);
+  expect(shouldClearCustomerAccountHint(null)).toBe(false);
 
-  expect(
-    freshCustomerLoginParameters("nonce", {
-      idTokenClaims: { idp: "google.com" },
-    }),
-  ).toMatchObject({
-    domainHint: "google",
+  const parameters = freshCustomerLoginParameters("nonce");
+  expect(parameters).toMatchObject({
     extraQueryParameters: { max_age: "0" },
   });
-  expect(
-    freshCustomerLoginParameters("nonce", {
-      idTokenClaims: { idp: "untrusted.example" },
-    }),
-  ).not.toHaveProperty("domainHint");
-  expect(
-    freshCustomerLoginParameters("nonce", {
-      idTokenClaims: { idp: "untrusted.example" },
-    }).extraQueryParameters,
-  ).toEqual({ max_age: "0" });
+  expect(parameters).not.toHaveProperty("domainHint");
+  expect(parameters).not.toHaveProperty("loginHint");
 });
 
 test("client verification stays stable across rerenders, refresh and public navigation", async ({
@@ -361,7 +340,7 @@ test("real customer MSAL starts code flow with PKCE and customer-only scope", as
   );
   expect(url.searchParams.has("client_secret")).toBe(false);
   expect(url.searchParams.get("nonce")).toBe("a".repeat(64));
-  expect(url.searchParams.get("prompt")).toBe("login");
+  expect(url.searchParams.get("prompt")).toBe("select_account");
   expect(url.searchParams.get("max_age")).toBe("0");
   expect(url.searchParams.has("domain_hint")).toBe(false);
   expect(
