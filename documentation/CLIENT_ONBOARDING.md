@@ -144,7 +144,10 @@ accept unsigned browser claims, or label a UI-only timeout as an enforced sessio
    cached ID-token `idp` claim and sends the allowlisted External ID `domain_hint=google`.
    This returns an expired Google session to Google instead of offering a password for
    External ID's generated local username. First sign-in and unknown providers retain the
-   normal provider chooser; arbitrary claim values are never forwarded.
+   normal provider chooser; arbitrary claim values are never forwarded. Provider routing
+   uses MSAL's `domainHint` property while the cached account is temporarily not active,
+   preventing its opaque `login_hint` from being sent with `domain_hint` and rejected as
+   `AADSTS1002014`.
 3. `POST /customer/auth/session` validates the API access JWT and a separate signed
    ID-token proof. The proof must have the configured SPA audience, trusted issuer,
    matching signed tenant/object IDs, an unused nonce and authentication within ten

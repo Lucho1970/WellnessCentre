@@ -1,6 +1,6 @@
 import { InteractionRequiredAuthError, PublicClientApplication } from '@azure/msal-browser';
 import { selectAccount } from '../auth/accountSelection';
-import { freshCustomerLoginParameters } from './providerRouting';
+import { freshCustomerLoginParameters, shouldClearCustomerAccountHint } from './providerRouting';
 
 const tenant = import.meta.env.VITE_CUSTOMER_ENTRA_TENANT_ID ?? '';
 const subdomain = import.meta.env.VITE_CUSTOMER_ENTRA_SUBDOMAIN ?? '';
@@ -40,8 +40,26 @@ export async function customerToken() {
 export async function customerSignIn() {
   const { beginCustomerLogin } = await import('./session');
   const nonce = await beginCustomerLogin();
-  await customerInstance.loginRedirect({ scopes: customerScopes, prompt: nonce ? 'login' : 'select_account',
-    ...(nonce ? freshCustomerLoginParameters(nonce, selectCustomerAccount()) : {}) });
+  const account = selectCustomerAccount();
+  const clearCachedAccountHint = Boolean(nonce && shouldClearCustomerAccountHint(account));
+
+  // A cached External ID account can carry an opaque login_hint (and an opaque
+  // username fallback). External ID rejects either hint when domain_hint is also
+  // present. Keep the account in MSAL's cache, but do not make it the active
+  // account for this provider-routed authorization request.
+  if (clearCachedAccountHint) customerInstance.setActiveAccount(null);
+
+  try {
+    await customerInstance.loginRedirect({
+      scopes: customerScopes,
+      prompt: nonce ? 'login' : 'select_account',
+      ...(nonce ? freshCustomerLoginParameters(nonce, account) : {}),
+    });
+  } catch (error) {
+    // If navigation could not start, restore the existing local session display.
+    if (clearCachedAccountHint && account) customerInstance.setActiveAccount(account);
+    throw error;
+  }
 }
 
 export async function customerSignOut() {

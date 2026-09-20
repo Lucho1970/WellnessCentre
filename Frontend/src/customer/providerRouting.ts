@@ -18,15 +18,22 @@ export function customerProviderHint(account: CustomerAccountWithClaims): Custom
     : null;
 }
 
+export function shouldClearCustomerAccountHint(account: CustomerAccountWithClaims) {
+  return customerProviderHint(account) !== null;
+}
+
 export function freshCustomerLoginParameters(nonce: string, account: CustomerAccountWithClaims) {
   const providerHint = customerProviderHint(account);
   return {
     nonce,
     maxAge: 0,
+    // Use MSAL's supported property instead of adding domain_hint as a raw query
+    // parameter. MSAL can then suppress the cached opaque login_hint, because
+    // External ID rejects domain_hint and an opaque login_hint used together.
+    ...(providerHint ? { domainHint: providerHint } : {}),
     // Explicit query parameter: this MSAL version does not serialize maxAge=0.
     extraQueryParameters: {
       max_age: '0',
-      ...(providerHint ? { domain_hint: providerHint } : {}),
     },
     claims: JSON.stringify({ id_token: { auth_time: { essential: true } } }),
   };

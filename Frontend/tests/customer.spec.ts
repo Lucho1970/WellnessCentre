@@ -3,6 +3,7 @@ import { selectAccount } from "../src/auth/accountSelection";
 import {
   customerProviderHint,
   freshCustomerLoginParameters,
+  shouldClearCustomerAccountHint,
 } from "../src/customer/providerRouting";
 import type { AccountInfo } from "@azure/msal-browser";
 
@@ -144,12 +145,33 @@ test("fresh customer login returns a Google identity to Google without forwardin
   expect(
     customerProviderHint({ idTokenClaims: { idp: "untrusted.example" } }),
   ).toBeNull();
+  expect(
+    shouldClearCustomerAccountHint({
+      idTokenClaims: {
+        idp: "google.com",
+        login_hint: "opaque-login-hint",
+      },
+    }),
+  ).toBe(true);
+  expect(
+    shouldClearCustomerAccountHint({
+      idTokenClaims: { idp: "untrusted.example" },
+    }),
+  ).toBe(false);
 
   expect(
     freshCustomerLoginParameters("nonce", {
       idTokenClaims: { idp: "google.com" },
-    }).extraQueryParameters,
-  ).toEqual({ max_age: "0", domain_hint: "google" });
+    }),
+  ).toMatchObject({
+    domainHint: "google",
+    extraQueryParameters: { max_age: "0" },
+  });
+  expect(
+    freshCustomerLoginParameters("nonce", {
+      idTokenClaims: { idp: "untrusted.example" },
+    }),
+  ).not.toHaveProperty("domainHint");
   expect(
     freshCustomerLoginParameters("nonce", {
       idTokenClaims: { idp: "untrusted.example" },
