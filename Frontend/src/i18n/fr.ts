@@ -154,10 +154,10 @@ const fr: Record<string, string> = {
   "Loading available times": "Chargement des heures disponibles",
   "No practitioner is assigned to this service yet.":
     "Aucun praticien n’est encore affecté à ce service.",
-  "No available times were found in the next seven days.":
-    "Aucune heure disponible n’a été trouvée au cours des sept prochains jours.",
-  "Times shown in {{timezone}}. Showing up to 24 available options.":
-    "Heures affichées selon le fuseau {{timezone}}. Jusqu’à 24 options disponibles sont affichées.",
+  "No available times were found on this date.":
+    "Aucune heure disponible n’a été trouvée à cette date.",
+  "Times shown in {{timezone}}. Choose an available start time.":
+    "Heures affichées selon le fuseau {{timezone}}. Choisissez une heure de début disponible.",
   "View client booking information":
     "Voir les renseignements de réservation du client",
   "Profile saved. Existing appointment destinations have not changed.":

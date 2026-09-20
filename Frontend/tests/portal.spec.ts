@@ -880,16 +880,32 @@ test("public booking hands off preferences without reserving or creating an appo
   page,
 }) => {
   const writes: string[] = [];
+  const availabilityQueries: URL[] = [];
   page.on("request", (request) => {
     if (request.method() !== "GET") writes.push(request.url());
   });
   await fixtures(page);
+  await page.route("**/api/v1/availability?**", (route) => {
+    availabilityQueries.push(new URL(route.request().url()));
+    const availability = Array.from({ length: 25 }, (_, index) => {
+      const starts = new Date(Date.UTC(2030, 9, 1, 13, index * 15));
+      return {
+        duration_option_id: 4,
+        starts_at: starts.toISOString(),
+        ends_at: new Date(starts.getTime() + 60 * 60000).toISOString(),
+      };
+    });
+    return route.fulfill({
+      json: { data: { timezone: "America/Toronto", availability } },
+    });
+  });
   await page.goto(`${publicHost}/book`);
+  await page.getByLabel("Appointment date").fill("2030-10-01");
+  await expect.poll(() => availabilityQueries.at(-1)?.searchParams.get("date_from")).toBe("2030-10-01");
+  expect(availabilityQueries.at(-1)?.searchParams.get("date_to")).toBe("2030-10-01");
   await expect(page.getByText("60 min — $100.00", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /Oct 1.*60 min.*\$100\.00/ }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Oct 1.*60 min/ }).click();
+  await expect(page.getByRole("button", { name: /60 min.*\$100\.00/ })).toHaveCount(25);
+  await page.getByRole("button", { name: /9:00.*60 min/ }).click();
   await page
     .getByRole("link", { name: "View client booking information" })
     .click();

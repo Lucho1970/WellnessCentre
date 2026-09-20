@@ -148,10 +148,10 @@ const en = {
   "Loading available times": "Loading available times",
   "No practitioner is assigned to this service yet.":
     "No practitioner is assigned to this service yet.",
-  "No available times were found in the next seven days.":
-    "No available times were found in the next seven days.",
-  "Times shown in {{timezone}}. Showing up to 24 available options.":
-    "Times shown in {{timezone}}. Showing up to 24 available options.",
+  "No available times were found on this date.":
+    "No available times were found on this date.",
+  "Times shown in {{timezone}}. Choose an available start time.":
+    "Times shown in {{timezone}}. Choose an available start time.",
   "View client booking information": "View client booking information",
   "Profile saved. Existing appointment destinations have not changed.":
     "Profile saved. Existing appointment destinations have not changed.",
