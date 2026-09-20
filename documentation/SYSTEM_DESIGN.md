@@ -1,6 +1,6 @@
 # Wellness Centre — System Design
 
-Version 1.2 · 20 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
+Version 1.3 · 20 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
 
 ### Customer onboarding implementation checkpoint
 
@@ -201,6 +201,7 @@ Current host evidence reports MySQL **5.7.44**, not the MySQL 8+ aspiration in t
 | Optional retail | No approved operational module | Products/SKUs, per-location stock ledger, reorder levels, taxable sales/refunds and commission only after explicit business approval |
 | Privacy/operations | `audit_logs`, `data_export_requests`, `retention_policies` | Controlled exports, legal holds/disposition, audit querying, migration tracking and recovery evidence |
 | Client identity consolidation | `client_email_addresses`, `client_merge_records` | Searchable email aliases, explicit survivor selection, immutable merge provenance and conflict-safe customer identity ownership |
+| Data import/migration | No general-purpose import subsystem | Versioned source profiles/templates, protected uploads and staging, field/value mapping, validation/dry runs, duplicate review, bounded commit batches, row provenance, reconciliation and retention cleanup |
 
 Table presence does not imply endpoints/UI or tested business behavior. Read `api/database/schema.sql` and actual migrations for exact physical names and constraints before implementation; this table maps responsibilities, not a replacement schema.
 
@@ -229,6 +230,20 @@ Departure and coverage are first-class transitions. Before deactivation, produce
 **Prepaid value and payment collection.** Packages, memberships and gift cards use an auditable entitlement/value ledger rather than mutable remaining-balance fields alone. Every issue, payment, redemption, expiry, transfer, adjustment and refund references its source and reversing entry where applicable. Booking may quote an eligible entitlement, but redemption occurs transactionally at the approved business event and is idempotent. Separate deferred/liability balances from earned appointment revenue. Store only payment-provider customer/payment-method references; verified webhooks update local attempts through idempotent event handling and unmatched events enter reconciliation review.
 
 **Compensation and optional retail.** Compensation rules are effective-dated and evaluated from settled source lines, not current catalogue values. Refunds and adjustments create traceable compensation corrections. Exports contain only payroll/accounting-required data and require finance permission. Do not implement tax withholding or statutory filing in the core application. If retail is approved later, use a per-location stock-movement ledger for receipts, sales, returns, transfers and adjustments; never rely solely on an editable quantity counter.
+
+### 5.2 Import and migration architecture
+
+Use a pipeline of **upload → parse → normalize → map → validate → match → dry-run report → authorized commit → reconcile → expire artifacts**. Parsing and source-specific transformation never write production domain tables. Store an import job with clinic, source type/profile version, file checksum, actor, locale/timezone assumptions, state, counts and retention deadline. Store staged rows and structured issues separately from committed domain records; protect all of them as client data.
+
+Define versioned canonical import records per domain, initially client/contact, address, catalogue and appointment. CSV templates are one source adapter. Named-system adapters convert vendor exports into the same canonical records so domain validation is not duplicated. Parsers must handle documented encoding, delimiter, quoting, line endings, date formats and blank/null semantics; reject ambiguous dates or require an explicit locale. Treat spreadsheet formulas as untrusted text and neutralize formula injection in every downloadable report.
+
+Matching is deterministic and explainable. Prefer an existing source-system key previously committed for the same clinic/profile. Otherwise produce candidate matches using approved normalized fields, but require review for ambiguity and never attach authentication identity from imported email. A match decision records its rule, reviewer and outcome. Source keys are unique within clinic + source profile and make retries idempotent. Mapping a source record to an existing entity does not erase the source snapshot or merge unrelated records.
+
+The commit worker reads only a frozen, approved dry-run revision. It processes bounded deterministic batches, records create/update/skip/quarantine outcomes and resumes from durable checkpoints. Domain services—not ad hoc importer SQL—perform writes so authorization-independent invariants, audit, normalization and historical snapshots remain consistent. Updates require an explicit per-field policy; blank incoming values do not erase populated data by default. Future appointments use the booking/schedule validation service and enter quarantine when references or conflicts cannot be resolved. Historical appointments may use a distinct migration path that preserves source status/provenance without emitting live reminders or invoices unless explicitly approved.
+
+Clinical notes/files, forms/consents, insurance and finance require dedicated import contracts with legal/privacy and accounting review. Preserve original author/source/timestamps only as labelled imported provenance; never represent an imported note as cryptographically signed or locally authored when it is not. Financial opening balances and settled transactions require reconciliation totals and corrective-entry strategy. Attachment archives need path traversal protection, file allowlists, size limits, malware screening and private storage.
+
+Before commit, display entity counts, duplicates, unresolved references, warnings, errors and expected side effects. After commit, reconcile input, staged and resulting counts plus domain totals where applicable. Generate a protected migration report and audit record. Reversal is implemented only when a domain-specific compensating plan exists and no subsequent dependent activity makes it unsafe; otherwise restore from a verified pre-import backup or apply reviewed corrections. Source files, row payloads and reports expire under configured retention, while minimal provenance/checksum/outcome records remain according to audit policy.
 
 ## 6. Scheduling, transactions and state
 
@@ -283,7 +298,7 @@ Block creation must identify impacted booked appointments and create an exceptio
 
 Preserve `/api/v1` and the existing JSON success/error envelope, including safe error code/message/correlation ID. Integer database identifiers (`id`, `*_id` and `*_ids`) are JSON numbers at the API boundary even when PDO returns numeric strings; frontend request helpers defensively normalize the same fields before storing or comparing them. UUIDs, provider subjects, idempotency keys and other external identifiers remain strings. Use ISO-8601 timestamps with explicit zones at boundaries; avoid ambiguous local strings. Money uses integer cents and currency. Validate request size, supported content type, enumerations, ranges and nested resource scope. Lists need bounded pagination and stable sorting; preserve current page contracts unless versioning a change.
 
-Expected domain groups: auth/current user; public catalogue/availability; business/practitioner/room/service/add-on administration; clients/profiles/relationships; appointments/recurrence/cancellation/check-in; availability/time off; waitlists; forms/notes/files/treatment plans/outcomes; messaging; notifications; finance/accounting; insurer policies/claims; packages/memberships/gift cards; compensation/reporting; audit/privacy. Optional retail remains a separate disabled group until approved. Not all groups are implemented. Produce an OpenAPI contract alongside each new group; do not document planned routes as live.
+Expected domain groups: auth/current user; public catalogue/availability; business/practitioner/room/service/add-on administration; clients/profiles/relationships; appointments/recurrence/cancellation/check-in; availability/time off; waitlists; forms/notes/files/treatment plans/outcomes; messaging; notifications; finance/accounting; insurer policies/claims; packages/memberships/gift cards; compensation/reporting; imports/migration; audit/privacy. Optional retail remains a separate disabled group until approved. Not all groups are implemented. Produce an OpenAPI contract alongside each new group; do not document planned routes as live.
 
 Mutation contracts need optimistic revisions where concurrent edits are possible, and idempotency for booking, offer acceptance, payment/refund, package or gift-card redemption, claim submission/reversal and external synchronization. Derive authoritative actor/client identity from the principal; a client-supplied user ID never proves ownership. Acting for a related client requires an active server-resolved relationship permission for that exact purpose. Public projections are allowlists separate from internal entity serializers.
 
@@ -294,6 +309,8 @@ Do not cache API/auth responses in a service worker. Cache only explicitly selec
 ## 8. Background work, communications and integration boundaries
 
 Current notification records are only a foundation; no verified complete email sender/reminder service exists. Build a durable worker using pending/leased/delivered/failed states, attempt counts, next-attempt time, lease expiry, retry backoff and dead-letter/operator review. Use an atomic MySQL-5.7-compatible claim mechanism; do not assume `SKIP LOCKED` support. Jobs must be idempotent, bounded and recover from process interruption.
+
+Import commits use the same bounded-worker principles but a separate queue/state machine and dedicated permission. An import worker never selects a newer upload or mapping after approval: it consumes the frozen dry-run revision and checksum. Pause on tenant/scope mismatch, changed source revision, excessive error threshold or unreconciled domain failure, and require an authorized review before resuming.
 
 Confirm Netfirms scheduling/CLI capabilities. Preferred execution is a protected scheduled command outside the public web root. If unavailable, explicitly approve a safe external scheduler/worker arrangement; never expose an unauthenticated “send all reminders” URL or rely on visitors to trigger jobs. Queue and provider delivery events are distinct; track both.
 
@@ -345,11 +362,11 @@ Current focused local checks cover client validation/authorization, booking requ
 | --- | --- |
 | Static/build | PHP syntax/dependency checks, TypeScript/frontend builds, lint and secret/package inspection |
 | Unit/policy | Permission matrix incl. negative cases, fees/money, durations/buffers, state transitions, idempotency fingerprints and timezone edges |
-| Real MySQL integration | Concurrent booking/reschedule/time-off/import conflicts, transaction rollback, duplicate requests/offers/payments, migration/backfill integrity and scope isolation |
+| Real MySQL integration | Concurrent booking/reschedule/time-off/import conflicts, transaction rollback, duplicate requests/offers/payments, migration/backfill integrity, import retry/resume/idempotency and clinic-scope isolation |
 | Identity | Staff MFA/roles, inactive/unlinked users, Google and personal Microsoft, wrong issuer/audience/expired token, safe linking/recovery, dual persona and privilege non-escalation |
 | Browser | Public discovery → portal auth → durable booking; staff/reception/practitioner/accountant paths; deep links, refresh/back/logout/account switch; error recovery and upgrades from old workers |
 | Care/privacy | Unrelated practitioner/client denial, directed family/caregiver permission and revocation, note/form/plan/outcome/address/file restrictions, consent versions, supervision/release rules, reviewed export expiry, audit contents and retention/legal-hold behavior |
-| Jobs/finance | Retries after crashes/timeouts, obsolete reminder suppression, delivery failure visibility, invoice uniqueness/refund reconciliation, entitlement double-redemption prevention, gift-card/package liability reconciliation, claim submit/reverse idempotency and provider outage isolation |
+| Jobs/finance | Retries after crashes/timeouts, obsolete reminder suppression, delivery failure visibility, import frozen-revision/partial-batch recovery and reconciliation, invoice uniqueness/refund reconciliation, entitlement double-redemption prevention, gift-card/package liability reconciliation, claim submit/reverse idempotency and provider outage isolation |
 | Accessibility/operations | Keyboard/screen-reader/mobile/tablet checks, WCAG 2.2 AA review, measured load target, monitoring alerts and timed backup restore drill |
 
 Stage gates follow R0–R9 in Master Requirements. Keep deployment acceptance separate from local tests. Do not enable real client booking before email/operational follow-up exists, or clinical records before protected storage/access and approved privacy policies exist. Run schema tests with synthetic fixtures only; never seed demonstration records into the live clinic.
