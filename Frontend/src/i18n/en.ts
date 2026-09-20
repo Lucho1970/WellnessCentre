@@ -271,6 +271,20 @@ const en = {
   "Contact details and booking records for your clinic.":
     "Contact details and booking records for your clinic.",
   "Add client": "Add client",
+  "Client actions": "Client actions",
+  "New client": "New client",
+  "Filter clients": "Filter clients",
+  "Select a client to view details or enable actions.":
+    "Select a client to view details or enable actions.",
+  "Use New client in the action bar to add the first client.":
+    "Use New client in the action bar to add the first client.",
+  "Client details": "Client details",
+  "Add a client": "Add a client",
+  "Date of birth": "Date of birth",
+  "Service address": "Service address",
+  "Address instructions": "Address instructions",
+  "Emergency contact phone": "Emergency contact phone",
+  "Administrative notes": "Administrative notes",
   "Search name, email, or phone": "Search name, email, or phone",
   Search: "Search",
   "Loading clients": "Loading clients",

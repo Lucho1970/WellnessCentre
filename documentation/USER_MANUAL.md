@@ -19,6 +19,12 @@ Administration pages are moving to a list-first layout:
 3. **Details** opens a read-only panel. **Edit** opens the same information as editable fields.
 4. Close or cancel a panel to return to the list. If information has changed but has not been saved, the portal asks before discarding it.
 
+## Clients
+
+The **Clients** page uses the list-first administration pattern. Use the search field in the command bar to find a client by name, email, or phone, then select the matching row. **Details** opens the complete contact profile and portal-access controls without making the fields editable. **Edit** opens the same client in an editable panel. Use **New client** to create a record.
+
+Super Administrators can select an active duplicate and choose **Merge**. The merge remains a separate confirmation workflow because it reassigns related records. After a successful merge, the duplicate disappears from the list and the surviving client remains selected. Deactivate a client when future booking must be prevented without merging or deleting their history.
+
 ## Services
 
 Open **Administration → Services** to manage the treatments or other services the clinic offers.

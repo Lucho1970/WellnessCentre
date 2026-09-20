@@ -129,7 +129,8 @@ test("staff client invitation approval requires review code and verification che
     return route.fulfill({ json: { data } });
   });
   await page.goto(`${portalHost}/admin/clients`);
-  await page.getByRole("button", { name: "Edit Existing Client" }).click();
+  await page.getByRole("button", { name: /Existing Client.*existing@example\.test/ }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   const approve = page.getByRole("button", { name: "Approve client link" });
   await expect(approve).toBeDisabled();
   await page
@@ -371,7 +372,7 @@ test("staff client creation saves a reusable service address with manual fallbac
     return route.fulfill({ json: { data: { items: [], has_more: false } } });
   });
   await page.goto(`${portalHost}/admin/clients`);
-  await page.getByRole("button", { name: "Add client", exact: true }).click();
+  await page.getByRole("button", { name: "New client", exact: true }).click();
   await page.getByRole("textbox", { name: "First name" }).fill("Mobile");
   await page.getByRole("textbox", { name: "Last name" }).fill("Client");
   await page
@@ -399,6 +400,48 @@ test("staff client creation saves a reusable service address with manual fallbac
       country: "Canada",
     },
   });
+});
+
+test("clients use list-first actions with details and edit panels", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  const client = {
+    id: 8,
+    display_name: "Avery Client",
+    given_name: "Avery",
+    family_name: "Client",
+    email: "avery@example.test",
+    phone: "905-555-0188",
+    preferred_contact: "email",
+    date_of_birth: "1991-04-12",
+    emergency_contact_name: "Morgan Client",
+    emergency_contact_phone: "905-555-0189",
+    administrative_notes: "Prefers afternoon calls",
+    status: "active",
+    revision: "client-rev",
+    address: { address_line1: "8 Test Lane", address_line2: "", city: "Test City", province: "Ontario", postal_code: "A1A 1A1", country: "Canada", instructions: "Side door" },
+  };
+  let updated: Record<string, unknown> | undefined;
+  await page.route("**/api/v1/clients**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/8/invitations")) return route.fulfill({ json: { data: { items: [], linked: false } } });
+    if (path.endsWith("/8") && route.request().method() === "PATCH") {
+      updated = route.request().postDataJSON();
+      return route.fulfill({ json: { data: { ...client, ...updated } } });
+    }
+    if (path.endsWith("/8")) return route.fulfill({ json: { data: client } });
+    return route.fulfill({ json: { data: { items: [client], has_more: false } } });
+  });
+  await page.goto(`${portalHost}/admin/clients`);
+  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: /Avery Client.*avery@example\.test/ }).click();
+  await page.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(page.getByText("Client details", { exact: true })).toBeVisible();
+  await expect(page.getByText("8 Test Lane, Test City, Ontario, A1A 1A1, Canada", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("textbox", { name: "Phone", exact: true }).fill("905-555-0190");
+  await page.getByRole("button", { name: "Save client", exact: true }).click();
+  await expect(page.getByText("Client details saved.")).toBeVisible();
+  expect(updated).toMatchObject({ phone: "905-555-0190", revision: "client-rev" });
 });
 
 test("possible duplicates require acknowledgement and Super Admin can merge with a preview", async ({
@@ -474,7 +517,7 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
     });
   });
   await page.goto(`${portalHost}/admin/clients`);
-  await page.getByRole("button", { name: "Add client", exact: true }).click();
+  await page.getByRole("button", { name: "New client", exact: true }).click();
   await page.getByRole("textbox", { name: "First name" }).fill("Same");
   await page.getByRole("textbox", { name: "Last name" }).fill("Client");
   await page
@@ -487,7 +530,8 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
     page.getByText("Client created. The record is ready for booking."),
   ).toBeVisible();
   expect(createAttempts).toBe(2);
-  await page.getByRole("button", { name: "Merge duplicate" }).nth(1).click();
+  await page.getByRole("button", { name: /second@example\.test/ }).click();
+  await page.getByRole("button", { name: "Merge", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Find the surviving client" })
     .fill("first");
@@ -507,7 +551,7 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
     ),
   ).toBeVisible();
   await expect(page.getByText("second@example.test", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("first@example.test", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /first@example\.test/ })).toBeVisible();
   expect(mergeBody).toMatchObject({
     survivor_revision: "survivor-rev",
     duplicate_revision: "duplicate-rev",
@@ -866,7 +910,7 @@ test("anonymous portal deep link is gated behind staff sign-in", async ({
   await expect(
     page.getByRole("heading", { name: "Staff portal", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add client" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New client" })).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Feel better, on your schedule." }),
   ).toHaveCount(0);
@@ -918,7 +962,7 @@ test("reception routes support refresh, back, profile menu and restricted deep l
   await expect(
     page.getByRole("heading", { name: "Clients", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add client" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New client" })).toBeVisible();
   await page.getByRole("link", { name: /Appointments Bookings/ }).click();
   await expect(page).toHaveURL(`${portalHost}/admin/appointments`);
   await expect(
@@ -1167,7 +1211,7 @@ test("failed authorization never renders protected screens and allows retry", as
   await expect(page.getByRole("alert")).toContainText(
     "Your sign-in is no longer valid. Please sign in again.",
   );
-  await expect(page.getByRole("button", { name: "Add client" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New client" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
 });
 
@@ -1216,7 +1260,7 @@ test("screenshots: public and mobile portal layouts", async ({ page }) => {
   ).toBeVisible();
   await page.screenshot({ path: "../.tmp/public-home.png", fullPage: true });
   await page.goto(`${portalHost}/admin/clients`);
-  await expect(page.getByRole("button", { name: "Add client" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New client" })).toBeVisible();
   await page.screenshot({ path: "../.tmp/portal-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Open portal menu" }).click();

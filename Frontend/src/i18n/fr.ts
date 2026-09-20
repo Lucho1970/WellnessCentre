@@ -278,6 +278,20 @@ const fr: Record<string, string> = {
   "Contact details and booking records for your clinic.":
     "Coordonnées et dossiers de réservation de votre clinique.",
   "Add client": "Ajouter un client",
+  "Client actions": "Actions pour les clients",
+  "New client": "Nouveau client",
+  "Filter clients": "Filtrer les clients",
+  "Select a client to view details or enable actions.":
+    "Sélectionnez un client pour afficher ses renseignements ou activer les actions.",
+  "Use New client in the action bar to add the first client.":
+    "Utilisez Nouveau client dans la barre d’actions pour ajouter le premier client.",
+  "Client details": "Renseignements du client",
+  "Add a client": "Ajouter un client",
+  "Date of birth": "Date de naissance",
+  "Service address": "Adresse de service",
+  "Address instructions": "Instructions pour l’adresse",
+  "Emergency contact phone": "Téléphone de la personne à joindre en cas d’urgence",
+  "Administrative notes": "Notes administratives",
   "Search name, email, or phone":
     "Rechercher un nom, un courriel ou un téléphone",
   Search: "Rechercher",
