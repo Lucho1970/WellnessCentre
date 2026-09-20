@@ -45,12 +45,14 @@ $assert((int)$root->query('SELECT client_id FROM customer_client_links WHERE ide
 $assert((int)$root->query('SELECT COUNT(*) FROM client_email_addresses WHERE client_id=2')->fetchColumn()===2);
 $assert($root->query('SELECT status FROM users WHERE id=3')->fetchColumn()==='inactive');
 $assert(str_starts_with((string)$root->query('SELECT email FROM users WHERE id=3')->fetchColumn(),'merged-client-3@'));
+$directory=$service->search($admin,[]);$directoryIds=array_map('intval',array_column($directory['items'],'id'));sort($directoryIds);$assert($directoryIds===[2,4],'Merged client remained in the directory');
+$activeDirectory=$service->search($admin,['status'=>'active']);$activeDirectoryIds=array_map('intval',array_column($activeDirectory['items'],'id'));sort($activeDirectoryIds);$assert($activeDirectoryIds===[2,4],'Merged client remained in the active directory');
 $assert($root->query('SELECT phone FROM client_profiles WHERE user_id=2')->fetchColumn()==='555-2000');
 $assert(json_decode((string)$root->query('SELECT address_json FROM client_contact_addresses WHERE client_id=2')->fetchColumn(),true)['city']==='Duplicate City');
 $assert((int)$root->query("SELECT COUNT(*) FROM audit_logs WHERE action='client.merge'")->fetchColumn()===1);
 $reject(fn()=>$service->merge($admin,2,3,['survivor_revision'=>'stale','duplicate_revision'=>'stale','reason'=>'Retry merge','confirmation'=>'MERGE 3 INTO 2'],'x'),'client_changed');
 $body=['given_name'=>'Same','family_name'=>'Client','email'=>'third@example.test'];
-$reject(fn()=>$service->save($admin,$body,$cid),'possible_duplicate');
+try{$service->save($admin,$body,$cid);throw new RuntimeException('Possible duplicate should have been rejected');}catch(ApiException $e){$assert($e->errorCode==='possible_duplicate');$assert(array_map('intval',array_column($e->fields['candidates']??[],'id'))===[2],'Merged client appeared in duplicate candidates');}
 $created=$service->save($admin,$body+['confirm_possible_duplicate'=>true],$cid);$assert($created['email']==='third@example.test');
 $root->exec("INSERT INTO customer_client_links(identity_id,client_id,clinic_id,created_at)VALUES(2,4,1,UTC_TIMESTAMP())");
 $conflict=$service->mergePreview($admin,2,4,$cid);$assert($conflict['blocked']);

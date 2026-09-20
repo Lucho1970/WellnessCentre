@@ -12,6 +12,7 @@ This release adds conservative duplicate handling to the staff client directory.
 - The merge runs in one InnoDB transaction with both client rows locked and revision tokens checked.
 - Appointments, recurring series, waitlist entries, forms, practitioner notes, invoices, consents, export requests, invitations, appointment attendance, and the compatible customer identity link are reassigned.
 - Both email addresses become aliases of the survivor. The duplicate `users` row remains as an inactive historical record with a non-routable tombstone email. It is not deleted.
+- Merged duplicate rows are excluded from the staff client directory, booking selectors, and possible-duplicate suggestions. Ordinary inactive clients remain visible in the administrative directory.
 - Audit authorship and other historical actor fields are not rewritten.
 - If both records are linked to different customer identities, the merge is blocked. Identity ownership must be resolved manually before retrying.
 

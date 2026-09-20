@@ -426,7 +426,8 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
     revision: "duplicate-rev",
   };
   let createAttempts = 0,
-    mergeBody: Record<string, unknown> | undefined;
+    mergeBody: Record<string, unknown> | undefined,
+    merged = false;
   await page.route("**/api/v1/clients**", (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname,
@@ -463,12 +464,13 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
       });
     if (method === "POST" && path.endsWith("/merge/3")) {
       mergeBody = route.request().postDataJSON();
+      merged = true;
       return route.fulfill({
         json: { data: { client: survivor, merged_client_id: 3 } },
       });
     }
     return route.fulfill({
-      json: { data: { items: [survivor, duplicate], has_more: false } },
+      json: { data: { items: merged ? [survivor] : [survivor, duplicate], has_more: false } },
     });
   });
   await page.goto(`${portalHost}/admin/clients`);
@@ -504,6 +506,8 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
       "Client records merged. Both email addresses were preserved.",
     ),
   ).toBeVisible();
+  await expect(page.getByText("second@example.test", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("first@example.test", { exact: true })).toBeVisible();
   expect(mergeBody).toMatchObject({
     survivor_revision: "survivor-rev",
     duplicate_revision: "duplicate-rev",

@@ -27,7 +27,7 @@ final class ClientService
         $term=trim((string)($query['q']??''));
         if (strlen($term)>190) throw new ApiException(422,'validation_error','Search must be at most 190 characters.');
         $page=max(1,min(100000,(int)($query['page']??1))); $offset=($page-1)*25;
-        $sql="FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client'";
+        $sql="FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id)";
         $params=['clinic'=>$actor->clinicId];
         if(($query['status']??'')==='active')$sql.=" AND u.status='active'";
         if ($term!=='') {
@@ -129,7 +129,7 @@ final class ClientService
 
     private function duplicateCandidates(AuthContext $actor,array $data): array
     {
-        $sql="SELECT u.id,u.display_name,u.email,u.status,p.phone,p.date_of_birth FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND LOWER(u.given_name)=LOWER(:given) AND LOWER(u.family_name)=LOWER(:family)";
+        $sql="SELECT u.id,u.display_name,u.email,u.status,p.phone,p.date_of_birth FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id) AND LOWER(u.given_name)=LOWER(:given) AND LOWER(u.family_name)=LOWER(:family)";
         $params=['clinic'=>$actor->clinicId,'given'=>$data['given_name'],'family'=>$data['family_name'],'email'=>$data['email']];
         $sql.=' ORDER BY (u.email=:email) DESC';
         if($data['phone']){$sql.=',(p.phone=:phone) DESC';$params['phone']=$data['phone'];}

@@ -8,6 +8,8 @@ After a linked client signs in, **My appointments** opens by default. The client
 
 The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Clients must currently contact the clinic to book, cancel, or reschedule.
 
+After a duplicate client is merged, only the surviving client appears in client lists and booking searches. The merged record remains in protected history for audit purposes and is not deleted.
+
 ## Common administration pattern
 
 Administration pages are moving to a list-first layout:
