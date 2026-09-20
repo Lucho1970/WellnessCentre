@@ -572,6 +572,7 @@ test("mobile-only booking captures destination and price without requesting a ro
       json: {
         data: {
           rooms: [],
+          default_location_id: 1,
           combinations: [
             {
               location_id: 1,
@@ -587,6 +588,23 @@ test("mobile-only booking captures destination and price without requesting a ro
               base_price_cents: 12000,
               practitioner_id: 3,
               practitioner_name: "Therapist",
+              duration_option_id: 4,
+              duration_minutes: 60,
+            },
+            {
+              location_id: 2,
+              location_name: "Alternate area",
+              timezone: "America/Toronto",
+              service_id: 2,
+              service_name: "Massage",
+              requires_room: 0,
+              offers_mobile: 1,
+              offers_clinic: 0,
+              travel_buffer_minutes: 30,
+              mobile_fee_cents: 0,
+              base_price_cents: 10000,
+              practitioner_id: 3,
+              practitioner_name: "Test Practitioner",
               duration_option_id: 4,
               duration_minutes: 60,
             },
@@ -677,6 +695,8 @@ test("mobile-only booking captures destination and price without requesting a ro
   await expect(page.getByRole("textbox", { name: "Street address" })).toHaveValue("123 Test Street");
   await expect(page.getByText(/saved client address is loaded/i)).toBeVisible();
   expect(addressFetches).toBe(1);
+  await expect(page.getByRole("combobox", { name: /Base location/ })).toContainText("Mobile service area");
+  await expect(page.getByRole("combobox", { name: /Base location/ })).toBeEnabled();
   await select(/^Base location/, "Mobile service area");
   await select(/^Service/, "Massage");
   await select(/^Practitioner/, "Therapist");
@@ -724,6 +744,7 @@ test("appointment client finder filters by exact birthdate and debounced contact
       json: {
         data: {
           rooms: [],
+          default_location_id: 1,
           combinations: [
             {
               location_id: 1,
@@ -1026,6 +1047,7 @@ test("practitioner mobile navigation can book and change only the scoped schedul
       json: {
         data: {
           rooms: [],
+          default_location_id: 1,
           combinations: [
             {
               location_id: 1,
@@ -1074,8 +1096,14 @@ test("practitioner mobile navigation can book and change only the scoped schedul
           availability: [
             {
               duration_option_id: 4,
-              starts_at: "2030-10-02T10:00:00-04:00",
-              ends_at: "2030-10-02T11:00:00-04:00",
+              starts_at: "2030-10-01T10:00:00-04:00",
+              ends_at: "2030-10-01T11:00:00-04:00",
+              available_room_ids: [],
+            },
+            {
+              duration_option_id: 4,
+              starts_at: "2030-10-01T11:00:00-04:00",
+              ends_at: "2030-10-01T12:00:00-04:00",
               available_room_ids: [],
             },
           ],
@@ -1107,6 +1135,8 @@ test("practitioner mobile navigation can book and change only the scoped schedul
     .toBe(true);
   await expect(page.getByLabel("Practitioner")).toHaveValue("Test Practitioner");
   await expect(page.getByLabel("Practitioner")).not.toBeEditable();
+  await expect(page.getByRole("combobox", { name: "Base location / service area" })).toContainText("Mobile area");
+  await expect(page.getByRole("combobox", { name: "Base location / service area" })).toBeEnabled();
   await page
     .getByRole("textbox", { name: "Find an active client" })
     .fill("New Clinic");
@@ -1125,9 +1155,10 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Change appointment" }).click();
   await page.getByRole("button", { name: "Reschedule", exact: true }).click();
-  await page.getByLabel("Appointment date").fill("2030-10-02");
+  await page.getByLabel("Appointment date").fill("2030-10-01");
   await page.getByRole("button", { name: "Find times", exact: true }).click();
-  await page.getByRole("button", { name: /Oct 2, 2030/ }).click();
+  await expect(page.getByRole("button", { name: /Oct 1, 2030, 10:00/ })).toHaveCount(0);
+  await page.getByRole("button", { name: /Oct 1, 2030, 11:00/ }).click();
   await page.getByRole("button", { name: "Confirm reschedule" }).click();
   await expect(
     page.getByText("Appointment #10 was rescheduled."),
@@ -1135,7 +1166,7 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   expect(changes[0]).toMatchObject({
     action: "reschedule",
     version: 2,
-    starts_at: "2030-10-02T10:00:00-04:00",
+    starts_at: "2030-10-01T11:00:00-04:00",
   });
   await page.getByRole("button", { name: "Change appointment" }).click();
   await page.getByRole("button", { name: "Cancel appointment" }).click();

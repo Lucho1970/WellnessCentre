@@ -25,7 +25,7 @@ paths:
         '200': { description: Confirmed appointment }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { description: Schedule, room, price, or replay conflict }
-        '422': { description: Validation failure }
+        '422': { description: Validation failure, including a reschedule request that keeps the existing start time }
   /appointments/{id}:
     patch:
       summary: Reschedule or cancel an appointment
@@ -53,7 +53,7 @@ paths:
         - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
         - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
       responses:
-        '200': { description: Availability calculated while excluding only this appointment }
+        '200': { description: Replacement availability calculated while excluding this appointment from conflict checks and omitting its unchanged current start time }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Appointment not found }
   /booking-options:
@@ -62,7 +62,7 @@ paths:
       parameters:
         - { name: scope, in: query, schema: { type: string, enum: [practitioner] } }
       responses:
-        '200': { description: Practitioner scope contains only the signed-in practitioner and requires practitioner-managed booking }
+        '200': { description: Active combinations, rooms, and an editable default_location_id. Practitioner scope prefers the signed-in practitioner's active base location; administrative scope uses the only eligible location or the first configured eligible location. }
         '403': { $ref: '#/components/responses/Forbidden' }
   /booking-clients:
     get:

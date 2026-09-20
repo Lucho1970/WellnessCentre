@@ -106,7 +106,8 @@ function ManageAppointment({ appointment, request, close, complete }: ManageProp
     event.preventDefault(); setBusy(true); setError(''); setSlots([]); setSlot(null); setSearched(false);
     try {
       const data = await request(`/appointments/${appointment.id}/availability?date_from=${date}&date_to=${date}`);
-      setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(appointment.duration_option_id))); setSearched(true);
+      const currentStart=new Date(`${appointment.starts_at.replace(' ', 'T')}Z`).getTime();
+      setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(appointment.duration_option_id) && new Date(item.starts_at).getTime() !== currentStart)); setSearched(true);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
@@ -171,6 +172,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   const addressComplete=(['address_line1','city','province','postal_code','country'] as const).every(key=>destination[key].trim());
   const addressReady=mode==='clinic'||(addressComplete&&Boolean(coverage));
   const [location, setLocation] = useState('');
+  const [preferredLocation, setPreferredLocation] = useState('');
   const [service, setService] = useState('');
   const [practitioner, setPractitioner] = useState('');
   const [duration, setDuration] = useState('');
@@ -199,7 +201,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   ));
   useEffect(() => {
     const controller = new AbortController();
-    void request(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); } })
+    void request(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); setPreferredLocation(data.default_location_id ? String(data.default_location_id) : ''); } })
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [request]);
@@ -208,6 +210,12 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
     const assigned=String(assignedPractitioner.practitioner_id);
     if (practitioner!==assigned) setPractitioner(assigned);
   }, [assignedPractitioner, practitioner, practitionerLocked]);
+  useEffect(() => {
+    if(location)return;
+    const availableLocations=unique(options.filter(row=>Number(mode==='mobile'?row.offers_mobile:row.offers_clinic)),'location_id');
+    if(preferredLocation&&availableLocations.some(row=>String(row.location_id)===preferredLocation))setLocation(preferredLocation);
+    else if(availableLocations.length===1)setLocation(String(availableLocations[0].location_id));
+  },[location,mode,options,preferredLocation]);
   useEffect(() => {
     const term = clientQuery.trim();
     setClients([]); setClientMore(false); setClientError(''); setClientSearched(false);

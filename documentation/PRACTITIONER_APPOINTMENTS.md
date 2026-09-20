@@ -26,8 +26,14 @@ Creation continues through the existing transaction, clinic schedule lock, avail
 revalidation, room/travel checks, price snapshot, and idempotency key. Rescheduling uses the
 same schedule lock and availability engine while excluding only the appointment being moved.
 The API rejects stale appointment versions, past or terminal appointments, unsuitable rooms,
-and cross-practitioner changes. Exact reschedule/cancellation retries return the already
+cross-practitioner changes, and a reschedule that keeps the appointment's existing start time.
+The existing start time is not returned as a replacement choice. Exact reschedule/cancellation retries return the already
 updated result instead of repeating history, audit, or notification records.
+
+New bookings default the base location to the signed-in practitioner's active base location.
+The location remains editable when another eligible location is available. Administrative
+booking defaults to the only eligible location, or the first configured eligible location
+when the clinic has several; staff can change it before continuing.
 
 Every accepted change increments the appointment version, writes status history and an audit
 event, and queues a client notification event. The current environment still does not have a

@@ -94,7 +94,13 @@ final class BookingService
             WHERE s.clinic_id=:clinic AND s.active=1 AND (ps.offers_clinic=1 OR ps.offers_mobile=1)".($practitionerScope?" AND p.user_id=:user AND p.booking_mode='practitioner_managed'":'')." ORDER BY l.name,s.name,u.display_name,d.duration_minutes");
         $params=['clinic'=>$actor->clinicId];if($practitionerScope)$params['user']=$actor->userId;$s->execute($params);$combinations=$s->fetchAll();
         $s=$pdo->prepare('SELECT r.id,r.name,r.location_id FROM rooms r JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic AND r.is_bookable=1 ORDER BY r.name');$s->execute(['clinic'=>$actor->clinicId]);
-        return ['combinations'=>$combinations,'rooms'=>$s->fetchAll()];
+        $rooms=$s->fetchAll();$locationIds=array_values(array_unique(array_map(fn($row)=>(int)$row['location_id'],$combinations)));$defaultLocationId=count($locationIds)===1?$locationIds[0]:null;
+        if(($query['scope']??'')==='practitioner'&&$actor->hasAnyRole('practitioner')&&$locationIds){
+            $base=$pdo->prepare('SELECT pl.location_id FROM practitioner_locations pl JOIN practitioners p ON p.id=pl.practitioner_id JOIN locations l ON l.id=pl.location_id WHERE p.user_id=:user AND pl.active=1 AND l.clinic_id=:clinic AND l.is_bookable=1 ORDER BY pl.location_id');$base->execute(['user'=>$actor->userId,'clinic'=>$actor->clinicId]);
+            foreach($base->fetchAll(PDO::FETCH_COLUMN) as $candidate)if(in_array((int)$candidate,$locationIds,true)){$defaultLocationId=(int)$candidate;break;}
+        }
+        if($defaultLocationId===null&&$locationIds)$defaultLocationId=min($locationIds);
+        return ['combinations'=>$combinations,'rooms'=>$rooms,'default_location_id'=>$defaultLocationId];
     }
 
     public function bookingClients(AuthContext $actor,array $query=[]): array
@@ -139,10 +145,13 @@ final class BookingService
     public function updateAvailability(AuthContext $actor,int $id,array $query): array
     {
         $appointment=$this->appointment($actor,$id,false);$this->assertManage($actor,$appointment);
-        return (new AvailabilityService($this->database))->search([
+        $result=(new AvailabilityService($this->database))->search([
             'delivery_mode'=>$appointment['delivery_mode'],'service_id'=>$appointment['service_id'],'practitioner_id'=>$appointment['practitioner_id'],'location_id'=>$appointment['location_id'],
             'date_from'=>$query['date_from']??null,'date_to'=>$query['date_to']??null,
         ],$id);
+        $currentStart=(new DateTimeImmutable($appointment['starts_at'],new DateTimeZone('UTC')))->getTimestamp();
+        $result['availability']=array_values(array_filter($result['availability'],fn($slot)=>(new DateTimeImmutable($slot['starts_at']))->getTimestamp()!==$currentStart));
+        return $result;
     }
 
     public function update(AuthContext $actor,int $id,array $body,string $correlationId): array
@@ -161,6 +170,7 @@ final class BookingService
             }
             if(!in_array($appointment['status'],['requested','confirmed','rescheduled'],true))throw new ApiException(409,'appointment_not_editable','This appointment can no longer be changed.');
             if(new DateTimeImmutable($appointment['ends_at'],new DateTimeZone('UTC'))<=new DateTimeImmutable('now',new DateTimeZone('UTC')))throw new ApiException(409,'appointment_not_editable','Past appointments cannot be rescheduled or canceled.');
+            if($action==='reschedule'&&(new DateTimeImmutable($appointment['starts_at'],new DateTimeZone('UTC')))->getTimestamp()===$requested?->getTimestamp())throw new ApiException(422,'appointment_time_unchanged','Choose a different time to reschedule this appointment.');
             $from=$appointment['status'];
             if($action==='cancel'){
                 $statement=$pdo->prepare("UPDATE appointments SET status='canceled_by_clinic',version=version+1 WHERE id=:id AND version=:version");$statement->execute(['id'=>$id,'version'=>$version]);

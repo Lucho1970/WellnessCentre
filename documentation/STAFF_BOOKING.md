@@ -12,7 +12,7 @@ Open **Staff portal → Appointments**. Super Admin, Clinic Admin, and reception
 The form supports in-clinic bookings using active client records:
 
 1. Search active clients by name, email, or phone. Results are limited to 25; refine the search if there are more matches. Create missing clients through Clients first.
-2. Select location, service, practitioner, and duration from the clinic's configured active assignments.
+2. Review the default base location, then select service, practitioner, and duration from the clinic's configured active assignments. A single eligible location is selected automatically. With several locations, administrative booking starts with the first configured eligible location and remains editable; practitioner booking prefers the signed-in practitioner's active base location.
 3. Choose a date and search current availability. Times use the location's timezone, including the review and appointment list.
 4. Select an offered time and one eligible room when the service requires a room.
 5. Review and confirm. The API revalidates the booking before inserting it. If the time or room is no longer available, the form returns to time selection.
