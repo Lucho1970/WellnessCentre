@@ -43,17 +43,17 @@ export async function customerSignIn() {
   const account = selectCustomerAccount();
   const clearCachedAccountHint = Boolean(nonce && shouldClearCustomerAccountHint(account));
 
-  // A cached External ID account can carry an opaque login_hint (and an opaque
-  // username fallback). External ID rejects either hint when domain_hint is also
-  // present. Keep the account in MSAL's cache, but do not make it the active
-  // account for this provider-routed authorization request.
+  // A cached External ID account can carry an opaque login_hint or provider
+  // metadata that is not valid as a new authorization hint. Keep the account
+  // cached for local display, but let the configured user flow present its own
+  // provider choices for this fresh authorization request.
   if (clearCachedAccountHint) customerInstance.setActiveAccount(null);
 
   try {
     await customerInstance.loginRedirect({
       scopes: customerScopes,
-      prompt: nonce ? 'login' : 'select_account',
-      ...(nonce ? freshCustomerLoginParameters(nonce, account) : {}),
+      prompt: 'select_account',
+      ...(nonce ? freshCustomerLoginParameters(nonce) : {}),
     });
   } catch (error) {
     // If navigation could not start, restore the existing local session display.
