@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import {
   AppBar,
   Box,
@@ -19,10 +19,13 @@ import { ClientLoginLink } from "./public/ClientLoginLink";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 
+const ContentPage = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentPage })));
+const ContentSection = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentSection })));
+
 function Home() {
   const { t } = useTranslation();
   return (
-    <Box className="hero" py={{ xs: 7, md: 12 }}>
+    <><Box className="hero" py={{ xs: 7, md: 12 }}>
       <Container maxWidth="lg">
         <Grid container spacing={5} alignItems="center">
           <Grid size={{ xs: 12, md: 8 }}>
@@ -69,7 +72,7 @@ function Home() {
           </Grid>
         </Grid>
       </Container>
-    </Box>
+    </Box><Suspense fallback={null}><ContentSection contentKey="sections/home-welcome" /></Suspense></>
   );
 }
 function Contact() {
@@ -151,6 +154,15 @@ export default function App() {
               <Button component={Link} to="/book">
                 {t("Book online")}
               </Button>
+              <Button component={Link} to="/new-clients">
+                {t("New clients")}
+              </Button>
+              <Button component={Link} to="/about">
+                {t("About")}
+              </Button>
+              <Button component={Link} to="/faq">
+                {t("FAQs")}
+              </Button>
               <Button component={Link} to="/contact">
                 {t("Contact")}
               </Button>
@@ -171,6 +183,9 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomeWithLegacyBooking />} />
           <Route path="/book" element={<Booking />} />
+          <Route path="/about" element={<Suspense fallback={null}><ContentPage contentKey="pages/about" /></Suspense>} />
+          <Route path="/new-clients" element={<Suspense fallback={null}><ContentPage contentKey="pages/new-clients" /></Suspense>} />
+          <Route path="/faq" element={<Suspense fallback={null}><ContentPage contentKey="pages/faq" /></Suspense>} />
           <Route path="/contact" element={<Contact />} />
           <Route
             path="*"
@@ -193,11 +208,17 @@ export default function App() {
               "For questions about your information or care, please contact the clinic.",
             )}
           </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" mt={2}>
+            <Button component={Link} to="/about" color="inherit" size="small">{t("About")}</Button>
+            <Button component={Link} to="/new-clients" color="inherit" size="small">{t("New clients")}</Button>
+            <Button component={Link} to="/faq" color="inherit" size="small">{t("FAQs")}</Button>
+            <Button component={Link} to="/contact" color="inherit" size="small">{t("Contact")}</Button>
+          </Stack>
           <Button
             href={portalLink("staff/login")}
             color="inherit"
             size="small"
-            sx={{ mt: 2 }}
+            sx={{ mt: 1 }}
           >
             {t("StaffSignIn")}
           </Button>

@@ -162,6 +162,13 @@ rejects browser-supplied client IDs and reuses the locked/idempotent booking tra
 Selection is not a hold. Client cancellation/rescheduling and actual notification delivery
 remain pending, so this slice must not be opened as an unattended production workflow.
 
+**20 September 2026 public-content slice:** the public site now has a bilingual,
+version-controlled Markdown content layer with validated metadata, safe rendering, SEO
+title/description handling, and initial About, New Clients, FAQ and home-section content.
+This is intentionally not a CMS. Service and practitioner discovery remain API-backed
+R3 work so catalogue facts are not duplicated in content files. See
+[Public website content](PUBLIC_CONTENT.md).
+
 **17 September 2026 mobile-first slice:** staff-assisted mobile booking now supports
 per-practitioner clinic/mobile eligibility, destination snapshots, fixed travel buffers,
 base-price/mobile-surcharge snapshots and authorized schedule display. See

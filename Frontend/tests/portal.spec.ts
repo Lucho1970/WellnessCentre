@@ -876,6 +876,23 @@ test("public home has client-first login and no workforce authentication or fake
   ).toBe(false);
 });
 
+test("public Markdown pages follow the selected language and publish safe metadata", async ({ page }) => {
+  await fixtures(page);
+  await page.goto(`${publicHost}/about`);
+  await expect(page.getByRole("heading", { name: "About our centre", level: 1 })).toBeVisible();
+  await expect(page).toHaveTitle("About us | Test Wellness");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /approach to accessible wellness care/);
+  await expect(page.getByRole("link", { name: "New clients" }).first()).toHaveAttribute("href", "/new-clients");
+  await page.getByRole("button", { name: "Language and region" }).click();
+  await page.getByRole("button", { name: /Français \(Canada\)/ }).click();
+  await expect(page.getByRole("heading", { name: "À propos de notre centre", level: 1 })).toBeVisible();
+  await expect(page).toHaveTitle("À propos | Test Wellness");
+  await page.getByRole("link", { name: "Nouveaux clients" }).first().click();
+  await expect(page.getByRole("heading", { name: "Bienvenue aux nouveaux clients", level: 1 })).toBeVisible();
+  await page.getByRole("link", { name: "FAQ", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Foire aux questions", level: 1 })).toBeVisible();
+});
+
 test("public booking hands off preferences without reserving or creating an appointment", async ({
   page,
 }) => {

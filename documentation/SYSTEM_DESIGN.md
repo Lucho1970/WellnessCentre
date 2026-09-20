@@ -91,6 +91,13 @@ New Clients, FAQ and resource content may remain version-controlled initially. D
 introduce a CMS until editing roles, review/publishing state, localization, media handling
 and audit requirements justify it.
 
+**Implemented content checkpoint (20 September 2026):** public editorial pages and
+embeddable sections load from matching `Frontend/content/en` and `fr` Markdown trees.
+YAML metadata controls title, description and draft/published state; raw HTML and unsafe
+URLs are rejected, media is restricted to reviewed `/content-assets/`, and builds require
+matching bilingual files and publication status. Markdown rendering is code-split from
+the public bootstrap. Catalogue facts remain API-backed. See [Public website content](PUBLIC_CONTENT.md).
+
 Public media stores consent/provenance, alt text, crop/variant metadata and publication
 state; serve optimized responsive formats while preserving a controlled original outside
 the public document root. Conversion events use an allowlist of non-sensitive event names
