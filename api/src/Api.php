@@ -55,6 +55,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/locations','locations');
                 $routes->addRoute('GET','/api/v1/services','services');
                 $routes->addRoute('GET','/api/v1/practitioners','practitioners');
+                $routes->addRoute('GET','/api/v1/team','team');
+                $routes->addRoute('GET','/api/v1/team/{slug:[a-z0-9-]+}/image','teamImage');
                 $routes->addRoute('GET','/api/v1/availability','availability');
                 $routes->addRoute('GET','/api/v1/auth/me','me');
                 $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
@@ -95,6 +97,8 @@ final class Api
                 $routes->addRoute('POST','/api/v1/admin/staff','createStaff');
                 $routes->addRoute('GET','/api/v1/admin/staff','adminStaff');
                 $routes->addRoute('PATCH','/api/v1/admin/staff/{id:\\d+}','updateStaff');
+                $routes->addRoute('GET','/api/v1/admin/team-profiles','teamProfiles');
+                $routes->addRoute('PUT','/api/v1/admin/team-profiles/{id:\\d+}','updateTeamProfile');
                 $routes->addRoute('POST','/api/v1/admin/practitioners','createPractitioner');
                 $routes->addRoute('GET','/api/v1/admin/practitioners','adminPractitioners');
                 $routes->addRoute('POST','/api/v1/admin/practitioners/onboard','onboardPractitioner');
@@ -128,6 +132,8 @@ final class Api
                 'locations'=>$this->catalog->locations(),
                 'services'=>$this->catalog->services(isset($request->query['practitioner_id'])?(int)$request->query['practitioner_id']:null),
                 'practitioners'=>$this->catalog->practitioners(isset($request->query['service_id'])?(int)$request->query['service_id']:null),
+                'team'=>$this->catalog->team(),
+                'teamImage'=>$this->teamImage($request,(string)$route[2]['slug']),
                 'availability'=>$this->availability->search($request->query),
                 'me'=>$this->me($this->user($request)),
                 'customerMe'=>$this->customerMe($request),
@@ -168,6 +174,8 @@ final class Api
                 'createStaff'=>$this->admin->createStaff($this->user($request),$request->body,$request->correlationId),
                 'adminStaff'=>$this->admin->staff($this->user($request)),
                 'updateStaff'=>$this->admin->updateStaff($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'teamProfiles'=>$this->admin->teamProfiles($this->user($request)),
+                'updateTeamProfile'=>$this->admin->updateTeamProfile($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createPractitioner'=>$this->admin->createPractitioner($this->user($request),$request->body,$request->correlationId),
                 'adminPractitioners'=>$this->admin->practitioners($this->user($request)),
                 'onboardPractitioner'=>$this->admin->onboardPractitioner($this->user($request),$request->body,$request->correlationId),
@@ -257,6 +265,16 @@ final class Api
     {
         $this->database->connection()->query('SELECT 1')->fetchColumn();
         return ['status'=>'ok'];
+    }
+
+    private function teamImage(Request $request, string $slug): never
+    {
+        $image = $this->catalog->teamImage($slug);
+        $hash = (string)$image['content_hash'];
+        if (trim((string)($request->headers['if-none-match'] ?? ''), '"') === $hash) {
+            Response::notModified($hash, $request->correlationId);
+        }
+        Response::image((string)$image['image_data'], (string)$image['mime_type'], $hash, $request->correlationId);
     }
 
     private function user(Request $request): AuthContext{return $this->auth->authenticate($request->bearerToken());}

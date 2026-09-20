@@ -1,5 +1,5 @@
 export type Workspace = 'admin' | 'practitioner';
-export type PortalPage = 'dashboard' | 'appointments' | 'clients' | 'calendar' | 'business' | 'practitioners' | 'staff' | 'locations' | 'rooms' | 'services' | 'profile';
+export type PortalPage = 'dashboard' | 'appointments' | 'clients' | 'calendar' | 'business' | 'practitioners' | 'staff' | 'team' | 'locations' | 'rooms' | 'services' | 'profile';
 const operations = ['super_admin', 'clinic_admin', 'reception', 'accountant'];
 const bookingRoles = ['super_admin', 'clinic_admin', 'reception'];
 export function workspacesFor(roles: string[]): Workspace[] {
@@ -9,9 +9,9 @@ export function pagesFor(roles: string[], workspace: Workspace): PortalPage[] {
   if (!workspacesFor(roles).includes(workspace)) return [];
   if (workspace === 'practitioner') return ['dashboard', 'appointments', 'profile'];
   return ['dashboard', ...(roles.some(role => bookingRoles.includes(role)) ? ['appointments' as const, 'clients' as const] : []),
-    ...(roles.includes('super_admin') ? ['calendar', 'practitioners', 'staff', 'locations', 'rooms', 'services', 'business'] as PortalPage[] : []), 'profile'];
+    ...(roles.includes('super_admin') ? ['calendar', 'practitioners', 'staff', 'team', 'locations', 'rooms', 'services', 'business'] as PortalPage[] : []), 'profile'];
 }
-const slugs: Record<PortalPage, string> = { dashboard: '', appointments: 'appointments', clients: 'clients', calendar: 'availability', business: 'settings', practitioners: 'practitioners', staff: 'users', locations: 'locations', rooms: 'rooms', services: 'services', profile: 'profile' };
+const slugs: Record<PortalPage, string> = { dashboard: '', appointments: 'appointments', clients: 'clients', calendar: 'availability', business: 'settings', practitioners: 'practitioners', staff: 'users', team: 'team', locations: 'locations', rooms: 'rooms', services: 'services', profile: 'profile' };
 export function pagePath(workspace: Workspace, page: PortalPage) {
   const slug = workspace === 'practitioner' && page === 'appointments' ? 'schedule' : slugs[page];
   return `/${workspace}${slug ? `/${slug}` : ''}`;

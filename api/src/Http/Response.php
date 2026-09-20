@@ -45,4 +45,29 @@ final class Response
         echo json_encode(self::normalizeNumericIds($payload), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         exit;
     }
+
+    public static function image(string $data, string $mimeType, string $contentHash, ?string $correlationId = null): never
+    {
+        if (!in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            throw new ApiException(500, 'invalid_image', 'The published image format is not supported.');
+        }
+        http_response_code(200);
+        if ($correlationId) header('X-Correlation-ID: ' . $correlationId);
+        header('Content-Type: ' . $mimeType);
+        header('Content-Length: ' . strlen($data));
+        header('Cache-Control: public, max-age=3600');
+        header('ETag: "' . $contentHash . '"');
+        echo $data;
+        exit;
+    }
+
+    public static function notModified(string $contentHash, ?string $correlationId = null): never
+    {
+        http_response_code(304);
+        if ($correlationId) header('X-Correlation-ID: ' . $correlationId);
+        header('Cache-Control: public, max-age=3600');
+        header('ETag: "' . $contentHash . '"');
+        header_remove('Content-Type');
+        exit;
+    }
 }

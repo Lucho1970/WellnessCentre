@@ -42,6 +42,7 @@ const RoomAdmin = lazy(() => import('../admin/RoomAdmin').then(module => ({ defa
 const ServiceAdmin = lazy(() => import('../admin/ServiceAdmin').then(module => ({ default: module.ServiceAdmin })));
 const CatalogueSettings = lazy(() => import('../admin/CatalogueSettings').then(module => ({ default: module.CatalogueSettings })));
 const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ default: module.StaffAdmin })));
+const TeamAdmin = lazy(() => import('../admin/TeamAdmin').then(module => ({ default: module.TeamAdmin })));
 const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
 const ScheduleExceptions = lazy(() => import('../scheduling/ScheduleExceptions').then(module => ({ default: module.ScheduleExceptions })));
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
@@ -68,6 +69,7 @@ const navigation: NavigationItem[] = [
   { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} /> },
   { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} /> },
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
+  { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   {
     id: "profile",
     label: "My profile",
@@ -170,6 +172,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
+        {page === "team" && <TeamAdmin />}
         {page === "calendar" && <><AvailabilityAdmin /><ScheduleExceptions /></>}
         {page === "profile" && <ProfileSettings />}
         </Suspense>

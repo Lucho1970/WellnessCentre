@@ -893,6 +893,46 @@ test("public Markdown pages follow the selected language and publish safe metada
   await expect(page.getByRole("heading", { name: "Foire aux questions", level: 1 })).toBeVisible();
 });
 
+test("contact page lists published practitioners first and carries a team booking choice", async ({ page }) => {
+  await fixtures(page);
+  await page.route("**/api/v1/team", route => route.fulfill({ json: { data: [
+    { slug: "test-practitioner", section: "practitioner", display_name: "Test Practitioner", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", display_order: 1, has_image: 0, image_version: null, practitioner_id: 3 },
+    { slug: "test-admin", section: "administration", display_name: "Test Administrator", public_title: "Clinic Administrator", public_title_fr: "Administration de la clinique", summary: null, summary_fr: null, display_order: 1, has_image: 0, image_version: null, practitioner_id: null },
+  ] } }));
+  await page.goto(`${publicHost}/contact`);
+  const practitionerHeading = page.getByRole('heading', { name: "Practitioners", level: 3 });
+  const administrationHeading = page.getByRole('heading', { name: "Administration", level: 3 });
+  await expect(practitionerHeading).toBeVisible();
+  await expect(administrationHeading).toBeVisible();
+  const practitionerBox = await practitionerHeading.boundingBox(), administrationBox = await administrationHeading.boundingBox();
+  expect(practitionerBox && administrationBox ? practitionerBox.y : Number.POSITIVE_INFINITY).toBeLessThan(administrationBox?.y ?? 0);
+  await page.getByRole('button', { name: "View profile for Test Practitioner" }).hover();
+  await expect(page.getByRole('dialog', { name: "Profile for Test Practitioner" })).toBeVisible();
+  await page.getByRole('link', { name: "Book a session" }).click();
+  await expect(page).toHaveURL(`${publicHost}/book?practitioner_id=3`);
+  await expect(page.getByRole('combobox', { name: "Practitioner" })).toContainText("Test Practitioner");
+});
+
+test("super admin deliberately publishes a bilingual public team profile", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  let saved: Record<string, unknown> | null = null;
+  await page.route("**/api/v1/admin/team-profiles", route => route.fulfill({ json: { data: [
+    { user_id: 7, display_name: "Esther Vanderpoel", status: "active", practitioner_id: 3, slug: null, section: null, public_title: null, public_title_fr: null, summary: null, summary_fr: null, display_order: null, published: null, show_booking_action: null, has_image: 1 },
+  ] } }));
+  await page.route("**/api/v1/admin/team-profiles/7", async route => {
+    saved = route.request().postDataJSON();
+    await route.fulfill({ json: { data: { user_id: 7, published: true } } });
+  });
+  await page.goto(`${portalHost}/admin/team`);
+  await expect(page.getByRole('heading', { name: "Public team" })).toBeVisible();
+  await page.getByLabel("Title (English)").fill("Registered Massage Therapist");
+  await page.getByLabel("Title (French)").fill("Massothérapeute agréée");
+  await page.getByLabel("Show Book a session action").check();
+  await page.getByLabel("Publish on the Contact page").check();
+  await page.getByRole('button', { name: "Save team profile" }).click();
+  await expect.poll(() => saved).toMatchObject({ slug: "esther-vanderpoel", section: "practitioner", published: true, show_booking_action: true });
+});
+
 test("public booking hands off preferences without reserving or creating an appointment", async ({
   page,
 }) => {

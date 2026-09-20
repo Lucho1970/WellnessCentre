@@ -3,6 +3,7 @@ import { Alert, Box, Button, CircularProgress, Container, Grid, MenuItem, Paper,
 import { apiRequest } from '../shared/api';
 import { portalLink } from '../shared/urls';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { formatCad, formatDateTime } from '../i18n/format';
 
 type Location = { id: number; name: string; timezone?: string };
@@ -13,6 +14,8 @@ type Availability = { timezone: string; availability: Slot[] };
 const dateInZone = (timezone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 export function Booking() {
   const { t, i18n } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const requestedPractitionerId = /^\d+$/.test(searchParams.get('practitioner_id') ?? '') ? searchParams.get('practitioner_id')! : '';
   const message = (cause: unknown) => cause instanceof Error ? cause.message : t('Unable to load online booking.');
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [mode,setMode]=useState('mobile');
@@ -28,22 +31,23 @@ export function Booking() {
 
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');
-    void Promise.all([apiRequest<Location[]>('/locations', { signal: controller.signal }), apiRequest<Service[]>('/services', { signal: controller.signal })])
+    const servicePath = requestedPractitionerId ? `/services?practitioner_id=${requestedPractitionerId}` : '/services';
+    void Promise.all([apiRequest<Location[]>('/locations', { signal: controller.signal }), apiRequest<Service[]>(servicePath, { signal: controller.signal })])
       .then(([nextLocations, nextServices]) => { if (!controller.signal.aborted) { setLocations(nextLocations); setServices(nextServices); setLocationId(String(nextLocations[0]?.id ?? '')); setServiceId(String(nextServices[0]?.id ?? '')); } })
       .catch(cause => { if (!controller.signal.aborted) setError(message(cause)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [retry]);
+  }, [retry, requestedPractitionerId]);
   useEffect(() => {
     const controller = new AbortController(); setPractitioners([]); setPractitionerId(''); setSlot(null); setPractitionerError('');
     if (!serviceId) return () => controller.abort();
     setPractitionerBusy(true);
     void apiRequest<Practitioner[]>(`/practitioners?service_id=${serviceId}`, { signal: controller.signal })
-      .then(data => { if (!controller.signal.aborted) { setPractitioners(data); setPractitionerId(String(data[0]?.id ?? '')); } })
+      .then(data => { if (!controller.signal.aborted) { setPractitioners(data); const requested = data.find(item => String(item.id) === requestedPractitionerId); setPractitionerId(String(requested?.id ?? data[0]?.id ?? '')); } })
       .catch(cause => { if (!controller.signal.aborted) setPractitionerError(message(cause)); })
       .finally(() => { if (!controller.signal.aborted) setPractitionerBusy(false); });
     return () => controller.abort();
-  }, [serviceId, retry]);
+  }, [serviceId, retry, requestedPractitionerId]);
   useEffect(() => {
     if (locationId) setAppointmentDate(current => current || dateInZone(selectedTimezone));
   }, [locationId, selectedTimezone]);

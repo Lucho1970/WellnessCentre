@@ -158,6 +158,63 @@ final class AdminService
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
 
+    public function teamProfiles(AuthContext $actor): array
+    {
+        $this->superAdmin($actor);
+        $statement = $this->database->connection()->prepare(
+            "SELECT u.id AS user_id,u.display_name,u.status,p.id AS practitioner_id,
+                    t.slug,t.section,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,t.published,t.show_booking_action,
+                    CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image
+               FROM users u
+               JOIN staff_accounts a ON a.user_id=u.id
+          LEFT JOIN practitioners p ON p.user_id=u.id
+          LEFT JOIN public_team_profiles t ON t.user_id=u.id
+          LEFT JOIN user_profile_images i ON i.user_id=u.id
+              WHERE u.clinic_id=:clinic
+              ORDER BY CASE WHEN p.id IS NULL THEN 1 ELSE 0 END,u.display_name"
+        );
+        $statement->execute(['clinic' => $actor->clinicId]);
+        return $statement->fetchAll();
+    }
+
+    public function updateTeamProfile(AuthContext $actor, int $userId, array $body, string $correlationId): array
+    {
+        $this->superAdmin($actor);
+        $this->required($body, ['slug','section','public_title']);
+        $slug = strtolower(trim((string)$body['slug']));
+        $section = (string)$body['section'];
+        $title = trim((string)$body['public_title']);
+        $titleFr = $this->optional($body, 'public_title_fr');
+        $summary = $this->optional($body, 'summary');
+        $summaryFr = $this->optional($body, 'summary_fr');
+        $order = (int)($body['display_order'] ?? 100);
+        $published = (bool)($body['published'] ?? false);
+        $showBooking = (bool)($body['show_booking_action'] ?? false);
+        if (preg_match('/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/', $slug) !== 1) throw new ApiException(422,'validation_error','Use a lowercase URL name containing letters, numbers, and hyphens.',['slug'=>'Invalid URL name']);
+        if (!in_array($section,['practitioner','administration'],true)) throw new ApiException(422,'validation_error','Choose a valid team section.',['section'=>'Invalid section']);
+        if ($title==='' || strlen($title)>150 || ($titleFr!==null && strlen($titleFr)>150)) throw new ApiException(422,'validation_error','Team titles may contain up to 150 characters.',['public_title'=>'Required; maximum 150 characters']);
+        if (($summary!==null && strlen($summary)>1000) || ($summaryFr!==null && strlen($summaryFr)>1000)) throw new ApiException(422,'validation_error','Team summaries may contain up to 1000 characters.',['summary'=>'Maximum 1000 characters']);
+        if ($order<0 || $order>65535) throw new ApiException(422,'validation_error','Display order must be between 0 and 65535.',['display_order'=>'Invalid display order']);
+        $pdo = $this->database->connection();
+        $check = $pdo->prepare("SELECT p.id practitioner_id FROM users u JOIN staff_accounts a ON a.user_id=u.id LEFT JOIN practitioners p ON p.user_id=u.id AND p.active=1 WHERE u.id=:user AND u.clinic_id=:clinic AND u.user_type='staff'");
+        $check->execute(['user'=>$userId,'clinic'=>$actor->clinicId]);
+        $staff = $check->fetch();
+        if (!$staff) throw new ApiException(404,'staff_not_found','Staff member not found.');
+        if ($section==='practitioner' && !$staff['practitioner_id']) throw new ApiException(422,'validation_error','Only an active practitioner can appear in the practitioner section.',['section'=>'Active practitioner required']);
+        if ($showBooking && ($section!=='practitioner' || !$staff['practitioner_id'])) throw new ApiException(422,'validation_error','Booking can only be shown for an active practitioner.',['show_booking_action'=>'Active practitioner required']);
+        $statement = $pdo->prepare("INSERT INTO public_team_profiles(user_id,clinic_id,slug,section,public_title,public_title_fr,summary,summary_fr,display_order,published,show_booking_action,updated_by)
+            VALUES(:user,:clinic,:slug,:section,:title,:title_fr,:summary,:summary_fr,:display_order,:published,:booking,:actor)
+            ON DUPLICATE KEY UPDATE slug=VALUES(slug),section=VALUES(section),public_title=VALUES(public_title),public_title_fr=VALUES(public_title_fr),summary=VALUES(summary),summary_fr=VALUES(summary_fr),display_order=VALUES(display_order),published=VALUES(published),show_booking_action=VALUES(show_booking_action),updated_by=VALUES(updated_by)");
+        try {
+            $statement->execute(['user'=>$userId,'clinic'=>$actor->clinicId,'slug'=>$slug,'section'=>$section,'title'=>$title,'title_fr'=>$titleFr,'summary'=>$summary,'summary_fr'=>$summaryFr,'display_order'=>$order,'published'=>$published?1:0,'booking'=>$showBooking?1:0,'actor'=>$actor->userId]);
+        } catch (\PDOException $e) {
+            if ((string)$e->getCode()==='23000') throw new ApiException(409,'slug_already_exists','That public profile URL is already in use.',['slug'=>'Already in use']);
+            throw $e;
+        }
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'team_profile.update','user',$userId,'success',['published'=>$published,'section'=>$section]);
+        return ['user_id'=>$userId,'published'=>$published];
+    }
+
     public function createPractitioner(AuthContext $actor,array $body,string $correlationId): array
     {
         $this->admin($actor);$this->required($body,['user_id','discipline','location_id']);$this->ownedLocation($actor,(int)$body['location_id']);$pdo=$this->database->connection();

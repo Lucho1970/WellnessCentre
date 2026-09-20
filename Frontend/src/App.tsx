@@ -18,6 +18,7 @@ import { Booking } from "./public/Booking";
 import { ClientLoginLink } from "./public/ClientLoginLink";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
+import { TeamSection } from "./public/TeamSection";
 
 const ContentPage = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentPage })));
 const ContentSection = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentSection })));
@@ -79,7 +80,7 @@ function Contact() {
   const { config } = useClinicConfig();
   const { t } = useTranslation();
   return (
-    <Container maxWidth="md" sx={{ py: 7 }}>
+    <><Container maxWidth="md" sx={{ py: 7 }}>
       <Typography variant="h3" component="h1">
         {t("Contact {{name}}", { name: config.name })}
       </Typography>
@@ -100,7 +101,7 @@ function Contact() {
           </Typography>
         )}
       </Stack>
-    </Container>
+    </Container><TeamSection /></>
   );
 }
 function LegacyLinks() {

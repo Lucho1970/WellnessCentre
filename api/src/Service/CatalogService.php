@@ -42,4 +42,43 @@ final class CatalogService
         if($serviceId){$sql.=' JOIN practitioner_services ps ON ps.practitioner_id=p.id WHERE p.active=1 AND ps.active=1 AND ps.service_id=:service';$params['service']=$serviceId;}else{$sql.=' WHERE p.active=1';}
         $sql.=' ORDER BY u.display_name'; $statement=$this->database->connection()->prepare($sql);$statement->execute($params);return $statement->fetchAll();
     }
+
+    public function team(): array
+    {
+        $sql = "SELECT t.slug,t.section,u.display_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,
+                       CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image,
+                       i.content_hash image_version,
+                       CASE WHEN t.section='practitioner' AND t.show_booking_action=1 AND p.active=1 THEN p.id ELSE NULL END practitioner_id
+                  FROM public_team_profiles t
+                  JOIN users u ON u.id=t.user_id AND u.status='active' AND u.user_type='staff'
+             LEFT JOIN practitioners p ON p.user_id=u.id
+             LEFT JOIN user_profile_images i ON i.user_id=u.id
+                 WHERE t.published=1
+                   AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                   AND (t.section<>'practitioner' OR p.active=1)
+              ORDER BY CASE t.section WHEN 'practitioner' THEN 0 ELSE 1 END,t.display_order,u.display_name";
+        return $this->database->connection()->query($sql)->fetchAll();
+    }
+
+    public function teamImage(string $slug): array
+    {
+        if (preg_match('/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/', $slug) !== 1) {
+            throw new ApiException(404, 'not_found', 'Published team image not found.');
+        }
+        $statement = $this->database->connection()->prepare(
+            "SELECT i.mime_type,i.image_data,i.content_hash
+               FROM public_team_profiles t
+               JOIN users u ON u.id=t.user_id AND u.status='active' AND u.user_type='staff'
+               JOIN user_profile_images i ON i.user_id=u.id
+          LEFT JOIN practitioners p ON p.user_id=u.id
+              WHERE t.slug=:slug AND t.published=1
+                AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                AND (t.section<>'practitioner' OR p.active=1)
+              LIMIT 1"
+        );
+        $statement->execute(['slug' => $slug]);
+        $image = $statement->fetch();
+        if (!$image) throw new ApiException(404, 'not_found', 'Published team image not found.');
+        return $image;
+    }
 }
