@@ -1,5 +1,6 @@
 import { InteractionRequiredAuthError, PublicClientApplication } from '@azure/msal-browser';
 import { selectAccount } from '../auth/accountSelection';
+import { freshCustomerLoginParameters } from './providerRouting';
 
 const tenant = import.meta.env.VITE_CUSTOMER_ENTRA_TENANT_ID ?? '';
 const subdomain = import.meta.env.VITE_CUSTOMER_ENTRA_SUBDOMAIN ?? '';
@@ -40,8 +41,7 @@ export async function customerSignIn() {
   const { beginCustomerLogin } = await import('./session');
   const nonce = await beginCustomerLogin();
   await customerInstance.loginRedirect({ scopes: customerScopes, prompt: nonce ? 'login' : 'select_account',
-    // Explicit query parameter: this MSAL version does not serialize maxAge=0.
-    ...(nonce ? { nonce, maxAge: 0, extraQueryParameters: { max_age: '0' }, claims: JSON.stringify({ id_token: { auth_time: { essential: true } } }) } : {}) });
+    ...(nonce ? freshCustomerLoginParameters(nonce, selectCustomerAccount()) : {}) });
 }
 
 export async function customerSignOut() {

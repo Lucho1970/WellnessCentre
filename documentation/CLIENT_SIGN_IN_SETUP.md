@@ -21,6 +21,13 @@ on every new MSAL account object. Verification times out after 20 seconds with e
 retry/sign-in recovery. Both personas filter restored accounts by tenant and trusted
 environment before acquiring tokens; API validation is unchanged.
 
+When an application session expires but the cached customer identity remains, a returning
+Google user is routed back through Google using External ID's `domain_hint=google`. The
+hint is selected only from an allowlisted value of the signed cached `idp` claim. The
+fresh nonce, `prompt=login`, `max_age=0`, and `auth_time` proof remain mandatory, so this
+changes provider routing without weakening the onboarding/session freshness check. A
+first-time user, a missing claim, or an unsupported provider still sees the normal chooser.
+
 Public initials use a hidden portal `/client/session` page with exact-origin/source and
 nonce-checked postMessage replies. Only initials from an unexpired cached customer ID
 token are shared, never tokens, email, account IDs, staff roles or clinical data. This is
