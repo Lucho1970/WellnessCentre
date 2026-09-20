@@ -6,8 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../i18n/format';
 import { AddressEntry } from '../shared/AddressEntry';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
+import { CustomerBooking } from './CustomerBooking';
+import { clearCustomerBookingIntent, customerBookingIntent } from './bookingIntent';
 
-export type CustomerStatus = { onboarding_status: 'not_linked' | 'pending_review' | 'linked'; review_code?: string };
+export type CustomerStatus = { onboarding_status: 'not_linked' | 'pending_review' | 'linked'; review_code?: string; capabilities?: string[] };
 const emptyAddress = { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' };
 const emptyProfile = { given_name: '', family_name: '', email: '', phone: '', preferred_contact: 'email', address: emptyAddress, revision: '' };
 type Profile = typeof emptyProfile;
@@ -16,7 +18,8 @@ type AppointmentView = 'upcoming' | 'past' | 'all';
 const appointmentInstant = (value: string) => new Date(`${value.replace(' ', 'T')}Z`).getTime();
 export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatus; onRefresh: () => void }) {
   const { t, i18n } = useTranslation();
-  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments'>(status.onboarding_status === 'linked' ? 'appointments' : 'choose');
+  const canBook=status.capabilities?.includes('book_own_appointments')??false;
+  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking'>(status.onboarding_status === 'linked' ? (canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
   const [appointmentView, setAppointmentView] = useState<AppointmentView>('upcoming');
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -26,8 +29,8 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
   const [reload, setReload] = useState(0);
   const { markDirty, markClean } = useUnsavedForm();
   useEffect(() => {
-    if (status.onboarding_status === 'linked' && (mode === 'choose' || mode === 'invite')) setMode('appointments');
-  }, [mode, status.onboarding_status]);
+    if (status.onboarding_status === 'linked' && (mode === 'choose' || mode === 'invite')) setMode(canBook&&customerBookingIntent() ? 'booking' : 'appointments');
+  }, [canBook, mode, status.onboarding_status]);
   useEffect(() => {
     if (status.onboarding_status !== 'linked' || !['profile','appointments'].includes(mode)) return;
     const controller = new AbortController(); setLoading(true); setError('');
@@ -71,12 +74,12 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
   return <Stack spacing={2} mt={3}>
     <Divider />
     <Typography variant="h6">{t(status.onboarding_status === 'linked' ? 'My client account' : 'Set up your client account')}</Typography>
-    {status.onboarding_status === 'linked' ? <Stack direction="row" spacing={1}><Button variant={mode === 'appointments' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('appointments')}>{t('My appointments')}</Button><Button variant={mode === 'profile' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('profile')}>{t('My profile')}</Button></Stack>
+    {status.onboarding_status === 'linked' ? <Stack direction="row" spacing={1} flexWrap="wrap"><Button variant={mode === 'appointments' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('appointments')}>{t('My appointments')}</Button>{canBook&&<Button variant={mode === 'booking' ? 'contained' : 'text'} disabled={saving} onClick={() => { setNotice(''); setMode('booking'); }}>{t('Book appointment')}</Button>}<Button variant={mode === 'profile' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('profile')}>{t('My profile')}</Button></Stack>
       : <><Typography>{t('If the clinic has booked you before, request an invitation instead of creating another record. Email matching does not link accounts.')}</Typography><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}><Button onClick={() => setMode('profile')}>{t('I am a new client')}</Button><Button onClick={() => setMode('invite')}>{t('I have an invitation')}</Button></Stack></>}
     {error && <Alert severity="error">{error}{status.onboarding_status === 'linked' && <Button disabled={saving || loading} onClick={() => setReload(v => v + 1)}>{t('Reload saved information')}</Button>}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
-    {loading ? <CircularProgress aria-label={t(mode === 'appointments' ? 'Loading appointments' : 'Loading your information…')} /> : mode === 'appointments' ? <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+    {mode === 'booking' ? <CustomerBooking cancel={() => { clearCustomerBookingIntent(); setMode('appointments'); }} complete={id => { clearCustomerBookingIntent(); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : loading ? <CircularProgress aria-label={t(mode === 'appointments' ? 'Loading appointments' : 'Loading your information…')} /> : mode === 'appointments' ? <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between" mb={2}>
-        <Box><Typography variant="h6">{t('My appointments')}</Typography><Typography color="text.secondary">{t('Contact the clinic to book or make changes.')}</Typography></Box>
+        <Box><Typography variant="h6">{t('My appointments')}</Typography><Typography color="text.secondary">{t('Book a new appointment here. Contact the clinic if you need help changing an existing appointment.')}</Typography></Box>
         <Stack direction="row" spacing={1} alignItems="center">
           <TextField select size="small" label={t('Show')} value={appointmentView} onChange={event => setAppointmentView(event.target.value as AppointmentView)} sx={{ minWidth: 170 }}>
             <MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem>

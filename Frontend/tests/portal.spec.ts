@@ -901,6 +901,9 @@ test("public booking hands off preferences without reserving or creating an appo
       exact: false,
     }),
   ).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("wellness.customer.booking-intent.v1") ?? "null"))).toMatchObject({
+    delivery_mode: "mobile", location_id: "1", service_id: "2", practitioner_id: "3", duration_option_id: "4",
+  });
   expect(writes).toEqual([]);
 });
 

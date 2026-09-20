@@ -526,3 +526,67 @@ test("invitation fragment is removed and acceptance remains pending until manual
   await page.getByRole("button", { name: "Check approval status" }).click();
   await expect.poll(() => reads).toBeGreaterThan(before);
 });
+
+test("linked client books only for the signed-in client through the customer API", async ({ page }) => {
+  await fixture(page, true);
+  await page.route("**/api/v1/customer/auth/me", route => route.fulfill({ json: { data: {
+    authenticated: true, authentication_context: "customer", onboarding_status: "linked",
+    capabilities: ["own_profile", "own_appointments", "book_own_appointments"],
+    session: { idle_expires_at: Date.now()/1000+1800, absolute_expires_at: Date.now()/1000+28800 },
+  } } }));
+  let appointmentReads = 0, confirmations = 0;
+  await page.route("**/api/v1/customer/appointments", route => {
+    if (route.request().method() === "POST") {
+      confirmations++;
+      const body = route.request().postDataJSON();
+      expect(body.client_id).toBeUndefined();
+      expect(body.service_id).toBe(4);
+      expect(body.practitioner_id).toBe(7);
+      expect(body.delivery_mode).toBe("mobile");
+      expect(body.destination.address_line1).toBe("10 Client Street");
+      expect(body.address_validation_token).toBe("coverage-proof");
+      expect(body.idempotency_key).toBeTruthy();
+      return route.fulfill({ json: { data: { id: 91 } } });
+    }
+    appointmentReads++;
+    return route.fulfill({ json: { data: { items: [], limit: 100 } } });
+  });
+  await page.route("**/api/v1/customer/booking-options", route => route.fulfill({ json: { data: {
+    default_location_id: 2, rooms: [], combinations: [{
+      location_id: 2, location_name: "Holland Landing", timezone: "America/Toronto",
+      service_id: 4, service_name: "Massage", requires_room: 0, offers_mobile: 1, offers_clinic: 0,
+      travel_buffer_minutes: 20, mobile_fee_cents: 1500, base_price_cents: 12000,
+      practitioner_id: 7, practitioner_name: "Esther Vanderpoel", duration_option_id: 8, duration_minutes: 60,
+    }],
+  } } }));
+  await page.route("**/api/v1/customer/profile", route => route.fulfill({ json: { data: {
+    given_name: "Test", family_name: "Client", email: "client@example.test", phone: "555-0100", preferred_contact: "email", revision: "r1",
+    address: { address_line1: "10 Client Street", address_line2: "", city: "Newmarket", province: "ON", postal_code: "L3Y 1A1", country: "Canada", instructions: "" },
+  } } }));
+  await page.route("**/api/v1/customer/address-coverage/validate", route => route.fulfill({ json: { data: {
+    destination: route.request().postDataJSON().destination, distance_km: 7.2, radius_km: 25, token: "coverage-proof",
+  } } }));
+  await page.route("**/api/v1/customer/availability?**", route => route.fulfill({ json: { data: { availability: [{
+    duration_option_id: 8, starts_at: "2099-10-01T14:00:00-04:00", ends_at: "2099-10-01T15:00:00-04:00", available_room_ids: [],
+  }] } } }));
+
+  await page.goto("http://localhost:5184/client");
+  await page.getByRole("button", { name: "Book appointment" }).click();
+  await page.getByRole("combobox", { name: "Service", exact: true }).click();
+  await page.getByRole("option", { name: "Massage", exact: true }).click();
+  await page.getByRole("combobox", { name: "Practitioner", exact: true }).click();
+  await page.getByRole("option", { name: "Esther Vanderpoel", exact: true }).click();
+  await page.getByRole("combobox", { name: "Duration", exact: true }).click();
+  await page.getByRole("option", { name: /60 minutes/ }).click();
+  await page.getByRole("button", { name: "Validate address and coverage" }).click();
+  await expect(page.getByText(/Address confirmed: 7.2 km/)).toBeVisible();
+  await page.getByRole("button", { name: "Find a time" }).click();
+  await page.getByLabel("Appointment date").fill("2099-10-01");
+  await page.getByRole("button", { name: "Find times" }).click();
+  await page.getByRole("button", { name: /Oct.*1.*2099/i }).click();
+  await page.getByRole("button", { name: "Review appointment" }).click();
+  await page.getByRole("button", { name: "Confirm appointment" }).click();
+  await expect(page.getByText("Appointment #91 confirmed. Confirmation email is queued; delivery is not yet enabled.")).toBeVisible();
+  expect(confirmations).toBe(1);
+  expect(appointmentReads).toBeGreaterThanOrEqual(2);
+});

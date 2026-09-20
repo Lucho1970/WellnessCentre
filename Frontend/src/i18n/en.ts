@@ -809,6 +809,17 @@ const en = {
   "Link a practitioner": "Link a practitioner",
   "Practitioner availability": "Practitioner availability",
   "Unavailable": "Unavailable",
+  "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
+    "Choose a service, practitioner, and visit type. No time is reserved until you confirm.",
+  "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.":
+    "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.",
+  "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
+    "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.",
+  "Unable to load booking options.": "Unable to load booking options.",
+  "Sign in to continue booking. No appointment has been requested or reserved.":
+    "Sign in to continue booking. No appointment has been requested or reserved.",
+  "Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.":
+    "Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.",
 } as const;
 
 export default en;

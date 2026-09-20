@@ -112,10 +112,42 @@ paths:
         '422': {description: Invalid/privileged fields}
   /api/v1/customer/appointments:
     get:
-      summary: Most recent 100 own appointments, descending start time, read-only
+      summary: Most recent 100 own appointments, descending start time
       responses:
         '200': {description: 'data.items: id, starts_at, ends_at (UTC), status, delivery_mode, service, practitioner, location, timezone. data.limit=100. No notes/addresses/attendees/financial data.'}
         '403': {description: Not linked or inactive}
+    post:
+      summary: Confirm an appointment for the signed-in linked client
+      description: >-
+        The server derives client_id from the reviewed identity link and rejects a submitted
+        client_id. Uses the same clinic lock, availability revalidation, price snapshot,
+        coverage proof, idempotency and notification-event transaction as staff booking.
+      responses:
+        '200': {description: Confirmed appointment; an exact idempotent replay returns the same appointment}
+        '403': {description: Not linked, inactive or wrong customer context}
+        '409': {description: Slot, room or quoted price changed}
+        '422': {description: Invalid selection, destination, proof or browser-supplied client_id}
+  /api/v1/customer/booking-options:
+    get:
+      summary: Active booking combinations for the linked client's configured clinic
+      responses:
+        '200': {description: Sanitized location, service, practitioner, duration, delivery and price combinations plus bookable rooms}
+        '403': {description: Not linked or inactive}
+  /api/v1/customer/availability:
+    get:
+      summary: Search current availability for an eligible same-clinic combination
+      responses:
+        '200': {description: Available times and eligible room IDs; selection does not reserve a slot}
+        '404': {description: Combination is not active in the linked client's clinic}
+        '422': {description: Invalid delivery mode, IDs or date range}
+  /api/v1/customer/address-coverage/validate:
+    post:
+      summary: Validate the signed-in client's proposed On-Site destination and service radius
+      responses:
+        '200': {description: Normalized destination, route distance and short-lived proof bound to the customer and booking selections}
+        '403': {description: Not linked or inactive}
+        '422': {description: Incomplete, unconfirmed or out-of-range address}
+        '503': {description: Google validation/routing or server configuration unavailable}
   /api/v1/clients/{id}/invitations:
     parameters:
       - {$ref: '#/components/parameters/ClientId'}

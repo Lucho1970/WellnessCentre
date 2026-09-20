@@ -24,7 +24,7 @@ final class AddressCoverageService
 
     public function validate(AuthContext $actor, array $body): array
     {
-        $this->assertStaffCanBook($actor);
+        $this->assertCanBook($actor);
         foreach (['location_id', 'service_id', 'practitioner_id'] as $field) {
             if (empty($body[$field])) throw new ApiException(422, 'validation_error', "{$field} is required.", [$field => 'Required']);
         }
@@ -184,8 +184,9 @@ final class AddressCoverageService
         return $decoded;
     }
 
-    private function assertStaffCanBook(AuthContext $actor): void
+    private function assertCanBook(AuthContext $actor): void
     {
+        if ($actor->userType === 'client') return;
         if ($actor->userType !== 'staff' || !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception', 'practitioner')) throw new ApiException(403, 'forbidden', 'Your role cannot validate On-Site visit addresses.');
     }
 

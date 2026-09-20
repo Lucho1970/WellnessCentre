@@ -154,6 +154,14 @@ The user-facing term for a practitioner travelling to the client is **On-Site**.
 
 ## 12. Verified source baseline versus remaining work
 
+**20 September 2026 client-booking slice:** a reviewed linked client can carry sanitized
+public availability preferences into the client portal, choose or revise care details,
+validate an On-Site destination, search current availability, review the current price and
+confirm an appointment for self. The API derives the client from the signed identity link,
+rejects browser-supplied client IDs and reuses the locked/idempotent booking transaction.
+Selection is not a hold. Client cancellation/rescheduling and actual notification delivery
+remain pending, so this slice must not be opened as an unattended production workflow.
+
 **17 September 2026 mobile-first slice:** staff-assisted mobile booking now supports
 per-practitioner clinic/mobile eligibility, destination snapshots, fixed travel buffers,
 base-price/mobile-surcharge snapshots and authorized schedule display. See
@@ -172,8 +180,8 @@ Baseline: source reviewed on 16 September 2026, combining `origin/main` at `9b5f
 | Catalogue | Locations, rooms, capabilities, services/durations, assignments, taxes/settings and mobile metadata | Hosted acceptance; practitioner self-service permissions where not yet exposed |
 | Availability | Recurring rules/overrides, buffers, room constraints and server slot calculation | Complete practitioner UI, shared mutation locking, database concurrency/DST acceptance |
 | Staff/practitioner booking | Administrator/reception client and slot selection plus practitioner-scoped own booking, rescheduling and cancellation; transaction/idempotency, optimistic versions, history/audit and scoped lists | End-to-end hosted MySQL verification, full lifecycle/fees/recurrence and notification delivery |
-| Client management | Staff search/create/edit, role checks, stale-edit handling and audit | Client sign-in/claiming, self-service, addresses, full history/forms/privacy flows |
-| Public booking | Catalogue/availability browsing and presentation flow | Replace local-only confirmation with authenticated server booking; never claim a slot is held without a hold |
+| Client management | Staff search/create/edit/merge; reviewed customer identity links; own profile, saved address and appointment history | Client appointment changes, full history/forms/privacy flows and recovery/shared-account decisions |
+| Public booking | Catalogue/availability browsing, preference handoff and authenticated self-booking through the shared transaction | Hosted race acceptance, client cancellation/rescheduling and delivery of confirmations; never claim a slot is held without a hold |
 | Notifications | Durable event/schema foundation | Sender worker, provider/templates, reminders, delivery/failure handling |
 | Forms, waitlist, billing, exports, accounting | Schema foundations | Complete services, authorization, UI, jobs and acceptance; tables are not completed modules |
 | Portal split/messages/mobile safety | Requirements and some supporting fields | Separate deployable experiences; conversations; address snapshots/travel/safety workflows |

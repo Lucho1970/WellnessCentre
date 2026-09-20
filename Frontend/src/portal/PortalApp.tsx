@@ -27,21 +27,17 @@ function ClientBookingInformation() {
       sx={{ p: { xs: 3, md: 5 }, maxWidth: 700, mx: "auto" }}
     >
       <Typography variant="h4" component="h1">
-        {t("Client booking is coming next")}
+        {t("Book online")}
       </Typography>
       <Alert severity="info" sx={{ my: 3 }}>
-        {t(
-          "Client sign-in and online confirmation are not available yet. No appointment has been requested or reserved.",
-        )}
+        {t("Sign in to continue booking. No appointment has been requested or reserved.")}
       </Alert>
       <Typography>
-        {t(
-          "Google and Microsoft personal-account sign-in are planned. Please contact the clinic to arrange your appointment. Availability will need to be checked again before confirmation.",
-        )}
+        {t("Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.")}
       </Typography>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mt={3}>
-        <Button href={publicLink("contact")} variant="contained">
-          {t("Contact the clinic")}
+        <Button href={`${import.meta.env.BASE_URL}client`} variant="contained">
+          {t("Sign in or create client account")}
         </Button>
         <Button href={publicLink("book")}>{t("Browse availability")}</Button>
       </Stack>

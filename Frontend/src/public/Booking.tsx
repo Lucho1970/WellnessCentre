@@ -59,7 +59,7 @@ export function Booking() {
   if (slot) handoff.search = new URLSearchParams({ delivery_mode: mode, location_id: locationId, service_id: serviceId, practitioner_id: practitionerId, duration_option_id: String(slot.duration_option_id), starts_at: slot.starts_at }).toString();
   return <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 } }}>
     <Typography variant="overline" color="primary">{t('Book online')}</Typography><Typography variant="h3" component="h1">{t('Find a time that fits your life.')}</Typography>
-    <Alert severity="info" sx={{ my: 3 }}>{t('Availability browsing is open. Client sign-in and online confirmation are not available yet; contact the clinic to book. Selecting a time does not reserve it.')}</Alert>
+    <Alert severity="info" sx={{ my: 3 }}>{t('Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.')}</Alert>
     {loading && <CircularProgress aria-label={t('Loading booking options')} />}
     {error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>}
     {!loading && !error && (!services.length || !locations.length) && <Alert severity="info">{t('Online services and locations have not been configured yet.')}</Alert>}

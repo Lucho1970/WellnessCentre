@@ -836,6 +836,17 @@ const fr: Record<string, string> = {
   "Link a practitioner": "Associer un praticien",
   "Practitioner availability": "Disponibilité du praticien",
   "Unavailable": "Indisponible",
+  "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
+    "Choisissez un service, un praticien et un type de visite. Aucune plage horaire n’est réservée avant votre confirmation.",
+  "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.":
+    "La disponibilité est vérifiée de nouveau lors de la confirmation. L’envoi de courriels n’est pas encore activé; conservez donc le numéro de rendez-vous affiché après la confirmation.",
+  "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
+    "Réservez un nouveau rendez-vous ici. Communiquez avec la clinique si vous avez besoin d’aide pour modifier un rendez-vous existant.",
+  "Unable to load booking options.": "Impossible de charger les options de réservation.",
+  "Sign in to continue booking. No appointment has been requested or reserved.":
+    "Connectez-vous pour poursuivre la réservation. Aucun rendez-vous n’a été demandé ni réservé.",
+  "Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.":
+    "Consultez les heures disponibles, puis connectez-vous pour vérifier et confirmer. La sélection d’une heure ne la réserve pas.",
 };
 
 export default fr;

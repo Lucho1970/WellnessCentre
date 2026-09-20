@@ -237,6 +237,7 @@ final class Api
         $session = $service->session($claims, $token, $route === 'POST auth/activity');
         $identity = $session['identity_id'];
         unset($session['identity_id']);
+        $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
         return match ($route) {
             'POST auth/activity' => ['session' => $session],
             'POST register' => $service->register($identity, $r->body, $r->correlationId),
@@ -244,6 +245,10 @@ final class Api
             'GET profile' => $service->profile($identity, $r->correlationId),
             'PATCH profile' => $service->saveProfile($identity, $r->body, $r->correlationId),
             'GET appointments' => $service->appointments($identity, $r->correlationId),
+            'GET booking-options' => $this->bookings->options($bookingActor()),
+            'GET availability' => $this->bookings->customerAvailability($bookingActor(), $r->query),
+            'POST address-coverage/validate' => $this->addressCoverage->validate($bookingActor(), $r->body),
+            'POST appointments' => $this->bookings->createForCustomer($bookingActor(), $r->body, $r->correlationId),
             default => throw new ApiException(404, 'not_found', 'Route not found.'),
         };
     }

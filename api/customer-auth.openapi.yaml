@@ -31,7 +31,7 @@ paths:
                       authenticated: {type: boolean, enum: [true]}
                       authentication_context: {type: string, enum: [customer]}
                       onboarding_status: {type: string, enum: [not_linked, pending_review, linked]}
-                      capabilities: {type: array, items: {type: string, enum: [own_profile, own_appointments]}}
+                      capabilities: {type: array, items: {type: string, enum: [own_profile, own_appointments, book_own_appointments]}}
                       review_code: {type: string, nullable: true}
                       session:
                         type: object

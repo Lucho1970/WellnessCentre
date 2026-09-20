@@ -30,7 +30,13 @@ MASTER_REQUIREMENTS.md; SYSTEM_DESIGN.md remains the architecture authority.
   It shows the service, scheduled start/end, status, practitioner, visit type/location,
   and appointment reference. Booking and changes remain staff-assisted in this slice.
   No clinical notes, staff administrative notes, other attendees' information, financial
-  records or other clients' addresses are returned. Booking mutations remain disabled.
+  records or other clients' addresses are returned. A linked client can create a booking
+  only for their server-resolved client record. The client chooses an active service,
+  duration, practitioner, visit mode and offered time; On-Site destinations use their
+  saved address by default and require the same Google coverage proof as staff booking.
+  Confirmation reuses the locked/idempotent booking transaction and rechecks current
+  eligibility, availability, room, price and coverage. Selection never claims a slot hold.
+  Changing or canceling an existing appointment remains staff-assisted in this slice.
 - Preserve all current user IDs and appointment references. Preserve existing unique
   clinic/email constraint; duplicate registration fails with a neutral contact-clinic
   message and never links or merges automatically.
@@ -187,6 +193,31 @@ contain exception class + correlation ID, not SQL values, proofs or stack argume
 7. Revert the flag to false if acceptance fails. Roll back matching code packages if
    needed, but retain the additive tables and links/audit trail. Never delete real links
    or clients to undo this deployment.
+
+## Client self-booking deployment and acceptance
+
+This increment has no database migration. Deploy the matching public frontend, portal and
+private API together; the public API pointer is unchanged. Preserve the private `.env`,
+runtime files and uploads. Do not deploy the portal alone because it hides self-booking
+until the API returns `book_own_appointments`, and do not expose the new API with an older
+portal that has not been acceptance-tested.
+
+With a synthetic linked client account:
+
+1. Browse public availability, choose a time and continue to the portal. Confirm the care
+   choices survive sign-in, while the selected time is clearly not presented as reserved.
+2. Confirm clinic and On-Site appointments. For On-Site, verify the saved address loads,
+   Google coverage succeeds, and editing it does not change the profile address.
+3. Confirm the resulting appointment appears once in the client's list and in the assigned
+   practitioner's schedule with matching duration, price snapshot and destination access.
+4. Attempt to add `client_id` to the customer request and verify it is rejected. Confirm an
+   unlinked/inactive client and a staff token cannot use customer booking endpoints.
+5. Submit the same idempotency key twice and verify one appointment/history/notification
+   event. Race the last offered slot from two sessions and verify only one succeeds.
+6. Change price, assignment, availability, room or coverage after search but before
+   confirmation; verify confirmation fails safely and requires refreshed choices.
+7. Repeat in English/French, mobile/desktop and after session expiry. Email remains queued
+   but unsent, so retain the explicit appointment-number notice and operational follow-up.
 
 Existing client invitations are in **Clients → edit a client → Client portal access**.
 Links expire after 48 hours and are displayed once; send them manually through a known

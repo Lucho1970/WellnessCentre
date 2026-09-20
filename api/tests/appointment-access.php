@@ -11,6 +11,16 @@ foreach(['super_admin','clinic_admin','reception','practitioner'] as $role){
     BookingService::authorizeList(new AuthContext(1,1,'','','','staff',[$role]));$checks++;
 }
 BookingService::authorizeList(new AuthContext(1,1,'','','','client',[]));$checks++;
+$customer=new AuthContext(27,1,'','','','client',[]);
+$payload=BookingService::customerPayload($customer,['service_id'=>4]);if($payload['client_id']!==27)throw new RuntimeException('Customer payload did not derive its client ID.');$checks++;
+try{BookingService::customerPayload($customer,['client_id'=>28]);throw new RuntimeException('Customer payload accepted a browser client ID.');}catch(ApiException $e){if($e->status!==422)throw $e;$checks++;}
+try{BookingService::customerPayload(new AuthContext(1,1,'','','','staff',['super_admin']),[]);throw new RuntimeException('Staff used customer booking payload.');}catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}
+BookingService::authorizeOptions(new AuthContext(1,1,'','','','client',[]));$checks++;
+foreach(['super_admin','clinic_admin','reception','practitioner'] as $role){BookingService::authorizeOptions(new AuthContext(1,1,'','','','staff',[$role]));$checks++;}
+foreach([['staff',['accounting']],['unknown',['super_admin']]] as [$type,$roles]){
+    try{BookingService::authorizeOptions(new AuthContext(1,1,'','','',$type,$roles));throw new RuntimeException('Booking options accepted an unauthorized actor.');}
+    catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}
+}
 foreach(['super_admin','clinic_admin','reception','practitioner'] as $role){BookingService::authorizeBookingClientAddress(new AuthContext(1,1,'','','','staff',[$role]));$checks++;}
 foreach([['client',[]],['staff',['accountant']]] as [$type,$roles]){
     try{BookingService::authorizeBookingClientAddress(new AuthContext(1,1,'','','',$type,$roles));throw new RuntimeException('Booking address lookup accepted an unauthorized actor.');}
