@@ -1,0 +1,32 @@
+{
+  "source_commit": "c187653c96c64dcac38035fc5a927edd539558dc",
+  "built_at_utc": "2026-09-20T15:04:15.5724677Z",
+  "layout": "separate-public-and-portal",
+  "deployment_guide": "documentation/PORTAL_SEPARATION.md",
+  "archives": [
+    {
+      "file": "wellness-api-private.zip",
+      "bytes": 156321,
+      "entries": 121,
+      "sha256": "45b9798e3e3651c7fe7dea641d2858876ccafaea60e9fea452d00946ba3fa1b9"
+    },
+    {
+      "file": "wellness-api-public.zip",
+      "bytes": 758,
+      "entries": 2,
+      "sha256": "a270612bf669843f77792800f90996fb6743f53ea7db2553f6f83917f65cad56"
+    },
+    {
+      "file": "wellness-portal.zip",
+      "bytes": 375180,
+      "entries": 42,
+      "sha256": "23a8abb0af378941789695fdebbceb3dbd6faee3bf3ff4f97e8563a5b2bf4f51"
+    },
+    {
+      "file": "wellness-public.zip",
+      "bytes": 221835,
+      "entries": 5,
+      "sha256": "56c36c408e31135543290f27eef3cba372e880ce5dacbb32cef40de44037c942"
+    }
+  ]
+}
