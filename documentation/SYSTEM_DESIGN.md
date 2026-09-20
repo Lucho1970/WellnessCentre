@@ -104,6 +104,9 @@ controls publication, section, bilingual title/summary, ordering and practitione
 action in `/admin/team`; unpublished staff and account email are never returned. Approved
 application profile images are served through the published slug only, with bounded public
 caching. Migration `008_public_team_profiles.sql` is required. See [Public team profiles](PUBLIC_TEAM.md).
+The Contact layout renders this public projection directly; a reusable pop-up person-card
+pattern is deferred to compact appointment and schedule contexts rather than duplicating
+the same information over an already expanded Contact card.
 
 Public media stores consent/provenance, alt text, crop/variant metadata and publication
 state; serve optimized responsive formats while preserving a controlled original outside

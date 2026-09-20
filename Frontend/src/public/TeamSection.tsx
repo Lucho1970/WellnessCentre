@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, Box, Button, Card, CardActionArea, CircularProgress, Container, Grid, Popover, Stack, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Alert, Avatar, Box, Button, Card, CardActions, CardContent, CircularProgress, Container, Grid, Stack, Typography } from '@mui/material';
 import { CalendarDays } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,8 @@ type TeamMember = {
   has_image: number | boolean;
   image_version: string | null;
   practitioner_id: number | null;
+  discipline: string | null;
+  credentials: string | null;
 };
 
 function initials(name: string) {
@@ -25,61 +27,27 @@ function initials(name: string) {
 
 function TeamMemberTile({ member }: { member: TeamMember }) {
   const { t, i18n } = useTranslation();
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cancelClose = () => { if (closeTimer.current) clearTimeout(closeTimer.current); };
-  const open = (element: HTMLElement) => { cancelClose(); setAnchor(element); };
-  const closeSoon = () => { cancelClose(); closeTimer.current = setTimeout(() => setAnchor(null), 140); };
-  useEffect(() => () => cancelClose(), []);
   const image = member.has_image
     ? `${apiBaseUrl}/team/${encodeURIComponent(member.slug)}/image?v=${encodeURIComponent(member.image_version ?? '')}`
     : '';
   const french = i18n.resolvedLanguage?.startsWith('fr');
   const title = french && member.public_title_fr ? member.public_title_fr : member.public_title;
   const summary = french && member.summary_fr ? member.summary_fr : member.summary;
+  const professionalDetails = [member.credentials, member.discipline].filter((value, index, values) => value && values.indexOf(value) === index).join(' · ');
 
-  return <>
-    <Card variant="outlined" sx={{ height: '100%', borderRadius: 3, overflow: 'hidden' }}>
-      <CardActionArea
-        aria-haspopup="dialog"
-        aria-expanded={Boolean(anchor)}
-        aria-label={t('View profile for {{name}}', { name: member.display_name })}
-        onMouseEnter={event => open(event.currentTarget)}
-        onMouseLeave={closeSoon}
-        onFocus={event => open(event.currentTarget)}
-        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) closeSoon(); }}
-        onClick={event => setAnchor(current => current ? null : event.currentTarget)}
-        sx={{ height: '100%', p: 2.5 }}
-      >
-        <Stack alignItems="center" spacing={1.5} textAlign="center">
+  return <Card variant="outlined" sx={{ height: '100%', borderRadius: 3, display: 'flex', flexDirection: 'column' }}>
+      <CardContent sx={{ p: 3, flexGrow: 1 }}>
+        <Stack alignItems="center" spacing={1.5} textAlign="center" height="100%">
           <Avatar src={image || undefined} alt="" sx={{ width: 112, height: 112, bgcolor: 'primary.light', color: 'primary.dark', fontSize: '2rem' }}>
             {initials(member.display_name)}
           </Avatar>
-          <Box><Typography variant="h6" component="h3">{member.display_name}</Typography><Typography color="text.secondary">{title}</Typography></Box>
+          <Box><Typography variant="h6" component="h4">{member.display_name}</Typography><Typography color="primary.main" fontWeight={650}>{title}</Typography></Box>
+          {professionalDetails && <Typography variant="body2" color="text.secondary">{professionalDetails}</Typography>}
+          {summary && <Typography sx={{ whiteSpace: 'pre-line' }}>{summary}</Typography>}
         </Stack>
-      </CardActionArea>
-    </Card>
-    <Popover
-      open={Boolean(anchor)}
-      anchorEl={anchor}
-      onClose={() => setAnchor(null)}
-      disableRestoreFocus
-      anchorOrigin={{ vertical: 'center', horizontal: 'center' }}
-      transformOrigin={{ vertical: 'center', horizontal: 'center' }}
-      slotProps={{ paper: { onMouseEnter: cancelClose, onMouseLeave: closeSoon, sx: { width: 330, maxWidth: 'calc(100vw - 32px)', p: 3, borderRadius: 3 } } }}
-    >
-      <Stack spacing={2} role="dialog" aria-label={t('Profile for {{name}}', { name: member.display_name })}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Avatar src={image || undefined} alt="" sx={{ width: 72, height: 72, bgcolor: 'primary.light', color: 'primary.dark' }}>{initials(member.display_name)}</Avatar>
-          <Box><Typography variant="h6">{member.display_name}</Typography><Typography color="text.secondary">{title}</Typography></Box>
-        </Stack>
-        {summary && <Typography>{summary}</Typography>}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          {member.practitioner_id && <Button component={Link} to={`/book?practitioner_id=${member.practitioner_id}`} variant="contained" startIcon={<CalendarDays size={18} />} onClick={() => setAnchor(null)}>{t('Book a session')}</Button>}
-        </Stack>
-      </Stack>
-    </Popover>
-  </>;
+      </CardContent>
+      {member.practitioner_id && <CardActions sx={{ px: 3, pb: 3, pt: 0 }}><Button fullWidth component={Link} to={`/book?practitioner_id=${member.practitioner_id}`} variant="contained" startIcon={<CalendarDays size={18} />}>{t('Book a session')}</Button></CardActions>}
+    </Card>;
 }
 
 export function TeamSection() {

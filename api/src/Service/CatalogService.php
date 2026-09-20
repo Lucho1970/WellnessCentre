@@ -45,7 +45,7 @@ final class CatalogService
 
     public function team(): array
     {
-        $sql = "SELECT t.slug,t.section,u.display_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,
+        $sql = "SELECT t.slug,t.section,u.display_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,p.discipline,p.credentials,
                        CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image,
                        i.content_hash image_version,
                        CASE WHEN t.section='practitioner' AND t.show_booking_action=1 AND p.active=1 THEN p.id ELSE NULL END practitioner_id

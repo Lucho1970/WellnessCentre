@@ -896,8 +896,8 @@ test("public Markdown pages follow the selected language and publish safe metada
 test("contact page lists published practitioners first and carries a team booking choice", async ({ page }) => {
   await fixtures(page);
   await page.route("**/api/v1/team", route => route.fulfill({ json: { data: [
-    { slug: "test-practitioner", section: "practitioner", display_name: "Test Practitioner", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", display_order: 1, has_image: 0, image_version: null, practitioner_id: 3 },
-    { slug: "test-admin", section: "administration", display_name: "Test Administrator", public_title: "Clinic Administrator", public_title_fr: "Administration de la clinique", summary: null, summary_fr: null, display_order: 1, has_image: 0, image_version: null, practitioner_id: null },
+    { slug: "test-practitioner", section: "practitioner", display_name: "Test Practitioner", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", discipline: "Massage therapy", credentials: "RMT", display_order: 1, has_image: 0, image_version: null, practitioner_id: 3 },
+    { slug: "test-admin", section: "administration", display_name: "Test Administrator", public_title: "Clinic Administrator", public_title_fr: "Administration de la clinique", summary: "Supports clinic operations.", summary_fr: "Soutient les activités de la clinique.", discipline: null, credentials: null, display_order: 1, has_image: 0, image_version: null, practitioner_id: null },
   ] } }));
   await page.goto(`${publicHost}/contact`);
   const practitionerHeading = page.getByRole('heading', { name: "Practitioners", level: 3 });
@@ -906,8 +906,10 @@ test("contact page lists published practitioners first and carries a team bookin
   await expect(administrationHeading).toBeVisible();
   const practitionerBox = await practitionerHeading.boundingBox(), administrationBox = await administrationHeading.boundingBox();
   expect(practitionerBox && administrationBox ? practitionerBox.y : Number.POSITIVE_INFINITY).toBeLessThan(administrationBox?.y ?? 0);
-  await page.getByRole('button', { name: "View profile for Test Practitioner" }).hover();
-  await expect(page.getByRole('dialog', { name: "Profile for Test Practitioner" })).toBeVisible();
+  await expect(page.getByText("Mobile therapeutic massage.")).toBeVisible();
+  await expect(page.getByText("RMT · Massage therapy")).toBeVisible();
+  await expect(page.getByText("Supports clinic operations.")).toBeVisible();
+  await expect(page.getByRole('dialog', { name: "Profile for Test Practitioner" })).toHaveCount(0);
   await page.getByRole('link', { name: "Book a session" }).click();
   await expect(page).toHaveURL(`${publicHost}/book?practitioner_id=3`);
   await expect(page.getByRole('combobox', { name: "Practitioner" })).toContainText("Test Practitioner");
