@@ -178,7 +178,7 @@ test("client verification stays stable across rerenders, refresh and public navi
   });
   await page.goto("http://localhost:5184/client");
   const globeBox = await page
-      .getByRole("button", { name: "LanguageAndRegion" })
+      .getByRole("button", { name: "Language and region" })
       .boundingBox(),
     accountBox = await page
       .getByRole("button", { name: "Open client account menu" })
