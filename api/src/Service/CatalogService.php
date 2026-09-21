@@ -24,15 +24,52 @@ final class CatalogService
 
     public function services(?int $practitionerId = null): array
     {
-        $sql = "SELECT s.id,s.name,s.description,s.preparation_instructions,s.price_cents,s.duration_mode,s.lead_time_minutes,s.booking_horizon_days,s.cancellation_window_minutes,s.requires_room,s.recurrence_allowed,c.name category,
+        $sql = "SELECT s.id,s.slug,s.name,s.description,s.preparation_instructions,s.price_cents,c.name category,
                        JSON_ARRAYAGG(JSON_OBJECT('id',d.id,'minutes',d.duration_minutes,'price_cents',COALESCE(d.price_cents,s.price_cents))) durations
                   FROM services s LEFT JOIN service_categories c ON c.id=s.category_id JOIN service_duration_options d ON d.service_id=s.id AND d.active=1";
         $params = [];
-        if ($practitionerId) { $sql .= ' JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1 WHERE s.active=1 AND ps.practitioner_id=:practitioner'; $params['practitioner']=$practitionerId; }
-        else $sql .= ' WHERE s.active=1';
-        $sql .= ' GROUP BY s.id,c.name ORDER BY c.name,s.name';
+        if ($practitionerId) { $sql .= ' JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1 WHERE s.active=1 AND s.published=1 AND ps.practitioner_id=:practitioner'; $params['practitioner']=$practitionerId; }
+        else $sql .= ' WHERE s.active=1 AND s.published=1';
+        $sql .= ' GROUP BY s.id,s.slug,s.name,s.description,s.preparation_instructions,s.price_cents,c.name ORDER BY c.name,s.display_order,s.name';
         $statement=$this->database->connection()->prepare($sql); $statement->execute($params);
         $rows=$statement->fetchAll(); foreach($rows as &$row) $row['durations']=json_decode($row['durations'],true); return $rows;
+    }
+
+    public function publicServices(): array
+    {
+        $sql="SELECT s.slug,s.name,s.name_fr,s.public_summary,s.public_summary_fr,s.description,s.description_fr,s.preparation_instructions,s.preparation_instructions_fr,c.name category,
+                     EXISTS(SELECT 1 FROM practitioner_services ps WHERE ps.service_id=s.id AND ps.active=1 AND ps.offers_clinic=1) offers_clinic,
+                     EXISTS(SELECT 1 FROM practitioner_services ps WHERE ps.service_id=s.id AND ps.active=1 AND ps.offers_mobile=1) offers_mobile,
+                     JSON_ARRAYAGG(JSON_OBJECT('minutes',d.duration_minutes,'price_cents',COALESCE(d.price_cents,s.price_cents))) durations
+                FROM services s
+           LEFT JOIN service_categories c ON c.id=s.category_id AND c.clinic_id=s.clinic_id
+                JOIN service_duration_options d ON d.service_id=s.id AND d.active=1
+               WHERE s.active=1 AND s.published=1
+                 AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+            GROUP BY s.id,s.slug,s.name,s.name_fr,s.public_summary,s.public_summary_fr,s.description,s.description_fr,s.preparation_instructions,s.preparation_instructions_fr,c.name,s.display_order
+            ORDER BY c.name IS NULL,c.name,s.display_order,s.name";
+        $rows=$this->database->connection()->query($sql)->fetchAll();
+        foreach($rows as &$row){$row['durations']=json_decode($row['durations'],true);$row['offers_clinic']=(bool)$row['offers_clinic'];$row['offers_mobile']=(bool)$row['offers_mobile'];}
+        return $rows;
+    }
+
+    public function publicService(string $slug): array
+    {
+        if(preg_match('/^[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?$/',$slug)!==1)throw new ApiException(404,'service_not_found','Published service not found.');
+        $services=array_values(array_filter($this->publicServices(),static fn(array $service):bool=>$service['slug']===$slug));
+        if($services===[])throw new ApiException(404,'service_not_found','Published service not found.');
+        $service=$services[0];
+        $practitioners=$this->database->connection()->prepare("SELECT t.slug,u.display_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,p.id booking_practitioner_id
+              FROM services s JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1
+              JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1 JOIN users u ON u.id=p.user_id AND u.status='active'
+              JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=s.clinic_id AND t.published=1 AND t.section='practitioner'
+             WHERE s.slug=:slug AND s.active=1 AND s.published=1
+               AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+          ORDER BY t.display_order,u.display_name");
+        $practitioners->execute(['slug'=>$slug]);$service['practitioners']=$practitioners->fetchAll();
+        $locations=$this->database->connection()->prepare("SELECT l.name,l.city,l.province FROM services s JOIN service_locations sl ON sl.service_id=s.id AND sl.active=1 JOIN locations l ON l.id=sl.location_id AND l.is_bookable=1 WHERE s.slug=:slug AND s.active=1 AND s.published=1 AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1) ORDER BY l.name");
+        $locations->execute(['slug'=>$slug]);$service['locations']=$locations->fetchAll();
+        return $service;
     }
 
     public function practitioners(?int $serviceId = null): array

@@ -7,7 +7,7 @@ import { useSearchParams } from 'react-router-dom';
 import { formatCad, formatDateTime } from '../i18n/format';
 
 type Location = { id: number; name: string; timezone?: string };
-type Service = { id: number; name: string; description: string | null; price_cents: number; durations: { id: number; minutes: number; price_cents: number }[] };
+type Service = { id: number; slug: string; name: string; description: string | null; price_cents: number; durations: { id: number; minutes: number; price_cents: number }[] };
 type Practitioner = { id: number; display_name: string; discipline: string; credentials: string | null };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string };
 type Availability = { timezone: string; availability: Slot[] };
@@ -16,6 +16,7 @@ export function Booking() {
   const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
   const requestedPractitionerId = /^\d+$/.test(searchParams.get('practitioner_id') ?? '') ? searchParams.get('practitioner_id')! : '';
+  const requestedServiceSlug = /^[a-z0-9-]+$/.test(searchParams.get('service') ?? '') ? searchParams.get('service')! : '';
   const message = (cause: unknown) => cause instanceof Error ? cause.message : t('Unable to load online booking.');
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [mode,setMode]=useState('mobile');
@@ -33,11 +34,11 @@ export function Booking() {
     const controller = new AbortController(); setLoading(true); setError('');
     const servicePath = requestedPractitionerId ? `/services?practitioner_id=${requestedPractitionerId}` : '/services';
     void Promise.all([apiRequest<Location[]>('/locations', { signal: controller.signal }), apiRequest<Service[]>(servicePath, { signal: controller.signal })])
-      .then(([nextLocations, nextServices]) => { if (!controller.signal.aborted) { setLocations(nextLocations); setServices(nextServices); setLocationId(String(nextLocations[0]?.id ?? '')); setServiceId(String(nextServices[0]?.id ?? '')); } })
+      .then(([nextLocations, nextServices]) => { if (!controller.signal.aborted) { const requestedService=nextServices.find(item=>item.slug===requestedServiceSlug);setLocations(nextLocations); setServices(nextServices); setLocationId(String(nextLocations[0]?.id ?? '')); setServiceId(String(requestedService?.id ?? nextServices[0]?.id ?? '')); } })
       .catch(cause => { if (!controller.signal.aborted) setError(message(cause)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [retry, requestedPractitionerId]);
+  }, [retry, requestedPractitionerId, requestedServiceSlug]);
   useEffect(() => {
     const controller = new AbortController(); setPractitioners([]); setPractitionerId(''); setSlot(null); setPractitionerError('');
     if (!serviceId) return () => controller.abort();

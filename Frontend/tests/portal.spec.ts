@@ -52,6 +52,7 @@ async function fixtures(page: Page, roles?: string[], permissions: string[] = []
       data = [
         {
           id: 2,
+          slug: "massage",
           name: "Massage",
           description: "Therapeutic care",
           price_cents: 10000,
@@ -915,6 +916,30 @@ test("contact page lists published practitioners first and carries a team bookin
   await expect(page.getByRole('combobox', { name: "Practitioner" })).toContainText("Test Practitioner");
 });
 
+test("published service catalogue filters categories and carries service and practitioner into booking", async ({ page }) => {
+  await fixtures(page);
+  const massage = { slug: "massage-therapy", name: "Massage Therapy", name_fr: "Massothérapie", category: "Massage", public_summary: "Treatment tailored to your goals.", public_summary_fr: "Un traitement adapté à vos objectifs.", description: "A detailed treatment description.", description_fr: "Une description détaillée du traitement.", preparation_instructions: "Wear comfortable clothing.", preparation_instructions_fr: "Portez des vêtements confortables.", offers_clinic: false, offers_mobile: true, durations: [{ minutes: 60, price_cents: 10000 }] };
+  await page.route("**/api/v1/public/services", route => route.fulfill({ json: { data: [massage, { ...massage, slug: "nutrition", name: "Nutrition", category: "Nutrition" }] } }));
+  await page.route("**/api/v1/public/services/massage-therapy", route => route.fulfill({ json: { data: { ...massage, practitioners: [{ slug: "test-practitioner", display_name: "Test Practitioner", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", booking_practitioner_id: 3 }], locations: [{ name: "Holland Landing", city: "Holland Landing", province: "Ontario" }] } } }));
+  await page.route("**/api/v1/services**", route => route.fulfill({ json: { data: [
+    { id: 9, slug: "nutrition", name: "Nutrition", description: "Nutrition", price_cents: 8000, durations: [{ id: 8, minutes: 60, price_cents: 8000 }] },
+    { id: 2, slug: "massage-therapy", name: "Massage Therapy", description: "Therapeutic care", price_cents: 10000, durations: [{ id: 4, minutes: 60, price_cents: 10000 }] },
+  ] } }));
+  await page.goto(`${publicHost}/services`);
+  await expect(page.getByRole("heading", { name: "Find the care that fits you." })).toBeVisible();
+  await page.getByRole("combobox", { name: "Category" }).click();
+  await page.getByRole("option", { name: "Massage", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Massage Therapy" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nutrition" })).toHaveCount(0);
+  await page.getByRole("link", { name: "View service" }).click();
+  await expect(page.getByRole("heading", { name: "Massage Therapy", level: 1 })).toBeVisible();
+  await expect(page.getByText("Mobile therapeutic massage.")).toBeVisible();
+  await page.getByRole("link", { name: "Book with Test Practitioner" }).click();
+  await expect(page).toHaveURL(`${publicHost}/book?service=massage-therapy&practitioner_id=3`);
+  await expect(page.getByRole("combobox").filter({ hasText: "Massage Therapy" })).toHaveCount(1);
+  await expect(page.getByRole("combobox", { name: "Practitioner" })).toContainText("Test Practitioner");
+});
+
 test("super admin deliberately publishes a bilingual public team profile", async ({ page }) => {
   await fixtures(page, ["super_admin"]);
   let saved: Record<string, unknown> | null = null;
@@ -1059,7 +1084,7 @@ test("reception routes support refresh, back, profile menu and restricted deep l
   await fixtures(page, ["reception"]);
   await page.goto(`${portalHost}/admin/clients`);
   await expect(
-    page.getByRole("heading", { name: "Clients", exact: true }),
+    page.getByRole("heading", { name: "Clients", exact: true, level: 1 }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "New client" })).toBeVisible();
   await page.getByRole("link", { name: /Appointments Bookings/ }).click();
@@ -1300,7 +1325,7 @@ test("legacy public staff bookmarks migrate to guarded portal routes", async ({
   await page.goto(`${publicHost}/?portal=clients#portal`);
   await expect(page).toHaveURL(`${portalHost}/admin/clients`);
   await expect(
-    page.getByRole("heading", { name: "Clients", exact: true }),
+    page.getByRole("heading", { name: "Clients", exact: true, level: 1 }),
   ).toBeVisible();
 });
 

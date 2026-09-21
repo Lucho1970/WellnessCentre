@@ -217,7 +217,7 @@ Current host evidence reports MySQL **5.7.44**, not the MySQL 8+ aspiration in t
 
 Table presence does not imply endpoints/UI or tested business behavior. Read `api/database/schema.sql` and actual migrations for exact physical names and constraints before implementation; this table maps responsibilities, not a replacement schema.
 
-Existing upgrade scripts are `api/database/migrations/001_user_profile_images.sql`, `002_service_delivery_assignments.sql`, and `003_catalogue_settings.sql`. Fresh-install `schema.sql` is not a repeatable upgrade script for an existing database. Inspect actual schema before applying any migration; do not rerun a bulk create or seed file to repair a live deployment.
+Existing upgrade scripts are the numbered files in `api/database/migrations`, currently 001 through 009. Apply only the migrations required after the last verified deployment, in numeric order. Fresh-install `schema.sql` is not a repeatable upgrade script for an existing database. Inspect actual schema before applying any migration; do not rerun a bulk create or seed file to repair a live deployment.
 
 Add migration version/checksum tracking and preflight checks. Back up first; make additive changes, backfill in bounded steps, verify counts/constraints, then switch readers/writers. MySQL DDL may commit implicitly: transaction wrappers are not a universal rollback guarantee. Every release must identify applicable migrations, compatibility with the previous app, restore path and validation queries. Never rebuild/drop production data to adopt this design.
 
@@ -407,11 +407,13 @@ denial, MySQL conflict, exact-retry and notification-record scenarios in
 [Practitioner appointment management](PRACTITIONER_APPOINTMENTS.md) before extending its
 lifecycle scope.
 
-After that acceptance, the next public-site slice is the R3 publishing foundation: inspect
-the existing service, practitioner and location schema; add only the publication fields,
-stable slugs and approved profile/content fields that are missing; expose allowlisted public
-projections; then build service and practitioner directory/detail routes with direct handoff
-to the existing booking flow. Deliver New Clients/FAQ/static resources after that
+The R3 public service publishing slice is implemented in source: governed bilingual service
+fields, stable slugs, an allowlisted anonymous projection, category-filtered directory and
+detail routes, and direct handoff to the existing booking flow. Migration 009 and the signed-in
+administrative/public acceptance checks in [Public service catalogue](PUBLIC_SERVICE_CATALOGUE.md)
+remain deployment gates. The next public discovery slice is the practitioner directory and
+detail experience, reusing the published team projection and service relationships rather
+than creating a second profile source. Deliver New Clients/FAQ/static resources after that
 foundation. Guided discovery, analytics and search metadata follow once the owner has
 approved the content taxonomy and measurement policy. Do not start reviews/testimonials or
 classes/workshops as part of this slice.

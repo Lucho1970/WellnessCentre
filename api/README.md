@@ -43,6 +43,7 @@ Public:
 - `GET /api/v1/site-config`
 - `GET /api/v1/locations`
 - `GET /api/v1/services?practitioner_id=`
+- `GET /api/v1/public/services` and `GET /api/v1/public/services/{slug}`
 - `GET /api/v1/practitioners?service_id=`
 - `GET /api/v1/team` and `GET /api/v1/team/{slug}/image` (published public profiles only)
 - `GET /api/v1/availability?location_id=&service_id=&practitioner_id=&date_from=&date_to=`
@@ -108,6 +109,8 @@ Availability results include `available_room_ids` for services requiring rooms. 
 Run `php tests/schedule-intervals.php` for interval and daylight-saving checks. Before deployment acceptance, verify extra openings, time off, room shortages, and cross-location appointments against MySQL. Booking-time revalidation and concurrency coverage remain Phase 4 work. No schema migration is needed for this checkpoint.
 
 Client duplicate prevention and Super Admin merge require `database/migrations/006_client_merge.sql` before the matching API is deployed. The merge endpoints are `GET /api/v1/clients/{survivor}/merge-preview/{duplicate}` and `POST /api/v1/clients/{survivor}/merge/{duplicate}`. See `../documentation/CLIENT_MERGE.md` for safeguards, deployment order and tests.
+
+The governed public service catalogue requires `database/migrations/009_public_service_catalogue.sql` before the matching API and frontend are deployed. It preserves the services already visible in public booking, then lets Super Administrators review their stable slugs and bilingual public content. See `../documentation/PUBLIC_SERVICE_CATALOGUE.md`.
 
 - Use a restricted database account rather than the MySQL server administrator.
 - Keep `.env`, `vendor`, and runtime cache files outside source control.

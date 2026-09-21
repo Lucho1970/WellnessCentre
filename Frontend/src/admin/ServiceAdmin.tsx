@@ -17,21 +17,25 @@ type DurationOption = { minutes: number; price_cents: number };
 type DurationForm = { key: string; minutes: string; price: string };
 type Category = { id: number; name: string };
 type Service = {
-  id: number; category_id: number | null; category_name: string | null; name: string; description: string | null; preparation_instructions: string | null;
+  id: number; category_id: number | null; category_name: string | null; slug: string; name: string; name_fr: string | null;
+  public_summary: string | null; public_summary_fr: string | null; description: string | null; description_fr: string | null;
+  preparation_instructions: string | null; preparation_instructions_fr: string | null; published: number | boolean; display_order: number;
   price_cents: number; durations: number[]; duration_options?: DurationOption[];
   lead_time_minutes: number; booking_horizon_days: number; buffer_before_minutes: number;
   buffer_after_minutes: number; requires_room: number | boolean; recurrence_allowed: number | boolean;
   active: number | boolean;
 };
 type Form = {
-  category_id: string; name: string; description: string; preparation_instructions: string; duration_options: DurationForm[];
+  category_id: string; slug: string; name: string; name_fr: string; public_summary: string; public_summary_fr: string;
+  description: string; description_fr: string; preparation_instructions: string; preparation_instructions_fr: string; duration_options: DurationForm[];
   lead_time_minutes: string; booking_horizon_days: string; buffer_before_minutes: string;
-  buffer_after_minutes: string; requires_room: boolean; recurrence_allowed: boolean; active: boolean;
+  buffer_after_minutes: string; display_order: string; requires_room: boolean; recurrence_allowed: boolean; active: boolean; published: boolean;
 };
 type PanelMode = 'details' | 'new' | 'edit' | null;
 
 const duration = (minutes = '60', price = ''): DurationForm => ({ key: crypto.randomUUID(), minutes, price });
-const blank = (): Form => ({ category_id: '', name: '', description: '', preparation_instructions: '', duration_options: [duration()], lead_time_minutes: '0', booking_horizon_days: '365', buffer_before_minutes: '0', buffer_after_minutes: '0', requires_room: true, recurrence_allowed: false, active: true });
+const blank = (): Form => ({ category_id: '', slug: '', name: '', name_fr: '', public_summary: '', public_summary_fr: '', description: '', description_fr: '', preparation_instructions: '', preparation_instructions_fr: '', duration_options: [duration()], lead_time_minutes: '0', booking_horizon_days: '365', buffer_before_minutes: '0', buffer_after_minutes: '0', display_order: '100', requires_room: true, recurrence_allowed: false, active: true, published: false });
+const slugify = (value: string) => value.toLocaleLowerCase('en-CA').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 120);
 const normalizeService = (service: Service): Service => ({
   ...service,
   id: Number(service.id),
@@ -43,6 +47,7 @@ const normalizeService = (service: Service): Service => ({
   booking_horizon_days: Number(service.booking_horizon_days),
   buffer_before_minutes: Number(service.buffer_before_minutes),
   buffer_after_minutes: Number(service.buffer_after_minutes),
+  display_order: Number(service.display_order),
 });
 const fieldLabels: Record<'lead_time_minutes' | 'booking_horizon_days' | 'buffer_before_minutes' | 'buffer_after_minutes', string> = {
   lead_time_minutes: 'Lead time minutes', booking_horizon_days: 'Booking horizon days', buffer_before_minutes: 'Buffer before minutes', buffer_after_minutes: 'Buffer after minutes',
@@ -108,11 +113,11 @@ export function ServiceAdmin() {
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
   const serviceForm = (service: Service): Form => ({
-    category_id: service.category_id === null ? '' : String(service.category_id), name: service.name, description: service.description ?? '', preparation_instructions: service.preparation_instructions ?? '',
+    category_id: service.category_id === null ? '' : String(service.category_id), slug: service.slug, name: service.name, name_fr: service.name_fr ?? '', public_summary: service.public_summary ?? '', public_summary_fr: service.public_summary_fr ?? '', description: service.description ?? '', description_fr: service.description_fr ?? '', preparation_instructions: service.preparation_instructions ?? '', preparation_instructions_fr: service.preparation_instructions_fr ?? '',
     duration_options: options(service).map(option => duration(String(option.minutes), (Number(option.price_cents) / 100).toFixed(2))),
     lead_time_minutes: String(service.lead_time_minutes), booking_horizon_days: String(service.booking_horizon_days),
     buffer_before_minutes: String(service.buffer_before_minutes), buffer_after_minutes: String(service.buffer_after_minutes),
-    requires_room: Boolean(Number(service.requires_room)), recurrence_allowed: Boolean(Number(service.recurrence_allowed)), active: Boolean(Number(service.active)),
+    display_order: String(service.display_order), requires_room: Boolean(Number(service.requires_room)), recurrence_allowed: Boolean(Number(service.recurrence_allowed)), active: Boolean(Number(service.active)), published: Boolean(Number(service.published)),
   });
   const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); setPanelError(''); setPanelMode('new'); };
   const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelMode('details'); setPanelError(''); };
@@ -136,7 +141,7 @@ export function ServiceAdmin() {
     event.preventDefault(); setBusy(true); setPanelError(''); setSaved('');
     try {
       const durationOptions = form.duration_options.map(option => ({ minutes: Number(option.minutes), price_cents: Math.round(Number(option.price) * 100) }));
-      const payload = { ...form, category_id: form.category_id ? Number(form.category_id) : null, duration_options: durationOptions, price_cents: Math.min(...durationOptions.map(option => option.price_cents)), durations: durationOptions.map(option => option.minutes), lead_time_minutes: Number(form.lead_time_minutes), booking_horizon_days: Number(form.booking_horizon_days), buffer_before_minutes: Number(form.buffer_before_minutes), buffer_after_minutes: Number(form.buffer_after_minutes) };
+      const payload = { ...form, category_id: form.category_id ? Number(form.category_id) : null, duration_options: durationOptions, price_cents: Math.min(...durationOptions.map(option => option.price_cents)), durations: durationOptions.map(option => option.minutes), lead_time_minutes: Number(form.lead_time_minutes), booking_horizon_days: Number(form.booking_horizon_days), buffer_before_minutes: Number(form.buffer_before_minutes), buffer_after_minutes: Number(form.buffer_after_minutes), display_order: Number(form.display_order) };
       const token = await getAccessToken();
       const response = await fetch(editingId ? `${api}/admin/services/${editingId}` : `${api}/admin/services`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
@@ -176,7 +181,7 @@ export function ServiceAdmin() {
         {filteredItems.map(service => {
           const serviceOptions = options(service);
           return <ListItemButton key={service.id} selected={selectedId === service.id} onClick={() => setSelectedId(service.id)} divider sx={{ py: 1.75, px: 2.5 }}>
-            <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{service.name}</Typography><Chip size="small" variant="outlined" label={service.category_name ?? t('Uncategorized')}/><Chip size="small" color={Boolean(Number(service.active)) ? 'success' : 'default'} label={t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')}/></Stack>} secondary={<>{serviceOptions.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')} · {t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')}</>} />
+            <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{service.name}</Typography><Chip size="small" variant="outlined" label={service.category_name ?? t('Uncategorized')}/><Chip size="small" color={Boolean(Number(service.published)) ? 'primary' : 'default'} label={t(Boolean(Number(service.published)) ? 'Published' : 'Not published')}/><Chip size="small" color={Boolean(Number(service.active)) ? 'success' : 'default'} label={t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')}/></Stack>} secondary={<>{serviceOptions.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')} · {t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')}</>} />
           </ListItemButton>;
         })}
         {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching services' : 'No services yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different service name.' : 'Create the first service offered by the clinic.')}</Typography>{!query && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New service')}</Button>}</Box>}
@@ -207,6 +212,9 @@ function ServiceDetails({ service, options, money, edit, assignments }: { servic
   const { t } = useTranslation();
   const rows = [
     [t('Status'), t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')],
+    [t('Public catalogue'), t(Boolean(Number(service.published)) ? 'Published' : 'Not published')],
+    [t('Public URL'), `/services/${service.slug}`],
+    [t('Display order'), String(service.display_order)],
     [t('Category'), service.category_name ?? t('Uncategorized')],
     [t('Duration and price options'), options.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')],
     [t('Room requirement'), t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')],
@@ -227,13 +235,21 @@ function ServiceFields({ form, categories, field, changeDuration, removeDuration
   const { t } = useTranslation();
   return <Grid container spacing={2}>
     <Grid size={12}><TextField select fullWidth label={t('Category')} value={form.category_id} onChange={event => field('category_id', event.target.value)} helperText={categories.length === 0 ? t('Create service categories in Business settings, or leave this service uncategorized.') : undefined}><MenuItem value="">{t('Uncategorized')}</MenuItem>{categories.map(category => <MenuItem key={category.id} value={String(category.id)}>{category.name}</MenuItem>)}</TextField></Grid>
-    <Grid size={12}><TextField required fullWidth label={t('Service name')} value={form.name} onChange={event => field('name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
+    <Grid size={12}><TextField required fullWidth label={t('Service name')} value={form.name} onChange={event => { field('name', event.target.value); if (!form.slug) field('slug', slugify(event.target.value)); }} inputProps={{ maxLength: 150 }}/></Grid>
+    <Grid size={12}><TextField fullWidth label={t('Service name (French)')} value={form.name_fr} onChange={event => field('name_fr', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
     <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Description')} value={form.description} onChange={event => field('description', event.target.value)}/></Grid>
+    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Description (French)')} value={form.description_fr} onChange={event => field('description_fr', event.target.value)}/></Grid>
     <Grid size={12}><Typography variant="subtitle1" fontWeight={700}>{t('Duration and price options')}</Typography><Typography variant="body2" color="text.secondary">{t('Prices are explicit for each duration. Appointments keep a snapshot of the selected price.')}</Typography></Grid>
     {form.duration_options.map((option, index) => <Grid size={12} key={option.key}><Stack direction="row" spacing={1} alignItems="center"><TextField required fullWidth type="number" label={t('Duration {{number}} (minutes)', { number: index + 1 })} value={option.minutes} onChange={event => changeDuration(option.key, 'minutes', event.target.value)} inputProps={{ min: 15, max: 480, step: 15 }}/><TextField required fullWidth type="number" label={t('Price {{number}} (CAD)', { number: index + 1 })} value={option.price} onChange={event => changeDuration(option.key, 'price', event.target.value)} inputProps={{ min: 0, step: .01 }}/><IconButton aria-label={t('Remove duration {{number}}', { number: index + 1 })} disabled={form.duration_options.length === 1} onClick={() => removeDuration(option.key)}><Trash2 size={18}/></IconButton></Stack></Grid>)}
     <Grid size={12}><Button startIcon={<Plus size={16}/>} onClick={() => field('duration_options', [...form.duration_options, duration()])}>{t('Add duration and price')}</Button></Grid>
     {(Object.keys(fieldLabels) as (keyof typeof fieldLabels)[]).map(key => <Grid size={{ xs: 6 }} key={key}><TextField required fullWidth type="number" label={t(fieldLabels[key])} value={form[key]} onChange={event => field(key, event.target.value)}/></Grid>)}
     <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Preparation instructions')} value={form.preparation_instructions} onChange={event => field('preparation_instructions', event.target.value)}/></Grid>
-    <Grid size={12}><Stack><FormControlLabel control={<Switch checked={form.requires_room} onChange={event => field('requires_room', event.target.checked)}/>} label={t('Requires a room')}/><FormControlLabel control={<Switch checked={form.recurrence_allowed} onChange={event => field('recurrence_allowed', event.target.checked)}/>} label={t('Recurring bookings')}/><FormControlLabel control={<Switch checked={form.active} onChange={event => field('active', event.target.checked)}/>} label={t('Active')}/></Stack></Grid>
+    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Preparation instructions (French)')} value={form.preparation_instructions_fr} onChange={event => field('preparation_instructions_fr', event.target.value)}/></Grid>
+    <Grid size={12}><Divider><Typography variant="overline">{t('Public catalogue')}</Typography></Divider></Grid>
+    <Grid size={12}><TextField required fullWidth label={t('Public URL')} value={form.slug} onChange={event => field('slug', slugify(event.target.value))} helperText={t('Lowercase letters, numbers, and hyphens. Changing this URL may break saved links.')} inputProps={{ maxLength: 120 }}/></Grid>
+    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Public summary')} value={form.public_summary} onChange={event => field('public_summary', event.target.value)} inputProps={{ maxLength: 500 }}/></Grid>
+    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Public summary (French)')} value={form.public_summary_fr} onChange={event => field('public_summary_fr', event.target.value)} inputProps={{ maxLength: 500 }}/></Grid>
+    <Grid size={{ xs: 12, sm: 6 }}><TextField required fullWidth type="number" label={t('Display order')} value={form.display_order} onChange={event => field('display_order', event.target.value)} inputProps={{ min: 0, max: 65535 }}/></Grid>
+    <Grid size={12}><Stack><FormControlLabel control={<Switch checked={form.published} onChange={event => field('published', event.target.checked)}/>} label={t('Publish in the public catalogue')}/><FormControlLabel control={<Switch checked={form.requires_room} onChange={event => field('requires_room', event.target.checked)}/>} label={t('Requires a room')}/><FormControlLabel control={<Switch checked={form.recurrence_allowed} onChange={event => field('recurrence_allowed', event.target.checked)}/>} label={t('Recurring bookings')}/><FormControlLabel control={<Switch checked={form.active} onChange={event => field('active', event.target.checked)}/>} label={t('Active')}/></Stack></Grid>
   </Grid>;
 }
