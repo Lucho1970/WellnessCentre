@@ -3,10 +3,11 @@ const fr: Record<string, string> = {
   English: "Anglais",
   French: "Français",
   "Switch language to {{language}}": "Passer la langue au {{language}}",
-  "Language and region": "Langue et région",
+  LanguageAndRegion: "Langue et région",
   Language: "Langue",
   "Choose a language": "Choisir une langue",
-  "Additional regional preferences can be added here later.": "D’autres préférences régionales pourront être ajoutées ici plus tard.",
+  "Additional regional preferences can be added here later.":
+    "D’autres préférences régionales pourront être ajoutées ici plus tard.",
   SkipToContent: "Aller au contenu",
   "Care that makes room for you": "Des soins qui vous font une place",
   "Feel better, on your schedule.": "Sentez-vous mieux, selon votre horaire.",
@@ -28,7 +29,8 @@ const fr: Record<string, string> = {
   "New clients": "Nouveaux clients",
   About: "À propos",
   FAQs: "FAQ",
-  "Content unavailable": "Ce contenu n’est pas disponible dans la langue sélectionnée.",
+  "Content unavailable":
+    "Ce contenu n’est pas disponible dans la langue sélectionnée.",
   Contact: "Nous joindre",
   SignIn: "Connexion",
   PageNotFound: "Page introuvable",
@@ -294,7 +296,8 @@ const fr: Record<string, string> = {
   "Date of birth": "Date de naissance",
   "Service address": "Adresse de service",
   "Address instructions": "Instructions pour l’adresse",
-  "Emergency contact phone": "Téléphone de la personne à joindre en cas d’urgence",
+  "Emergency contact phone":
+    "Téléphone de la personne à joindre en cas d’urgence",
   "Administrative notes": "Notes administratives",
   "Search name, email, or phone":
     "Rechercher un nom, un courriel ou un téléphone",
@@ -762,10 +765,12 @@ const fr: Record<string, string> = {
   "Appointments booked in your practitioner workspace are assigned to you.":
     "Les rendez-vous réservés dans votre espace praticien vous sont automatiquement attribués.",
   "Birthdate (optional)": "Date de naissance (facultative)",
-  "Use an exact birthdate to narrow the search first.": "Utilisez une date de naissance exacte pour commencer à préciser la recherche.",
+  "Use an exact birthdate to narrow the search first.":
+    "Utilisez une date de naissance exacte pour commencer à préciser la recherche.",
   "Optionally enter at least 2 characters to narrow the birthdate matches.":
     "Saisissez facultativement au moins 2 caractères pour préciser les résultats correspondant à cette date de naissance.",
-  "Loading saved client address…": "Chargement de l’adresse enregistrée du client…",
+  "Loading saved client address…":
+    "Chargement de l’adresse enregistrée du client…",
   "The saved client address is loaded. You can replace it using Google address suggestions. Changes apply only to this appointment.":
     "L’adresse enregistrée du client est chargée. Vous pouvez la remplacer à l’aide des suggestions d’adresse Google. Les modifications s’appliquent uniquement à ce rendez-vous.",
   "Visit address changes apply only to this appointment and do not update the client profile.":
@@ -777,115 +782,140 @@ const fr: Record<string, string> = {
   "Leave this page?": "Quitter cette page?",
   "You have unsaved changes. If you leave now, the information you entered will be lost.":
     "Vous avez des modifications non enregistrées. Si vous quittez maintenant, les renseignements saisis seront perdus.",
-  "Stay": "Rester",
+  Stay: "Rester",
   "Leave without saving": "Quitter sans enregistrer",
   "Service actions": "Actions du service",
   "New service": "Nouveau service",
-  "Assignments": "Affectations",
+  Assignments: "Affectations",
   "Filter services": "Filtrer les services",
-  "Select a service to view its details or enable actions.": "Sélectionnez un service pour afficher ses détails ou activer les actions.",
+  "Select a service to view its details or enable actions.":
+    "Sélectionnez un service pour afficher ses détails ou activer les actions.",
   "No matching services": "Aucun service correspondant",
   "Try a different service name.": "Essayez un autre nom de service.",
   "No services yet": "Aucun service pour le moment",
-  "Create the first service offered by the clinic.": "Créez le premier service offert par la clinique.",
+  "Create the first service offered by the clinic.":
+    "Créez le premier service offert par la clinique.",
   "Service details": "Détails du service",
   "Create a service": "Créer un service",
   "Close panel": "Fermer le panneau",
-  "Discard your unsaved changes?": "Abandonner vos modifications non enregistrées?",
+  "Discard your unsaved changes?":
+    "Abandonner vos modifications non enregistrées?",
   "Room requirement": "Exigence de salle",
   "Lead time": "Délai de réservation",
   "Booking horizon": "Horizon de réservation",
   "{{days}} days": "{{days}} jours",
-  "Buffers": "Temps tampons",
-  "{{before}} min before · {{after}} min after": "{{before}} min avant · {{after}} min après",
-  "Allowed": "Autorisé",
+  Buffers: "Temps tampons",
+  "{{before}} min before · {{after}} min after":
+    "{{before}} min avant · {{after}} min après",
+  Allowed: "Autorisé",
   "Not allowed": "Non autorisé",
   "Practitioners & locations": "Praticiens et emplacements",
   "Current assignments": "Affectations actuelles",
-  "These locations and practitioners determine where and how this service can be booked.": "Ces emplacements et praticiens déterminent où et comment ce service peut être réservé.",
+  "These locations and practitioners determine where and how this service can be booked.":
+    "Ces emplacements et praticiens déterminent où et comment ce service peut être réservé.",
   "Edit assignments": "Modifier les affectations",
   "Add assignment": "Ajouter une affectation",
-  "This service has no current assignments and cannot be booked.": "Ce service n’a aucune affectation actuelle et ne peut pas être réservé.",
+  "This service has no current assignments and cannot be booked.":
+    "Ce service n’a aucune affectation actuelle et ne peut pas être réservé.",
   "Unknown location": "Emplacement inconnu",
   "No base locations assigned.": "Aucun emplacement de base attribué.",
   "Unknown practitioner": "Praticien inconnu",
-  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee": "Rayon de {{radius}} km · {{minutes}} min de déplacement dans chaque sens · frais sur place de {{fee}}",
+  "{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee":
+    "Rayon de {{radius}} km · {{minutes}} min de déplacement dans chaque sens · frais sur place de {{fee}}",
   "Not set": "Non défini",
   "No practitioners assigned.": "Aucun praticien attribué.",
   "Location actions": "Actions de l’emplacement",
   "New location": "Nouvel emplacement",
   "Filter locations": "Filtrer les emplacements",
-  "Select a location to view its details or enable actions.": "Sélectionnez un emplacement pour afficher ses détails ou activer les actions.",
+  "Select a location to view its details or enable actions.":
+    "Sélectionnez un emplacement pour afficher ses détails ou activer les actions.",
   "No matching locations": "Aucun emplacement correspondant",
-  "Try a different location name or address.": "Essayez un autre nom ou une autre adresse.",
+  "Try a different location name or address.":
+    "Essayez un autre nom ou une autre adresse.",
   "No locations yet": "Aucun emplacement pour le moment",
-  "Create the first clinic location or service area.": "Créez le premier emplacement de clinique ou secteur de service.",
+  "Create the first clinic location or service area.":
+    "Créez le premier emplacement de clinique ou secteur de service.",
   "Location details": "Détails de l’emplacement",
   "Create a location": "Créer un emplacement",
   "Room actions": "Actions de la salle",
   "New room": "Nouvelle salle",
   "Filter rooms": "Filtrer les salles",
-  "Select a room to view its details or enable actions.": "Sélectionnez une salle pour afficher ses détails ou activer les actions.",
+  "Select a room to view its details or enable actions.":
+    "Sélectionnez une salle pour afficher ses détails ou activer les actions.",
   "No matching rooms": "Aucune salle correspondante",
-  "Try a different room or location name.": "Essayez un autre nom de salle ou d’emplacement.",
+  "Try a different room or location name.":
+    "Essayez un autre nom de salle ou d’emplacement.",
   "No rooms yet": "Aucune salle pour le moment",
-  "Create the first room at a clinic location.": "Créez la première salle d’un emplacement de clinique.",
-  "Create a location before adding rooms.": "Créez un emplacement avant d’ajouter des salles.",
+  "Create the first room at a clinic location.":
+    "Créez la première salle d’un emplacement de clinique.",
+  "Create a location before adding rooms.":
+    "Créez un emplacement avant d’ajouter des salles.",
   "Room details": "Détails de la salle",
   "Create a room": "Créer une salle",
   "Turnover time": "Temps de rotation",
-  "Capabilities": "Capacités",
+  Capabilities: "Capacités",
   "Room capabilities": "Capacités des salles",
   "Practitioner actions": "Actions du praticien",
   "New practitioner": "Nouveau praticien",
   "Filter practitioners": "Filtrer les praticiens",
-  "Select a practitioner to view details or enable actions.": "Sélectionnez un praticien pour afficher ses détails ou activer les actions.",
+  "Select a practitioner to view details or enable actions.":
+    "Sélectionnez un praticien pour afficher ses détails ou activer les actions.",
   "No active location": "Aucun emplacement actif",
   "No matching practitioners": "Aucun praticien correspondant",
   "No practitioners yet": "Aucun praticien pour le moment",
-  "Try a different name, email, discipline, or location.": "Essayez un autre nom, courriel, domaine ou emplacement.",
-  "Link the first practitioner after creating their Microsoft Entra account.": "Associez le premier praticien après avoir créé son compte Microsoft Entra.",
-  "Create a location before adding practitioners.": "Créez un emplacement avant d’ajouter des praticiens.",
+  "Try a different name, email, discipline, or location.":
+    "Essayez un autre nom, courriel, domaine ou emplacement.",
+  "Link the first practitioner after creating their Microsoft Entra account.":
+    "Associez le premier praticien après avoir créé son compte Microsoft Entra.",
+  "Create a location before adding practitioners.":
+    "Créez un emplacement avant d’ajouter des praticiens.",
   "Practitioner details": "Détails du praticien",
   "Link a practitioner": "Associer un praticien",
   "Practitioner availability": "Disponibilité du praticien",
-  "Unavailable": "Indisponible",
+  Unavailable: "Indisponible",
   "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
     "Choisissez un service, un praticien et un type de visite. Aucune plage horaire n’est réservée avant votre confirmation.",
   "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.":
     "La disponibilité est vérifiée de nouveau lors de la confirmation. L’envoi de courriels n’est pas encore activé; conservez donc le numéro de rendez-vous affiché après la confirmation.",
   "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
     "Réservez un nouveau rendez-vous ici. Communiquez avec la clinique si vous avez besoin d’aide pour modifier un rendez-vous existant.",
-  "Unable to load booking options.": "Impossible de charger les options de réservation.",
+  "Unable to load booking options.":
+    "Impossible de charger les options de réservation.",
   "Sign in to continue booking. No appointment has been requested or reserved.":
     "Connectez-vous pour poursuivre la réservation. Aucun rendez-vous n’a été demandé ni réservé.",
   "Browse available times, then sign in to review and confirm. Selecting a time does not reserve it.":
     "Consultez les heures disponibles, puis connectez-vous pour vérifier et confirmer. La sélection d’une heure ne la réserve pas.",
   "Our Team": "Notre équipe",
   "People who care": "Une équipe attentionnée",
-  "Meet the people who support your care and your experience with the clinic.": "Faites connaissance avec les personnes qui vous accompagnent dans vos soins et votre expérience à la clinique.",
-  "Administration": "Administration",
+  "Meet the people who support your care and your experience with the clinic.":
+    "Faites connaissance avec les personnes qui vous accompagnent dans vos soins et votre expérience à la clinique.",
+  Administration: "Administration",
   "View profile for {{name}}": "Voir le profil de {{name}}",
   "Profile for {{name}}": "Profil de {{name}}",
   "Book a session": "Réserver une séance",
   "Loading team": "Chargement de l’équipe",
   "Unable to load the team.": "Impossible de charger l’équipe.",
-  "Team profiles are being prepared.": "Les profils de l’équipe sont en préparation.",
+  "Team profiles are being prepared.":
+    "Les profils de l’équipe sont en préparation.",
   "Public team": "Équipe publique",
   "Published staff profiles": "Profils du personnel publiés",
-  "Only profiles you publish here appear on the public Contact page. Staff email and account details are never published.": "Seuls les profils que vous publiez ici apparaissent sur la page publique Nous joindre. Les courriels et les renseignements de compte du personnel ne sont jamais publiés.",
+  "Only profiles you publish here appear on the public Contact page. Staff email and account details are never published.":
+    "Seuls les profils que vous publiez ici apparaissent sur la page publique Nous joindre. Les courriels et les renseignements de compte du personnel ne sont jamais publiés.",
   "Team profiles": "Profils de l’équipe",
-  "Published": "Publié",
+  Published: "Publié",
   "Not published": "Non publié",
-  "Profile image is ready to publish.": "La photo de profil est prête à être publiée.",
-  "No profile image has been uploaded. Initials will be shown.": "Aucune photo de profil n’a été téléversée. Les initiales seront affichées.",
+  "Profile image is ready to publish.":
+    "La photo de profil est prête à être publiée.",
+  "No profile image has been uploaded. Initials will be shown.":
+    "Aucune photo de profil n’a été téléversée. Les initiales seront affichées.",
   "Public URL name": "Nom dans l’adresse publique",
   "Public full name": "Nom public complet",
   "Booking name": "Nom pour les réservations",
   "Shown on public team and service pages.": "Affiché sur les pages publiques de l’équipe et des services.",
   "Used in friendly actions such as “Book with Esther”.": "Utilisé dans des actions conviviales comme « Réserver avec Esther ».",
   "Another published practitioner uses this booking name. Add a surname initial or another familiar identifier.": "Une autre personne praticienne publiée utilise ce nom. Ajoutez l’initiale du nom de famille ou un autre identifiant familier.",
-  "Lowercase letters, numbers, and hyphens only.": "Lettres minuscules, chiffres et traits d’union seulement.",
+  "Lowercase letters, numbers, and hyphens only.":
+    "Lettres minuscules, chiffres et traits d’union seulement.",
   "Team section": "Section de l’équipe",
   "Title (English)": "Titre (anglais)",
   "Title (French)": "Titre (français)",
@@ -895,14 +925,19 @@ const fr: Record<string, string> = {
   "Show Book a session action": "Afficher l’action Réserver une séance",
   "Publish on the Contact page": "Publier sur la page Nous joindre",
   "Save team profile": "Enregistrer le profil",
-  "Unable to load team profiles.": "Impossible de charger les profils de l’équipe.",
-  "Unable to save team profile.": "Impossible d’enregistrer le profil de l’équipe.",
-  "Public team profile saved.": "Le profil public de l’équipe a été enregistré.",
+  "Unable to load team profiles.":
+    "Impossible de charger les profils de l’équipe.",
+  "Unable to save team profile.":
+    "Impossible d’enregistrer le profil de l’équipe.",
+  "Public team profile saved.":
+    "Le profil public de l’équipe a été enregistré.",
   "Our services": "Nos services",
   "Find the care that fits you.": "Trouvez les soins qui vous conviennent.",
-  "Compare treatment options, prices, appointment formats, and the practitioners who provide them.": "Comparez les options de traitement, les prix, les modes de rendez-vous et les praticiens qui les offrent.",
+  "Compare treatment options, prices, appointment formats, and the practitioners who provide them.":
+    "Comparez les options de traitement, les prix, les modes de rendez-vous et les praticiens qui les offrent.",
   "Loading services": "Chargement des services",
-  "No services have been published yet.": "Aucun service n’a encore été publié.",
+  "No services have been published yet.":
+    "Aucun service n’a encore été publié.",
   "View service": "Voir le service",
   Book: "Réserver",
   "Public catalogue": "Catalogue public",
@@ -913,7 +948,8 @@ const fr: Record<string, string> = {
   "Public summary": "Résumé public",
   "Public summary (French)": "Résumé public (français)",
   "Publish in the public catalogue": "Publier dans le catalogue public",
-  "Lowercase letters, numbers, and hyphens. Changing this URL may break saved links.": "Lettres minuscules, chiffres et traits d’union. Modifier cette adresse peut briser les liens enregistrés.",
+  "Lowercase letters, numbers, and hyphens. Changing this URL may break saved links.":
+    "Lettres minuscules, chiffres et traits d’union. Modifier cette adresse peut briser les liens enregistrés.",
   "Unable to load this service.": "Impossible de charger ce service.",
   "Loading service": "Chargement du service",
   "This service is not available.": "Ce service n’est pas disponible.",
@@ -923,7 +959,8 @@ const fr: Record<string, string> = {
   "Appointment options": "Options de rendez-vous",
   "Available locations": "Lieux disponibles",
   "Book this service": "Réserver ce service",
-  "Contact the clinic for practitioner availability.": "Communiquez avec la clinique pour connaître les disponibilités des praticiens.",
+  "Contact the clinic for practitioner availability.":
+    "Communiquez avec la clinique pour connaître les disponibilités des praticiens.",
   "Book with {{name}}": "Réserver avec {{name}}",
   "On-Site": "Sur place chez le client",
 };

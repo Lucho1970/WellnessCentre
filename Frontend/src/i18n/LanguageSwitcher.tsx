@@ -32,10 +32,10 @@ export function LanguageSwitcher() {
     <>
       <IconButton
         color="primary"
-        aria-label={t("Language and region")}
+        aria-label={t("LanguageAndRegion")}
         aria-haspopup="dialog"
         aria-expanded={open ? "true" : undefined}
-        title={t("Language and region")}
+        title={t("LanguageAndRegion")}
         onClick={() => setOpen(true)}
         sx={{ flexShrink: 0 }}
       >
@@ -59,7 +59,7 @@ export function LanguageSwitcher() {
         aria-labelledby="language-region-title"
       >
         <DialogTitle id="language-region-title">
-          {t("Language and region")}
+          {t("LanguageAndRegion")}
         </DialogTitle>
         <DialogContent dividers>
           <Typography

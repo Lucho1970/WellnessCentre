@@ -17,7 +17,11 @@ test.beforeEach(({ page }) => {
 test.afterEach(({ page }) => {
   expect(errors.get(page)).toEqual([]);
 });
-async function fixtures(page: Page, roles?: string[], permissions: string[] = []) {
+async function fixtures(
+  page: Page,
+  roles?: string[],
+  permissions: string[] = [],
+) {
   // Test-only network substitution. No production flag or authentication bypass.
   if (roles)
     await page.route("**/src/auth/AuthProvider.tsx", (route) =>
@@ -130,7 +134,9 @@ test("staff client invitation approval requires review code and verification che
     return route.fulfill({ json: { data } });
   });
   await page.goto(`${portalHost}/admin/clients`);
-  await page.getByRole("button", { name: /Existing Client.*existing@example\.test/ }).click();
+  await page
+    .getByRole("button", { name: /Existing Client.*existing@example\.test/ })
+    .click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const approve = page.getByRole("button", { name: "Approve client link" });
   await expect(approve).toBeDisabled();
@@ -191,7 +197,18 @@ test("services use a list-first command bar and selected services can be assigne
       }
     } else if (path.endsWith("/service-assignments"))
       data = {
-        practitioners: [{ practitioner_id: "3", service_id: "2", active: "1", offers_mobile: "1", offers_clinic: "0", mobile_radius_km: "25", travel_buffer_minutes: "30", mobile_fee_cents: "1500" }],
+        practitioners: [
+          {
+            practitioner_id: "3",
+            service_id: "2",
+            active: "1",
+            offers_mobile: "1",
+            offers_clinic: "0",
+            mobile_radius_km: "25",
+            travel_buffer_minutes: "30",
+            mobile_fee_cents: "1500",
+          },
+        ],
         locations: [{ service_id: "2", location_id: "1", active: "1" }],
       };
     else if (path.endsWith("/locations"))
@@ -204,19 +221,33 @@ test("services use a list-first command bar and selected services can be assigne
     await route.fulfill({ json: { data } });
   });
   await page.goto(`${portalHost}/admin/services`);
-  await expect(page.getByText("Existing massage", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Existing massage", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Edit", exact: true }),
+  ).toBeDisabled();
   await page.getByRole("button", { name: /Second massage.*130\.00/ }).click();
   await page.getByRole("button", { name: "Details" }).click();
-  await expect(page.getByText("Service details", { exact: true })).toBeVisible();
-  await expect(page.getByText("90 min — $130.00", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Service details", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("90 min — $130.00", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
   await page.getByRole("button", { name: "Assignments", exact: true }).click();
-  await expect(page.getByText("Current assignments", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Current assignments", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Test location", { exact: true })).toBeVisible();
   await expect(page.getByText("Test Therapist", { exact: true })).toBeVisible();
-  await expect(page.getByText(/25 km radius.*30 min travel each way.*\$15\.00 On-Site fee/)).toBeVisible();
+  await expect(
+    page.getByText(
+      /25 km radius.*30 min travel each way.*\$15\.00 On-Site fee/,
+    ),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "New service", exact: true }).click();
   await page
@@ -236,10 +267,20 @@ test("services use a list-first command bar and selected services can be assigne
   ]);
   await page.getByRole("button", { name: /New massage.*120\.00/ }).click();
   await page.getByRole("button", { name: "Assignments", exact: true }).click();
-  await expect(page.getByText("This service has no current assignments and cannot be booked.")).toBeVisible();
-  await page.getByRole("button", { name: "Add assignment", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: /^Service / })).toHaveText("New massage");
-  await expect(page.getByRole("combobox", { name: /^Service / })).toBeDisabled();
+  await expect(
+    page.getByText(
+      "This service has no current assignments and cannot be booked.",
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Add assignment", exact: true })
+    .click();
+  await expect(page.getByRole("combobox", { name: /^Service / })).toHaveText(
+    "New massage",
+  );
+  await expect(
+    page.getByRole("combobox", { name: /^Service / }),
+  ).toBeDisabled();
   await page
     .getByRole("checkbox", { name: "Test Therapist", exact: true })
     .check();
@@ -254,84 +295,186 @@ test("services use a list-first command bar and selected services can be assigne
   });
 });
 
-test("locations and rooms use list-first actions with ID-safe create and edit panels", async ({ page }) => {
+test("locations and rooms use list-first actions with ID-safe create and edit panels", async ({
+  page,
+}) => {
   await fixtures(page, ["super_admin"]);
   const locations = [
-    { id: "11", name: "Holland Landing", timezone: "America/Toronto", address_line1: "1 Main Street", address_line2: null, city: "Holland Landing", province: "Ontario", postal_code: "L9N 1A1", phone: "905-555-0100", is_bookable: "1" },
-    { id: "12", name: "Mobile Service Area", timezone: "America/Toronto", address_line1: null, address_line2: null, city: null, province: "Ontario", postal_code: null, phone: null, is_bookable: "0" },
+    {
+      id: "11",
+      name: "Holland Landing",
+      timezone: "America/Toronto",
+      address_line1: "1 Main Street",
+      address_line2: null,
+      city: "Holland Landing",
+      province: "Ontario",
+      postal_code: "L9N 1A1",
+      phone: "905-555-0100",
+      is_bookable: "1",
+    },
+    {
+      id: "12",
+      name: "Mobile Service Area",
+      timezone: "America/Toronto",
+      address_line1: null,
+      address_line2: null,
+      city: null,
+      province: "Ontario",
+      postal_code: null,
+      phone: null,
+      is_bookable: "0",
+    },
   ];
   const rooms = [
-    { id: "21", location_id: "11", location_name: "Holland Landing", name: "Room Birch", room_type: "Treatment room", equipment_notes: "Massage table", turnover_minutes: "15", is_bookable: "1" },
+    {
+      id: "21",
+      location_id: "11",
+      location_name: "Holland Landing",
+      name: "Room Birch",
+      room_type: "Treatment room",
+      equipment_notes: "Massage table",
+      turnover_minutes: "15",
+      is_bookable: "1",
+    },
   ];
   let updatedLocation: Record<string, unknown> | undefined;
   let createdRoom: Record<string, unknown> | undefined;
-  await page.route("**/api/v1/admin/**", async route => {
+  await page.route("**/api/v1/admin/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = {};
-    if (path.endsWith("/locations/12") && route.request().method() === "PATCH") {
+    if (
+      path.endsWith("/locations/12") &&
+      route.request().method() === "PATCH"
+    ) {
       updatedLocation = route.request().postDataJSON();
-      locations[1] = { ...locations[1], ...updatedLocation } as typeof locations[number];
+      locations[1] = {
+        ...locations[1],
+        ...updatedLocation,
+      } as (typeof locations)[number];
       data = { id: "12" };
     } else if (path.endsWith("/locations")) data = locations;
     else if (path.endsWith("/rooms") && route.request().method() === "POST") {
       createdRoom = route.request().postDataJSON();
-      rooms.push({ id: "22", location_name: "Holland Landing", room_type: null, equipment_notes: null, ...createdRoom } as typeof rooms[number]);
+      rooms.push({
+        id: "22",
+        location_name: "Holland Landing",
+        room_type: null,
+        equipment_notes: null,
+        ...createdRoom,
+      } as (typeof rooms)[number]);
       data = { id: "22" };
     } else if (path.endsWith("/rooms")) data = rooms;
-    else if (path.endsWith("/room-capabilities")) data = { capabilities: [], rooms: [], services: [] };
+    else if (path.endsWith("/room-capabilities"))
+      data = { capabilities: [], rooms: [], services: [] };
     else if (path.endsWith("/services")) data = [];
     await route.fulfill({ json: { data } });
   });
 
   await page.goto(`${portalHost}/admin/locations`);
   await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
-  await page.getByRole("button", { name: /Mobile Service Area.*Not bookable/ }).click();
+  await page
+    .getByRole("button", { name: /Mobile Service Area.*Not bookable/ })
+    .click();
   await page.getByRole("button", { name: "Details" }).click();
-  await expect(page.getByText("Location details", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Location details", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Ontario", { exact: true }).last()).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await page.getByRole("textbox", { name: "Phone", exact: true }).fill("905-555-0199");
+  await page
+    .getByRole("textbox", { name: "Phone", exact: true })
+    .fill("905-555-0199");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
-  await expect(page.getByText("Mobile Service Area was updated.")).toBeVisible();
+  await expect(
+    page.getByText("Mobile Service Area was updated."),
+  ).toBeVisible();
   expect(updatedLocation?.phone).toBe("905-555-0199");
 
   await page.goto(`${portalHost}/admin/rooms`);
-  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeDisabled();
-  await expect(page.getByRole("heading", { name: "Room capabilities" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Edit", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("heading", { name: "Room capabilities" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Capabilities", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Room capabilities" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Room capabilities" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await page.getByRole("button", { name: /Room Birch.*15 min turnover/ }).click();
+  await page
+    .getByRole("button", { name: /Room Birch.*15 min turnover/ })
+    .click();
   await page.getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("Room details", { exact: true })).toBeVisible();
   await expect(page.getByText("Massage table", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
   await page.getByRole("button", { name: "New room", exact: true }).click();
-  await page.getByRole("textbox", { name: "Room name", exact: true }).fill("Room Cedar");
-  await page.getByRole("spinbutton", { name: "Turnover time (minutes)" }).fill("20");
+  await page
+    .getByRole("textbox", { name: "Room name", exact: true })
+    .fill("Room Cedar");
+  await page
+    .getByRole("spinbutton", { name: "Turnover time (minutes)" })
+    .fill("20");
   await page.getByRole("button", { name: "Add room", exact: true }).click();
   await expect(page.getByText("Room Cedar was created.")).toBeVisible();
-  expect(createdRoom).toMatchObject({ location_id: 11, name: "Room Cedar", turnover_minutes: 20 });
+  expect(createdRoom).toMatchObject({
+    location_id: 11,
+    name: "Room Cedar",
+    turnover_minutes: 20,
+  });
 });
 
-test("practitioners use list-first details, edit, and identity-linking panels", async ({ page }) => {
+test("practitioners use list-first details, edit, and identity-linking panels", async ({
+  page,
+}) => {
   await fixtures(page, ["super_admin"]);
   const practitioners = [
-    { practitioner_id: "8", user_id: "18", given_name: "Esther", family_name: "Vanderpoel", display_name: "Esther Vanderpoel", email: "esther@example.test", status: "active", discipline: "Registered Massage Therapy", credentials: "RMT", booking_mode: "practitioner_managed", active: "1", location_id: "1", locations: "Holland Landing" },
+    {
+      practitioner_id: "8",
+      user_id: "18",
+      given_name: "Esther",
+      family_name: "Vanderpoel",
+      display_name: "Esther Vanderpoel",
+      email: "esther@example.test",
+      status: "active",
+      discipline: "Registered Massage Therapy",
+      credentials: "RMT",
+      booking_mode: "practitioner_managed",
+      active: "1",
+      location_id: "1",
+      locations: "Holland Landing",
+    },
   ];
   let updated: Record<string, unknown> | undefined;
   let created: Record<string, unknown> | undefined;
-  await page.route("**/api/v1/admin/practitioners**", async route => {
+  await page.route("**/api/v1/admin/practitioners**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = practitioners;
-    if (path.endsWith("/practitioners/8") && route.request().method() === "PATCH") {
+    if (
+      path.endsWith("/practitioners/8") &&
+      route.request().method() === "PATCH"
+    ) {
       updated = route.request().postDataJSON();
-      practitioners[0] = { ...practitioners[0], ...updated } as typeof practitioners[number];
+      practitioners[0] = {
+        ...practitioners[0],
+        ...updated,
+      } as (typeof practitioners)[number];
       data = { id: "8" };
-    } else if (path.endsWith("/practitioners/onboard") && route.request().method() === "POST") {
+    } else if (
+      path.endsWith("/practitioners/onboard") &&
+      route.request().method() === "POST"
+    ) {
       created = route.request().postDataJSON();
-      practitioners.push({ practitioner_id: "9", user_id: "19", status: "active", active: "1", locations: "Holland Landing", ...created } as typeof practitioners[number]);
+      practitioners.push({
+        practitioner_id: "9",
+        user_id: "19",
+        status: "active",
+        active: "1",
+        locations: "Holland Landing",
+        ...created,
+      } as (typeof practitioners)[number]);
       data = { id: "9", user_id: "19", status: "active" };
     }
     await route.fulfill({ json: { data } });
@@ -339,27 +482,63 @@ test("practitioners use list-first details, edit, and identity-linking panels", 
 
   await page.goto(`${portalHost}/admin/practitioners`);
   await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
-  await page.getByRole("button", { name: /Esther Vanderpoel.*RMT.*Holland Landing/ }).click();
+  await page
+    .getByRole("button", { name: /Esther Vanderpoel.*RMT.*Holland Landing/ })
+    .click();
   await page.getByRole("button", { name: "Details" }).click();
-  await expect(page.getByText("Practitioner details", { exact: true })).toBeVisible();
-  await expect(page.getByText("esther@example.test", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Practitioner details", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("esther@example.test", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await page.getByRole("textbox", { name: "Credentials", exact: true }).fill("RMT, BSc");
+  await page
+    .getByRole("textbox", { name: "Credentials", exact: true })
+    .fill("RMT, BSc");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByText("Esther Vanderpoel was updated.")).toBeVisible();
-  expect(updated).toMatchObject({ practitioner_id: 8, location_id: 1, credentials: "RMT, BSc" });
+  expect(updated).toMatchObject({
+    practitioner_id: 8,
+    location_id: 1,
+    credentials: "RMT, BSc",
+  });
 
-  await page.getByRole("button", { name: "New practitioner", exact: true }).click();
-  await page.getByRole("textbox", { name: "First name", exact: true }).fill("New");
-  await page.getByRole("textbox", { name: "Last name", exact: true }).fill("Therapist");
-  await page.getByRole("textbox", { name: "Internal display name", exact: true }).fill("New Therapist");
-  await page.getByRole("textbox", { name: "Microsoft sign-in email" }).fill("new@example.test");
-  await page.getByRole("textbox", { name: "Entra Object ID" }).fill("11111111-1111-4111-8111-111111111111");
-  await page.getByRole("textbox", { name: "Entra Tenant ID" }).fill("22222222-2222-4222-8222-222222222222");
-  await page.getByRole("button", { name: "Add practitioner", exact: true }).click();
-  await expect(page.getByText("New Therapist was added as a practitioner.")).toBeVisible();
-  expect(created).toMatchObject({ location_id: 1, given_name: "New", family_name: "Therapist", display_name: "New Therapist", object_id: "11111111-1111-4111-8111-111111111111" });
+  await page
+    .getByRole("button", { name: "New practitioner", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "First name", exact: true })
+    .fill("New");
+  await page
+    .getByRole("textbox", { name: "Last name", exact: true })
+    .fill("Therapist");
+  await page
+    .getByRole("textbox", { name: "Internal display name", exact: true })
+    .fill("New Therapist");
+  await page
+    .getByRole("textbox", { name: "Microsoft sign-in email" })
+    .fill("new@example.test");
+  await page
+    .getByRole("textbox", { name: "Entra Object ID" })
+    .fill("11111111-1111-4111-8111-111111111111");
+  await page
+    .getByRole("textbox", { name: "Entra Tenant ID" })
+    .fill("22222222-2222-4222-8222-222222222222");
+  await page
+    .getByRole("button", { name: "Add practitioner", exact: true })
+    .click();
+  await expect(
+    page.getByText("New Therapist was added as a practitioner."),
+  ).toBeVisible();
+  expect(created).toMatchObject({
+    location_id: 1,
+    given_name: "New",
+    family_name: "Therapist",
+    display_name: "New Therapist",
+    object_id: "11111111-1111-4111-8111-111111111111",
+  });
 });
 
 test("staff client creation saves a reusable service address with manual fallback", async ({
@@ -405,7 +584,9 @@ test("staff client creation saves a reusable service address with manual fallbac
   });
 });
 
-test("clients use list-first actions with details and edit panels", async ({ page }) => {
+test("clients use list-first actions with details and edit panels", async ({
+  page,
+}) => {
   await fixtures(page, ["super_admin"]);
   const client = {
     id: 8,
@@ -421,30 +602,54 @@ test("clients use list-first actions with details and edit panels", async ({ pag
     administrative_notes: "Prefers afternoon calls",
     status: "active",
     revision: "client-rev",
-    address: { address_line1: "8 Test Lane", address_line2: "", city: "Test City", province: "Ontario", postal_code: "A1A 1A1", country: "Canada", instructions: "Side door" },
+    address: {
+      address_line1: "8 Test Lane",
+      address_line2: "",
+      city: "Test City",
+      province: "Ontario",
+      postal_code: "A1A 1A1",
+      country: "Canada",
+      instructions: "Side door",
+    },
   };
   let updated: Record<string, unknown> | undefined;
   await page.route("**/api/v1/clients**", (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith("/8/invitations")) return route.fulfill({ json: { data: { items: [], linked: false } } });
+    if (path.endsWith("/8/invitations"))
+      return route.fulfill({ json: { data: { items: [], linked: false } } });
     if (path.endsWith("/8") && route.request().method() === "PATCH") {
       updated = route.request().postDataJSON();
       return route.fulfill({ json: { data: { ...client, ...updated } } });
     }
     if (path.endsWith("/8")) return route.fulfill({ json: { data: client } });
-    return route.fulfill({ json: { data: { items: [client], has_more: false } } });
+    return route.fulfill({
+      json: { data: { items: [client], has_more: false } },
+    });
   });
   await page.goto(`${portalHost}/admin/clients`);
-  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: /Avery Client.*avery@example\.test/ }).click();
+  await expect(
+    page.getByRole("button", { name: "Details", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: /Avery Client.*avery@example\.test/ })
+    .click();
   await page.getByRole("button", { name: "Details", exact: true }).click();
   await expect(page.getByText("Client details", { exact: true })).toBeVisible();
-  await expect(page.getByText("8 Test Lane, Test City, Ontario, A1A 1A1, Canada", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("8 Test Lane, Test City, Ontario, A1A 1A1, Canada", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await page.getByRole("textbox", { name: "Phone", exact: true }).fill("905-555-0190");
+  await page
+    .getByRole("textbox", { name: "Phone", exact: true })
+    .fill("905-555-0190");
   await page.getByRole("button", { name: "Save client", exact: true }).click();
   await expect(page.getByText("Client details saved.")).toBeVisible();
-  expect(updated).toMatchObject({ phone: "905-555-0190", revision: "client-rev" });
+  expect(updated).toMatchObject({
+    phone: "905-555-0190",
+    revision: "client-rev",
+  });
 });
 
 test("possible duplicates require acknowledgement and Super Admin can merge with a preview", async ({
@@ -516,7 +721,12 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
       });
     }
     return route.fulfill({
-      json: { data: { items: merged ? [survivor] : [survivor, duplicate], has_more: false } },
+      json: {
+        data: {
+          items: merged ? [survivor] : [survivor, duplicate],
+          has_more: false,
+        },
+      },
     });
   });
   await page.goto(`${portalHost}/admin/clients`);
@@ -553,8 +763,12 @@ test("possible duplicates require acknowledgement and Super Admin can merge with
       "Client records merged. Both email addresses were preserved.",
     ),
   ).toBeVisible();
-  await expect(page.getByText("second@example.test", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /first@example\.test/ })).toBeVisible();
+  await expect(
+    page.getByText("second@example.test", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /first@example\.test/ }),
+  ).toBeVisible();
   expect(mergeBody).toMatchObject({
     survivor_revision: "survivor-rev",
     duplicate_revision: "duplicate-rev",
@@ -635,7 +849,21 @@ test("mobile-only booking captures destination and price without requesting a ro
   );
   await page.route("**/api/v1/booking-clients/5/address", (route) => {
     addressFetches += 1;
-    return route.fulfill({ json: { data: { address: { address_line1: "123 Test Street", address_line2: "", city: "Test City", province: "Ontario", postal_code: "A1A 1A1", country: "Canada", instructions: "Side entrance" } } } });
+    return route.fulfill({
+      json: {
+        data: {
+          address: {
+            address_line1: "123 Test Street",
+            address_line2: "",
+            city: "Test City",
+            province: "Ontario",
+            postal_code: "A1A 1A1",
+            country: "Canada",
+            instructions: "Side entrance",
+          },
+        },
+      },
+    });
   });
   await page.route("**/api/v1/availability?**", (route) => {
     availabilityMode =
@@ -695,11 +923,17 @@ test("mobile-only booking captures destination and price without requesting a ro
     .fill("Test");
   await page.getByRole("button", { name: "Select Test Client" }).click();
   await expect(page.getByText("Selected client")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Street address" })).toHaveValue("123 Test Street");
+  await expect(
+    page.getByRole("textbox", { name: "Street address" }),
+  ).toHaveValue("123 Test Street");
   await expect(page.getByText(/saved client address is loaded/i)).toBeVisible();
   expect(addressFetches).toBe(1);
-  await expect(page.getByRole("combobox", { name: /Base location/ })).toContainText("Mobile service area");
-  await expect(page.getByRole("combobox", { name: /Base location/ })).toBeEnabled();
+  await expect(
+    page.getByRole("combobox", { name: /Base location/ }),
+  ).toContainText("Mobile service area");
+  await expect(
+    page.getByRole("combobox", { name: /Base location/ }),
+  ).toBeEnabled();
   await select(/^Base location/, "Mobile service area");
   await select(/^Service/, "Massage");
   await select(/^Practitioner/, "Therapist");
@@ -774,7 +1008,10 @@ test("appointment client finder filters by exact birthdate and debounced contact
   const searches: { q: string; dateOfBirth: string }[] = [];
   await page.route("**/api/v1/booking-clients?**", (route) => {
     const params = new URL(route.request().url()).searchParams;
-    searches.push({ q: params.get("q") ?? "", dateOfBirth: params.get("date_of_birth") ?? "" });
+    searches.push({
+      q: params.get("q") ?? "",
+      dateOfBirth: params.get("date_of_birth") ?? "",
+    });
     return route.fulfill({
       json: {
         data: {
@@ -801,7 +1038,9 @@ test("appointment client finder filters by exact birthdate and debounced contact
   await page.waitForTimeout(400);
   expect(searches).toEqual([]);
   await birthdate.fill("1980-05-06");
-  await expect(page.getByRole("button", { name: "Select Test Client" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Select Test Client" }),
+  ).toBeVisible();
   expect(searches).toEqual([{ q: "", dateOfBirth: "1980-05-06" }]);
   await search.fill("Te");
   await page.waitForTimeout(100);
@@ -862,9 +1101,20 @@ test("public home has client-first login and no workforce authentication or fake
   await expect(
     page.getByRole("link", { name: "Sign In", exact: true }),
   ).toHaveAttribute("href", `${portalHost}/client?lang=en`);
-  await expect(page.getByRole("button", { name: "Language and region" })).toBeVisible();
-  const globeBox=await page.getByRole("button", { name: "Language and region" }).boundingBox(),signInBox=await page.getByRole("link", { name: "Sign In", exact: true }).boundingBox();
-  expect(globeBox&&signInBox?signInBox.x-(globeBox.x+globeBox.width):Number.POSITIVE_INFINITY).toBeLessThanOrEqual(8);
+  await expect(
+    page.getByRole("button", { name: "LanguageAndRegion" }),
+  ).toBeVisible();
+  const globeBox = await page
+      .getByRole("button", { name: "LanguageAndRegion" })
+      .boundingBox(),
+    signInBox = await page
+      .getByRole("link", { name: "Sign In", exact: true })
+      .boundingBox();
+  expect(
+    globeBox && signInBox
+      ? signInBox.x - (globeBox.x + globeBox.width)
+      : Number.POSITIVE_INFINITY,
+  ).toBeLessThanOrEqual(8);
   await expect(
     page.getByRole("link", { name: "Staff Sign In", exact: true }),
   ).toHaveAttribute("href", `${portalHost}/staff/login?lang=en`);
@@ -879,87 +1129,285 @@ test("public home has client-first login and no workforce authentication or fake
   ).toBe(false);
 });
 
-test("public Markdown pages follow the selected language and publish safe metadata", async ({ page }) => {
+test("public Markdown pages follow the selected language and publish safe metadata", async ({
+  page,
+}) => {
   await fixtures(page);
   await page.goto(`${publicHost}/about`);
-  await expect(page.getByRole("heading", { name: "About our centre", level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "About our centre", level: 1 }),
+  ).toBeVisible();
   await expect(page).toHaveTitle("About us | Test Wellness");
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /approach to accessible wellness care/);
-  await expect(page.getByRole("link", { name: "New clients" }).first()).toHaveAttribute("href", "/new-clients");
-  await page.getByRole("button", { name: "Language and region" }).click();
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    /approach to accessible wellness care/,
+  );
+  await expect(
+    page.getByRole("link", { name: "New clients" }).first(),
+  ).toHaveAttribute("href", "/new-clients");
+  await page.getByRole("button", { name: "LanguageAndRegion" }).click();
   await page.getByRole("button", { name: /Français \(Canada\)/ }).click();
-  await expect(page.getByRole("heading", { name: "À propos de notre centre", level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "À propos de notre centre", level: 1 }),
+  ).toBeVisible();
   await expect(page).toHaveTitle("À propos | Test Wellness");
   await page.getByRole("link", { name: "Nouveaux clients" }).first().click();
-  await expect(page.getByRole("heading", { name: "Bienvenue aux nouveaux clients", level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Bienvenue aux nouveaux clients",
+      level: 1,
+    }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "FAQ", exact: true }).first().click();
-  await expect(page.getByRole("heading", { name: "Foire aux questions", level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Foire aux questions", level: 1 }),
+  ).toBeVisible();
 });
 
-test("contact page lists published practitioners first and carries a team booking choice", async ({ page }) => {
+test("contact page lists published practitioners first and carries a team booking choice", async ({
+  page,
+}) => {
   await fixtures(page);
-  await page.route("**/api/v1/team", route => route.fulfill({ json: { data: [
-    { slug: "test-practitioner", section: "practitioner", public_name: "Test Practitioner", booking_name: "Test", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", discipline: "Massage therapy", credentials: "RMT", display_order: 1, has_image: 0, image_version: null, practitioner_id: 3 },
-    { slug: "test-admin", section: "administration", public_name: "Test Administrator", booking_name: null, public_title: "Clinic Administrator", public_title_fr: "Administration de la clinique", summary: "Supports clinic operations.", summary_fr: "Soutient les activités de la clinique.", discipline: null, credentials: null, display_order: 1, has_image: 0, image_version: null, practitioner_id: null },
-  ] } }));
+  await page.route("**/api/v1/team", (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          {
+            slug: "test-practitioner",
+            section: "practitioner",
+            public_name: "Test Practitioner",
+            booking_name: "Test",
+            public_title: "Registered Massage Therapist",
+            public_title_fr: "Massothérapeute agréée",
+            summary: "Mobile therapeutic massage.",
+            summary_fr: "Massothérapie thérapeutique mobile.",
+            discipline: "Massage therapy",
+            credentials: "RMT",
+            display_order: 1,
+            has_image: 0,
+            image_version: null,
+            practitioner_id: 3,
+          },
+          {
+            slug: "test-admin",
+            section: "administration",
+            public_name: "Test Administrator",
+            booking_name: null,
+            public_title: "Clinic Administrator",
+            public_title_fr: "Administration de la clinique",
+            summary: "Supports clinic operations.",
+            summary_fr: "Soutient les activités de la clinique.",
+            discipline: null,
+            credentials: null,
+            display_order: 1,
+            has_image: 0,
+            image_version: null,
+            practitioner_id: null,
+          },
+        ],
+      },
+    }),
+  );
   await page.goto(`${publicHost}/contact`);
-  const practitionerHeading = page.getByRole('heading', { name: "Practitioners", level: 3 });
-  const administrationHeading = page.getByRole('heading', { name: "Administration", level: 3 });
+  const practitionerHeading = page.getByRole("heading", {
+    name: "Practitioners",
+    level: 3,
+  });
+  const administrationHeading = page.getByRole("heading", {
+    name: "Administration",
+    level: 3,
+  });
   await expect(practitionerHeading).toBeVisible();
   await expect(administrationHeading).toBeVisible();
-  const practitionerBox = await practitionerHeading.boundingBox(), administrationBox = await administrationHeading.boundingBox();
-  expect(practitionerBox && administrationBox ? practitionerBox.y : Number.POSITIVE_INFINITY).toBeLessThan(administrationBox?.y ?? 0);
+  const practitionerBox = await practitionerHeading.boundingBox(),
+    administrationBox = await administrationHeading.boundingBox();
+  expect(
+    practitionerBox && administrationBox
+      ? practitionerBox.y
+      : Number.POSITIVE_INFINITY,
+  ).toBeLessThan(administrationBox?.y ?? 0);
   await expect(page.getByText("Mobile therapeutic massage.")).toBeVisible();
   await expect(page.getByText("RMT · Massage therapy")).toBeVisible();
   await expect(page.getByText("Supports clinic operations.")).toBeVisible();
-  await expect(page.getByRole('dialog', { name: "Profile for Test Practitioner" })).toHaveCount(0);
-  await page.getByRole('link', { name: "Book with Test Practitioner" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Profile for Test Practitioner" }),
+  ).toHaveCount(0);
+  await page.getByRole("link", { name: "Book with Test Practitioner" }).click();
   await expect(page).toHaveURL(`${publicHost}/book?practitioner_id=3`);
-  await expect(page.getByRole('combobox', { name: "Practitioner" })).toContainText("Test Practitioner");
+  await expect(
+    page.getByRole("combobox", { name: "Practitioner" }),
+  ).toContainText("Test Practitioner");
 });
 
-test("published service catalogue filters categories and carries service and practitioner into booking", async ({ page }) => {
+test("published service catalogue filters categories and carries service and practitioner into booking", async ({
+  page,
+}) => {
   await fixtures(page);
-  const massage = { slug: "massage-therapy", name: "Massage Therapy", name_fr: "Massothérapie", category: "Massage", public_summary: "Treatment tailored to your goals.", public_summary_fr: "Un traitement adapté à vos objectifs.", description: "A detailed treatment description.", description_fr: "Une description détaillée du traitement.", preparation_instructions: "Wear comfortable clothing.", preparation_instructions_fr: "Portez des vêtements confortables.", offers_clinic: false, offers_mobile: true, durations: [{ minutes: 60, price_cents: 10000 }] };
-  await page.route("**/api/v1/public/services", route => route.fulfill({ json: { data: [massage, { ...massage, slug: "nutrition", name: "Nutrition", category: "Nutrition" }] } }));
-  await page.route("**/api/v1/public/services/massage-therapy", route => route.fulfill({ json: { data: { ...massage, practitioners: [{ slug: "test-practitioner", public_name: "Test Practitioner", booking_name: "Test", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", booking_practitioner_id: 3 }], locations: [{ name: "Holland Landing", city: "Holland Landing", province: "Ontario" }] } } }));
-  await page.route("**/api/v1/services**", route => route.fulfill({ json: { data: [
-    { id: 9, slug: "nutrition", name: "Nutrition", description: "Nutrition", price_cents: 8000, durations: [{ id: 8, minutes: 60, price_cents: 8000 }] },
-    { id: 2, slug: "massage-therapy", name: "Massage Therapy", description: "Therapeutic care", price_cents: 10000, durations: [{ id: 4, minutes: 60, price_cents: 10000 }] },
-  ] } }));
+  const massage = {
+    slug: "massage-therapy",
+    name: "Massage Therapy",
+    name_fr: "Massothérapie",
+    category: "Massage",
+    public_summary: "Treatment tailored to your goals.",
+    public_summary_fr: "Un traitement adapté à vos objectifs.",
+    description: "A detailed treatment description.",
+    description_fr: "Une description détaillée du traitement.",
+    preparation_instructions: "Wear comfortable clothing.",
+    preparation_instructions_fr: "Portez des vêtements confortables.",
+    offers_clinic: false,
+    offers_mobile: true,
+    durations: [{ minutes: 60, price_cents: 10000 }],
+  };
+  await page.route("**/api/v1/public/services", (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          massage,
+          {
+            ...massage,
+            slug: "nutrition",
+            name: "Nutrition",
+            category: "Nutrition",
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/v1/public/services/massage-therapy", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          ...massage,
+          practitioners: [
+            {
+              slug: "test-practitioner",
+              public_name: "Test Practitioner",
+              booking_name: "Test",
+              public_title: "Registered Massage Therapist",
+              public_title_fr: "Massothérapeute agréée",
+              summary: "Mobile therapeutic massage.",
+              summary_fr: "Massothérapie thérapeutique mobile.",
+              booking_practitioner_id: 3,
+            },
+          ],
+          locations: [
+            {
+              name: "Holland Landing",
+              city: "Holland Landing",
+              province: "Ontario",
+            },
+          ],
+        },
+      },
+    }),
+  );
+  await page.route("**/api/v1/services**", (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          {
+            id: 9,
+            slug: "nutrition",
+            name: "Nutrition",
+            description: "Nutrition",
+            price_cents: 8000,
+            durations: [{ id: 8, minutes: 60, price_cents: 8000 }],
+          },
+          {
+            id: 2,
+            slug: "massage-therapy",
+            name: "Massage Therapy",
+            description: "Therapeutic care",
+            price_cents: 10000,
+            durations: [{ id: 4, minutes: 60, price_cents: 10000 }],
+          },
+        ],
+      },
+    }),
+  );
   await page.goto(`${publicHost}/services`);
-  await expect(page.getByRole("heading", { name: "Find the care that fits you." })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Find the care that fits you." }),
+  ).toBeVisible();
   await page.getByRole("combobox", { name: "Category" }).click();
   await page.getByRole("option", { name: "Massage", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Massage Therapy" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Massage Therapy" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Nutrition" })).toHaveCount(0);
   await page.getByRole("link", { name: "View service" }).click();
-  await expect(page.getByRole("heading", { name: "Massage Therapy", level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Massage Therapy", level: 1 }),
+  ).toBeVisible();
   await expect(page.getByText("Mobile therapeutic massage.")).toBeVisible();
   await page.getByRole("link", { name: "Book with Test Practitioner" }).click();
-  await expect(page).toHaveURL(`${publicHost}/book?service=massage-therapy&practitioner_id=3`);
-  await expect(page.getByRole("combobox").filter({ hasText: "Massage Therapy" })).toHaveCount(1);
-  await expect(page.getByRole("combobox", { name: "Practitioner" })).toContainText("Test Practitioner");
+  await expect(page).toHaveURL(
+    `${publicHost}/book?service=massage-therapy&practitioner_id=3`,
+  );
+  await expect(
+    page.getByRole("combobox").filter({ hasText: "Massage Therapy" }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("combobox", { name: "Practitioner" }),
+  ).toContainText("Test Practitioner");
 });
 
-test("super admin deliberately publishes a bilingual public team profile", async ({ page }) => {
+test("super admin deliberately publishes a bilingual public team profile", async ({
+  page,
+}) => {
   await fixtures(page, ["super_admin"]);
   let saved: Record<string, unknown> | null = null;
-  await page.route("**/api/v1/admin/team-profiles", route => route.fulfill({ json: { data: [
-    { user_id: 7, given_name: "Esther", family_name: "Vanderpoel", display_name: "Esther Vanderpoel", status: "active", practitioner_id: 3, slug: null, section: null, public_name: null, booking_name: null, public_title: null, public_title_fr: null, summary: null, summary_fr: null, display_order: null, published: null, show_booking_action: null, has_image: 1 },
-  ] } }));
-  await page.route("**/api/v1/admin/team-profiles/7", async route => {
+  await page.route("**/api/v1/admin/team-profiles", (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          {
+            user_id: 7,
+            given_name: "Esther",
+            family_name: "Vanderpoel",
+            display_name: "Esther Vanderpoel",
+            status: "active",
+            practitioner_id: 3,
+            slug: null,
+            section: null,
+            public_name: null,
+            booking_name: null,
+            public_title: null,
+            public_title_fr: null,
+            summary: null,
+            summary_fr: null,
+            display_order: null,
+            published: null,
+            show_booking_action: null,
+            has_image: 1,
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/v1/admin/team-profiles/7", async (route) => {
     saved = route.request().postDataJSON();
     await route.fulfill({ json: { data: { user_id: 7, published: true } } });
   });
   await page.goto(`${portalHost}/admin/team`);
-  await expect(page.getByRole('heading', { name: "Public team" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Public team" }),
+  ).toBeVisible();
   await page.getByLabel("Title (English)").fill("Registered Massage Therapist");
   await page.getByLabel("Title (French)").fill("Massothérapeute agréée");
   await page.getByLabel("Show Book a session action").check();
   await page.getByLabel("Publish on the Contact page").check();
-  await page.getByRole('button', { name: "Save team profile" }).click();
-  await expect.poll(() => saved).toMatchObject({ slug: "esther-vanderpoel", section: "practitioner", public_name: "Esther Vanderpoel", booking_name: "Esther", published: true, show_booking_action: true });
+  await page.getByRole("button", { name: "Save team profile" }).click();
+  await expect
+    .poll(() => saved)
+    .toMatchObject({
+      slug: "esther-vanderpoel",
+      section: "practitioner",
+      public_name: "Esther Vanderpoel",
+      booking_name: "Esther",
+      published: true,
+      show_booking_action: true,
+    });
 });
 
 test("public booking hands off preferences without reserving or creating an appointment", async ({
@@ -987,10 +1435,18 @@ test("public booking hands off preferences without reserving or creating an appo
   });
   await page.goto(`${publicHost}/book`);
   await page.getByLabel("Appointment date").fill("2030-10-01");
-  await expect.poll(() => availabilityQueries.at(-1)?.searchParams.get("date_from")).toBe("2030-10-01");
-  expect(availabilityQueries.at(-1)?.searchParams.get("date_to")).toBe("2030-10-01");
-  await expect(page.getByText("60 min — $100.00", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /60 min.*\$100\.00/ })).toHaveCount(25);
+  await expect
+    .poll(() => availabilityQueries.at(-1)?.searchParams.get("date_from"))
+    .toBe("2030-10-01");
+  expect(availabilityQueries.at(-1)?.searchParams.get("date_to")).toBe(
+    "2030-10-01",
+  );
+  await expect(
+    page.getByText("60 min — $100.00", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /60 min.*\$100\.00/ }),
+  ).toHaveCount(25);
   await page.getByRole("button", { name: /9:00.*60 min/ }).click();
   await page
     .getByRole("link", { name: "View client booking information" })
@@ -1003,8 +1459,18 @@ test("public booking hands off preferences without reserving or creating an appo
       exact: false,
     }),
   ).toBeVisible();
-  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("wellness.customer.booking-intent.v1") ?? "null"))).toMatchObject({
-    delivery_mode: "mobile", location_id: "1", service_id: "2", practitioner_id: "3", duration_option_id: "4",
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(
+        sessionStorage.getItem("wellness.customer.booking-intent.v1") ?? "null",
+      ),
+    ),
+  ).toMatchObject({
+    delivery_mode: "mobile",
+    location_id: "1",
+    service_id: "2",
+    practitioner_id: "3",
+    duration_option_id: "4",
   });
   expect(writes).toEqual([]);
 });
@@ -1018,11 +1484,9 @@ test("public infrastructure errors have a readable retry state", async ({
   );
   await page.goto(`${publicHost}/book`);
   await expect(
-    page
-      .getByRole("alert")
-      .filter({
-        hasText: "The service is temporarily unavailable. Please try again.",
-      }),
+    page.getByRole("alert").filter({
+      hasText: "The service is temporarily unavailable. Please try again.",
+    }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
   await expect(page.getByText("Unexpected end of JSON")).toHaveCount(0);
@@ -1042,39 +1506,67 @@ test("anonymous portal deep link is gated behind staff sign-in", async ({
   ).toHaveCount(0);
 });
 
-test("warns before unsaved form work is lost through navigation or browser unload", async ({ page }) => {
+test("warns before unsaved form work is lost through navigation or browser unload", async ({
+  page,
+}) => {
   await fixtures(page, ["super_admin"]);
-  await page.route("**/api/v1/admin/catalogue-settings", (route) => route.fulfill({ json: { data: {
-    categories: [], taxes: [], settings: { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 },
-  } } }));
+  await page.route("**/api/v1/admin/catalogue-settings", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          categories: [],
+          taxes: [],
+          settings: {
+            default_lead_time_minutes: 60,
+            default_booking_horizon_days: 90,
+            default_cancellation_window_minutes: 1440,
+          },
+        },
+      },
+    }),
+  );
   await page.goto(`${portalHost}/admin/settings`);
   const operatingName = page.getByRole("textbox", { name: "Operating name" });
   await expect(operatingName).toHaveValue("Test Wellness");
   await operatingName.fill("Unsaved Wellness Name");
 
-  expect(await page.evaluate(() => {
-    const event = new Event("beforeunload", { cancelable: true });
-    return !window.dispatchEvent(event);
-  })).toBe(true);
+  expect(
+    await page.evaluate(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      return !window.dispatchEvent(event);
+    }),
+  ).toBe(true);
 
   await page.getByRole("link", { name: /Dashboard Today at a glance/ }).click();
-  await expect(page.getByRole("heading", { name: "Leave this page?" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Leave this page?" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Stay" }).click();
   await expect(page).toHaveURL(`${portalHost}/admin/settings`);
   await expect(operatingName).toHaveValue("Unsaved Wellness Name");
 
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Business settings saved.")).toBeVisible();
-  expect(await page.evaluate(() => {
-    const event = new Event("beforeunload", { cancelable: true });
-    return !window.dispatchEvent(event);
-  })).toBe(false);
+  expect(
+    await page.evaluate(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      return !window.dispatchEvent(event);
+    }),
+  ).toBe(false);
   await page.getByRole("link", { name: /Dashboard Today at a glance/ }).click();
   await expect(page).toHaveURL(`${portalHost}/admin`);
-  await expect(page.getByRole("heading", { name: "Leave this page?" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Leave this page?" }),
+  ).toHaveCount(0);
 
-  await page.getByRole("link", { name: /Business settings Clinic identity and defaults/ }).click();
-  await page.getByRole("textbox", { name: "Business phone" }).fill("905-555-0199");
+  await page
+    .getByRole("link", {
+      name: /Business settings Clinic identity and defaults/,
+    })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Business phone" })
+    .fill("905-555-0199");
   await page.getByRole("link", { name: /Dashboard Today at a glance/ }).click();
   await page.getByRole("button", { name: "Leave without saving" }).click();
   await expect(page).toHaveURL(`${portalHost}/admin`);
@@ -1238,10 +1730,16 @@ test("practitioner mobile navigation can book and change only the scoped schedul
       ),
     )
     .toBe(true);
-  await expect(page.getByLabel("Practitioner")).toHaveValue("Test Practitioner");
+  await expect(page.getByLabel("Practitioner")).toHaveValue(
+    "Test Practitioner",
+  );
   await expect(page.getByLabel("Practitioner")).not.toBeEditable();
-  await expect(page.getByRole("combobox", { name: "Base location / service area" })).toContainText("Mobile area");
-  await expect(page.getByRole("combobox", { name: "Base location / service area" })).toBeEnabled();
+  await expect(
+    page.getByRole("combobox", { name: "Base location / service area" }),
+  ).toContainText("Mobile area");
+  await expect(
+    page.getByRole("combobox", { name: "Base location / service area" }),
+  ).toBeEnabled();
   await page
     .getByRole("textbox", { name: "Find an active client" })
     .fill("New Clinic");
@@ -1262,7 +1760,9 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   await page.getByRole("button", { name: "Reschedule", exact: true }).click();
   await page.getByLabel("Appointment date").fill("2030-10-01");
   await page.getByRole("button", { name: "Find times", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Oct 1, 2030, 10:00/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Oct 1, 2030, 10:00/ }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: /Oct 1, 2030, 11:00/ }).click();
   await page.getByRole("button", { name: "Confirm reschedule" }).click();
   await expect(
@@ -1290,22 +1790,77 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   ).toBeVisible();
 });
 
-test("delegated scheduling permission allows a practitioner to choose another practitioner", async ({ page }) => {
+test("delegated scheduling permission allows a practitioner to choose another practitioner", async ({
+  page,
+}) => {
   await fixtures(page, ["practitioner"], ["schedule_for_other_practitioners"]);
-  await page.route("**/api/v1/appointments?**", route => route.fulfill({ json: { data: [] } }));
-  await page.route("**/api/v1/booking-options?**", route => route.fulfill({ json: { data: { rooms: [], combinations: [
-    { location_id: 1, location_name: "Mobile area", timezone: "America/Toronto", service_id: 2, service_name: "Massage", requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 3, practitioner_name: "Test Practitioner", duration_option_id: 4, duration_minutes: 60 },
-    { location_id: 1, location_name: "Mobile area", timezone: "America/Toronto", service_id: 2, service_name: "Massage", requires_room: 0, offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 0, base_price_cents: 10000, practitioner_id: 9, practitioner_name: "Covering Practitioner", duration_option_id: 4, duration_minutes: 60 },
-  ] } } }));
+  await page.route("**/api/v1/appointments?**", (route) =>
+    route.fulfill({ json: { data: [] } }),
+  );
+  await page.route("**/api/v1/booking-options?**", (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          rooms: [],
+          combinations: [
+            {
+              location_id: 1,
+              location_name: "Mobile area",
+              timezone: "America/Toronto",
+              service_id: 2,
+              service_name: "Massage",
+              requires_room: 0,
+              offers_mobile: 1,
+              offers_clinic: 0,
+              travel_buffer_minutes: 30,
+              mobile_fee_cents: 0,
+              base_price_cents: 10000,
+              practitioner_id: 3,
+              practitioner_name: "Test Practitioner",
+              duration_option_id: 4,
+              duration_minutes: 60,
+            },
+            {
+              location_id: 1,
+              location_name: "Mobile area",
+              timezone: "America/Toronto",
+              service_id: 2,
+              service_name: "Massage",
+              requires_room: 0,
+              offers_mobile: 1,
+              offers_clinic: 0,
+              travel_buffer_minutes: 30,
+              mobile_fee_cents: 0,
+              base_price_cents: 10000,
+              practitioner_id: 9,
+              practitioner_name: "Covering Practitioner",
+              duration_option_id: 4,
+              duration_minutes: 60,
+            },
+          ],
+        },
+      },
+    }),
+  );
   await page.goto(`${portalHost}/practitioner/schedule`);
-  await page.getByRole("button", { name: "Book appointment", exact: true }).click();
-  await page.getByRole("combobox", { name: "Base location / service area" }).click();
+  await page
+    .getByRole("button", { name: "Book appointment", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Base location / service area" })
+    .click();
   await page.getByRole("option", { name: "Mobile area" }).click();
   await page.getByRole("combobox", { name: "Service", exact: true }).click();
   await page.getByRole("option", { name: "Massage" }).click();
-  await expect(page.getByRole("combobox", { name: "Practitioner", exact: true })).toBeEditable();
-  await page.getByRole("combobox", { name: "Practitioner", exact: true }).click();
-  await expect(page.getByRole("option", { name: "Covering Practitioner" })).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Practitioner", exact: true }),
+  ).toBeEditable();
+  await page
+    .getByRole("combobox", { name: "Practitioner", exact: true })
+    .click();
+  await expect(
+    page.getByRole("option", { name: "Covering Practitioner" }),
+  ).toBeVisible();
 });
 
 test("dual roles can switch eligible workspaces and retain that preference", async ({
