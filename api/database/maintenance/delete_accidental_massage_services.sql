@@ -27,9 +27,9 @@ SELECT id, clinic_id, service_id, client_id, practitioner_id, location_id,
 FROM appointments
 WHERE id = 2;
 
--- Protected appointment dependencies must all be zero. Attendees and status
--- history are shown separately because they are part of this canceled test
--- booking and will be removed by their existing ON DELETE CASCADE rules.
+-- Protected appointment dependencies must all be zero except notification_events,
+-- which must be exactly two test notifications for appointment 2. Attendees and
+-- status history are removed by their existing ON DELETE CASCADE rules.
 SELECT
   (SELECT COUNT(*) FROM cancellation_adjustments WHERE appointment_id = 2) AS cancellation_adjustments,
   (SELECT COUNT(*) FROM waitlist_offers WHERE appointment_id = 2) AS waitlist_offers,
@@ -49,6 +49,64 @@ SELECT
   (SELECT COUNT(*) FROM form_assignments WHERE service_id IN (1, 5)) AS form_assignments,
   (SELECT COUNT(*) FROM invoice_line_items WHERE service_id IN (1, 5)) AS invoice_lines;
 
+-- Remove only the two notification artifacts belonging to the exact canceled
+-- test appointment. Every other protected dependency must still be absent.
+DELETE FROM notification_events
+WHERE appointment_id = 2
+  AND 2 = (
+    SELECT notification_count
+    FROM (
+      SELECT COUNT(*) AS notification_count
+      FROM notification_events
+      WHERE appointment_id = 2
+    ) notification_guard
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM appointments
+    WHERE id = 2
+      AND clinic_id = 1
+      AND service_id = 5
+      AND status = 'canceled_by_clinic'
+      AND starts_at = '2026-09-19 14:00:00'
+      AND ends_at = '2026-09-19 16:00:00'
+      AND source = 'admin'
+  )
+  AND 2 = (
+    SELECT matched_targets
+    FROM (
+      SELECT COUNT(*) AS matched_targets
+      FROM services
+      WHERE clinic_id = 1
+        AND active = 0
+        AND (
+          (id = 1 AND BINARY name = BINARY 'Massage Session 1.5hr')
+          OR
+          (id = 5 AND BINARY name = BINARY 'Massage Session 2hr')
+        )
+    ) notification_service_guard
+  )
+  AND 1 = (
+    SELECT service_appointment_count
+    FROM (
+      SELECT COUNT(*) AS service_appointment_count
+      FROM appointments
+      WHERE service_id IN (1, 5)
+    ) notification_appointment_guard
+  )
+  AND NOT EXISTS (SELECT 1 FROM cancellation_adjustments WHERE appointment_id = 2)
+  AND NOT EXISTS (SELECT 1 FROM waitlist_offers WHERE appointment_id = 2)
+  AND NOT EXISTS (SELECT 1 FROM form_submissions WHERE appointment_id = 2)
+  AND NOT EXISTS (SELECT 1 FROM practitioner_client_notes WHERE appointment_id = 2)
+  AND NOT EXISTS (SELECT 1 FROM operational_tasks WHERE appointment_id = 2)
+  AND NOT EXISTS (SELECT 1 FROM invoices WHERE appointment_id = 2)
+  AND NOT EXISTS (SELECT 1 FROM recurring_series WHERE service_id IN (1, 5))
+  AND NOT EXISTS (SELECT 1 FROM waitlist_entries WHERE service_id IN (1, 5))
+  AND NOT EXISTS (SELECT 1 FROM form_assignments WHERE service_id IN (1, 5))
+  AND NOT EXISTS (SELECT 1 FROM invoice_line_items WHERE service_id IN (1, 5));
+
+SET @deleted_test_notifications = ROW_COUNT();
+
 -- Delete only the exact canceled test appointment supplied for this cleanup.
 -- The nested aggregate also guarantees it is the only appointment attached to
 -- either target service.
@@ -60,6 +118,7 @@ WHERE id = 2
   AND starts_at = '2026-09-19 14:00:00'
   AND ends_at = '2026-09-19 16:00:00'
   AND source = 'admin'
+  AND @deleted_test_notifications = 2
   AND 2 = (
     SELECT matched_targets
     FROM (
@@ -136,7 +195,9 @@ COMMIT;
 
 SELECT @deleted_accidental_appointment AS deleted_appointments;
 SELECT @deleted_accidental_services AS deleted_services;
--- Expected: deleted_appointments = 1 and deleted_services = 2.
+SELECT @deleted_test_notifications AS deleted_notifications;
+-- Expected: deleted_notifications = 2, deleted_appointments = 1 and
+-- deleted_services = 2.
 -- A result of 0 means a target changed or has retained references. Do not
 -- disable foreign keys or delete history to force removal.
 
