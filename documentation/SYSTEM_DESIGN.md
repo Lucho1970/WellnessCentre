@@ -1,6 +1,6 @@
 # Wellness Centre — System Design
 
-Version 1.3 · 20 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
+Version 1.4 · 20 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
 
 ### Customer onboarding implementation checkpoint
 
@@ -114,6 +114,18 @@ the public document root. Conversion events use an allowlist of non-sensitive ev
 and coarse page/flow context. Do not send search terms about health goals, identity,
 addresses, form answers, tokens, appointment details or free text to analytics providers.
 
+### 3.1 Theme and brand configuration
+
+Keep one maintained component system for every clinic and express customization through a versioned, schema-validated token document. Tokens cover semantic roles—not arbitrary selectors—including primary/secondary/accent, text/background/surface/status colours, approved font family/scale, spacing density, radius, shadows and asset references. Components consume semantic tokens through the shared MUI theme and CSS custom properties; clinic code, raw CSS, script and unrestricted HTML are never accepted. Public and portal surfaces may use controlled variants of the same brand identity but cannot diverge into separate frontend forks.
+
+Store draft and published theme revisions with clinic, schema version, author, timestamps and optional change note. Publishing is a privileged audited operation using optimistic revision checks. Validate colour syntax, contrast for normal/large text, focus visibility, status distinguishability, responsive layout bounds, supported font/assets and fallback behaviour before publish. Preview drafts through a protected preview context that cannot affect other users or be mistaken for the published site. Rollback republishes a prior validated revision as a new revision so history remains intact.
+
+Upload logos, marks, favicons and related brand assets through the existing protected media pipeline: allowlisted types, bounded dimensions/size, server-side decode/re-encode, metadata removal, malware/content checks where applicable, generated light/dark or responsive variants and immutable versioned asset URLs. Never fetch arbitrary remote fonts or assets at render time. Use locally hosted/licensed approved fonts or safe system stacks compatible with CSP and performance targets.
+
+Anonymous public bootstrap resolves the clinic from an exact configured host mapping, then returns only the published public business/theme projection with an ETag/version. The portal receives the same published projection plus authorized draft-management endpoints. Cache by clinic and version, never by an unvalidated `Host` value alone. Load a safe embedded default immediately and apply the validated theme without blocking authentication; API failure must retain a usable accessible interface rather than a blank page. Theme publication invalidates the relevant caches without requiring a new frontend build.
+
+Email and generated-document renderers use the same semantic brand projection but have channel-specific allowlists and fallbacks because email clients and print/PDF do not support the full web theme. Legal name, sender identity, accessibility text and required financial/clinical content cannot be hidden or recoloured into illegibility by branding.
+
 Dedicated callback behavior must match the chosen identity SDK; do not allow the general router to consume/rewrite authorization responses before processing. Test popup and redirect flows under real production-style headers. Public and portal deep-link refreshes need separate SPA fallbacks; `/api/*` must never fall back to frontend HTML.
 
 ## 4. Authentication and authorization design
@@ -187,7 +199,7 @@ Current host evidence reports MySQL **5.7.44**, not the MySQL 8+ aspiration in t
 
 | Domain | Existing foundation | Planned extensions / responsibility |
 | --- | --- | --- |
-| Organization/identity | `clinics`, `locations`, `users`, `roles`, `user_roles`, `staff_accounts`, `identity_links`, `user_profile_images` | Persona/issuer-aware linkage, claims/recovery, policy/session state; retain app-owned avatar storage |
+| Organization/identity | `clinics`, `locations`, `users`, `roles`, `user_roles`, `staff_accounts`, `identity_links`, `user_profile_images` | Persona/issuer-aware linkage, claims/recovery, policy/session state; versioned theme revisions and processed brand assets; retain app-owned avatar storage |
 | Practitioner operating model | Practitioner/profile/location/service foundations | Effective-dated operating agreement/configuration, scheduling/reception delegation, client/record stewardship, merchant/payee and compensation responsibility, coverage and departure workflow |
 | Related people | No complete relationship/proxy-access domain | Directed client/contact relationships, independently granted purpose permissions, verification/consent evidence, notification and revocation history; never shared credentials |
 | Catalogue | Practitioners, services/durations, practitioner/service assignments, rooms/capabilities, `service_locations`, taxes and `clinic_booking_settings` | Delegated editing, explicit policy versions/quotes, treatment add-ons; central branding and publication projection; optional retail catalogue kept separate |
@@ -367,7 +379,7 @@ Current focused local checks cover client validation/authorization, booking requ
 | Browser | Public discovery → portal auth → durable booking; staff/reception/practitioner/accountant paths; deep links, refresh/back/logout/account switch; error recovery and upgrades from old workers |
 | Care/privacy | Unrelated practitioner/client denial, directed family/caregiver permission and revocation, note/form/plan/outcome/address/file restrictions, consent versions, supervision/release rules, reviewed export expiry, audit contents and retention/legal-hold behavior |
 | Jobs/finance | Retries after crashes/timeouts, obsolete reminder suppression, delivery failure visibility, import frozen-revision/partial-batch recovery and reconciliation, invoice uniqueness/refund reconciliation, entitlement double-redemption prevention, gift-card/package liability reconciliation, claim submit/reverse idempotency and provider outage isolation |
-| Accessibility/operations | Keyboard/screen-reader/mobile/tablet checks, WCAG 2.2 AA review, measured load target, monitoring alerts and timed backup restore drill |
+| Accessibility/operations | Keyboard/screen-reader/mobile/tablet checks, WCAG 2.2 AA review across default and configurable theme tokens, invalid-theme rejection, brand-asset fallback/cache isolation, measured load target, monitoring alerts and timed backup restore drill |
 
 Stage gates follow R0–R9 in Master Requirements. Keep deployment acceptance separate from local tests. Do not enable real client booking before email/operational follow-up exists, or clinical records before protected storage/access and approved privacy policies exist. Run schema tests with synthetic fixtures only; never seed demonstration records into the live clinic.
 
