@@ -15,19 +15,21 @@ final class AdminService
     public function practitioners(AuthContext $actor): array
     {
         $this->superAdmin($actor);
-        $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,MIN(pl.location_id) AS location_id,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY u.display_name");
+        $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.given_name,u.family_name,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,MIN(pl.location_id) AS location_id,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.given_name,u.family_name,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY u.display_name");
         $statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
     }
 
     public function onboardPractitioner(AuthContext $actor,array $body,string $correlationId): array
     {
-        $this->superAdmin($actor);$this->required($body,['tenant_id','object_id','email','display_name','location_id','discipline']);$this->ownedLocation($actor,(int)$body['location_id']);
-        $tenantId=strtolower(trim((string)$body['tenant_id']));$objectId=strtolower(trim((string)$body['object_id']));$email=strtolower(trim((string)$body['email']));$displayName=trim((string)$body['display_name']);$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)($body['booking_mode']??'practitioner_managed');
+        $this->superAdmin($actor);$this->required($body,['tenant_id','object_id','email','given_name','family_name','display_name','location_id','discipline']);$this->ownedLocation($actor,(int)$body['location_id']);
+        $tenantId=strtolower(trim((string)$body['tenant_id']));$objectId=strtolower(trim((string)$body['object_id']));$email=strtolower(trim((string)$body['email']));$givenName=trim((string)$body['given_name']);$familyName=trim((string)$body['family_name']);$displayName=trim((string)$body['display_name']);$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)($body['booking_mode']??'practitioner_managed');
         $uuid='/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
         if(!preg_match($uuid,$tenantId))throw new ApiException(422,'validation_error','Enter a valid Entra tenant ID.',['tenant_id'=>'Invalid UUID']);
         if(!preg_match($uuid,$objectId))throw new ApiException(422,'validation_error','Enter a valid Entra Object ID.',['object_id'=>'Invalid UUID']);
         if(filter_var($email,FILTER_VALIDATE_EMAIL)===false||strlen($email)>190)throw new ApiException(422,'validation_error','Enter a valid email address.',['email'=>'Invalid email']);
-        if(strlen($displayName)>150)throw new ApiException(422,'validation_error','The display name is too long.',['display_name'=>'Maximum 150 characters']);
+        if($givenName===''||strlen($givenName)>100)throw new ApiException(422,'validation_error','Enter a valid first name.',['given_name'=>'Required; maximum 100 characters']);
+        if($familyName===''||strlen($familyName)>100)throw new ApiException(422,'validation_error','Enter a valid last name.',['family_name'=>'Required; maximum 100 characters']);
+        if($displayName===''||strlen($displayName)>150)throw new ApiException(422,'validation_error','Enter a valid display name.',['display_name'=>'Required; maximum 150 characters']);
         if(strlen($discipline)>100)throw new ApiException(422,'validation_error','The discipline is too long.',['discipline'=>'Maximum 100 characters']);
         if($credentials!==null&&strlen($credentials)>500)throw new ApiException(422,'validation_error','The credentials are too long.',['credentials'=>'Maximum 500 characters']);
         if(!in_array($bookingMode,['practitioner_managed','clinic_managed'],true))throw new ApiException(422,'validation_error','Invalid booking mode.',['booking_mode'=>'Invalid booking mode']);
@@ -35,7 +37,7 @@ final class AdminService
         $existing=$pdo->prepare("SELECT 1 FROM identity_links WHERE provider='microsoft' AND tenant_id=:tenant AND provider_subject=:subject");$existing->execute(['tenant'=>$tenantId,'subject'=>$objectId]);if($existing->fetchColumn())throw new ApiException(409,'identity_already_linked','This Entra identity is already linked to a local user.');
         $existing=$pdo->prepare('SELECT 1 FROM users WHERE clinic_id=:clinic AND email=:email');$existing->execute(['clinic'=>$actor->clinicId,'email'=>$email]);if($existing->fetchColumn())throw new ApiException(409,'email_already_exists','A user with this email already exists in the clinic.');
         try{$pdo->beginTransaction();
-            $statement=$pdo->prepare("INSERT INTO users(clinic_id,email,display_name,user_type,status) VALUES(:clinic,:email,:name,'staff','active')");$statement->execute(['clinic'=>$actor->clinicId,'email'=>$email,'name'=>$displayName]);$userId=(int)$pdo->lastInsertId();
+            $statement=$pdo->prepare("INSERT INTO users(clinic_id,email,given_name,family_name,display_name,user_type,status) VALUES(:clinic,:email,:given,:family,:name,'staff','active')");$statement->execute(['clinic'=>$actor->clinicId,'email'=>$email,'given'=>$givenName,'family'=>$familyName,'name'=>$displayName]);$userId=(int)$pdo->lastInsertId();
             $statement=$pdo->prepare("INSERT INTO identity_links(user_id,provider,tenant_id,provider_subject,email_at_link_time) VALUES(:user,'microsoft',:tenant,:subject,:email)");$statement->execute(['user'=>$userId,'tenant'=>$tenantId,'subject'=>$objectId,'email'=>$email]);
             $statement=$pdo->prepare("INSERT INTO user_roles(user_id,role_id,location_id,assigned_by) SELECT :user,id,:location,:actor FROM roles WHERE code='practitioner'");$statement->execute(['user'=>$userId,'location'=>(int)$body['location_id'],'actor'=>$actor->userId]);if($statement->rowCount()!==1)throw new ApiException(500,'role_not_configured','The practitioner role is not configured.');
             $statement=$pdo->prepare('INSERT INTO staff_accounts(user_id,mfa_required) VALUES(:user,1)');$statement->execute(['user'=>$userId]);
@@ -47,8 +49,10 @@ final class AdminService
 
     public function updatePractitioner(AuthContext $actor,int $practitionerId,array $body,string $correlationId): array
     {
-        $this->superAdmin($actor);$this->required($body,['display_name','email','location_id','discipline','booking_mode','status']);$this->ownedLocation($actor,(int)$body['location_id']);
-        $displayName=trim((string)$body['display_name']);$email=strtolower(trim((string)$body['email']));$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)$body['booking_mode'];$status=(string)$body['status'];$active=(bool)($body['active']??true);
+        $this->superAdmin($actor);$this->required($body,['given_name','family_name','display_name','email','location_id','discipline','booking_mode','status']);$this->ownedLocation($actor,(int)$body['location_id']);
+        $givenName=trim((string)$body['given_name']);$familyName=trim((string)$body['family_name']);$displayName=trim((string)$body['display_name']);$email=strtolower(trim((string)$body['email']));$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)$body['booking_mode'];$status=(string)$body['status'];$active=(bool)($body['active']??true);
+        if($givenName===''||strlen($givenName)>100)throw new ApiException(422,'validation_error','Enter a valid first name.',['given_name'=>'Required; maximum 100 characters']);
+        if($familyName===''||strlen($familyName)>100)throw new ApiException(422,'validation_error','Enter a valid last name.',['family_name'=>'Required; maximum 100 characters']);
         if($displayName===''||strlen($displayName)>150)throw new ApiException(422,'validation_error','Enter a valid display name.',['display_name'=>'Required; maximum 150 characters']);
         if(filter_var($email,FILTER_VALIDATE_EMAIL)===false||strlen($email)>190)throw new ApiException(422,'validation_error','Enter a valid email address.',['email'=>'Invalid email']);
         if($discipline===''||strlen($discipline)>100)throw new ApiException(422,'validation_error','Enter a valid discipline.',['discipline'=>'Required; maximum 100 characters']);
@@ -59,7 +63,7 @@ final class AdminService
         try{$pdo->beginTransaction();
             $find=$pdo->prepare('SELECT p.user_id FROM practitioners p JOIN users u ON u.id=p.user_id WHERE p.id=:practitioner AND u.clinic_id=:clinic FOR UPDATE');$find->execute(['practitioner'=>$practitionerId,'clinic'=>$actor->clinicId]);$userId=$find->fetchColumn();if(!$userId)throw new ApiException(404,'practitioner_not_found','Practitioner not found.');
             $duplicate=$pdo->prepare('SELECT 1 FROM users WHERE clinic_id=:clinic AND email=:email AND id<>:user');$duplicate->execute(['clinic'=>$actor->clinicId,'email'=>$email,'user'=>(int)$userId]);if($duplicate->fetchColumn())throw new ApiException(409,'email_already_exists','A user with this email already exists in the clinic.');
-            $statement=$pdo->prepare('UPDATE users SET display_name=:name,email=:email,status=:status WHERE id=:user');$statement->execute(['name'=>$displayName,'email'=>$email,'status'=>$status,'user'=>(int)$userId]);
+            $statement=$pdo->prepare('UPDATE users SET given_name=:given,family_name=:family,display_name=:name,email=:email,status=:status WHERE id=:user');$statement->execute(['given'=>$givenName,'family'=>$familyName,'name'=>$displayName,'email'=>$email,'status'=>$status,'user'=>(int)$userId]);
             $statement=$pdo->prepare('UPDATE practitioners SET discipline=:discipline,credentials=:credentials,booking_mode=:mode,active=:active WHERE id=:practitioner');$statement->execute(['discipline'=>$discipline,'credentials'=>$credentials,'mode'=>$bookingMode,'active'=>$active?1:0,'practitioner'=>$practitionerId]);
             $statement=$pdo->prepare('UPDATE practitioner_locations SET active=0 WHERE practitioner_id=:practitioner');$statement->execute(['practitioner'=>$practitionerId]);
             $statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id,active) VALUES(:practitioner,:location,1) ON DUPLICATE KEY UPDATE active=1');$statement->execute(['practitioner'=>$practitionerId,'location'=>(int)$body['location_id']]);
@@ -162,8 +166,8 @@ final class AdminService
     {
         $this->superAdmin($actor);
         $statement = $this->database->connection()->prepare(
-            "SELECT u.id AS user_id,u.display_name,u.status,p.id AS practitioner_id,
-                    t.slug,t.section,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,t.published,t.show_booking_action,
+            "SELECT u.id AS user_id,u.given_name,u.family_name,u.display_name,u.status,p.id AS practitioner_id,
+                    t.slug,t.section,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,t.published,t.show_booking_action,
                     CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image
                FROM users u
                JOIN staff_accounts a ON a.user_id=u.id
@@ -180,9 +184,11 @@ final class AdminService
     public function updateTeamProfile(AuthContext $actor, int $userId, array $body, string $correlationId): array
     {
         $this->superAdmin($actor);
-        $this->required($body, ['slug','section','public_title']);
+        $this->required($body, ['slug','section','public_name','public_title']);
         $slug = strtolower(trim((string)$body['slug']));
         $section = (string)$body['section'];
+        $publicName = trim((string)$body['public_name']);
+        $bookingName = $this->optional($body, 'booking_name');
         $title = trim((string)$body['public_title']);
         $titleFr = $this->optional($body, 'public_title_fr');
         $summary = $this->optional($body, 'summary');
@@ -192,6 +198,8 @@ final class AdminService
         $showBooking = (bool)($body['show_booking_action'] ?? false);
         if (preg_match('/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/', $slug) !== 1) throw new ApiException(422,'validation_error','Use a lowercase URL name containing letters, numbers, and hyphens.',['slug'=>'Invalid URL name']);
         if (!in_array($section,['practitioner','administration'],true)) throw new ApiException(422,'validation_error','Choose a valid team section.',['section'=>'Invalid section']);
+        if ($publicName==='' || strlen($publicName)>150) throw new ApiException(422,'validation_error','Enter a valid public name.',['public_name'=>'Required; maximum 150 characters']);
+        if ($section==='practitioner' && ($bookingName===null || strlen($bookingName)>100)) throw new ApiException(422,'validation_error','Enter a valid booking name.',['booking_name'=>'Required for practitioners; maximum 100 characters']);
         if ($title==='' || strlen($title)>150 || ($titleFr!==null && strlen($titleFr)>150)) throw new ApiException(422,'validation_error','Team titles may contain up to 150 characters.',['public_title'=>'Required; maximum 150 characters']);
         if (($summary!==null && strlen($summary)>1000) || ($summaryFr!==null && strlen($summaryFr)>1000)) throw new ApiException(422,'validation_error','Team summaries may contain up to 1000 characters.',['summary'=>'Maximum 1000 characters']);
         if ($order<0 || $order>65535) throw new ApiException(422,'validation_error','Display order must be between 0 and 65535.',['display_order'=>'Invalid display order']);
@@ -202,11 +210,11 @@ final class AdminService
         if (!$staff) throw new ApiException(404,'staff_not_found','Staff member not found.');
         if ($section==='practitioner' && !$staff['practitioner_id']) throw new ApiException(422,'validation_error','Only an active practitioner can appear in the practitioner section.',['section'=>'Active practitioner required']);
         if ($showBooking && ($section!=='practitioner' || !$staff['practitioner_id'])) throw new ApiException(422,'validation_error','Booking can only be shown for an active practitioner.',['show_booking_action'=>'Active practitioner required']);
-        $statement = $pdo->prepare("INSERT INTO public_team_profiles(user_id,clinic_id,slug,section,public_title,public_title_fr,summary,summary_fr,display_order,published,show_booking_action,updated_by)
-            VALUES(:user,:clinic,:slug,:section,:title,:title_fr,:summary,:summary_fr,:display_order,:published,:booking,:actor)
-            ON DUPLICATE KEY UPDATE slug=VALUES(slug),section=VALUES(section),public_title=VALUES(public_title),public_title_fr=VALUES(public_title_fr),summary=VALUES(summary),summary_fr=VALUES(summary_fr),display_order=VALUES(display_order),published=VALUES(published),show_booking_action=VALUES(show_booking_action),updated_by=VALUES(updated_by)");
+        $statement = $pdo->prepare("INSERT INTO public_team_profiles(user_id,clinic_id,slug,section,public_name,booking_name,public_title,public_title_fr,summary,summary_fr,display_order,published,show_booking_action,updated_by)
+            VALUES(:user,:clinic,:slug,:section,:public_name,:booking_name,:title,:title_fr,:summary,:summary_fr,:display_order,:published,:booking,:actor)
+            ON DUPLICATE KEY UPDATE slug=VALUES(slug),section=VALUES(section),public_name=VALUES(public_name),booking_name=VALUES(booking_name),public_title=VALUES(public_title),public_title_fr=VALUES(public_title_fr),summary=VALUES(summary),summary_fr=VALUES(summary_fr),display_order=VALUES(display_order),published=VALUES(published),show_booking_action=VALUES(show_booking_action),updated_by=VALUES(updated_by)");
         try {
-            $statement->execute(['user'=>$userId,'clinic'=>$actor->clinicId,'slug'=>$slug,'section'=>$section,'title'=>$title,'title_fr'=>$titleFr,'summary'=>$summary,'summary_fr'=>$summaryFr,'display_order'=>$order,'published'=>$published?1:0,'booking'=>$showBooking?1:0,'actor'=>$actor->userId]);
+            $statement->execute(['user'=>$userId,'clinic'=>$actor->clinicId,'slug'=>$slug,'section'=>$section,'public_name'=>$publicName,'booking_name'=>$bookingName,'title'=>$title,'title_fr'=>$titleFr,'summary'=>$summary,'summary_fr'=>$summaryFr,'display_order'=>$order,'published'=>$published?1:0,'booking'=>$showBooking?1:0,'actor'=>$actor->userId]);
         } catch (\PDOException $e) {
             if ((string)$e->getCode()==='23000') throw new ApiException(409,'slug_already_exists','That public profile URL is already in use.',['slug'=>'Already in use']);
             throw $e;

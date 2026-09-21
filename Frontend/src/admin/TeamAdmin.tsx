@@ -7,10 +7,10 @@ import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
-type Profile = { user_id: number; display_name: string; status: string; practitioner_id: number | null; slug: string | null; section: 'practitioner'|'administration'|null; public_title: string | null; public_title_fr: string | null; summary: string | null; summary_fr: string | null; display_order: number | null; published: number|boolean|null; show_booking_action: number|boolean|null; has_image: number|boolean };
-type Form = { slug: string; section: 'practitioner'|'administration'; public_title: string; public_title_fr: string; summary: string; summary_fr: string; display_order: number; published: boolean; show_booking_action: boolean };
+type Profile = { user_id: number; given_name: string | null; family_name: string | null; display_name: string; status: string; practitioner_id: number | null; slug: string | null; section: 'practitioner'|'administration'|null; public_name: string | null; booking_name: string | null; public_title: string | null; public_title_fr: string | null; summary: string | null; summary_fr: string | null; display_order: number | null; published: number|boolean|null; show_booking_action: number|boolean|null; has_image: number|boolean };
+type Form = { slug: string; section: 'practitioner'|'administration'; public_name: string; booking_name: string; public_title: string; public_title_fr: string; summary: string; summary_fr: string; display_order: number; published: boolean; show_booking_action: boolean };
 const slug = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
-const formFor = (item: Profile): Form => ({ slug:item.slug??slug(item.display_name), section:item.section??(item.practitioner_id?'practitioner':'administration'), public_title:item.public_title??'', public_title_fr:item.public_title_fr??'', summary:item.summary??'', summary_fr:item.summary_fr??'', display_order:Number(item.display_order??100), published:Boolean(Number(item.published)), show_booking_action:item.practitioner_id?Boolean(Number(item.show_booking_action)):false });
+const formFor = (item: Profile): Form => ({ slug:item.slug??slug(item.display_name), section:item.section??(item.practitioner_id?'practitioner':'administration'), public_name:item.public_name??item.display_name, booking_name:item.booking_name??item.given_name??item.display_name.trim().split(/\s+/)[0]??'', public_title:item.public_title??'', public_title_fr:item.public_title_fr??'', summary:item.summary??'', summary_fr:item.summary_fr??'', display_order:Number(item.display_order??100), published:Boolean(Number(item.published)), show_booking_action:item.practitioner_id?Boolean(Number(item.show_booking_action)):false });
 
 export function TeamAdmin() {
   const { t } = useTranslation();
@@ -24,6 +24,7 @@ export function TeamAdmin() {
   const set=<K extends keyof Form>(key:K,value:Form[K])=>setForm(current=>current?{...current,[key]:value}:null);
   const save=async()=>{if(!form||!selectedId)return;setError('');setSaved('');try{const token=await getAccessToken();const response=await fetch(`${api}/admin/team-profiles/${selectedId}`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(form)});const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to save team profile.')));await load(selectedId);setSaved(t('Public team profile saved.'));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to save team profile.'));}};
   const selected=items.find(item=>item.user_id===selectedId);
+  const duplicateBookingName=form?.section==='practitioner'&&form.published&&form.booking_name.trim()&&items.some(item=>item.user_id!==selectedId&&item.section==='practitioner'&&Boolean(Number(item.published))&&(item.booking_name??'').trim().toLocaleLowerCase()===form.booking_name.trim().toLocaleLowerCase());
   return <Stack spacing={3}>
     <Alert severity="info">{t('Only profiles you publish here appear on the public Contact page. Staff email and account details are never published.')}</Alert>
     {error&&<Alert severity="error">{error}</Alert>}{saved&&<Alert severity="success">{saved}</Alert>}
@@ -32,6 +33,9 @@ export function TeamAdmin() {
       {form&&selected&&<Paper variant="outlined" sx={{p:3,flex:1,width:'100%'}}><Stack spacing={2}>
         <Typography variant="h5">{selected.display_name}</Typography>
         <Typography variant="body2" color="text.secondary">{selected.has_image?t('Profile image is ready to publish.'):t('No profile image has been uploaded. Initials will be shown.')}</Typography>
+        <TextField required label={t('Public full name')} value={form.public_name} helperText={t('Shown on public team and service pages.')} inputProps={{maxLength:150}} onChange={event=>set('public_name',event.target.value)}/>
+        {form.section==='practitioner'&&<TextField required label={t('Booking name')} value={form.booking_name} helperText={t('Used in friendly actions such as “Book with Esther”.')} inputProps={{maxLength:100}} onChange={event=>set('booking_name',event.target.value)}/>}
+        {duplicateBookingName&&<Alert severity="warning">{t('Another published practitioner uses this booking name. Add a surname initial or another familiar identifier.')}</Alert>}
         <TextField required label={t('Public URL name')} value={form.slug} helperText={t('Lowercase letters, numbers, and hyphens only.')} onChange={event=>set('slug',event.target.value.toLowerCase())}/>
         <TextField select label={t('Team section')} value={form.section} onChange={event=>{const value=event.target.value as Form['section'];setForm(current=>current?{...current,section:value,show_booking_action:value==='practitioner'?current.show_booking_action:false}:null);}}><MenuItem value="practitioner" disabled={!selected.practitioner_id}>{t('Practitioners')}</MenuItem><MenuItem value="administration">{t('Administration')}</MenuItem></TextField>
         <TextField required label={t('Title (English)')} value={form.public_title} inputProps={{maxLength:150}} onChange={event=>set('public_title',event.target.value)}/>
@@ -41,7 +45,7 @@ export function TeamAdmin() {
         <TextField type="number" label={t('Display order')} value={form.display_order} inputProps={{min:0,max:65535}} onChange={event=>set('display_order',Number(event.target.value))}/>
         {form.section==='practitioner'&&<FormControlLabel control={<Checkbox checked={form.show_booking_action} onChange={event=>set('show_booking_action',event.target.checked)}/>} label={t('Show Book a session action')}/>}
         <FormControlLabel control={<Checkbox checked={form.published} onChange={event=>set('published',event.target.checked)}/>} label={t('Publish on the Contact page')}/>
-        <Button variant="contained" startIcon={<Save size={18}/>} disabled={!form.public_title.trim()||!form.slug.trim()} onClick={save}>{t('Save team profile')}</Button>
+        <Button variant="contained" startIcon={<Save size={18}/>} disabled={!form.public_name.trim()||!form.public_title.trim()||!form.slug.trim()||(form.section==='practitioner'&&!form.booking_name.trim())} onClick={save}>{t('Save team profile')}</Button>
       </Stack></Paper>}
     </Stack>
   </Stack>;

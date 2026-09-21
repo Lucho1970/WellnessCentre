@@ -1,6 +1,19 @@
 # Public team profiles
 
-The Contact page includes an **Our Team** directory. Practitioners are shown before administration. Each card directly presents the approved profile image (or initials), display name, public title, practitioner credentials/discipline and public summary. An active practitioner can expose a **Book a session** action that carries their public practitioner ID into availability browsing. Pop-up person cards are reserved for future compact contexts, such as hovering or focusing a practitioner's name in an appointment view.
+The Contact page includes an **Our Team** directory. Practitioners are shown before administration. Each card directly presents the approved profile image (or initials), public full name, public title, practitioner credentials/discipline and public summary. An active practitioner can expose a friendly **Book with _name_** action that carries their public practitioner ID into availability browsing. Pop-up person cards are reserved for future compact contexts, such as hovering or focusing a practitioner's name in an appointment view.
+
+## Names
+
+Practitioner identity and presentation names are intentionally separate:
+
+- `users.given_name` and `users.family_name` store the structured personal name.
+- `users.display_name` is the internal staff/administration display name.
+- `public_team_profiles.public_name` is the full name approved for public cards and service pages.
+- `public_team_profiles.booking_name` is the familiar name used in calls to action, such as **Book with Esther**. It may be a nickname or include a surname initial when two published practitioners use the same given name.
+
+The administration screen warns about duplicate published booking names but allows the clinic to choose the most recognizable disambiguation. Public APIs expose only the approved public and booking names, not the internal display name.
+
+Migration `010_practitioner_public_names.sql` adds the public-name fields and preserves each existing profile's visible name. Existing practitioners with missing structured names are given a best-effort first/last suggestion in the edit form and should be reviewed the next time their account is edited.
 
 ## Privacy and publication
 

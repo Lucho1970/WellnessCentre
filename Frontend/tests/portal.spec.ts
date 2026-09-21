@@ -318,7 +318,7 @@ test("locations and rooms use list-first actions with ID-safe create and edit pa
 test("practitioners use list-first details, edit, and identity-linking panels", async ({ page }) => {
   await fixtures(page, ["super_admin"]);
   const practitioners = [
-    { practitioner_id: "8", user_id: "18", display_name: "Esther Vanderpoel", email: "esther@example.test", status: "active", discipline: "Registered Massage Therapy", credentials: "RMT", booking_mode: "practitioner_managed", active: "1", location_id: "1", locations: "Holland Landing" },
+    { practitioner_id: "8", user_id: "18", given_name: "Esther", family_name: "Vanderpoel", display_name: "Esther Vanderpoel", email: "esther@example.test", status: "active", discipline: "Registered Massage Therapy", credentials: "RMT", booking_mode: "practitioner_managed", active: "1", location_id: "1", locations: "Holland Landing" },
   ];
   let updated: Record<string, unknown> | undefined;
   let created: Record<string, unknown> | undefined;
@@ -351,13 +351,15 @@ test("practitioners use list-first details, edit, and identity-linking panels", 
   expect(updated).toMatchObject({ practitioner_id: 8, location_id: 1, credentials: "RMT, BSc" });
 
   await page.getByRole("button", { name: "New practitioner", exact: true }).click();
-  await page.getByRole("textbox", { name: "Display name", exact: true }).fill("New Therapist");
+  await page.getByRole("textbox", { name: "First name", exact: true }).fill("New");
+  await page.getByRole("textbox", { name: "Last name", exact: true }).fill("Therapist");
+  await page.getByRole("textbox", { name: "Internal display name", exact: true }).fill("New Therapist");
   await page.getByRole("textbox", { name: "Microsoft sign-in email" }).fill("new@example.test");
   await page.getByRole("textbox", { name: "Entra Object ID" }).fill("11111111-1111-4111-8111-111111111111");
   await page.getByRole("textbox", { name: "Entra Tenant ID" }).fill("22222222-2222-4222-8222-222222222222");
   await page.getByRole("button", { name: "Add practitioner", exact: true }).click();
   await expect(page.getByText("New Therapist was added as a practitioner.")).toBeVisible();
-  expect(created).toMatchObject({ location_id: 1, display_name: "New Therapist", object_id: "11111111-1111-4111-8111-111111111111" });
+  expect(created).toMatchObject({ location_id: 1, given_name: "New", family_name: "Therapist", display_name: "New Therapist", object_id: "11111111-1111-4111-8111-111111111111" });
 });
 
 test("staff client creation saves a reusable service address with manual fallback", async ({
@@ -897,8 +899,8 @@ test("public Markdown pages follow the selected language and publish safe metada
 test("contact page lists published practitioners first and carries a team booking choice", async ({ page }) => {
   await fixtures(page);
   await page.route("**/api/v1/team", route => route.fulfill({ json: { data: [
-    { slug: "test-practitioner", section: "practitioner", display_name: "Test Practitioner", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", discipline: "Massage therapy", credentials: "RMT", display_order: 1, has_image: 0, image_version: null, practitioner_id: 3 },
-    { slug: "test-admin", section: "administration", display_name: "Test Administrator", public_title: "Clinic Administrator", public_title_fr: "Administration de la clinique", summary: "Supports clinic operations.", summary_fr: "Soutient les activités de la clinique.", discipline: null, credentials: null, display_order: 1, has_image: 0, image_version: null, practitioner_id: null },
+    { slug: "test-practitioner", section: "practitioner", public_name: "Test Practitioner", booking_name: "Test", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", discipline: "Massage therapy", credentials: "RMT", display_order: 1, has_image: 0, image_version: null, practitioner_id: 3 },
+    { slug: "test-admin", section: "administration", public_name: "Test Administrator", booking_name: null, public_title: "Clinic Administrator", public_title_fr: "Administration de la clinique", summary: "Supports clinic operations.", summary_fr: "Soutient les activités de la clinique.", discipline: null, credentials: null, display_order: 1, has_image: 0, image_version: null, practitioner_id: null },
   ] } }));
   await page.goto(`${publicHost}/contact`);
   const practitionerHeading = page.getByRole('heading', { name: "Practitioners", level: 3 });
@@ -911,7 +913,7 @@ test("contact page lists published practitioners first and carries a team bookin
   await expect(page.getByText("RMT · Massage therapy")).toBeVisible();
   await expect(page.getByText("Supports clinic operations.")).toBeVisible();
   await expect(page.getByRole('dialog', { name: "Profile for Test Practitioner" })).toHaveCount(0);
-  await page.getByRole('link', { name: "Book a session" }).click();
+  await page.getByRole('link', { name: "Book with Test Practitioner" }).click();
   await expect(page).toHaveURL(`${publicHost}/book?practitioner_id=3`);
   await expect(page.getByRole('combobox', { name: "Practitioner" })).toContainText("Test Practitioner");
 });
@@ -920,7 +922,7 @@ test("published service catalogue filters categories and carries service and pra
   await fixtures(page);
   const massage = { slug: "massage-therapy", name: "Massage Therapy", name_fr: "Massothérapie", category: "Massage", public_summary: "Treatment tailored to your goals.", public_summary_fr: "Un traitement adapté à vos objectifs.", description: "A detailed treatment description.", description_fr: "Une description détaillée du traitement.", preparation_instructions: "Wear comfortable clothing.", preparation_instructions_fr: "Portez des vêtements confortables.", offers_clinic: false, offers_mobile: true, durations: [{ minutes: 60, price_cents: 10000 }] };
   await page.route("**/api/v1/public/services", route => route.fulfill({ json: { data: [massage, { ...massage, slug: "nutrition", name: "Nutrition", category: "Nutrition" }] } }));
-  await page.route("**/api/v1/public/services/massage-therapy", route => route.fulfill({ json: { data: { ...massage, practitioners: [{ slug: "test-practitioner", display_name: "Test Practitioner", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", booking_practitioner_id: 3 }], locations: [{ name: "Holland Landing", city: "Holland Landing", province: "Ontario" }] } } }));
+  await page.route("**/api/v1/public/services/massage-therapy", route => route.fulfill({ json: { data: { ...massage, practitioners: [{ slug: "test-practitioner", public_name: "Test Practitioner", booking_name: "Test", public_title: "Registered Massage Therapist", public_title_fr: "Massothérapeute agréée", summary: "Mobile therapeutic massage.", summary_fr: "Massothérapie thérapeutique mobile.", booking_practitioner_id: 3 }], locations: [{ name: "Holland Landing", city: "Holland Landing", province: "Ontario" }] } } }));
   await page.route("**/api/v1/services**", route => route.fulfill({ json: { data: [
     { id: 9, slug: "nutrition", name: "Nutrition", description: "Nutrition", price_cents: 8000, durations: [{ id: 8, minutes: 60, price_cents: 8000 }] },
     { id: 2, slug: "massage-therapy", name: "Massage Therapy", description: "Therapeutic care", price_cents: 10000, durations: [{ id: 4, minutes: 60, price_cents: 10000 }] },
@@ -944,7 +946,7 @@ test("super admin deliberately publishes a bilingual public team profile", async
   await fixtures(page, ["super_admin"]);
   let saved: Record<string, unknown> | null = null;
   await page.route("**/api/v1/admin/team-profiles", route => route.fulfill({ json: { data: [
-    { user_id: 7, display_name: "Esther Vanderpoel", status: "active", practitioner_id: 3, slug: null, section: null, public_title: null, public_title_fr: null, summary: null, summary_fr: null, display_order: null, published: null, show_booking_action: null, has_image: 1 },
+    { user_id: 7, given_name: "Esther", family_name: "Vanderpoel", display_name: "Esther Vanderpoel", status: "active", practitioner_id: 3, slug: null, section: null, public_name: null, booking_name: null, public_title: null, public_title_fr: null, summary: null, summary_fr: null, display_order: null, published: null, show_booking_action: null, has_image: 1 },
   ] } }));
   await page.route("**/api/v1/admin/team-profiles/7", async route => {
     saved = route.request().postDataJSON();
@@ -957,7 +959,7 @@ test("super admin deliberately publishes a bilingual public team profile", async
   await page.getByLabel("Show Book a session action").check();
   await page.getByLabel("Publish on the Contact page").check();
   await page.getByRole('button', { name: "Save team profile" }).click();
-  await expect.poll(() => saved).toMatchObject({ slug: "esther-vanderpoel", section: "practitioner", published: true, show_booking_action: true });
+  await expect.poll(() => saved).toMatchObject({ slug: "esther-vanderpoel", section: "practitioner", public_name: "Esther Vanderpoel", booking_name: "Esther", published: true, show_booking_action: true });
 });
 
 test("public booking hands off preferences without reserving or creating an appointment", async ({

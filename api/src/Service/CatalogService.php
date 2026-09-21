@@ -59,13 +59,13 @@ final class CatalogService
         $services=array_values(array_filter($this->publicServices(),static fn(array $service):bool=>$service['slug']===$slug));
         if($services===[])throw new ApiException(404,'service_not_found','Published service not found.');
         $service=$services[0];
-        $practitioners=$this->database->connection()->prepare("SELECT t.slug,u.display_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,p.id booking_practitioner_id
+        $practitioners=$this->database->connection()->prepare("SELECT t.slug,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,p.id booking_practitioner_id
               FROM services s JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1
               JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1 JOIN users u ON u.id=p.user_id AND u.status='active'
               JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=s.clinic_id AND t.published=1 AND t.section='practitioner'
              WHERE s.slug=:slug AND s.active=1 AND s.published=1
                AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
-          ORDER BY t.display_order,u.display_name");
+          ORDER BY t.display_order,t.public_name");
         $practitioners->execute(['slug'=>$slug]);$service['practitioners']=$practitioners->fetchAll();
         $locations=$this->database->connection()->prepare("SELECT l.name,l.city,l.province FROM services s JOIN service_locations sl ON sl.service_id=s.id AND sl.active=1 JOIN locations l ON l.id=sl.location_id AND l.is_bookable=1 WHERE s.slug=:slug AND s.active=1 AND s.published=1 AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1) ORDER BY l.name");
         $locations->execute(['slug'=>$slug]);$service['locations']=$locations->fetchAll();
@@ -74,7 +74,7 @@ final class CatalogService
 
     public function practitioners(?int $serviceId = null): array
     {
-        $sql = "SELECT p.id,u.display_name,p.discipline,p.biography,p.credentials FROM practitioners p JOIN users u ON u.id=p.user_id";
+        $sql = "SELECT p.id,COALESCE(t.public_name,u.display_name) display_name,p.discipline,p.biography,p.credentials FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN public_team_profiles t ON t.user_id=u.id";
         $params=[];
         if($serviceId){$sql.=' JOIN practitioner_services ps ON ps.practitioner_id=p.id WHERE p.active=1 AND ps.active=1 AND ps.service_id=:service';$params['service']=$serviceId;}else{$sql.=' WHERE p.active=1';}
         $sql.=' ORDER BY u.display_name'; $statement=$this->database->connection()->prepare($sql);$statement->execute($params);return $statement->fetchAll();
@@ -82,7 +82,7 @@ final class CatalogService
 
     public function team(): array
     {
-        $sql = "SELECT t.slug,t.section,u.display_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,p.discipline,p.credentials,
+        $sql = "SELECT t.slug,t.section,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,p.discipline,p.credentials,
                        CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image,
                        i.content_hash image_version,
                        CASE WHEN t.section='practitioner' AND t.show_booking_action=1 AND p.active=1 THEN p.id ELSE NULL END practitioner_id
@@ -93,7 +93,7 @@ final class CatalogService
                  WHERE t.published=1
                    AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
                    AND (t.section<>'practitioner' OR p.active=1)
-              ORDER BY CASE t.section WHEN 'practitioner' THEN 0 ELSE 1 END,t.display_order,u.display_name";
+              ORDER BY CASE t.section WHEN 'practitioner' THEN 0 ELSE 1 END,t.display_order,t.public_name";
         return $this->database->connection()->query($sql)->fetchAll();
     }
 

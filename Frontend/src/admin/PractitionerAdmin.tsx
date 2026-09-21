@@ -9,12 +9,13 @@ import { useUnsavedForm } from '../shared/UnsavedChanges';
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const tenantId = import.meta.env.VITE_ENTRA_TENANT_ID ?? '';
 type Location = { id: number; name: string };
-type Practitioner = { practitioner_id: number; user_id: number; display_name: string; email: string; status: string; discipline: string; credentials: string | null; booking_mode: string; active: number | boolean; location_id: number | null; locations: string | null };
-type NewForm = { tenant_id: string; object_id: string; email: string; display_name: string; location_id: string; discipline: string; credentials: string; booking_mode: string };
-type EditForm = { practitioner_id: number; email: string; display_name: string; location_id: string; discipline: string; credentials: string; booking_mode: string; status: string; active: boolean };
+type Practitioner = { practitioner_id: number; user_id: number; given_name: string | null; family_name: string | null; display_name: string; email: string; status: string; discipline: string; credentials: string | null; booking_mode: string; active: number | boolean; location_id: number | null; locations: string | null };
+type NewForm = { tenant_id: string; object_id: string; email: string; given_name: string; family_name: string; display_name: string; location_id: string; discipline: string; credentials: string; booking_mode: string };
+type EditForm = { practitioner_id: number; email: string; given_name: string; family_name: string; display_name: string; location_id: string; discipline: string; credentials: string; booking_mode: string; status: string; active: boolean };
 type PanelMode = 'details' | 'new' | 'edit' | null;
-const newForm = (locationId = ''): NewForm => ({ tenant_id: tenantId, object_id: '', email: '', display_name: '', location_id: locationId, discipline: 'Massage Therapy', credentials: '', booking_mode: 'practitioner_managed' });
-const editForm = (item: Practitioner, fallbackLocation = ''): EditForm => ({ practitioner_id: item.practitioner_id, display_name: item.display_name, email: item.email, location_id: String(item.location_id ?? fallbackLocation), discipline: item.discipline, credentials: item.credentials ?? '', booking_mode: item.booking_mode, status: item.status, active: Boolean(Number(item.active)) });
+const nameParts = (name: string) => { const [given = '', ...family] = name.trim().split(/\s+/); return { given, family: family.join(' ') }; };
+const newForm = (locationId = ''): NewForm => ({ tenant_id: tenantId, object_id: '', email: '', given_name: '', family_name: '', display_name: '', location_id: locationId, discipline: 'Massage Therapy', credentials: '', booking_mode: 'practitioner_managed' });
+const editForm = (item: Practitioner, fallbackLocation = ''): EditForm => { const fallback=nameParts(item.display_name); return ({ practitioner_id: item.practitioner_id, given_name:item.given_name??fallback.given, family_name:item.family_name??fallback.family, display_name: item.display_name, email: item.email, location_id: String(item.location_id ?? fallbackLocation), discipline: item.discipline, credentials: item.credentials ?? '', booking_mode: item.booking_mode, status: item.status, active: Boolean(Number(item.active)) }); };
 const available = (item: Practitioner) => item.status === 'active' && Boolean(Number(item.active));
 
 export function PractitionerAdmin() {
@@ -36,7 +37,7 @@ export function PractitionerAdmin() {
   const selected = items.find(item => item.practitioner_id === selectedId) ?? null;
   const filteredItems = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
-    return term ? items.filter(item => `${item.display_name} ${item.email} ${item.discipline} ${item.credentials ?? ''} ${item.locations ?? ''}`.toLocaleLowerCase().includes(term)) : items;
+    return term ? items.filter(item => `${item.given_name ?? ''} ${item.family_name ?? ''} ${item.display_name} ${item.email} ${item.discipline} ${item.credentials ?? ''} ${item.locations ?? ''}`.toLocaleLowerCase().includes(term)) : items;
   }, [items, query]);
 
   const load = useCallback(async (preferredId?: number | null) => {
@@ -113,13 +114,13 @@ export function PractitionerAdmin() {
 
 function PractitionerDetails({ item, edit }: { item: Practitioner; edit: () => void }) {
   const { t } = useTranslation();
-  const rows = [[t('Account status'), t(item.status === 'active' ? 'Active' : 'Inactive')], [t('Practitioner availability'), t(Boolean(Number(item.active)) ? 'Available' : 'Unavailable')], [t('Discipline'), item.discipline], [t('Credentials'), item.credentials || t('Not set')], [t('Clinic location'), item.locations || t('No active location')], [t('Booking management'), t(item.booking_mode === 'practitioner_managed' ? 'Practitioner managed' : 'Clinic managed')], [t('Microsoft sign-in email'), item.email]];
+  const rows = [[t('First name'), item.given_name || t('Not set')], [t('Last name'), item.family_name || t('Not set')], [t('Internal display name'), item.display_name], [t('Account status'), t(item.status === 'active' ? 'Active' : 'Inactive')], [t('Practitioner availability'), t(Boolean(Number(item.active)) ? 'Available' : 'Unavailable')], [t('Discipline'), item.discipline], [t('Credentials'), item.credentials || t('Not set')], [t('Clinic location'), item.locations || t('No active location')], [t('Booking management'), t(item.booking_mode === 'practitioner_managed' ? 'Practitioner managed' : 'Clinic managed')], [t('Microsoft sign-in email'), item.email]];
   return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button></Stack>;
 }
 
 function NewPractitionerFields({ form, locations, field }: { form: NewForm; locations: Location[]; field: <K extends keyof NewForm>(key: K, value: NewForm[K]) => void }) {
   const { t } = useTranslation(); return <Grid container spacing={2}>
-    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Display name')} value={form.display_name} onChange={event => field('display_name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid><Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth type="email" label={t('Microsoft sign-in email')} value={form.email} onChange={event => field('email', event.target.value)} inputProps={{ maxLength: 190 }}/></Grid>
+    <NameFields form={form} field={field}/><Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth type="email" label={t('Microsoft sign-in email')} value={form.email} onChange={event => field('email', event.target.value)} inputProps={{ maxLength: 190 }}/></Grid>
     <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Entra Object ID')} value={form.object_id} onChange={event => field('object_id', event.target.value)} helperText={t('Found on the user profile in Microsoft Entra')}/></Grid><Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Entra Tenant ID')} value={form.tenant_id} onChange={event => field('tenant_id', event.target.value)}/></Grid>
     <PractitionerProfessionalFields form={form} locations={locations} field={field}/>
   </Grid>;
@@ -127,10 +128,18 @@ function NewPractitionerFields({ form, locations, field }: { form: NewForm; loca
 
 function EditPractitionerFields({ form, locations, field }: { form: EditForm; locations: Location[]; field: <K extends keyof EditForm>(key: K, value: EditForm[K]) => void }) {
   const { t } = useTranslation(); return <Grid container spacing={2}>
-    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Display name')} value={form.display_name} onChange={event => field('display_name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid><Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth type="email" label={t('Email')} value={form.email} onChange={event => field('email', event.target.value)} helperText={t('Changing this does not change the Microsoft Entra account.')} inputProps={{ maxLength: 190 }}/></Grid>
+    <NameFields form={form} field={field}/><Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth type="email" label={t('Email')} value={form.email} onChange={event => field('email', event.target.value)} helperText={t('Changing this does not change the Microsoft Entra account.')} inputProps={{ maxLength: 190 }}/></Grid>
     <PractitionerProfessionalFields form={form} locations={locations} field={field}/>
     <Grid size={{ xs: 12, md: 6 }}><TextField required select fullWidth label={t('Account status')} value={form.status} onChange={event => field('status', event.target.value)}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem></TextField></Grid><Grid size={{ xs: 12, md: 6 }}><FormControlLabel control={<Switch checked={form.active} onChange={event => field('active', event.target.checked)}/>} label={t('Available as a practitioner')}/></Grid>
   </Grid>;
+}
+
+function NameFields<T extends Pick<NewForm, 'given_name' | 'family_name' | 'display_name'>>({ form, field }: { form: T; field: <K extends keyof T>(key: K, value: T[K]) => void }) {
+  const { t } = useTranslation(); return <>
+    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('First name')} value={form.given_name} onChange={event => field('given_name', event.target.value as T['given_name'])} inputProps={{ maxLength: 100 }}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Last name')} value={form.family_name} onChange={event => field('family_name', event.target.value as T['family_name'])} inputProps={{ maxLength: 100 }}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Internal display name')} value={form.display_name} onChange={event => field('display_name', event.target.value as T['display_name'])} helperText={t('Used in staff and administration areas.')} inputProps={{ maxLength: 150 }}/></Grid>
+  </>;
 }
 
 function PractitionerProfessionalFields<T extends Pick<NewForm, 'discipline' | 'credentials' | 'location_id' | 'booking_mode'>>({ form, locations, field }: { form: T; locations: Location[]; field: <K extends keyof T>(key: K, value: T[K]) => void }) {

@@ -8,7 +8,8 @@ import { apiBaseUrl, apiRequest } from '../shared/api';
 type TeamMember = {
   slug: string;
   section: 'practitioner' | 'administration';
-  display_name: string;
+  public_name: string;
+  booking_name: string | null;
   public_title: string;
   public_title_fr: string | null;
   summary: string | null;
@@ -39,14 +40,14 @@ function TeamMemberTile({ member }: { member: TeamMember }) {
       <CardContent sx={{ p: 3, flexGrow: 1 }}>
         <Stack alignItems="center" spacing={1.5} textAlign="center" height="100%">
           <Avatar src={image || undefined} alt="" sx={{ width: 112, height: 112, bgcolor: 'primary.light', color: 'primary.dark', fontSize: '2rem' }}>
-            {initials(member.display_name)}
+            {initials(member.public_name)}
           </Avatar>
-          <Box><Typography variant="h6" component="h4">{member.display_name}</Typography><Typography color="primary.main" fontWeight={650}>{title}</Typography></Box>
+          <Box><Typography variant="h6" component="h4">{member.public_name}</Typography><Typography color="primary.main" fontWeight={650}>{title}</Typography></Box>
           {professionalDetails && <Typography variant="body2" color="text.secondary">{professionalDetails}</Typography>}
           {summary && <Typography sx={{ whiteSpace: 'pre-line' }}>{summary}</Typography>}
         </Stack>
       </CardContent>
-      {member.practitioner_id && <CardActions sx={{ px: 3, pb: 3, pt: 0 }}><Button fullWidth component={Link} to={`/book?practitioner_id=${member.practitioner_id}`} variant="contained" startIcon={<CalendarDays size={18} />}>{t('Book a session')}</Button></CardActions>}
+      {member.practitioner_id && <CardActions sx={{ px: 3, pb: 3, pt: 0 }}><Button fullWidth component={Link} to={`/book?practitioner_id=${member.practitioner_id}`} variant="contained" startIcon={<CalendarDays size={18} />} aria-label={t('Book with {{name}}',{name:member.public_name})}>{t('Book with {{name}}',{name:member.booking_name||member.public_name})}</Button></CardActions>}
     </Card>;
 }
 
