@@ -14,7 +14,7 @@ time is not reserved until confirmation succeeds. Keep the appointment number be
 email delivery is not enabled yet. Use the same confirmation button to retry an uncertain
 network result; do not start a second booking until the appointment list has been checked.
 
-The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Clients must currently contact the clinic to book, cancel, or reschedule.
+The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Linked clients can book, review, reschedule, and cancel their own eligible upcoming appointments. The portal rechecks availability before a reschedule. Cancellation charges are not yet calculated online, so the clinic may follow up when its current cancellation policy applies.
 
 After a duplicate client is merged, only the surviving client appears in client lists and booking searches. The merged record remains in protected history for audit purposes and is not deleted.
 

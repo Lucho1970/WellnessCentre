@@ -1112,6 +1112,12 @@ const fr: Record<string, string> = {
   "My availability": "Mes disponibilités",
   "Review and manage your regular hours, schedule changes, and time off.": "Consultez et gérez vos heures régulières, vos changements d’horaire et vos absences.",
   "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.": "Votre clinique gère cet horaire. Vous pouvez consulter les disponibilités ici, mais seuls les administrateurs de la clinique peuvent les modifier.",
+  "Book a new appointment or manage an upcoming appointment here.": "Prenez un nouveau rendez-vous ou gérez un rendez-vous à venir ici.",
+  "View or change": "Voir ou modifier",
+  "Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.": "Les frais d’annulation ne sont pas encore calculés en ligne. La clinique communiquera avec vous si sa politique d’annulation actuelle s’applique.",
+  "Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.": "Choisissez une nouvelle heure disponible. Le service, le praticien, le lieu, le mode de prestation, la durée et le prix demeurent inchangés.",
+  "No bookable times on this day. Try another day.": "Aucune heure réservable ce jour-là. Essayez une autre journée.",
+  "Canceling releases the appointment time. The canceled appointment remains in your history.": "L’annulation libère l’heure du rendez-vous. Le rendez-vous annulé demeure dans votre historique.",
 };
 
 export default fr;

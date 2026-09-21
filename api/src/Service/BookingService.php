@@ -196,7 +196,8 @@ final class BookingService
             $pdo->beginTransaction();$lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
             $appointment=$this->appointment($actor,$id,true);$this->assertManage($actor,$appointment);
             if((int)$appointment['version']!==$version){
-                $replayed=(int)$appointment['version']===$version+1&&(($action==='cancel'&&$appointment['status']==='canceled_by_clinic')||($action==='reschedule'&&$appointment['status']==='rescheduled'&&(new DateTimeImmutable($appointment['starts_at'],new DateTimeZone('UTC')))->getTimestamp()===$requested?->getTimestamp()));
+                $canceledStatus=$actor->userType==='client'?'canceled_by_client':'canceled_by_clinic';
+                $replayed=(int)$appointment['version']===$version+1&&(($action==='cancel'&&$appointment['status']===$canceledStatus)||($action==='reschedule'&&$appointment['status']==='rescheduled'&&(new DateTimeImmutable($appointment['starts_at'],new DateTimeZone('UTC')))->getTimestamp()===$requested?->getTimestamp()));
                 if($replayed){$pdo->commit();return $appointment;}throw new ApiException(409,'appointment_changed','This appointment changed. Refresh it before making another change.');
             }
             if(!in_array($appointment['status'],['requested','confirmed','rescheduled'],true))throw new ApiException(409,'appointment_not_editable','This appointment can no longer be changed.');
@@ -204,8 +205,9 @@ final class BookingService
             if($action==='reschedule'&&(new DateTimeImmutable($appointment['starts_at'],new DateTimeZone('UTC')))->getTimestamp()===$requested?->getTimestamp())throw new ApiException(422,'appointment_time_unchanged','Choose a different time to reschedule this appointment.');
             $from=$appointment['status'];
             if($action==='cancel'){
-                $statement=$pdo->prepare("UPDATE appointments SET status='canceled_by_clinic',version=version+1 WHERE id=:id AND version=:version");$statement->execute(['id'=>$id,'version'=>$version]);
-                $this->history($id,$from,'canceled_by_clinic',$actor->userId,$reason);$event='booking_cancellation';$audit='appointment.cancel';
+                $canceledStatus=$actor->userType==='client'?'canceled_by_client':'canceled_by_clinic';
+                $statement=$pdo->prepare('UPDATE appointments SET status=:status,version=version+1 WHERE id=:id AND version=:version');$statement->execute(['status'=>$canceledStatus,'id'=>$id,'version'=>$version]);
+                $this->history($id,$from,$canceledStatus,$actor->userId,$reason);$event='booking_cancellation';$audit='appointment.cancel';
             }else{
                 $location=$pdo->prepare('SELECT timezone FROM locations WHERE id=:id AND clinic_id=:clinic AND is_bookable=1');$location->execute(['id'=>$appointment['location_id'],'clinic'=>$actor->clinicId]);$timezone=$location->fetchColumn();if(!$timezone)throw new ApiException(422,'invalid_location','The appointment location is unavailable.');
                 $date=$requested->setTimezone(new DateTimeZone($timezone))->format('Y-m-d');$availability=(new AvailabilityService($this->database))->search(['delivery_mode'=>$appointment['delivery_mode'],'service_id'=>$appointment['service_id'],'practitioner_id'=>$appointment['practitioner_id'],'location_id'=>$appointment['location_id'],'date_from'=>$date,'date_to'=>$date],$id);
@@ -257,10 +259,16 @@ final class BookingService
         if($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')&&!$actor->hasPermission('schedule_for_other_practitioners')&&(!$ownsPractitioner||$bookingMode!=='practitioner_managed'))throw new ApiException(403,'forbidden','Practitioners can only change their own practitioner-managed appointments.');
     }
 
+    public static function authorizeCustomerChange(AuthContext $actor,int $clientId): void
+    {
+        if($actor->userType!=='client'||$actor->userId!==$clientId)throw new ApiException(404,'appointment_not_found','Appointment not found.');
+    }
+
     private function getById(AuthContext $actor,int $id): array{return $this->appointment($actor,$id,false);}
 
     private function assertManage(AuthContext $actor,array $appointment): void
     {
+        if($actor->userType==='client'){self::authorizeCustomerChange($actor,(int)$appointment['client_id']);return;}
         $statement=$this->database->connection()->prepare('SELECT booking_mode FROM practitioners WHERE id=:practitioner AND user_id=:user AND active=1');$statement->execute(['practitioner'=>$appointment['practitioner_id'],'user'=>$actor->userId]);$mode=$statement->fetchColumn();
         self::authorizeChange($actor,$mode!==false,(string)($mode?:''));
     }

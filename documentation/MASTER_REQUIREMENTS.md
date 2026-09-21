@@ -185,6 +185,15 @@ rejects browser-supplied client IDs and reuses the locked/idempotent booking tra
 Selection is not a hold. Client cancellation/rescheduling and actual notification delivery
 remain pending, so this slice must not be opened as an unattended production workflow.
 
+**21 September 2026 client appointment-management slice:** linked clients can now review an
+upcoming appointment and use the shared locked appointment mutation path to reschedule or
+cancel it. The API derives the client from the customer session, rejects access to another
+client's appointment, excludes the current appointment from replacement-slot conflicts,
+uses optimistic versions and records client cancellation status/history/audit/notification
+events. Cancellation policy windows and fee consequences are not yet calculated; the client
+UI states this explicitly. Hosted MySQL race acceptance and real notification delivery remain
+pending.
+
 **20 September 2026 public-content slice:** the public site now has a bilingual,
 version-controlled Markdown content layer with validated metadata, safe rendering, SEO
 title/description handling, and initial About, New Clients, FAQ and home-section content.

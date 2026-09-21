@@ -627,13 +627,23 @@ Public-service checkpoint: governed bilingual service publication fields, stable
 
 2026-09-15 confirmation checkpoint: booking creation revalidates against availability, checks client/location ownership and practitioner permissions, serializes clinic confirmations, and verifies idempotent retries. Local request tests pass; MySQL concurrency acceptance remains pending. See `BOOKING_VALIDATION_TESTS.md` for deployment tests and remaining administrative-edit coordination.
 
-Progress: recurring practitioner/location working hours plus one-time availability overrides and time off are implemented in the API and Super Admin portal. The practitioner portal now exposes the same list-first schedule screen for the signed-in practitioner's own records. Practitioner-managed profiles may maintain availability only at their active assigned locations; clinic-managed profiles receive a read-only view, with the policy enforced by both the UI and API. Availability search now includes extra openings, recurrence intervals, merged hours, service buffers and horizons, cross-location practitioner conflicts, and eligible rooms with capabilities, restrictions, and turnover. These changes require deployed MySQL verification. Next: enforce the same rules during booking, add concurrency tests, and connect the booking interface. Phase 4 remains in progress.
+Progress: recurring practitioner/location working hours plus one-time availability overrides and time off are implemented in the API and Super Admin portal. The practitioner portal exposes the same list-first schedule screen for the signed-in practitioner's own records. Practitioner-managed profiles may maintain availability only at their active assigned locations; clinic-managed profiles receive a read-only view, with the policy enforced by both the UI and API. Availability search and booking enforce extra openings, recurrence intervals, merged hours, service buffers and horizons, cross-location practitioner conflicts, eligible rooms with capabilities, restrictions, and turnover. Staff, practitioners, and linked clients can create appointments through this shared validation path. Hosted MySQL concurrency acceptance remains required before Phase 4 can be closed.
 
 20 September checkpoint: linked clients can now carry public preferences into the client
 portal and confirm their own clinic or On-Site appointment through the same availability,
 coverage, price, locking and idempotency rules as staff booking. Client identity and clinic
 scope are derived server-side. Client cancellation/rescheduling, hosted MySQL race
 acceptance and notification delivery remain required before completing the phase.
+
+21 September appointment-management checkpoint: linked clients can open their own upcoming
+appointment, search replacement times through the existing conflict-safe availability path,
+reschedule while preserving the service/practitioner/location/delivery/price snapshot, or
+cancel with a client-specific status. Identity and appointment ownership are derived and
+enforced server-side; optimistic versions, history, audit, notifications, room constraints,
+and exclusion of the current appointment are reused from staff appointment management.
+Configurable cancellation windows, fee preview/collection, secure action links, recurrence,
+and hosted MySQL race acceptance remain Phase 5 work. The UI explicitly states that fees are
+not yet calculated online rather than implying a zero charge.
 
 Build:
 
@@ -820,4 +830,4 @@ These decisions should be made at or before the phase that depends on them:
 
 ## 19 Recommended next build piece
 
-Proceed to **Phase 4 Scheduling and booking engine**, beginning with practitioner availability administration: recurring working hours, location-specific rules, one-time overrides, time off, and role-scoped calendar views. Then connect those rules to conflict-safe slot generation before enabling real appointment confirmation.
+Proceed with the remaining **Phase 5 Appointment management and recurrence** policy slice: configurable cancellation windows, fee calculation and preview, authorized staff overrides with waiver reasons, and clear client/practitioner policy outcomes. Keep payment collection separate until a hosted/tokenized payment provider is selected. In parallel with deployment acceptance, complete the hosted MySQL concurrency test that remains from Phase 4.

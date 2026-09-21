@@ -1075,6 +1075,12 @@ const en = {
   "My availability": "My availability",
   "Review and manage your regular hours, schedule changes, and time off.": "Review and manage your regular hours, schedule changes, and time off.",
   "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.": "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.",
+  "Book a new appointment or manage an upcoming appointment here.": "Book a new appointment or manage an upcoming appointment here.",
+  "View or change": "View or change",
+  "Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.": "Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.",
+  "Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.": "Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.",
+  "No bookable times on this day. Try another day.": "No bookable times on this day. Try another day.",
+  "Canceling releases the appointment time. The canceled appointment remains in your history.": "Canceling releases the appointment time. The canceled appointment remains in your history.",
 } as const;
 
 export default en;
