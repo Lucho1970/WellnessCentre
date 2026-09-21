@@ -1072,6 +1072,9 @@ const en = {
   "Widget disabled.": "Widget disabled.",
   "Widget enabled.": "Widget enabled.",
   "Unable to update widget.": "Unable to update widget.",
+  "My availability": "My availability",
+  "Review and manage your regular hours, schedule changes, and time off.": "Review and manage your regular hours, schedule changes, and time off.",
+  "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.": "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.",
 } as const;
 
 export default en;

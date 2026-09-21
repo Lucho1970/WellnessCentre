@@ -36,7 +36,7 @@ const utcToLocalInput = (value: string, timezone: string) => {
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 };
 
-export function AvailabilityAdmin() {
+export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMode?: boolean }) {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [people, setPeople] = useState<Practitioner[]>([]);
@@ -52,26 +52,45 @@ export function AvailabilityAdmin() {
   const [loadError, setLoadError] = useState('');
   const [panelError, setPanelError] = useState('');
   const [saved, setSaved] = useState('');
+  const [canManage, setCanManage] = useState(true);
   const formGuard = useUnsavedForm();
 
   const load = useCallback(async () => {
     setBusy(true); setLoadError('');
     try {
       const token = await getAccessToken(); const headers = { Authorization: `Bearer ${token}` };
-      const responses = await Promise.all([
-        fetch(`${api}/admin/practitioners`, { headers }), fetch(`${api}/admin/locations`, { headers }),
-        fetch(`${api}/admin/availability-rules`, { headers }), fetch(`${api}/admin/schedule-exceptions`, { headers }),
-      ]);
+      const responses = practitionerMode
+        ? await Promise.all([
+          fetch(`${api}/practitioner/availability-context`, { headers }),
+          fetch(`${api}/admin/availability-rules`, { headers }),
+          fetch(`${api}/admin/schedule-exceptions`, { headers }),
+        ])
+        : await Promise.all([
+          fetch(`${api}/admin/practitioners`, { headers }), fetch(`${api}/admin/locations`, { headers }),
+          fetch(`${api}/admin/availability-rules`, { headers }), fetch(`${api}/admin/schedule-exceptions`, { headers }),
+        ]);
       const bodies = await Promise.all(responses.map(response => response.json()));
       const failed = responses.findIndex(response => !response.ok);
       if (failed >= 0) throw new Error(apiErrorMessage(bodies[failed], responses[failed].status, t('Unable to load availability.')));
-      setPeople(normalizeNumericIds<Practitioner[]>(bodies[0].data));
-      setLocations(normalizeNumericIds<Location[]>(bodies[1].data));
-      setRules(normalizeNumericIds<Rule[]>(bodies[2].data));
-      setExceptions(normalizeNumericIds<Exception[]>(bodies[3].data));
+      if (practitionerMode) {
+        const context = bodies[0].data;
+        const practitioners = normalizeNumericIds<Practitioner[]>(context.practitioners);
+        setPeople(practitioners);
+        setLocations(normalizeNumericIds<Location[]>(context.locations));
+        setRules(normalizeNumericIds<Rule[]>(bodies[1].data));
+        setExceptions(normalizeNumericIds<Exception[]>(bodies[2].data));
+        setCanManage(Boolean(context.can_manage));
+        setExpandedId(practitioners[0]?.practitioner_id ?? null);
+      } else {
+        setPeople(normalizeNumericIds<Practitioner[]>(bodies[0].data));
+        setLocations(normalizeNumericIds<Location[]>(bodies[1].data));
+        setRules(normalizeNumericIds<Rule[]>(bodies[2].data));
+        setExceptions(normalizeNumericIds<Exception[]>(bodies[3].data));
+        setCanManage(true);
+      }
     } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to load availability.')); }
     finally { setBusy(false); }
-  }, [getAccessToken, t]);
+  }, [getAccessToken, practitionerMode, t]);
   useEffect(() => { void load(); }, [load]);
 
   const activePeople = useMemo(() => people.filter(person => person.active === undefined || Boolean(Number(person.active))), [people]);
@@ -84,12 +103,12 @@ export function AvailabilityAdmin() {
   const selectPractitioner = (id: number, expanded: boolean) => { setExpandedId(expanded ? id : null); setSelected(null); setSaved(''); };
   const selectItem = (item: SelectedItem) => { setSelected(current => current?.kind === item.kind && current.id === item.id ? null : item); };
   const startNew = (kind: ItemKind) => {
-    if (!selectedPractitioner) return;
+    if (!selectedPractitioner || !canManage) return;
     formGuard.markClean(); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); setPanelError(''); setPanelMode('new');
   };
   const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelKind(selected.kind); setPanelError(''); setPanelMode('details'); };
   const startEdit = () => {
-    if (!selected) return;
+    if (!selected || !canManage) return;
     const location = itemLocation(selected) ?? locations.find(item => item.id === defaultLocationId(selectedPractitioner)) ?? locations[0];
     const next = blankForm(selected.kind, location?.id ?? null);
     if (selected.rule) Object.assign(next, { location_id: String(selected.rule.location_id), weekday: String(selected.rule.weekday), start_time: selected.rule.start_time.slice(0, 5), end_time: selected.rule.end_time.slice(0, 5), valid_from: selected.rule.valid_from, valid_until: selected.rule.valid_until ?? '' });
@@ -102,7 +121,7 @@ export function AvailabilityAdmin() {
   };
 
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); if (!selectedPractitioner) return;
+    event.preventDefault(); if (!selectedPractitioner || !canManage) return;
     setBusy(true); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken();
@@ -121,7 +140,7 @@ export function AvailabilityAdmin() {
   };
 
   const remove = async () => {
-    if (!selected || !window.confirm(t(selected.kind === 'rule' ? 'Archive these working hours?' : 'Remove this schedule item?'))) return;
+    if (!canManage || !selected || !window.confirm(t(selected.kind === 'rule' ? 'Archive these working hours?' : 'Remove this schedule item?'))) return;
     setBusy(true); setLoadError('');
     try {
       const token = await getAccessToken(); const resource = selected.kind === 'rule' ? 'availability-rules' : selected.kind === 'override' ? 'availability-overrides' : 'time-off';
@@ -138,21 +157,22 @@ export function AvailabilityAdmin() {
   return <Stack spacing={2}>
     {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}
     {loadError && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>{t('Retry')}</Button>}>{loadError}</Alert>}
+    {practitionerMode && !canManage && <Alert severity="info">{t('Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.')}</Alert>}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-      <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Practitioner availability')}</Typography><Typography color="text.secondary">{t('Select a practitioner to manage regular hours, schedule changes, and time off.')}</Typography></Box>
+      <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t(practitionerMode ? 'My availability' : 'Practitioner availability')}</Typography><Typography color="text.secondary">{t(practitionerMode ? 'Review and manage your regular hours, schedule changes, and time off.' : 'Select a practitioner to manage regular hours, schedule changes, and time off.')}</Typography></Box>
       {activePeople.map(person => {
         const personRules = practitionerRules(person.practitioner_id); const changes = practitionerExceptions(person.practitioner_id, 'override'); const timeOff = practitionerExceptions(person.practitioner_id, 'time_off');
-        return <Accordion key={person.practitioner_id} expanded={expandedId === person.practitioner_id} onChange={(_, value) => selectPractitioner(person.practitioner_id, value)} disableGutters elevation={0} square sx={{ '&:before': { display: 'none' }, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <AccordionSummary expandIcon={<ChevronDown size={20}/>} sx={{ px: 2.5, py: .75 }}><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={1} width="100%" pr={2}><Box><Typography fontWeight={750}>{practitionerName(person)}</Typography><Typography variant="body2" color="text.secondary">{person.discipline || t('Practitioner')}</Typography></Box><Stack direction="row" gap={.75} flexWrap="wrap"><Chip size="small" label={t('{{count}} hour rules', { count: personRules.length })}/><Chip size="small" label={t('{{count}} changes', { count: changes.length })}/><Chip size="small" label={t('{{count}} time off', { count: timeOff.length })}/></Stack></Stack></AccordionSummary>
+        return <Accordion key={person.practitioner_id} expanded={expandedId === person.practitioner_id} onChange={(_, value) => { if (!practitionerMode) selectPractitioner(person.practitioner_id, value); }} disableGutters elevation={0} square sx={{ '&:before': { display: 'none' }, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <AccordionSummary expandIcon={practitionerMode ? undefined : <ChevronDown size={20}/>} sx={{ px: 2.5, py: .75, cursor: practitionerMode ? 'default !important' : undefined }}><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={1} width="100%" pr={2}><Box><Typography fontWeight={750}>{practitionerName(person)}</Typography><Typography variant="body2" color="text.secondary">{person.discipline || t('Practitioner')}</Typography></Box><Stack direction="row" gap={.75} flexWrap="wrap"><Chip size="small" label={t('{{count}} hour rules', { count: personRules.length })}/><Chip size="small" label={t('{{count}} changes', { count: changes.length })}/><Chip size="small" label={t('{{count}} time off', { count: timeOff.length })}/></Stack></Stack></AccordionSummary>
           <AccordionDetails sx={{ p: { xs: 1.5, md: 2.5 }, bgcolor: 'grey.50' }}>
             <Paper variant="outlined" sx={{ p: 1.25, mb: 2 }}><Stack component="nav" aria-label={t('Availability actions')} direction={{ xs: 'column', lg: 'row' }} gap={1} alignItems={{ lg: 'center' }}>
-              <Button variant="contained" startIcon={<Plus size={17}/>} onClick={() => startNew('rule')}>{t('Add hours')}</Button>
-              <Button startIcon={<Plus size={17}/>} onClick={() => startNew('override')}>{t('Add change')}</Button>
-              <Button startIcon={<CalendarOff size={17}/>} onClick={() => startNew('time_off')}>{t('Add time off')}</Button>
+              <Button variant="contained" startIcon={<Plus size={17}/>} disabled={!canManage} onClick={() => startNew('rule')}>{t('Add hours')}</Button>
+              <Button startIcon={<Plus size={17}/>} disabled={!canManage} onClick={() => startNew('override')}>{t('Add change')}</Button>
+              <Button startIcon={<CalendarOff size={17}/>} disabled={!canManage} onClick={() => startNew('time_off')}>{t('Add time off')}</Button>
               <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', lg: 'block' }, mx: .5 }}/>
               <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
-              <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={startEdit}>{t('Edit')}</Button>
-              <Button color="error" startIcon={selected?.kind === 'rule' ? <Archive size={17}/> : <Trash2 size={17}/>} disabled={!selected || busy} onClick={() => void remove()}>{t(selected?.kind === 'rule' ? 'Archive' : 'Remove')}</Button>
+              <Button startIcon={<Pencil size={17}/>} disabled={!selected || !canManage} onClick={startEdit}>{t('Edit')}</Button>
+              <Button color="error" startIcon={selected?.kind === 'rule' ? <Archive size={17}/> : <Trash2 size={17}/>} disabled={!selected || busy || !canManage} onClick={() => void remove()}>{t(selected?.kind === 'rule' ? 'Archive' : 'Remove')}</Button>
             </Stack></Paper>
             <ScheduleSection title={t('Regular hours')} empty={t('No regular hours have been added.')} items={personRules.map(rule => ({ key: `rule-${rule.id}`, selected: selected?.kind === 'rule' && selected.id === rule.id, primary: `${t(days[rule.weekday - 1])} · ${rule.start_time.slice(0, 5)}–${rule.end_time.slice(0, 5)}`, secondary: `${rule.location_name} · ${t('Effective {{from}}{{until}}', { from: rule.valid_from, until: rule.valid_until ? t(' through {{date}}', { date: rule.valid_until }) : '' })}`, onClick: () => selectItem({ kind: 'rule', id: rule.id, rule }) }))}/>
             <ScheduleSection title={t('Changes')} empty={t('No one-time schedule changes have been added.')} items={changes.map(item => exceptionRow(item, selected, locations, i18n.resolvedLanguage, t, selectItem))}/>
@@ -165,7 +185,7 @@ export function AvailabilityAdmin() {
 
     <Drawer anchor="right" open={panelMode !== null} onClose={closePanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 640 }, maxWidth: '100%' } } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'details' ? 'Schedule details' : panelMode === 'edit' ? 'Edit schedule item' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Typography><Typography variant="h5">{selectedPractitioner ? practitionerName(selectedPractitioner) : ''}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={closePanel}><X/></IconButton></Stack>
-      {panelMode === 'details' && selected && <ItemDetails item={selected} locations={locations} language={i18n.resolvedLanguage} edit={startEdit}/>}
+      {panelMode === 'details' && selected && <ItemDetails item={selected} locations={locations} language={i18n.resolvedLanguage} edit={startEdit} canEdit={canManage}/>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={submit} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Typography color="text.secondary" mb={2}>{panelKind === 'rule' ? t('Define recurring working hours for this practitioner.') : t('Enter times in {{timezone}}.', { timezone: selectedLocation?.timezone ?? t("the selected location's timezone") })}</Typography><Grid container spacing={2}>
           <Grid size={12}><TextField required select fullWidth label={t(panelKind === 'rule' ? 'Location' : 'Timezone location')} value={form.location_id} onChange={event => field('location_id', event.target.value)}>{locations.map(location => <MenuItem key={location.id} value={String(location.id)}>{location.name} ({location.timezone})</MenuItem>)}</TextField></Grid>
@@ -196,9 +216,9 @@ function exceptionRow(item: Exception, selected: SelectedItem | null, locations:
   return { key: `${item.kind}-${item.id}`, selected: selected?.kind === item.kind && selected.id === item.id, primary: t(labels[item.type] ?? item.type), secondary: `${interval}${item.location_name ? ` · ${item.location_name}` : ''}${item.reason ? ` · ${item.reason}` : ''}`, onClick: () => select({ kind: item.kind, id: item.id, exception: item }) };
 }
 function formatInZone(value: string, timezone: string | undefined, language: string | undefined) { return new Intl.DateTimeFormat(language, { timeZone: timezone ?? 'UTC', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(`${value.replace(' ', 'T')}Z`)); }
-function ItemDetails({ item, locations, language, edit }: { item: SelectedItem; locations: Location[]; language: string | undefined; edit: () => void }) {
+function ItemDetails({ item, locations, language, edit, canEdit }: { item: SelectedItem; locations: Location[]; language: string | undefined; edit: () => void; canEdit: boolean }) {
   const { t } = useTranslation(); const location = locations.find(value => value.id === (item.rule?.location_id ?? item.exception?.location_id));
   const typeLabels: Record<string, string> = { blocked: 'Blocked', available: 'Available', vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
   const rows = item.rule ? [[t('Type'), t('Regular hours')], [t('Day'), t(days[item.rule.weekday - 1])], [t('Time'), `${item.rule.start_time.slice(0, 5)}–${item.rule.end_time.slice(0, 5)}`], [t('Location'), item.rule.location_name], [t('Valid from'), item.rule.valid_from], [t('Valid until'), item.rule.valid_until || t('No end date')]] : item.exception ? [[t('Type'), t(item.kind === 'override' ? 'Schedule change' : 'Time off')], [t(item.kind === 'override' ? 'Availability' : 'Reason type'), t(typeLabels[item.exception.type] ?? item.exception.type)], [t('Starts'), formatInZone(item.exception.starts_at, location?.timezone, language)], [t('Ends'), formatInZone(item.exception.ends_at, location?.timezone, language)], [t('Location'), item.exception.location_name || t('Not set')], [t('Notes'), item.exception.reason || t('Not set')]] : [];
-  return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button></Stack>;
+  return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack>{canEdit && <Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button>}</Stack>;
 }

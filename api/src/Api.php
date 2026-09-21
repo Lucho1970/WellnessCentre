@@ -135,6 +135,7 @@ final class Api
                 $routes->addRoute('PATCH','/api/v1/admin/time-off/{id:\\d+}','updateTimeOff');
                 $routes->addRoute('DELETE','/api/v1/admin/availability-overrides/{id:\\d+}','deleteAvailabilityOverride');
                 $routes->addRoute('DELETE','/api/v1/admin/time-off/{id:\\d+}','deleteTimeOff');
+                $routes->addRoute('GET','/api/v1/practitioner/availability-context','practitionerAvailabilityContext');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
                 $routes->addRoute('GET','/api/v1/admin/clinic/branding','branding');
                 $routes->addRoute('PUT','/api/v1/admin/clinic/branding/{type:logo|favicon}','saveBrandAsset');
@@ -232,6 +233,7 @@ final class Api
                 'updateTimeOff'=>$this->admin->updateTimeOff($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'deleteAvailabilityOverride'=>$this->admin->deleteScheduleException($this->user($request),'availability_overrides',(int)$route[2]['id'],$request->correlationId),
                 'deleteTimeOff'=>$this->admin->deleteScheduleException($this->user($request),'time_off',(int)$route[2]['id'],$request->correlationId),
+                'practitionerAvailabilityContext'=>$this->admin->practitionerAvailabilityContext($this->user($request)),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
                 'branding'=>$this->admin->branding($this->user($request)),
                 'saveBrandAsset'=>$this->admin->saveBrandAsset($this->user($request),(string)$route[2]['type'],$request->body,$request->correlationId),
