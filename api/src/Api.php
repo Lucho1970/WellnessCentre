@@ -38,7 +38,7 @@ final class Api
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);
     }
 
     public function handle(): never
@@ -70,6 +70,11 @@ final class Api
                 $routes->addRoute('GET','/api/v1/dashboard/preferences','dashboardPreferences');
                 $routes->addRoute('PUT','/api/v1/dashboard/preferences','saveDashboardPreferences');
                 $routes->addRoute('DELETE','/api/v1/dashboard/preferences','resetDashboardPreferences');
+                $routes->addRoute('GET','/api/v1/admin/dashboard-widgets','adminDashboardWidgets');
+                $routes->addRoute('POST','/api/v1/admin/dashboard-widgets','uploadDashboardWidget');
+                $routes->addRoute('PATCH','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}','toggleDashboardWidget');
+                $routes->addRoute('GET','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions','dashboardWidgetVersions');
+                $routes->addRoute('POST','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions/{version:\d+}/restore','restoreDashboardWidget');
                 $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
                 $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
                 $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
@@ -159,6 +164,11 @@ final class Api
                 'dashboardPreferences'=>$this->dashboard->preferences($this->user($request),(string)($request->query['workspace']??'')),
                 'saveDashboardPreferences'=>$this->dashboard->savePreferences($this->user($request),(string)($request->query['workspace']??''),$request->body),
                 'resetDashboardPreferences'=>$this->dashboard->resetPreferences($this->user($request),(string)($request->query['workspace']??'')),
+                'adminDashboardWidgets'=>$this->dashboard->adminList($this->user($request)),
+                'uploadDashboardWidget'=>$this->dashboard->upload($this->user($request),$request->body,$request->correlationId),
+                'toggleDashboardWidget'=>$this->dashboard->setEnabled($this->user($request),(string)$route[2]['id'],$request->body,$request->correlationId),
+                'dashboardWidgetVersions'=>$this->dashboard->versions($this->user($request),(string)$route[2]['id']),
+                'restoreDashboardWidget'=>$this->dashboard->restore($this->user($request),(string)$route[2]['id'],(int)$route[2]['version'],$request->correlationId),
                 'customerMe'=>$this->customerMe($request),
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
                 'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),

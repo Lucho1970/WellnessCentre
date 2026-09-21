@@ -1,0 +1,28 @@
+{
+  "id": "confirmed_appointments_today",
+  "schemaVersion": 1,
+  "workspaces": ["admin"],
+  "renderer": "metric",
+  "dataProjection": "appointment_count",
+  "parameters": {
+    "date": "today",
+    "statuses": ["confirmed", "rescheduled"]
+  },
+  "requiredCapability": "appointments.view.clinic",
+  "title": {
+    "en": "Confirmed appointments today",
+    "fr": "Rendez-vous confirmés aujourd’hui"
+  },
+  "description": {
+    "en": "Confirmed and rescheduled appointments taking place today.",
+    "fr": "Rendez-vous confirmés et reportés ayant lieu aujourd’hui."
+  },
+  "icon": "calendar-check",
+  "destination": {
+    "page": "appointments"
+  },
+  "sizes": ["small", "medium", "wide"],
+  "defaultSize": "small",
+  "defaultEnabled": true,
+  "defaultOrder": 40
+}

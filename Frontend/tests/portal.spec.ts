@@ -38,7 +38,8 @@ async function fixtures(
       }),
     );
   await page.route("**/api/v1/**", (route) => {
-    const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
+    const url = new URL(route.request().url());
+    const path = url.pathname.replace("/api/v1", "");
     let data: unknown = [];
     if (path === "/site-config")
       data = {
@@ -49,33 +50,48 @@ async function fixtures(
       };
     if (path === "/auth/me") data = { roles: roles ?? [], permissions };
     if (path === "/profile/avatar") data = { image_base64: null };
-    if (path === "/dashboard")
+    if (path === "/dashboard") {
+      const workspace = url.searchParams.get("workspace") === "practitioner" ? "practitioner" : "admin";
+      const definitions = workspace === "admin" ? [
+        { id: "appointments_today", renderer: "metric", title: { en: "Today's appointments", fr: "Rendez-vous d’aujourd’hui" }, description: { en: "All active appointments scheduled today.", fr: "Tous les rendez-vous actifs prévus aujourd’hui." }, icon: "calendar-check", destination: { page: "appointments" }, sizes: ["small", "medium", "wide"] },
+        { id: "awaiting_confirmation", renderer: "metric", title: { en: "Awaiting confirmation", fr: "En attente de confirmation" }, description: { en: "Requested appointments that still need confirmation.", fr: "Rendez-vous demandés qui doivent encore être confirmés." }, icon: "clock", destination: { page: "appointments" }, sizes: ["small", "medium", "wide"] },
+        { id: "onsite_today", renderer: "metric", title: { en: "Today's On-Site visits", fr: "Visites sur place aujourd’hui" }, description: { en: "Appointments taking place at a client location.", fr: "Rendez-vous ayant lieu chez un client." }, icon: "map-pin", destination: { page: "appointments" }, sizes: ["small", "medium", "wide"] },
+      ] : [
+        { id: "my_appointments_today", renderer: "metric", title: { en: "My appointments today", fr: "Mes rendez-vous aujourd’hui" }, description: { en: "Your active appointments scheduled today.", fr: "Vos rendez-vous actifs prévus aujourd’hui." }, icon: "calendar-check", destination: { page: "appointments" }, sizes: ["small", "medium", "wide"] },
+        { id: "my_next_appointment", renderer: "next_appointment", title: { en: "My next appointment", fr: "Mon prochain rendez-vous" }, description: { en: "Your next active appointment.", fr: "Votre prochain rendez-vous actif." }, icon: "clock", destination: { page: "appointments" }, sizes: ["small", "medium", "wide"] },
+        { id: "my_onsite_today", renderer: "metric", title: { en: "My On-Site visits today", fr: "Mes visites sur place aujourd’hui" }, description: { en: "Your visits taking place at a client location.", fr: "Vos visites ayant lieu chez un client." }, icon: "map-pin", destination: { page: "appointments" }, sizes: ["small", "medium", "wide"] },
+      ];
       data = {
-        workspace: "admin",
+        workspace,
         timezone: "America/Toronto",
         as_of: "2026-09-21T14:00:00Z",
-        widgets: {
-          appointments_today: true,
-          awaiting_confirmation: true,
-          onsite_today: true,
-        },
-        metrics: {
+        definitions,
+        values: {
           appointments_today: 4,
           awaiting_confirmation: 1,
           onsite_today: 2,
-          next_appointment: null,
+          my_appointments_today: 3,
+          my_next_appointment: null,
+          my_onsite_today: 1,
         },
       };
-    if (path === "/dashboard/preferences")
+    }
+    if (path === "/dashboard/preferences") {
+      const practitioner = url.searchParams.get("workspace") === "practitioner";
       data = {
         version: 1,
-        workspace: "admin",
-        widgets: [
+        workspace: practitioner ? "practitioner" : "admin",
+        widgets: practitioner ? [
+          { id: "my_appointments_today", enabled: true, order: 0, size: "small" },
+          { id: "my_next_appointment", enabled: true, order: 1, size: "medium" },
+          { id: "my_onsite_today", enabled: true, order: 2, size: "small" },
+        ] : [
           { id: "appointments_today", enabled: true, order: 0, size: "small" },
           { id: "awaiting_confirmation", enabled: true, order: 1, size: "small" },
           { id: "onsite_today", enabled: true, order: 2, size: "small" },
         ],
       };
+    }
     if (path === "/clients") data = { items: [], has_more: false };
     if (path === "/locations")
       data = [{ id: 1, name: "Holland Landing", timezone: "America/Toronto" }];
@@ -1415,6 +1431,38 @@ test("staff dashboard shows live metrics and saves a personal layout", async ({ 
   await expect.poll(() => saved).not.toBeNull();
   expect((saved as { widgets: Array<{ id: string; enabled: boolean }> }).widgets.find(item => item.id === "onsite_today")?.enabled).toBe(false);
   await expect(page.getByText("Today's On-Site visits")).toHaveCount(0);
+});
+
+test("super admin uploads a versioned widget and can restore a prior version", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  const definition = {
+    id: "appointments_today", schemaVersion: 1, workspaces: ["admin"], renderer: "metric",
+    dataProjection: "appointment_count", parameters: { date: "today" }, requiredCapability: "appointments.view.clinic",
+    title: { en: "Today's bookings", fr: "Réservations d’aujourd’hui" },
+    description: { en: "Active bookings today.", fr: "Réservations actives aujourd’hui." },
+    icon: "calendar-check", destination: { page: "appointments" }, sizes: ["small", "medium", "wide"], defaultSize: "small", defaultEnabled: true, defaultOrder: 10,
+  };
+  let published = false, restored = 0;
+  await page.route("**/api/v1/admin/dashboard-widgets", async route => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      if (!body.confirm_replace) return route.fulfill({ status: 409, json: { error: { code: "widget_exists", message: "A widget with this ID already exists." } } });
+      published = true; return route.fulfill({ json: { data: { id: definition.id, version: 2, replaced: true } } });
+    }
+    return route.fulfill({ json: { data: [{ id: definition.id, source: "built_in", enabled: true, active_version: published ? 2 : 1, has_override: true, definition }] } });
+  });
+  await page.route("**/api/v1/admin/dashboard-widgets/appointments_today/versions", route => route.fulfill({ json: { data: { built_in: true, versions: [{ version_number: 1, definition_hash: "abc", created_at: "2026-09-21T12:00:00Z", created_by: "Test Admin", active: false, definition }] } } }));
+  await page.route("**/api/v1/admin/dashboard-widgets/appointments_today/versions/1/restore", route => { restored = 1; return route.fulfill({ json: { data: { id: definition.id, active_version: 1 } } }); });
+  await page.goto(`${portalHost}/admin/dashboard-widgets`);
+  await expect(page.getByRole("heading", { name: "Today's bookings" })).toBeVisible();
+  await page.locator('input[type="file"]').setInputFiles({ name: "widget.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(definition)) });
+  await page.getByRole("button", { name: "Validate and publish" }).click();
+  await expect(page.getByText(/already exists/)).toBeVisible();
+  await page.getByRole("button", { name: "Publish new version" }).click();
+  await expect.poll(() => published).toBe(true);
+  await page.getByRole("button", { name: "Versions" }).click();
+  await page.getByRole("button", { name: "Restore", exact: true }).last().click();
+  await expect.poll(() => restored).toBe(1);
 });
 
 test("public practitioner directory filters services and links profiles to booking", async ({

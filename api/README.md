@@ -116,6 +116,8 @@ Configurable business logos and favicons require `database/migrations/011_clinic
 
 Personalized staff dashboards require `database/migrations/012_dashboard_preferences.sql` before the matching API and portal are deployed. It stores layout preferences only; live widget values remain authorization-scoped projections. See `../documentation/DASHBOARD_WIDGETS.md`.
 
+Runtime Super Admin widget upload/version management additionally requires `database/migrations/013_dashboard_widget_catalogue.sql`. JSON definitions are data only and can select only allowlisted renderers, projections, filters, permissions, routes, sizes, and icons.
+
 - Use a restricted database account rather than the MySQL server administrator.
 - Keep `.env`, `vendor`, and runtime cache files outside source control.
 - Serve only the `public` directory.

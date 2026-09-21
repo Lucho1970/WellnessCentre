@@ -229,7 +229,7 @@ Current host evidence reports MySQL **5.7.44**, not the MySQL 8+ aspiration in t
 
 Table presence does not imply endpoints/UI or tested business behavior. Read `api/database/schema.sql` and actual migrations for exact physical names and constraints before implementation; this table maps responsibilities, not a replacement schema.
 
-Existing upgrade scripts are the numbered files in `api/database/migrations`, currently 001 through 012. Apply only the migrations required after the last verified deployment, in numeric order. Fresh-install `schema.sql` is not a repeatable upgrade script for an existing database. Inspect actual schema before applying any migration; do not rerun a bulk create or seed file to repair a live deployment.
+Existing upgrade scripts are the numbered files in `api/database/migrations`, currently 001 through 013. Apply only the migrations required after the last verified deployment, in numeric order. Fresh-install `schema.sql` is not a repeatable upgrade script for an existing database. Inspect actual schema before applying any migration; do not rerun a bulk create or seed file to repair a live deployment.
 
 Add migration version/checksum tracking and preflight checks. Back up first; make additive changes, backfill in bounded steps, verify counts/constraints, then switch readers/writers. MySQL DDL may commit implicitly: transaction wrappers are not a universal rollback guarantee. Every release must identify applicable migrations, compatibility with the previous app, restore path and validation queries. Never rebuild/drop production data to adopt this design.
 

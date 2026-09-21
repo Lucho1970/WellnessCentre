@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   MapPin,
   Menu,
+  PanelsTopLeft,
   Stethoscope,
   UserRound,
   DoorOpen,
@@ -48,6 +49,7 @@ const ScheduleExceptions = lazy(() => import('../scheduling/ScheduleExceptions')
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
+const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
 
 type NavigationItem = {
   id: PortalPage;
@@ -71,6 +73,7 @@ const navigation: NavigationItem[] = [
   { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} /> },
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
+  { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
   {
     id: "profile",
     label: "My profile",
@@ -167,6 +170,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}
+        {page === "widgets" && <DashboardWidgetAdmin />}
         {page === "calendar" && <><AvailabilityAdmin /><ScheduleExceptions /></>}
         {page === "profile" && <ProfileSettings />}
         </Suspense>

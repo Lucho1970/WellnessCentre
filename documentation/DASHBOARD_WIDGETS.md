@@ -103,9 +103,13 @@ Only widgets backed by released modules and real projections appear.
 
 Steps 1–5 are implemented for the initial Operations and Practitioner appointment widgets. Pointer drag-and-drop, client widgets, module-specific cards beyond appointments, and richer filtered destination views remain planned. Keyboard/touch move controls are the current accessible ordering mechanism.
 
+Super Admin runtime management is implemented as a guarded, versioned catalogue. A JSON upload may compose an approved renderer, appointment projection, capability, filters, destination and icon. The server rejects executable code, SQL, arbitrary URLs and unknown values. A duplicate ID requires explicit confirmation and creates a new immutable version; it never destructively overwrites history. Super Admin can disable a widget, restore an earlier uploaded version, or restore the packaged definition of a built-in widget. All publish, toggle and restore operations are audited.
+
+A ready-to-upload example is available at `documentation/examples/confirmed-appointments-today.widget.json`. It creates a new Operations metric from the approved appointment-count projection, so it is also the deployment acceptance fixture for confirming that a new JSON ID appears without rebuilding the frontend.
+
 ## Deployment
 
-Existing databases must apply `api/database/migrations/012_dashboard_preferences.sql` once before deploying the matching API and portal. The migration is additive and stores layout metadata only; it does not modify appointments or other clinical/operational records. Deploy in this order: back up the database, apply migration 012, upload the private API, then upload the portal build. Verify both an Operations and Practitioner dashboard and confirm that changing one layout does not change the other.
+Existing databases must apply `api/database/migrations/012_dashboard_preferences.sql` and then `013_dashboard_widget_catalogue.sql` once before deploying the matching API and portal. Both migrations are additive: 012 stores user layouts and 013 stores immutable widget definitions and their active pointer. Neither modifies appointments or other clinical/operational records. Deploy in this order: back up the database, apply migrations 012 and 013, upload the private API, then upload the portal build. Verify both an Operations and Practitioner dashboard, upload a safe test definition as Super Admin, and confirm rollback and workspace-separated layouts.
 
 ## Acceptance criteria
 
