@@ -641,9 +641,16 @@ reschedule while preserving the service/practitioner/location/delivery/price sna
 cancel with a client-specific status. Identity and appointment ownership are derived and
 enforced server-side; optimistic versions, history, audit, notifications, room constraints,
 and exclusion of the current appointment are reused from staff appointment management.
-Configurable cancellation windows, fee preview/collection, secure action links, recurrence,
-and hosted MySQL race acceptance remain Phase 5 work. The UI explicitly states that fees are
-not yet calculated online rather than implying a zero charge.
+Secure action links, recurrence, invoice/payment integration for assessed fees, and hosted
+MySQL race acceptance remain Phase 5 work.
+
+21 September cancellation-policy checkpoint: Super Admins can configure no-fee, fixed, or
+percentage cancellation terms per service. New appointments snapshot those terms. Clients
+receive a server-calculated preview and the assessed amount is stored transactionally on
+cancellation. Clinic cancellations default to zero; client-requested staff cancellations can
+apply the policy, while Super Admin/Clinic Admin reductions and waivers require a reason and
+are stored in `cancellation_adjustments`. Invoicing and payment collection are intentionally
+not part of this slice.
 
 Build:
 
@@ -830,4 +837,4 @@ These decisions should be made at or before the phase that depends on them:
 
 ## 19 Recommended next build piece
 
-Proceed with the remaining **Phase 5 Appointment management and recurrence** policy slice: configurable cancellation windows, fee calculation and preview, authorized staff overrides with waiver reasons, and clear client/practitioner policy outcomes. Keep payment collection separate until a hosted/tokenized payment provider is selected. In parallel with deployment acceptance, complete the hosted MySQL concurrency test that remains from Phase 4.
+Proceed with the remaining **Phase 5 Appointment management and recurrence** work: secure cancellation/rescheduling action links and recurrence design/implementation. Keep assessed cancellation fees separate from invoicing and payment collection until those finance milestones and a hosted/tokenized payment provider are ready. In parallel with deployment acceptance, complete the hosted MySQL concurrency test that remains from Phase 4.

@@ -103,5 +103,9 @@ ALTER TABLE appointments
  ADD COLUMN travel_buffer_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
  ADD COLUMN base_price_cents INT UNSIGNED NULL,
  ADD COLUMN mobile_fee_cents INT UNSIGNED NOT NULL DEFAULT 0,
+ ADD COLUMN cancellation_window_minutes INT UNSIGNED NOT NULL DEFAULT 1440,
+ ADD COLUMN cancellation_fee_type ENUM('none','fixed','percentage') NOT NULL DEFAULT 'none',
+ ADD COLUMN cancellation_fee_value INT UNSIGNED NOT NULL DEFAULT 0,
+ ADD COLUMN cancellation_fee_cents INT UNSIGNED NOT NULL DEFAULT 0,
  ADD COLUMN coverage_confirmed_by BIGINT UNSIGNED NULL,
  ADD COLUMN currency CHAR(3) NOT NULL DEFAULT 'CAD';

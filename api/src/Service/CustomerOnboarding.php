@@ -184,7 +184,7 @@ final class CustomerOnboarding
     public function appointments(int $identity, string $cid): array {
         $link = $this->link($identity);
         if (!$link) throw new ApiException(403, 'client_not_linked', 'Your client record is not linked yet.');
-        $rows = $this->query('SELECT a.id,a.starts_at,a.ends_at,a.status,a.version,a.room_id,a.duration_option_id,a.delivery_mode,s.name AS service,p.display_name AS practitioner,l.name AS location,l.timezone,r.name AS room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN practitioners pr ON pr.id=a.practitioner_id JOIN users p ON p.id=pr.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.client_id=? AND a.clinic_id=? ORDER BY a.starts_at DESC LIMIT 100', [$link['client_id'], $this->config->customerClinicId])->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $this->query('SELECT a.id,a.starts_at,a.ends_at,a.status,a.version,a.room_id,a.duration_option_id,a.delivery_mode,a.cancellation_fee_cents,s.name AS service,p.display_name AS practitioner,l.name AS location,l.timezone,r.name AS room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN practitioners pr ON pr.id=a.practitioner_id JOIN users p ON p.id=pr.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.client_id=? AND a.clinic_id=? ORDER BY a.starts_at DESC LIMIT 100', [$link['client_id'], $this->config->customerClinicId])->fetchAll(PDO::FETCH_ASSOC);
         $this->audit('customer.appointments.view', (int)$link['client_id'], $cid, null, ['identity_id' => $identity]); return ['items' => $rows, 'limit' => 100];
     }
     private function staffClient(AuthContext $actor, int $client): void {

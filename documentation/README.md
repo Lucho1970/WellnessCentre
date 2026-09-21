@@ -17,6 +17,7 @@ Start with these two authoritative documents:
 
 - [Staff booking checkpoint](STAFF_BOOKING.md), [Client management](CLIENT_MANAGEMENT.md) and [Booking validation tests](BOOKING_VALIDATION_TESTS.md) describe specific implementation/test checkpoints; they do not establish production readiness.
 - [Practitioner appointment management](PRACTITIONER_APPOINTMENTS.md) records the scoped practitioner booking, rescheduling, cancellation, authorization and deployment checkpoint.
+- [Cancellation policy](CANCELLATION_POLICY.md) covers service policy configuration, appointment snapshots, client fee previews, authorized waivers, SQL deployment, and acceptance checks.
 - [User manual](USER_MANUAL.md) is the non-technical, role-oriented guide for staff using released portal features. Expand it as each administration area adopts the list-and-command-bar model.
 - [Client duplicate prevention and merge](CLIENT_MERGE.md) records email aliases, duplicate warnings, Super Admin merge controls and migration 006.
 - [Recommended public site structure](Recommended_site_structure.md) records reviewed UX and content guidance for public discovery. Accepted scope, safeguards and sequencing are incorporated into the Master Requirements and System Design; the guidance is not a separate master specification.

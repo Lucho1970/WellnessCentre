@@ -739,6 +739,10 @@ test("linked client reschedules and cancels only their own upcoming appointment"
     { duration_option_id: 8, starts_at: "2099-09-20T10:00:00-04:00", ends_at: "2099-09-20T11:00:00-04:00", available_room_ids: [] },
     { duration_option_id: 8, starts_at: "2099-09-21T11:00:00-04:00", ends_at: "2099-09-21T12:00:00-04:00", available_room_ids: [] },
   ] } } }));
+  await page.route("**/api/v1/customer/appointments/41/cancellation-preview", route => route.fulfill({ json: { data: {
+    window_minutes: 1440, deadline: "2099-09-19T14:00:00+00:00", inside_fee_window: true,
+    fee_type: "percentage", appointment_total_cents: 12000, fee_cents: 6000, currency: "CAD",
+  } } }));
   await page.route("**/api/v1/customer/appointments/41", route => {
     changes.push(route.request().postDataJSON());
     return route.fulfill({ json: { data: { ...appointment, version: 4 } } });
@@ -746,7 +750,6 @@ test("linked client reschedules and cancels only their own upcoming appointment"
 
   await page.goto("http://localhost:5184/client");
   await page.getByRole("button", { name: "View or change" }).click();
-  await expect(page.getByText(/Cancellation charges are not calculated online yet/)).toBeVisible();
   await page.getByRole("button", { name: "Reschedule" }).click();
   await page.getByLabel("Appointment date").fill("2099-09-21");
   await page.getByRole("button", { name: "Find times" }).click();
@@ -759,6 +762,7 @@ test("linked client reschedules and cancels only their own upcoming appointment"
 
   await page.getByRole("button", { name: "View or change" }).click();
   await page.getByRole("button", { name: "Cancel appointment" }).click();
+  await expect(page.getByText(/will apply a \$60.00 cancellation fee/)).toBeVisible();
   await page.getByRole("button", { name: "Confirm cancellation" }).click();
   await expect(page.getByText("Appointment #41 was canceled.")).toBeVisible();
   expect(changes[1]).toMatchObject({ action: "cancel", version: 3 });

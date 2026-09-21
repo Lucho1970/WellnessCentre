@@ -86,6 +86,7 @@ final class Api
                 $routes->addRoute('POST','/api/v1/appointments','createAppointment');
                 $routes->addRoute('PATCH','/api/v1/appointments/{id:\\d+}','updateAppointment');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/availability','appointmentAvailability');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/cancellation-preview','appointmentCancellationPreview');
                 $routes->addRoute('GET','/api/v1/booking-options','bookingOptions');
                 $routes->addRoute('GET','/api/v1/booking-clients','bookingClients');
                 $routes->addRoute('GET','/api/v1/booking-clients/{id:\\d+}/address','bookingClientAddress');
@@ -188,6 +189,7 @@ final class Api
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
                 'updateAppointment'=>$this->bookings->update($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'appointmentAvailability'=>$this->bookings->updateAvailability($this->user($request),(int)$route[2]['id'],$request->query),
+                'appointmentCancellationPreview'=>$this->bookings->cancellationPreview($this->user($request),(int)$route[2]['id']),
                 'clients'=>$this->clients->search($this->user($request),$request->query),
                 'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId),
@@ -291,6 +293,7 @@ final class Api
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/availability$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->updateAvailability($bookingActor(),(int)$matches[1],$r->query);
+        if($r->method==='GET'&&preg_match('#^appointments/(\d+)/cancellation-preview$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->cancellationPreview($bookingActor(),(int)$matches[1]);
         if($r->method==='PATCH'&&preg_match('#^appointments/(\d+)$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->update($bookingActor(),(int)$matches[1],$r->body,$r->correlationId);
         return match ($route) {
             'POST auth/activity' => ['session' => $session],

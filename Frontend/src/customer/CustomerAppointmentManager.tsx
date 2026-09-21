@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { formatDateTime } from '../i18n/format';
+import { formatCad, formatDateTime } from '../i18n/format';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import { customerFetch } from './session';
 
@@ -11,6 +11,7 @@ export type CustomerAppointment = {
   service: string; practitioner: string; location: string; timezone: string; delivery_mode: string;
 };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
+type CancellationPreview = { window_minutes: number; deadline: string; inside_fee_window: boolean; fee_type: string; appointment_total_cents: number; fee_cents: number; currency: string };
 type Props = { appointment: CustomerAppointment; close: () => void; complete: (message: string) => void };
 
 const databaseInstant = (value: string) => new Date(`${value.replace(' ', 'T')}Z`);
@@ -29,10 +30,18 @@ export function CustomerAppointmentManager({ appointment, close, complete }: Pro
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [cancellation, setCancellation] = useState<CancellationPreview | null>(null);
   const needsRoom = appointment.room_id !== null;
   const dirty = action !== 'details' && (date !== originalDate || slot !== null || reason.trim() !== '');
   useUnsavedChanges(dirty);
   const closeSafely = () => { if (!dirty || window.confirm(t('Discard your unsaved changes?'))) close(); };
+
+  const beginCancel = async () => {
+    setBusy(true); setError('');
+    try { setCancellation(await customerFetch(`/appointments/${appointment.id}/cancellation-preview`)); setAction('cancel'); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }
+    finally { setBusy(false); }
+  };
 
   const display = (value: string, database = false) => formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, i18n.resolvedLanguage, { timeZone: appointment.timezone, dateStyle: 'medium', timeStyle: 'short' });
   const loadSlots = async (event: FormEvent) => {
@@ -67,8 +76,7 @@ export function CustomerAppointmentManager({ appointment, close, complete }: Pro
     {action === 'details' && <Stack spacing={2}>
       <Typography>{display(appointment.starts_at, true)} – {display(appointment.ends_at, true)}</Typography>
       <Typography>{appointment.delivery_mode === 'mobile' ? t('On-Site (client location)') : `${t('In clinic')} · ${appointment.location}`}{appointment.room_name ? ` · ${appointment.room_name}` : ''}</Typography>
-      <Alert severity="info">{t('Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.')}</Alert>
-      <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}><Button variant="contained" onClick={() => setAction('reschedule')}>{t('Reschedule')}</Button><Button color="error" variant="outlined" onClick={() => setAction('cancel')}>{t('Cancel appointment')}</Button></Stack>
+      <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}><Button variant="contained" onClick={() => setAction('reschedule')}>{t('Reschedule')}</Button><Button color="error" variant="outlined" disabled={busy} onClick={() => void beginCancel()}>{t('Cancel appointment')}</Button></Stack>
     </Stack>}
     {action === 'reschedule' && <Stack spacing={2}>
       <Typography>{t('Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.')}</Typography>
@@ -81,7 +89,7 @@ export function CustomerAppointmentManager({ appointment, close, complete }: Pro
     </Stack>}
     {action === 'cancel' && <Stack spacing={2}>
       <Alert severity="warning">{t('Canceling releases the appointment time. The canceled appointment remains in your history.')}</Alert>
-      <Alert severity="info">{t('Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.')}</Alert>
+      {cancellation && <Alert severity={cancellation.fee_cents > 0 ? 'warning' : 'info'}>{cancellation.fee_cents > 0 ? t('Canceling now will apply a {{fee}} cancellation fee under the policy accepted when this appointment was booked.', { fee: formatCad(cancellation.fee_cents, i18n.resolvedLanguage) }) : t('No cancellation fee applies if you cancel now.')}</Alert>}
       <TextField label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
       <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('details')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
     </Stack>}
