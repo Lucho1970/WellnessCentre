@@ -114,6 +114,8 @@ The governed public service catalogue requires `database/migrations/009_public_s
 
 Configurable business logos and favicons require `database/migrations/011_clinic_brand_assets.sql` before the matching API and frontends are deployed. Run it once, then use Administration → Business settings to upload the two independent assets. See `../documentation/CONFIGURABLE_BRANDING.md`.
 
+Personalized staff dashboards require `database/migrations/012_dashboard_preferences.sql` before the matching API and portal are deployed. It stores layout preferences only; live widget values remain authorization-scoped projections. See `../documentation/DASHBOARD_WIDGETS.md`.
+
 - Use a restricted database account rather than the MySQL server administrator.
 - Keep `.env`, `vendor`, and runtime cache files outside source control.
 - Serve only the `public` directory.

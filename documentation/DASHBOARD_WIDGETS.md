@@ -2,7 +2,7 @@
 
 ## Status and objective
 
-The current staff dashboard is a placeholder that directs users to portal navigation. Earlier visual sample counts were not backed by operational data and are not treated as implemented features. This document defines the target shared framework for client, practitioner and operations dashboards under requirements GOV-05 and EXP-08A.
+The first staff dashboard release is implemented for Operations and Practitioner workspaces. It uses live, authorization-scoped appointment projections and saved per-user layouts. Earlier visual sample counts were not backed by operational data and are not treated as implemented features. This document defines the current framework and its planned expansion to the client workspace under requirements GOV-05 and EXP-08A.
 
 Every workspace receives a useful recommended layout without setup. A user may personalize eligible widgets and their order, but personalization never grants permissions or creates an arbitrary page builder.
 
@@ -100,6 +100,12 @@ Only widgets backed by released modules and real projections appear.
 5. Add accessible edit mode for show/hide, order, supported size, save/cancel and reset.
 6. Add client defaults and later widgets only as their destination modules become released.
 7. Add charts only after metric definitions, reporting permissions and accessibility alternatives exist.
+
+Steps 1–5 are implemented for the initial Operations and Practitioner appointment widgets. Pointer drag-and-drop, client widgets, module-specific cards beyond appointments, and richer filtered destination views remain planned. Keyboard/touch move controls are the current accessible ordering mechanism.
+
+## Deployment
+
+Existing databases must apply `api/database/migrations/012_dashboard_preferences.sql` once before deploying the matching API and portal. The migration is additive and stores layout metadata only; it does not modify appointments or other clinical/operational records. Deploy in this order: back up the database, apply migration 012, upload the private API, then upload the portal build. Verify both an Operations and Practitioner dashboard and confirm that changing one layout does not change the other.
 
 ## Acceptance criteria
 

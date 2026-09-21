@@ -21,6 +21,7 @@ use Wellness\Service\CatalogService;
 use Wellness\Service\ProfileService;
 use Wellness\Service\ClientService;
 use Wellness\Service\CustomerOnboarding;
+use Wellness\Service\DashboardService;
 use function FastRoute\simpleDispatcher;
 
 final class Api
@@ -33,10 +34,11 @@ final class Api
     private ProfileService $profiles;
     private ClientService $clients;
     private AddressCoverageService $addressCoverage;
+    private DashboardService $dashboard;
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database);
     }
 
     public function handle(): never
@@ -64,6 +66,10 @@ final class Api
                 $routes->addRoute('GET','/api/v1/team/{slug:[a-z0-9-]+}/image','teamImage');
                 $routes->addRoute('GET','/api/v1/availability','availability');
                 $routes->addRoute('GET','/api/v1/auth/me','me');
+                $routes->addRoute('GET','/api/v1/dashboard','dashboard');
+                $routes->addRoute('GET','/api/v1/dashboard/preferences','dashboardPreferences');
+                $routes->addRoute('PUT','/api/v1/dashboard/preferences','saveDashboardPreferences');
+                $routes->addRoute('DELETE','/api/v1/dashboard/preferences','resetDashboardPreferences');
                 $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
                 $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
                 $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
@@ -149,6 +155,10 @@ final class Api
                 'teamImage'=>$this->teamImage($request,(string)$route[2]['slug']),
                 'availability'=>$this->availability->search($request->query),
                 'me'=>$this->me($this->user($request)),
+                'dashboard'=>$this->dashboard->summary($this->user($request),(string)($request->query['workspace']??'')),
+                'dashboardPreferences'=>$this->dashboard->preferences($this->user($request),(string)($request->query['workspace']??'')),
+                'saveDashboardPreferences'=>$this->dashboard->savePreferences($this->user($request),(string)($request->query['workspace']??''),$request->body),
+                'resetDashboardPreferences'=>$this->dashboard->resetPreferences($this->user($request),(string)($request->query['workspace']??'')),
                 'customerMe'=>$this->customerMe($request),
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
                 'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),

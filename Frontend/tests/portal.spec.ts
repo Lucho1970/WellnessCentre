@@ -49,6 +49,33 @@ async function fixtures(
       };
     if (path === "/auth/me") data = { roles: roles ?? [], permissions };
     if (path === "/profile/avatar") data = { image_base64: null };
+    if (path === "/dashboard")
+      data = {
+        workspace: "admin",
+        timezone: "America/Toronto",
+        as_of: "2026-09-21T14:00:00Z",
+        widgets: {
+          appointments_today: true,
+          awaiting_confirmation: true,
+          onsite_today: true,
+        },
+        metrics: {
+          appointments_today: 4,
+          awaiting_confirmation: 1,
+          onsite_today: 2,
+          next_appointment: null,
+        },
+      };
+    if (path === "/dashboard/preferences")
+      data = {
+        version: 1,
+        workspace: "admin",
+        widgets: [
+          { id: "appointments_today", enabled: true, order: 0, size: "small" },
+          { id: "awaiting_confirmation", enabled: true, order: 1, size: "small" },
+          { id: "onsite_today", enabled: true, order: 2, size: "small" },
+        ],
+      };
     if (path === "/clients") data = { items: [], has_more: false };
     if (path === "/locations")
       data = [{ id: 1, name: "Holland Landing", timezone: "America/Toronto" }];
@@ -1365,6 +1392,31 @@ test("published service catalogue filters categories and carries service and pra
   ).toContainText("Test Practitioner");
 });
 
+test("staff dashboard shows live metrics and saves a personal layout", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  let saved: unknown = null;
+  await page.route("**/api/v1/dashboard/preferences?**", async (route) => {
+    if (route.request().method() === "PUT") {
+      saved = route.request().postDataJSON();
+      return route.fulfill({ json: { data: { version: 1, workspace: "admin", widgets: (saved as { widgets: unknown[] }).widgets } } });
+    }
+    return route.fulfill({ json: { data: { version: 1, workspace: "admin", widgets: [
+      { id: "appointments_today", enabled: true, order: 0, size: "small" },
+      { id: "awaiting_confirmation", enabled: true, order: 1, size: "small" },
+      { id: "onsite_today", enabled: true, order: 2, size: "small" },
+    ] } } });
+  });
+  await page.goto(`${portalHost}/admin`);
+  await expect(page.getByText("Today's appointments")).toBeVisible();
+  await expect(page.getByText("4", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Customize dashboard" }).click();
+  await page.getByRole("button", { name: "Hide", exact: true }).last().click();
+  await page.getByRole("button", { name: "Save layout" }).click();
+  await expect.poll(() => saved).not.toBeNull();
+  expect((saved as { widgets: Array<{ id: string; enabled: boolean }> }).widgets.find(item => item.id === "onsite_today")?.enabled).toBe(false);
+  await expect(page.getByText("Today's On-Site visits")).toHaveCount(0);
+});
+
 test("public practitioner directory filters services and links profiles to booking", async ({
   page,
 }) => {
@@ -2045,7 +2097,7 @@ test("signed-in staff login returns to the authorized workspace", async ({
   await page.goto(`${portalHost}/staff/login`);
   await expect(page).toHaveURL(`${portalHost}/practitioner`);
   await expect(
-    page.getByText("Your clinic workspace", { exact: true }),
+    page.getByText("Your day at a glance", { exact: true }),
   ).toBeVisible();
 });
 

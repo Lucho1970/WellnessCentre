@@ -47,6 +47,7 @@ const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').t
 const ScheduleExceptions = lazy(() => import('../scheduling/ScheduleExceptions').then(module => ({ default: module.ScheduleExceptions })));
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
+const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 
 type NavigationItem = {
   id: PortalPage;
@@ -89,13 +90,6 @@ const navigation: NavigationItem[] = [
     icon: <Building2 size={20} />,
   },
 ];
-
-function Dashboard() {
-  const { t } = useTranslation();
-  return (
-    <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><CalendarDays size={36} color="#176b62"/><Typography variant="h4" mt={2}>{t('Your clinic workspace')}</Typography><Typography color="text.secondary" mt={1} maxWidth={680}>{t('Use the portal menu to access the tools available to your role. Administrators and reception can manage clinic bookings; practitioner-managed providers can book, reschedule, and cancel their own appointments.')}</Typography></Paper>
-  );
-}
 
 export function StaffPortal({ roles, permissions = [] }: { roles: string[]; permissions?: string[] }) {
   const { t } = useTranslation();
@@ -162,7 +156,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
           </Box>
         </Stack>
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
-        {page === "dashboard" && <Dashboard />}
+        {page === "dashboard" && <Dashboard workspace={workspace} />}
         {page === "clients" && <ClientManagement canMerge={roles.includes('super_admin')} />}
         {page === "appointments" && <StaffAppointments practitionerMode={workspace === 'practitioner'} canScheduleOthers={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('schedule_for_other_practitioners')} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
         {page === "practitioners" && <PractitionerAdmin />}
