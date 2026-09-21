@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer,
   FormControlLabel, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText,
-  Paper, Stack, Switch, TextField, Typography,
+  MenuItem, Paper, Stack, Switch, TextField, Typography,
 } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, Settings2, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -15,25 +15,27 @@ import { ServiceAssignments } from './ServiceAssignments';
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type DurationOption = { minutes: number; price_cents: number };
 type DurationForm = { key: string; minutes: string; price: string };
+type Category = { id: number; name: string };
 type Service = {
-  id: number; name: string; description: string | null; preparation_instructions: string | null;
+  id: number; category_id: number | null; category_name: string | null; name: string; description: string | null; preparation_instructions: string | null;
   price_cents: number; durations: number[]; duration_options?: DurationOption[];
   lead_time_minutes: number; booking_horizon_days: number; buffer_before_minutes: number;
   buffer_after_minutes: number; requires_room: number | boolean; recurrence_allowed: number | boolean;
   active: number | boolean;
 };
 type Form = {
-  name: string; description: string; preparation_instructions: string; duration_options: DurationForm[];
+  category_id: string; name: string; description: string; preparation_instructions: string; duration_options: DurationForm[];
   lead_time_minutes: string; booking_horizon_days: string; buffer_before_minutes: string;
   buffer_after_minutes: string; requires_room: boolean; recurrence_allowed: boolean; active: boolean;
 };
 type PanelMode = 'details' | 'new' | 'edit' | null;
 
 const duration = (minutes = '60', price = ''): DurationForm => ({ key: crypto.randomUUID(), minutes, price });
-const blank = (): Form => ({ name: '', description: '', preparation_instructions: '', duration_options: [duration()], lead_time_minutes: '0', booking_horizon_days: '365', buffer_before_minutes: '0', buffer_after_minutes: '0', requires_room: true, recurrence_allowed: false, active: true });
+const blank = (): Form => ({ category_id: '', name: '', description: '', preparation_instructions: '', duration_options: [duration()], lead_time_minutes: '0', booking_horizon_days: '365', buffer_before_minutes: '0', buffer_after_minutes: '0', requires_room: true, recurrence_allowed: false, active: true });
 const normalizeService = (service: Service): Service => ({
   ...service,
   id: Number(service.id),
+  category_id: service.category_id == null ? null : Number(service.category_id),
   price_cents: Number(service.price_cents),
   durations: (service.durations ?? []).map(Number),
   duration_options: service.duration_options?.map(option => ({ minutes: Number(option.minutes), price_cents: Number(option.price_cents) })),
@@ -50,6 +52,7 @@ export function ServiceAdmin() {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [items, setItems] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState<Form>(() => blank());
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>(null);
@@ -57,6 +60,7 @@ export function ServiceAdmin() {
   const [assignmentServiceId, setAssignmentServiceId] = useState<number | null>(null);
   const [assignmentsDirty, setAssignmentsDirty] = useState(false);
   const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [panelError, setPanelError] = useState('');
@@ -69,19 +73,30 @@ export function ServiceAdmin() {
   const selected = items.find(item => item.id === selectedId) ?? null;
   const filteredItems = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
-    return term ? items.filter(item => `${item.name} ${item.description ?? ''}`.toLocaleLowerCase().includes(term)) : items;
-  }, [items, query]);
+    return items.filter(item => {
+      const matchesTerm = !term || `${item.name} ${item.category_name ?? ''} ${item.description ?? ''}`.toLocaleLowerCase().includes(term);
+      const matchesCategory = categoryFilter === 'all'
+        || (categoryFilter === 'uncategorized' ? item.category_id === null : item.category_id === Number(categoryFilter));
+      return matchesTerm && matchesCategory;
+    });
+  }, [categoryFilter, items, query]);
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
 
   const load = useCallback(async (preferredId?: number | null) => {
     setBusy(true); setLoadError('');
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${api}/admin/services`, { headers: { Authorization: `Bearer ${token}` } });
-      const body = await response.json();
+      const headers = { Authorization: `Bearer ${token}` };
+      const [response, settingsResponse] = await Promise.all([
+        fetch(`${api}/admin/services`, { headers }),
+        fetch(`${api}/admin/catalogue-settings`, { headers }),
+      ]);
+      const [body, settingsBody] = await Promise.all([response.json(), settingsResponse.json()]);
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load services.')));
+      if (!settingsResponse.ok) throw new Error(apiErrorMessage(settingsBody, settingsResponse.status, t('Unable to load service categories.')));
       const loadedItems = body.data.map(normalizeService);
       setItems(loadedItems);
+      setCategories((settingsBody.data.categories ?? []).map((category: Category) => ({ ...category, id: Number(category.id) })));
       setSelectedId(current => {
         const requested = Number(preferredId ?? current ?? 0) || null;
         return loadedItems.some((item: Service) => item.id === requested) ? requested : null;
@@ -93,7 +108,7 @@ export function ServiceAdmin() {
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
   const serviceForm = (service: Service): Form => ({
-    name: service.name, description: service.description ?? '', preparation_instructions: service.preparation_instructions ?? '',
+    category_id: service.category_id === null ? '' : String(service.category_id), name: service.name, description: service.description ?? '', preparation_instructions: service.preparation_instructions ?? '',
     duration_options: options(service).map(option => duration(String(option.minutes), (Number(option.price_cents) / 100).toFixed(2))),
     lead_time_minutes: String(service.lead_time_minutes), booking_horizon_days: String(service.booking_horizon_days),
     buffer_before_minutes: String(service.buffer_before_minutes), buffer_after_minutes: String(service.buffer_after_minutes),
@@ -121,7 +136,7 @@ export function ServiceAdmin() {
     event.preventDefault(); setBusy(true); setPanelError(''); setSaved('');
     try {
       const durationOptions = form.duration_options.map(option => ({ minutes: Number(option.minutes), price_cents: Math.round(Number(option.price) * 100) }));
-      const payload = { ...form, duration_options: durationOptions, price_cents: Math.min(...durationOptions.map(option => option.price_cents)), durations: durationOptions.map(option => option.minutes), lead_time_minutes: Number(form.lead_time_minutes), booking_horizon_days: Number(form.booking_horizon_days), buffer_before_minutes: Number(form.buffer_before_minutes), buffer_after_minutes: Number(form.buffer_after_minutes) };
+      const payload = { ...form, category_id: form.category_id ? Number(form.category_id) : null, duration_options: durationOptions, price_cents: Math.min(...durationOptions.map(option => option.price_cents)), durations: durationOptions.map(option => option.minutes), lead_time_minutes: Number(form.lead_time_minutes), booking_horizon_days: Number(form.booking_horizon_days), buffer_before_minutes: Number(form.buffer_before_minutes), buffer_after_minutes: Number(form.buffer_after_minutes) };
       const token = await getAccessToken();
       const response = await fetch(editingId ? `${api}/admin/services/${editingId}` : `${api}/admin/services`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
@@ -141,6 +156,11 @@ export function ServiceAdmin() {
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
         <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
         <Button startIcon={<Settings2 size={17}/>} disabled={!selected} onClick={() => openAssignments()}>{t('Assignments')}</Button>
+        <TextField select size="small" label={t('Filter by category')} value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} sx={{ minWidth: { md: 190 } }}>
+          <MenuItem value="all">{t('All categories')}</MenuItem>
+          <MenuItem value="uncategorized">{t('Uncategorized')}</MenuItem>
+          {categories.map(category => <MenuItem key={category.id} value={String(category.id)}>{category.name}</MenuItem>)}
+        </TextField>
         <TextField size="small" label={t('Filter services')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
       </Stack>
     </Paper>
@@ -156,7 +176,7 @@ export function ServiceAdmin() {
         {filteredItems.map(service => {
           const serviceOptions = options(service);
           return <ListItemButton key={service.id} selected={selectedId === service.id} onClick={() => setSelectedId(service.id)} divider sx={{ py: 1.75, px: 2.5 }}>
-            <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{service.name}</Typography><Chip size="small" color={Boolean(Number(service.active)) ? 'success' : 'default'} label={t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')}/></Stack>} secondary={<>{serviceOptions.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')} · {t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')}</>} />
+            <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{service.name}</Typography><Chip size="small" variant="outlined" label={service.category_name ?? t('Uncategorized')}/><Chip size="small" color={Boolean(Number(service.active)) ? 'success' : 'default'} label={t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')}/></Stack>} secondary={<>{serviceOptions.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')} · {t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')}</>} />
           </ListItemButton>;
         })}
         {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching services' : 'No services yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different service name.' : 'Create the first service offered by the clinic.')}</Typography>{!query && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New service')}</Button>}</Box>}
@@ -170,7 +190,7 @@ export function ServiceAdmin() {
       </Stack>
       {panelMode === 'details' && selected && <ServiceDetails service={selected} options={options(selected)} money={money} edit={() => startEdit(selected)} assignments={() => openAssignments(selected)}/>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={submit} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-        <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><ServiceFields form={form} field={field} changeDuration={changeDuration} removeDuration={removeDuration}/>{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box>
+        <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><ServiceFields form={form} categories={categories} field={field} changeDuration={changeDuration} removeDuration={removeDuration}/>{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box>
         <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}><Button onClick={closePanel} disabled={busy}>{t('Cancel')}</Button><Button type="submit" variant="contained" disabled={busy} startIcon={<Save size={17}/>}>{t(busy ? 'Saving…' : panelMode === 'edit' ? 'Save changes' : 'Add service')}</Button></Stack>
       </Box>}
     </Drawer>
@@ -187,6 +207,7 @@ function ServiceDetails({ service, options, money, edit, assignments }: { servic
   const { t } = useTranslation();
   const rows = [
     [t('Status'), t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')],
+    [t('Category'), service.category_name ?? t('Uncategorized')],
     [t('Duration and price options'), options.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')],
     [t('Room requirement'), t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')],
     [t('Lead time'), t('{{minutes}} minutes', { minutes: service.lead_time_minutes })],
@@ -202,9 +223,10 @@ function ServiceDetails({ service, options, money, edit, assignments }: { servic
   </Stack>;
 }
 
-function ServiceFields({ form, field, changeDuration, removeDuration }: { form: Form; field: <K extends keyof Form>(key: K, value: Form[K]) => void; changeDuration: (key: string, property: 'minutes' | 'price', value: string) => void; removeDuration: (key: string) => void }) {
+function ServiceFields({ form, categories, field, changeDuration, removeDuration }: { form: Form; categories: Category[]; field: <K extends keyof Form>(key: K, value: Form[K]) => void; changeDuration: (key: string, property: 'minutes' | 'price', value: string) => void; removeDuration: (key: string) => void }) {
   const { t } = useTranslation();
   return <Grid container spacing={2}>
+    <Grid size={12}><TextField select fullWidth label={t('Category')} value={form.category_id} onChange={event => field('category_id', event.target.value)} helperText={categories.length === 0 ? t('Create service categories in Business settings, or leave this service uncategorized.') : undefined}><MenuItem value="">{t('Uncategorized')}</MenuItem>{categories.map(category => <MenuItem key={category.id} value={String(category.id)}>{category.name}</MenuItem>)}</TextField></Grid>
     <Grid size={12}><TextField required fullWidth label={t('Service name')} value={form.name} onChange={event => field('name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
     <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Description')} value={form.description} onChange={event => field('description', event.target.value)}/></Grid>
     <Grid size={12}><Typography variant="subtitle1" fontWeight={700}>{t('Duration and price options')}</Typography><Typography variant="body2" color="text.secondary">{t('Prices are explicit for each duration. Appointments keep a snapshot of the selected price.')}</Typography></Grid>

@@ -510,12 +510,20 @@ const fr: Record<string, string> = {
   "On-Site fee CAD": "Frais de visite sur place (CAD)",
   "Save assignments": "Enregistrer les affectations",
   "Unable to load services.": "Impossible de charger les services.",
+  "Unable to load service categories.":
+    "Impossible de charger les catégories de services.",
   "Unable to save service.": "Impossible d’enregistrer le service.",
   "Edit service": "Modifier le service",
   "Add a service": "Ajouter un service",
   "Define one service with one or more duration-and-price choices. Travel fees and buffers are configured separately.":
     "Définissez un service avec un ou plusieurs choix de durée et de prix. Les frais de déplacement et les périodes tampons sont configurés séparément.",
   "Service name": "Nom du service",
+  Category: "Catégorie",
+  "Filter by category": "Filtrer par catégorie",
+  "All categories": "Toutes les catégories",
+  Uncategorized: "Sans catégorie",
+  "Create service categories in Business settings, or leave this service uncategorized.":
+    "Créez des catégories de services dans les paramètres de l’entreprise ou laissez ce service sans catégorie.",
   Description: "Description",
   "Duration and price options": "Options de durée et de prix",
   "Prices are explicit for each duration. Appointments keep a snapshot of the selected price.":

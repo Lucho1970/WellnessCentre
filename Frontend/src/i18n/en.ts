@@ -492,12 +492,19 @@ const en = {
   "On-Site fee CAD": "On-Site fee CAD",
   "Save assignments": "Save assignments",
   "Unable to load services.": "Unable to load services.",
+  "Unable to load service categories.": "Unable to load service categories.",
   "Unable to save service.": "Unable to save service.",
   "Edit service": "Edit service",
   "Add a service": "Add a service",
   "Define one service with one or more duration-and-price choices. Travel fees and buffers are configured separately.":
     "Define one service with one or more duration-and-price choices. Travel fees and buffers are configured separately.",
   "Service name": "Service name",
+  Category: "Category",
+  "Filter by category": "Filter by category",
+  "All categories": "All categories",
+  Uncategorized: "Uncategorized",
+  "Create service categories in Business settings, or leave this service uncategorized.":
+    "Create service categories in Business settings, or leave this service uncategorized.",
   Description: "Description",
   "Duration and price options": "Duration and price options",
   "Prices are explicit for each duration. Appointments keep a snapshot of the selected price.":
