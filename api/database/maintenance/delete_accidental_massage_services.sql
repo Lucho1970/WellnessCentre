@@ -32,19 +32,24 @@ SET @deleted_accidental_appointment = ROW_COUNT();
 DELETE FROM services
 WHERE clinic_id = 1
   AND active = 0
-  AND (
-    (id = 1 AND BINARY name = BINARY 'Massage Session 1.5hr')
-    OR
-    (id = 5 AND BINARY name = BINARY 'Massage Session 2hr')
-  );
-SET @deleted_accidental_services = ROW_COUNT();
+  AND id = 1
+  AND BINARY name = BINARY 'Massage Session 1.5hr';
+SET @deleted_service_1 = ROW_COUNT();
+
+DELETE FROM services
+WHERE clinic_id = 1
+  AND active = 0
+  AND id = 5
+  AND BINARY name = BINARY 'Massage Session 2hr';
+SET @deleted_service_5 = ROW_COUNT();
 
 COMMIT;
 
 SELECT @deleted_test_notifications AS deleted_notifications;
 SELECT @deleted_accidental_appointment AS deleted_appointments;
-SELECT @deleted_accidental_services AS deleted_services;
--- Expected: 2, 1, and 2 respectively.
+SELECT @deleted_service_1 AS deleted_service_1;
+SELECT @deleted_service_5 AS deleted_service_5;
+-- Expected: 2, 1, 1, and 1 respectively.
 
 SELECT id, status, service_id
 FROM appointments
