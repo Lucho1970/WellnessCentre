@@ -126,6 +126,18 @@ Anonymous public bootstrap resolves the clinic from an exact configured host map
 
 Email and generated-document renderers use the same semantic brand projection but have channel-specific allowlists and fallbacks because email clients and print/PDF do not support the full web theme. Legal name, sender identity, accessibility text and required financial/clinical content cannot be hidden or recoloured into illegibility by branding.
 
+### 3.2 Dashboard widget system
+
+The current staff dashboard is an explanatory placeholder, not a live metric dashboard. Replace it incrementally with the governed widget model in [Dashboard widgets](DASHBOARD_WIDGETS.md). Maintain a code-owned widget registry rather than accepting arbitrary HTML, SQL, URLs or user-authored scripts. Each definition has a stable ID, workspace, supported presentation/size, required capability, destination route, data contract, refresh policy, localization keys and explicit loading/error/empty behavior.
+
+Resolve visible widgets as the intersection of released registry entries, the authenticated user's eligible workspace/capabilities, and their saved layout. A saved preference can arrange or hide an authorized widget but can never make an ineligible widget visible. Re-evaluate this intersection after role, permission, practitioner relationship, clinic status or feature-release changes. Destination routes repeat normal authorization and accept only documented filter parameters; a clickable metric is navigation convenience, not an access-control boundary.
+
+Persist layout preferences server-side per user and workspace using stable widget IDs, order, supported width/size and a schema version. Do not persist rendered values, client names, appointment details or other operational/clinical information in preferences or browser storage. Supply versioned role/workspace defaults and a reset operation. Unknown/retired widget IDs are ignored safely; new defaults do not unexpectedly re-enable a widget the user deliberately hid without a documented preference migration.
+
+Dashboard projections use purpose-built server aggregation queries with the same clinic, role, practitioner, client and record-relationship policies as destination modules. Definitions specify timezone, date boundary, status inclusion, units and denominator so a metric has one reproducible meaning. Responses include an `as_of` value where freshness matters and avoid free text or unnecessary sensitive fields. Cache only within the authorization scope and sensitivity of the projection. Never calculate authoritative operational counts by downloading broad records into the browser.
+
+Build shared accessible shells for metric, compact-list, alert/action, timeline and later chart widgets instead of one unbounded conditional component. The full card may act as one descriptive link when it has no other controls; widgets with secondary controls use a linked heading/action to avoid nested interactive elements. Edit mode supports pointer and keyboard reordering, show/hide, allowed sizing, save/cancel and reset. Desktop placement collapses deterministically to the saved order on narrow screens; drag-and-drop is never the only mechanism.
+
 Dedicated callback behavior must match the chosen identity SDK; do not allow the general router to consume/rewrite authorization responses before processing. Test popup and redirect flows under real production-style headers. Public and portal deep-link refreshes need separate SPA fallbacks; `/api/*` must never fall back to frontend HTML.
 
 ## 4. Authentication and authorization design
