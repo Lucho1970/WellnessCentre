@@ -136,9 +136,9 @@ test("language selection switches to French and persists across reloads", async 
     }),
   );
   await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
-  await page.getByRole("button", { name: "LanguageAndRegion" }).click();
+  await page.getByRole("button", { name: "Language and region" }).click();
   await expect(
-    page.getByRole("dialog", { name: "LanguageAndRegion" }),
+    page.getByRole("dialog", { name: "Language and region" }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Français \(Canada\)/ }).click();
   await expect(
@@ -194,7 +194,7 @@ test("API failures are presented in the selected language", async ({
     route.fulfill({ json: { data: [] } }),
   );
   await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
-  await page.getByRole("button", { name: "LanguageAndRegion" }).click();
+  await page.getByRole("button", { name: "Language and region" }).click();
   await page.getByRole("button", { name: /Français \(Canada\)/ }).click();
   await page.goto(`${publicOrigin}${info.config.metadata.publicBase}book`);
   await expect(
