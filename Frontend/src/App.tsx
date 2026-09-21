@@ -21,6 +21,7 @@ import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import { TeamSection } from "./public/TeamSection";
 import { ServiceDetails, ServicesDirectory } from "./public/Services";
 import { PractitionerDetails, PractitionersDirectory } from "./public/Practitioners";
+import { BrandLogo } from "./config/BrandLogo";
 
 const ContentPage = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentPage })));
 const ContentSection = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentSection })));
@@ -137,7 +138,7 @@ export default function App() {
       >
         <Container maxWidth="lg">
           <Toolbar disableGutters sx={{ gap: 2, flexWrap: "wrap", py: 1 }}>
-            <HeartPulse color="#176b62" />
+            <BrandLogo />
             <Typography
               component={Link}
               to="/"

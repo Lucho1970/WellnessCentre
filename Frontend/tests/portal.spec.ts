@@ -1647,6 +1647,37 @@ test("warns before unsaved form work is lost through navigation or browser unloa
   await expect(page).toHaveURL(`${portalHost}/admin`);
 });
 
+test("super admin configures a separate business logo and favicon", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  let logoVersion: string | null = null, faviconVersion: string | null = null;
+  const uploads: Record<string, Record<string, unknown>> = {};
+  await page.route("**/api/v1/admin/catalogue-settings", route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 } } } }));
+  await page.route("**/api/v1/site-config", route => route.fulfill({ json: { data: { name: "Test Wellness", legal_name: null, email: "clinic@example.test", phone: "905-555-0100", logo_version: logoVersion, favicon_version: faviconVersion } } }));
+  await page.route("**/api/v1/admin/clinic/branding/*", route => {
+    const type = new URL(route.request().url()).pathname.split("/").at(-1)!;
+    if (route.request().method() === "PUT") {
+      uploads[type] = route.request().postDataJSON();
+      if (type === "logo") logoVersion = "logo-hash"; else faviconVersion = "favicon-hash";
+      return route.fulfill({ json: { data: { asset_type: type, updated: true } } });
+    }
+    if (type === "logo") logoVersion = null; else faviconVersion = null;
+    return route.fulfill({ json: { data: { asset_type: type, deleted: true } } });
+  });
+  const pixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+  await page.goto(`${portalHost}/admin/settings`);
+  const choose = page.getByRole("button", { name: "Choose image" });
+  await choose.nth(0).locator("input").setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: pixel });
+  await expect(page.getByText("Business logo updated.")).toBeVisible();
+  await page.getByRole("button", { name: "Choose image" }).locator("input").setInputFiles({ name: "favicon.png", mimeType: "image/png", buffer: pixel });
+  await expect(page.getByText("Favicon updated.")).toBeVisible();
+  expect(uploads.logo).toMatchObject({ mime_type: "image/webp" });
+  expect(uploads.favicon).toMatchObject({ mime_type: "image/png" });
+  expect(String(uploads.logo.image_base64).length).toBeGreaterThan(20);
+  expect(String(uploads.favicon.image_base64).length).toBeGreaterThan(20);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", /brand\/favicon\?v=favicon-hash/);
+  await expect(page.getByRole("img", { name: "Current business logo" })).toBeVisible();
+});
+
 test("reception routes support refresh, back, profile menu and restricted deep links", async ({
   page,
 }) => {

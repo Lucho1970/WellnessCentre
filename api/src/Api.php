@@ -52,6 +52,7 @@ final class Api
                 $routes->addRoute('GET','/api/v1/health','health');
                 $routes->addRoute('GET','/api/v1/health/database','databaseHealth');
                 $routes->addRoute('GET','/api/v1/site-config','siteConfig');
+                $routes->addRoute('GET','/api/v1/brand/{type:logo|favicon}','brandAsset');
                 $routes->addRoute('GET','/api/v1/locations','locations');
                 $routes->addRoute('GET','/api/v1/services','services');
                 $routes->addRoute('GET','/api/v1/public/services','publicServices');
@@ -121,6 +122,9 @@ final class Api
                 $routes->addRoute('DELETE','/api/v1/admin/availability-overrides/{id:\\d+}','deleteAvailabilityOverride');
                 $routes->addRoute('DELETE','/api/v1/admin/time-off/{id:\\d+}','deleteTimeOff');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
+                $routes->addRoute('GET','/api/v1/admin/clinic/branding','branding');
+                $routes->addRoute('PUT','/api/v1/admin/clinic/branding/{type:logo|favicon}','saveBrandAsset');
+                $routes->addRoute('DELETE','/api/v1/admin/clinic/branding/{type:logo|favicon}','deleteBrandAsset');
                 $routes->addRoute('GET','/api/v1/admin/catalogue-settings','catalogueSettings');
                 $routes->addRoute('POST','/api/v1/admin/service-categories','createServiceCategory');
                 $routes->addRoute('POST','/api/v1/admin/taxes','createTax');
@@ -133,6 +137,7 @@ final class Api
                 'health'=>['status'=>'ok','time'=>gmdate(DATE_ATOM),'environment'=>$this->config->environment],
                 'databaseHealth'=>$this->databaseHealth(),
                 'siteConfig'=>$this->catalog->siteConfig(),
+                'brandAsset'=>$this->brandAsset($request,(string)$route[2]['type']),
                 'locations'=>$this->catalog->locations(),
                 'services'=>$this->catalog->services(isset($request->query['practitioner_id'])?(int)$request->query['practitioner_id']:null),
                 'publicServices'=>$this->catalog->publicServices(),
@@ -202,6 +207,9 @@ final class Api
                 'deleteAvailabilityOverride'=>$this->admin->deleteScheduleException($this->user($request),'availability_overrides',(int)$route[2]['id'],$request->correlationId),
                 'deleteTimeOff'=>$this->admin->deleteScheduleException($this->user($request),'time_off',(int)$route[2]['id'],$request->correlationId),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
+                'branding'=>$this->admin->branding($this->user($request)),
+                'saveBrandAsset'=>$this->admin->saveBrandAsset($this->user($request),(string)$route[2]['type'],$request->body,$request->correlationId),
+                'deleteBrandAsset'=>$this->admin->deleteBrandAsset($this->user($request),(string)$route[2]['type'],$request->correlationId),
                 'catalogueSettings'=>$this->admin->catalogueSettings($this->user($request)),
                 'createServiceCategory'=>$this->admin->createServiceCategory($this->user($request),$request->body,$request->correlationId),
                 'createTax'=>$this->admin->createTax($this->user($request),$request->body,$request->correlationId),
@@ -283,6 +291,13 @@ final class Api
             Response::notModified($hash, $request->correlationId);
         }
         Response::image((string)$image['image_data'], (string)$image['mime_type'], $hash, $request->correlationId);
+    }
+
+    private function brandAsset(Request $request, string $type): never
+    {
+        $asset=$this->catalog->brandAsset($type);$hash=(string)$asset['content_hash'];
+        if(trim((string)($request->headers['if-none-match']??''),'"')===$hash)Response::notModified($hash,$request->correlationId);
+        Response::image((string)$asset['image_data'],(string)$asset['mime_type'],$hash,$request->correlationId);
     }
 
     private function user(Request $request): AuthContext{return $this->auth->authenticate($request->bearerToken());}

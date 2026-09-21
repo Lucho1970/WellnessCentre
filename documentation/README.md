@@ -8,6 +8,7 @@ Start with these two authoritative documents:
 - [System Design](SYSTEM_DESIGN.md): public/portal architecture, identity and account linking, API/data boundaries, transactions, deployment, migrations and testing.
 - [Public website content](PUBLIC_CONTENT.md): bilingual Markdown locations, validation rules, editing workflow and the boundary between editorial content and API-backed catalogue data.
 - [Public practitioner directory](PUBLIC_PRACTITIONER_DIRECTORY.md): published practitioner projections, directory/profile behavior, preferred names and practitioner-first booking acceptance.
+- [Configurable branding](CONFIGURABLE_BRANDING.md): business logo/favicon roles, secure image constraints, migration and deployment acceptance.
 
 ## Supporting records and historical sources
 

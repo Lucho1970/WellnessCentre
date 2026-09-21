@@ -12,9 +12,24 @@ final class CatalogService
 
     public function siteConfig(): array
     {
-        $clinic = $this->database->connection()->query("SELECT name,legal_name,email,phone FROM clinics WHERE status='active' ORDER BY id LIMIT 1")->fetch();
+        $clinic = $this->database->connection()->query("SELECT c.name,c.legal_name,c.email,c.phone,
+                   (SELECT content_hash FROM clinic_brand_assets WHERE clinic_id=c.id AND asset_type='logo') logo_version,
+                   (SELECT content_hash FROM clinic_brand_assets WHERE clinic_id=c.id AND asset_type='favicon') favicon_version
+              FROM clinics c WHERE c.status='active' ORDER BY c.id LIMIT 1")->fetch();
         if (!$clinic) throw new ApiException(503, 'clinic_not_configured', 'The clinic has not been configured.');
         return $clinic;
+    }
+
+    public function brandAsset(string $type): array
+    {
+        if (!in_array($type, ['logo', 'favicon'], true)) throw new ApiException(404, 'brand_asset_not_found', 'Brand asset not found.');
+        $statement = $this->database->connection()->prepare("SELECT a.mime_type,a.image_data,a.content_hash
+              FROM clinic_brand_assets a JOIN clinics c ON c.id=a.clinic_id AND c.status='active'
+             WHERE a.asset_type=:type ORDER BY c.id LIMIT 1");
+        $statement->execute(['type' => $type]);
+        $asset = $statement->fetch();
+        if (!$asset) throw new ApiException(404, 'brand_asset_not_found', 'Brand asset not found.');
+        return $asset;
     }
 
     public function locations(): array

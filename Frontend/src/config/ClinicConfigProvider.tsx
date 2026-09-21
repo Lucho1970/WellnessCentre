@@ -6,9 +6,11 @@ export type ClinicConfig = {
   legal_name: string | null;
   email: string | null;
   phone: string | null;
+  logo_version: string | null;
+  favicon_version: string | null;
 };
 
-const fallbackConfig: ClinicConfig = { name: 'Wellness Centre', legal_name: null, email: null, phone: null };
+const fallbackConfig: ClinicConfig = { name: 'Wellness Centre', legal_name: null, email: null, phone: null, logo_version: null, favicon_version: null };
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
 type ClinicConfigValue = {
@@ -30,6 +32,8 @@ export function ClinicConfigProvider({ children }: PropsWithChildren) {
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
       setConfig(body.data);
       document.title = body.data.name;
+      const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'icon' }));
+      favicon.href = body.data.favicon_version ? `${apiBaseUrl}/brand/favicon?v=${encodeURIComponent(body.data.favicon_version)}` : '/favicon.svg';
     } catch {
       setConfig(fallbackConfig);
       document.title = fallbackConfig.name;

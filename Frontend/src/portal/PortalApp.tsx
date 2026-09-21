@@ -9,11 +9,11 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import { HeartPulse } from "lucide-react";
 import { Link, Route, Routes } from "react-router-dom";
 import { StaffSignIn } from "../auth/StaffSignIn";
 import { UserAccountMenu } from "../auth/UserAccountMenu";
 import { useClinicConfig } from "../config/ClinicConfigProvider";
+import { BrandLogo } from "../config/BrandLogo";
 import { publicLink } from "../shared/urls";
 import { StaffPortal } from "./StaffPortal";
 import { useTranslation } from "react-i18next";
@@ -60,7 +60,7 @@ export function PortalApp() {
       >
         <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ gap: 2, flexWrap: "wrap", py: 1 }}>
-            <HeartPulse color="#176b62" style={{ flexShrink: 0 }} />
+            <BrandLogo />
             <Typography
               component={Link}
               to="/"

@@ -112,6 +112,8 @@ Client duplicate prevention and Super Admin merge require `database/migrations/0
 
 The governed public service catalogue requires `database/migrations/009_public_service_catalogue.sql` before the matching API and frontend are deployed. It preserves the services already visible in public booking, then lets Super Administrators review their stable slugs and bilingual public content. See `../documentation/PUBLIC_SERVICE_CATALOGUE.md`.
 
+Configurable business logos and favicons require `database/migrations/011_clinic_brand_assets.sql` before the matching API and frontends are deployed. Run it once, then use Administration → Business settings to upload the two independent assets. See `../documentation/CONFIGURABLE_BRANDING.md`.
+
 - Use a restricted database account rather than the MySQL server administrator.
 - Keep `.env`, `vendor`, and runtime cache files outside source control.
 - Serve only the `public` directory.

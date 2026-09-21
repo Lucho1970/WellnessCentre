@@ -82,6 +82,42 @@ final class AdminService
         $pdo=$this->database->connection();
         try{$pdo->beginTransaction();$statement=$pdo->prepare('UPDATE clinics SET name=:name,legal_name=:legal_name,email=:email,phone=:phone WHERE id=:clinic');$statement->execute(['name'=>$name,'legal_name'=>$legalName,'email'=>$email,'phone'=>$phone,'clinic'=>$actor->clinicId]);if($statement->rowCount()===0){$check=$pdo->prepare('SELECT 1 FROM clinics WHERE id=:clinic');$check->execute(['clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'clinic_not_found','Clinic not found.');}$this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.settings.update','clinic',$actor->clinicId,'success',['fields'=>['name','legal_name','email','phone']]);$pdo->commit();return $this->clinic($actor->clinicId);}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
+
+    public function branding(AuthContext $actor): array
+    {
+        $this->superAdmin($actor);
+        $statement=$this->database->connection()->prepare('SELECT asset_type,mime_type,byte_size,width_px,height_px,content_hash,updated_at FROM clinic_brand_assets WHERE clinic_id=:clinic ORDER BY asset_type');
+        $statement->execute(['clinic'=>$actor->clinicId]);
+        $result=['logo'=>null,'favicon'=>null];
+        foreach($statement->fetchAll() as $asset)$result[(string)$asset['asset_type']]=$asset;
+        return $result;
+    }
+
+    public function saveBrandAsset(AuthContext $actor,string $type,array $body,string $correlationId): array
+    {
+        $this->superAdmin($actor);
+        if(!in_array($type,['logo','favicon'],true))throw new ApiException(404,'brand_asset_not_found','Brand asset not found.');
+        $mime=(string)($body['mime_type']??'');$encoded=(string)($body['image_base64']??'');
+        if(!in_array($mime,['image/png','image/webp'],true)||$encoded===''||strlen($encoded)>1_100_000)throw new ApiException(422,'validation_error','Choose a valid PNG or WebP image.');
+        $data=base64_decode($encoded,true);
+        if($data===false||strlen($data)>750_000)throw new ApiException(422,'validation_error','The image is invalid or larger than 750 KB.');
+        $info=@getimagesizefromstring($data);$actualMime=$info['mime']??'';$width=(int)($info[0]??0);$height=(int)($info[1]??0);
+        if($info===false||$actualMime!==$mime)throw new ApiException(422,'validation_error','The image content does not match its format.');
+        if($type==='logo'&&($width<64||$height<32||$width>1200||$height>600))throw new ApiException(422,'validation_error','The logo must be between 64×32 and 1200×600 pixels.');
+        if($type==='favicon'&&($width!==$height||$width<32||$width>512))throw new ApiException(422,'validation_error','The favicon must be square and between 32 and 512 pixels.');
+        $statement=$this->database->connection()->prepare('INSERT INTO clinic_brand_assets(clinic_id,asset_type,mime_type,image_data,byte_size,width_px,height_px,content_hash,updated_by) VALUES(:clinic,:type,:mime,:data,:size,:width,:height,:hash,:actor) ON DUPLICATE KEY UPDATE mime_type=VALUES(mime_type),image_data=VALUES(image_data),byte_size=VALUES(byte_size),width_px=VALUES(width_px),height_px=VALUES(height_px),content_hash=VALUES(content_hash),updated_by=VALUES(updated_by)');
+        $statement->bindValue(':clinic',$actor->clinicId,\PDO::PARAM_INT);$statement->bindValue(':type',$type);$statement->bindValue(':mime',$mime);$statement->bindValue(':data',$data,\PDO::PARAM_LOB);$statement->bindValue(':size',strlen($data),\PDO::PARAM_INT);$statement->bindValue(':width',$width,\PDO::PARAM_INT);$statement->bindValue(':height',$height,\PDO::PARAM_INT);$statement->bindValue(':hash',hash('sha256',$data));$statement->bindValue(':actor',$actor->userId,\PDO::PARAM_INT);$statement->execute();
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.branding.update','clinic',$actor->clinicId,'success',['asset_type'=>$type]);
+        return ['asset_type'=>$type,'updated'=>true,'content_hash'=>hash('sha256',$data)];
+    }
+
+    public function deleteBrandAsset(AuthContext $actor,string $type,string $correlationId): array
+    {
+        $this->superAdmin($actor);if(!in_array($type,['logo','favicon'],true))throw new ApiException(404,'brand_asset_not_found','Brand asset not found.');
+        $statement=$this->database->connection()->prepare('DELETE FROM clinic_brand_assets WHERE clinic_id=:clinic AND asset_type=:type');$statement->execute(['clinic'=>$actor->clinicId,'type'=>$type]);
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.branding.delete','clinic',$actor->clinicId,'success',['asset_type'=>$type]);
+        return ['asset_type'=>$type,'deleted'=>$statement->rowCount()>0];
+    }
     public function catalogueSettings(AuthContext $actor): array{$this->superAdmin($actor);$pdo=$this->database->connection();$c=$pdo->prepare('SELECT id,name,description FROM service_categories WHERE clinic_id=:clinic ORDER BY name');$c->execute(['clinic'=>$actor->clinicId]);$t=$pdo->prepare('SELECT id,code,name,rate_basis_points,active FROM taxes WHERE clinic_id=:clinic ORDER BY name');$t->execute(['clinic'=>$actor->clinicId]);$s=$pdo->prepare('SELECT default_lead_time_minutes,default_booking_horizon_days,default_cancellation_window_minutes,slot_increment_minutes,currency FROM clinic_booking_settings WHERE clinic_id=:clinic');$s->execute(['clinic'=>$actor->clinicId]);return ['categories'=>$c->fetchAll(),'taxes'=>$t->fetchAll(),'settings'=>$s->fetch()?:null];}
     public function createServiceCategory(AuthContext $actor,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['name']);$name=trim((string)$body['name']);if(strlen($name)>120)throw new ApiException(422,'validation_error','Category name is too long.');$s=$this->database->connection()->prepare('INSERT INTO service_categories(clinic_id,name,description) VALUES(:clinic,:name,:description)');$s->execute(['clinic'=>$actor->clinicId,'name'=>$name,'description'=>$this->optional($body,'description')]);return $this->created($actor,$cid,'service_category',(int)$this->database->connection()->lastInsertId());}
     public function createTax(AuthContext $actor,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['code','name','rate_basis_points']);$rate=(int)$body['rate_basis_points'];if($rate<0||$rate>10000)throw new ApiException(422,'validation_error','Tax rate must be between 0 and 100%.');$s=$this->database->connection()->prepare('INSERT INTO taxes(clinic_id,code,name,rate_basis_points) VALUES(:clinic,:code,:name,:rate)');$s->execute(['clinic'=>$actor->clinicId,'code'=>strtoupper(trim((string)$body['code'])),'name'=>trim((string)$body['name']),'rate'=>$rate]);return $this->created($actor,$cid,'tax',(int)$this->database->connection()->lastInsertId());}
