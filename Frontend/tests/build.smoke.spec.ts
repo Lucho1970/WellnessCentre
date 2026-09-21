@@ -52,7 +52,7 @@ test("built public and portal deep links load independently, including base path
 }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.route("**/api/v1/**", (route) =>
+  await page.route("**/api/v1/site-config", (route) =>
     route.fulfill({
       json: {
         data: {
@@ -63,6 +63,9 @@ test("built public and portal deep links load independently, including base path
         },
       },
     }),
+  );
+  await page.route("**/api/v1/team", (route) =>
+    route.fulfill({ json: { data: [] } }),
   );
   await page.goto(`${publicOrigin}${info.config.metadata.publicBase}contact`);
   await expect(
