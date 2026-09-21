@@ -275,6 +275,8 @@ Before commit, display entity counts, duplicates, unresolved references, warning
 
 Existing `AvailabilityService` derives slots from recurring rules/overrides, busy/time-off data, existing appointments, eligibility, room capabilities and buffers. Current implementation may perform repeated per-slot queries; profile and batch relevant date-window data before scaling rather than weakening constraints.
 
+Practitioner availability administration follows the practitioner profile's booking-management policy. A `practitioner_managed` practitioner can create, edit, archive, and remove only their own schedule records and only for active assigned locations. A `clinic_managed` practitioner can review their schedule but cannot mutate it. Clinic administrators retain the multi-practitioner schedule workspace. These ownership and policy rules are enforced in the API; the portal's disabled actions are only a usability aid.
+
 Existing `BookingService` uses a **clinic-row transaction lock**, rechecks availability, validates scope/client eligibility, creates the appointment/history/audit/notification event and supports idempotent requests. This is a coarse but useful starting lock, not a practitioner-level lock or a complete guarantee against all writers. Availability/canonical schedule edits do not all currently participate in the same lock protocol.
 
 Target critical write path:

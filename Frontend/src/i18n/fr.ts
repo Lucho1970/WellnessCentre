@@ -1109,6 +1109,9 @@ const fr: Record<string, string> = {
   "Widget disabled.": "Le widget a été désactivé.",
   "Widget enabled.": "Le widget a été activé.",
   "Unable to update widget.": "Impossible de mettre à jour le widget.",
+  "My availability": "Mes disponibilités",
+  "Review and manage your regular hours, schedule changes, and time off.": "Consultez et gérez vos heures régulières, vos changements d’horaire et vos absences.",
+  "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.": "Votre clinique gère cet horaire. Vous pouvez consulter les disponibilités ici, mais seuls les administrateurs de la clinique peuvent les modifier.",
 };
 
 export default fr;

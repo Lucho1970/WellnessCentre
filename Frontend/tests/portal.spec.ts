@@ -2202,3 +2202,42 @@ test("availability is practitioner-first with selectable hours, changes, and tim
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect.poll(() => update).toMatchObject({ practitioner_id: 8, location_id: 1, weekday: 1, end_time: "18:00" });
 });
+
+test("practitioner manages only their own availability at assigned locations", async ({ page }) => {
+  await fixtures(page, ["practitioner"]);
+  let created: Record<string, unknown> | undefined;
+  await page.route("**/api/v1/practitioner/availability-context", route => route.fulfill({ json: { data: {
+    practitioners: [{ practitioner_id: "8", display_name: "Esther Vanderpoel", preferred_name: "Esther", discipline: "Registered Massage Therapist", location_id: "1", active: "1" }],
+    locations: [{ id: "1", name: "Holland Landing", timezone: "America/Toronto" }],
+    can_manage: true,
+  } } }));
+  await page.route("**/api/v1/admin/availability-rules**", async route => {
+    if (route.request().method() === "POST") created = route.request().postDataJSON();
+    await route.fulfill({ json: { data: route.request().method() === "GET" ? [] : { id: "51" } } });
+  });
+  await page.route("**/api/v1/admin/schedule-exceptions", route => route.fulfill({ json: { data: [] } }));
+
+  await page.goto(`${portalHost}/practitioner/availability`);
+  await expect(page.getByRole("heading", { name: "My availability", exact: true })).toBeVisible();
+  await expect(page.getByText("Esther", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Add hours", exact: true }).click();
+  await page.getByRole("button", { name: "Add hours", exact: true }).last().click();
+  await expect.poll(() => created).toMatchObject({ practitioner_id: 8, location_id: 1 });
+});
+
+test("clinic-managed practitioner availability is read-only", async ({ page }) => {
+  await fixtures(page, ["practitioner"]);
+  await page.route("**/api/v1/practitioner/availability-context", route => route.fulfill({ json: { data: {
+    practitioners: [{ practitioner_id: "8", display_name: "Esther Vanderpoel", preferred_name: "Esther", discipline: "Registered Massage Therapist", location_id: "1", active: "1" }],
+    locations: [{ id: "1", name: "Holland Landing", timezone: "America/Toronto" }],
+    can_manage: false,
+  } } }));
+  await page.route("**/api/v1/admin/availability-rules**", route => route.fulfill({ json: { data: [] } }));
+  await page.route("**/api/v1/admin/schedule-exceptions", route => route.fulfill({ json: { data: [] } }));
+
+  await page.goto(`${portalHost}/practitioner/availability`);
+  await expect(page.getByRole("alert")).toContainText("Your clinic manages this schedule");
+  await expect(page.getByRole("button", { name: "Add hours", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Add change", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Add time off", exact: true })).toBeDisabled();
+});

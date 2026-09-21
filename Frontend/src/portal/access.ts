@@ -7,7 +7,7 @@ export function workspacesFor(roles: string[]): Workspace[] {
 }
 export function pagesFor(roles: string[], workspace: Workspace): PortalPage[] {
   if (!workspacesFor(roles).includes(workspace)) return [];
-  if (workspace === 'practitioner') return ['dashboard', 'appointments', 'profile'];
+  if (workspace === 'practitioner') return ['dashboard', 'appointments', 'calendar', 'profile'];
   return ['dashboard', ...(roles.some(role => bookingRoles.includes(role)) ? ['appointments' as const, 'clients' as const] : []),
     ...(roles.includes('super_admin') ? ['calendar', 'practitioners', 'staff', 'team', 'widgets', 'locations', 'rooms', 'services', 'business'] as PortalPage[] : []), 'profile'];
 }

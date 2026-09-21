@@ -170,7 +170,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}
         {page === "widgets" && <DashboardWidgetAdmin />}
-        {page === "calendar" && <AvailabilityAdmin />}
+        {page === "calendar" && <AvailabilityAdmin practitionerMode={workspace === 'practitioner'} />}
         {page === "profile" && <ProfileSettings />}
         </Suspense>
       </Box>
