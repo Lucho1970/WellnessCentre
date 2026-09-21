@@ -910,6 +910,7 @@ const fr: Record<string, string> = {
     "Aucune photo de profil n’a été téléversée. Les initiales seront affichées.",
   "Public URL name": "Nom dans l’adresse publique",
   "Public full name": "Nom public complet",
+  "Preferred public name": "Prénom public préféré",
   "Booking name": "Nom pour les réservations",
   "Shown on public team and service pages.": "Affiché sur les pages publiques de l’équipe et des services.",
   "Used in friendly actions such as “Book with Esther”.": "Utilisé dans des actions conviviales comme « Réserver avec Esther ».",
@@ -962,6 +963,25 @@ const fr: Record<string, string> = {
   "Contact the clinic for practitioner availability.":
     "Communiquez avec la clinique pour connaître les disponibilités des praticiens.",
   "Book with {{name}}": "Réserver avec {{name}}",
+  "View profile": "Voir le profil",
+  "Our practitioners": "Nos praticiens",
+  "Meet your care team.": "Découvrez votre équipe de soins.",
+  "Explore practitioner profiles, the services they offer, and book with the person who feels right for you.":
+    "Consultez les profils des praticiens et les services qu’ils offrent, puis réservez avec la personne qui vous convient.",
+  "All services": "Tous les services",
+  "Loading practitioners": "Chargement des praticiens",
+  "Practitioner profiles are being prepared.": "Les profils des praticiens sont en préparation.",
+  "No practitioners offer the selected service.": "Aucun praticien n’offre le service sélectionné.",
+  "Unable to load this practitioner.": "Impossible de charger ce profil de praticien.",
+  "Loading practitioner": "Chargement du praticien",
+  "This practitioner profile is not available.": "Ce profil de praticien n’est pas disponible.",
+  "Back to practitioners": "Retour aux praticiens",
+  "Practitioner profile": "Profil du praticien",
+  "Services offered": "Services offerts",
+  "Contact the clinic for service availability.": "Communiquez avec la clinique pour connaître les services disponibles.",
+  "Start with a practitioner (optional)": "Commencer par un praticien (facultatif)",
+  "Choose a practitioner first to see only the services they offer.": "Choisissez d’abord un praticien pour voir uniquement les services qu’il offre.",
+  "Any practitioner": "N’importe quel praticien",
   "On-Site": "Sur place chez le client",
 };
 

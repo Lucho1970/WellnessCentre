@@ -15,7 +15,7 @@ final class AdminService
     public function practitioners(AuthContext $actor): array
     {
         $this->superAdmin($actor);
-        $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.given_name,u.family_name,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,MIN(pl.location_id) AS location_id,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.given_name,u.family_name,u.display_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY u.display_name");
+        $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.given_name,u.family_name,u.display_name,t.booking_name AS preferred_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,MIN(pl.location_id) AS location_id,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=u.clinic_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.given_name,u.family_name,u.display_name,t.booking_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY COALESCE(t.booking_name,u.display_name)");
         $statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
     }
 

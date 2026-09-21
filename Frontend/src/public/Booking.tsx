@@ -9,6 +9,7 @@ import { formatCad, formatDateTime } from '../i18n/format';
 type Location = { id: number; name: string; timezone?: string };
 type Service = { id: number; slug: string; name: string; description: string | null; price_cents: number; durations: { id: number; minutes: number; price_cents: number }[] };
 type Practitioner = { id: number; display_name: string; discipline: string; credentials: string | null };
+type PublicPractitioner = { booking_practitioner_id: number | null; public_name: string; booking_name: string | null };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string };
 type Availability = { timezone: string; availability: Slot[] };
 const dateInZone = (timezone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -21,6 +22,7 @@ export function Booking() {
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [mode,setMode]=useState('mobile');
   const [locations, setLocations] = useState<Location[]>([]), [services, setServices] = useState<Service[]>([]), [practitioners, setPractitioners] = useState<Practitioner[]>([]);
+  const [publicPractitioners, setPublicPractitioners] = useState<PublicPractitioner[]>([]), [preferredPractitionerId, setPreferredPractitionerId] = useState(requestedPractitionerId);
   const [locationId, setLocationId] = useState(''), [serviceId, setServiceId] = useState(''), [practitionerId, setPractitionerId] = useState('');
   const [appointmentDate, setAppointmentDate] = useState('');
   const [availability, setAvailability] = useState<Availability>({ timezone: 'America/Toronto', availability: [] });
@@ -32,23 +34,23 @@ export function Booking() {
 
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');
-    const servicePath = requestedPractitionerId ? `/services?practitioner_id=${requestedPractitionerId}` : '/services';
-    void Promise.all([apiRequest<Location[]>('/locations', { signal: controller.signal }), apiRequest<Service[]>(servicePath, { signal: controller.signal })])
-      .then(([nextLocations, nextServices]) => { if (!controller.signal.aborted) { const requestedService=nextServices.find(item=>item.slug===requestedServiceSlug);setLocations(nextLocations); setServices(nextServices); setLocationId(String(nextLocations[0]?.id ?? '')); setServiceId(String(requestedService?.id ?? nextServices[0]?.id ?? '')); } })
+    const servicePath = preferredPractitionerId ? `/services?practitioner_id=${preferredPractitionerId}` : '/services';
+    void Promise.all([apiRequest<Location[]>('/locations', { signal: controller.signal }), apiRequest<Service[]>(servicePath, { signal: controller.signal }), apiRequest<PublicPractitioner[]>('/public/practitioners', { signal: controller.signal })])
+      .then(([nextLocations, nextServices, nextPublicPractitioners]) => { if (!controller.signal.aborted) { const requestedService=nextServices.find(item=>item.slug===requestedServiceSlug);setLocations(nextLocations); setServices(nextServices); setPublicPractitioners(nextPublicPractitioners.filter(item => item.booking_practitioner_id)); setLocationId(String(nextLocations[0]?.id ?? '')); setServiceId(String(requestedService?.id ?? nextServices[0]?.id ?? '')); } })
       .catch(cause => { if (!controller.signal.aborted) setError(message(cause)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [retry, requestedPractitionerId, requestedServiceSlug]);
+  }, [retry, preferredPractitionerId, requestedServiceSlug]);
   useEffect(() => {
     const controller = new AbortController(); setPractitioners([]); setPractitionerId(''); setSlot(null); setPractitionerError('');
     if (!serviceId) return () => controller.abort();
     setPractitionerBusy(true);
     void apiRequest<Practitioner[]>(`/practitioners?service_id=${serviceId}`, { signal: controller.signal })
-      .then(data => { if (!controller.signal.aborted) { setPractitioners(data); const requested = data.find(item => String(item.id) === requestedPractitionerId); setPractitionerId(String(requested?.id ?? data[0]?.id ?? '')); } })
+      .then(data => { if (!controller.signal.aborted) { setPractitioners(data); const requested = data.find(item => String(item.id) === preferredPractitionerId); setPractitionerId(String(requested?.id ?? data[0]?.id ?? '')); } })
       .catch(cause => { if (!controller.signal.aborted) setPractitionerError(message(cause)); })
       .finally(() => { if (!controller.signal.aborted) setPractitionerBusy(false); });
     return () => controller.abort();
-  }, [serviceId, retry, requestedPractitionerId]);
+  }, [serviceId, retry, preferredPractitionerId]);
   useEffect(() => {
     if (locationId) setAppointmentDate(current => current || dateInZone(selectedTimezone));
   }, [locationId, selectedTimezone]);
@@ -77,6 +79,7 @@ export function Booking() {
         <Typography variant="h5" component="h2">{t('Choose care')}</Typography>
         <TextField select label={t('Visit type')} value={mode} onChange={event=>{setSlot(null);setMode(event.target.value);}}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         <TextField select label={t('Base location / service area')} value={locationId} onChange={event => { setSlot(null); setLocationId(event.target.value); }}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
+        <TextField select label={t('Start with a practitioner (optional)')} value={preferredPractitionerId} helperText={t('Choose a practitioner first to see only the services they offer.')} onChange={event => { setSlot(null); setServiceId(''); setPractitionerId(''); setPreferredPractitionerId(event.target.value); }}><MenuItem value="">{t('Any practitioner')}</MenuItem>{publicPractitioners.map(item => <MenuItem key={item.booking_practitioner_id} value={String(item.booking_practitioner_id)}>{item.booking_name || item.public_name}</MenuItem>)}</TextField>
         <TextField select label={t('Service')} value={serviceId} onChange={event => { setSlot(null); setPractitionerId(''); setServiceId(event.target.value); }}>{services.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
         {service && <Box><Typography color="text.secondary">{service.description}</Typography><Typography mt={1}>{t('Treatment options before taxes')}</Typography><Typography variant="body2">{service.durations.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(Number(option.price_cents)) })).join(' · ')}</Typography>{mode === 'mobile' && <Typography variant="body2">{t('A separate On-Site surcharge may apply; staff will confirm coverage and travel time.')}</Typography>}</Box>}
       </Stack></Paper></Grid>

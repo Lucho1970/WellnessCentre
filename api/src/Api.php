@@ -56,6 +56,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/services','services');
                 $routes->addRoute('GET','/api/v1/public/services','publicServices');
                 $routes->addRoute('GET','/api/v1/public/services/{slug:[a-z0-9-]+}','publicService');
+                $routes->addRoute('GET','/api/v1/public/practitioners','publicPractitioners');
+                $routes->addRoute('GET','/api/v1/public/practitioners/{slug:[a-z0-9-]+}','publicPractitioner');
                 $routes->addRoute('GET','/api/v1/practitioners','practitioners');
                 $routes->addRoute('GET','/api/v1/team','team');
                 $routes->addRoute('GET','/api/v1/team/{slug:[a-z0-9-]+}/image','teamImage');
@@ -135,6 +137,8 @@ final class Api
                 'services'=>$this->catalog->services(isset($request->query['practitioner_id'])?(int)$request->query['practitioner_id']:null),
                 'publicServices'=>$this->catalog->publicServices(),
                 'publicService'=>$this->catalog->publicService((string)$route[2]['slug']),
+                'publicPractitioners'=>$this->catalog->publicPractitioners(),
+                'publicPractitioner'=>$this->catalog->publicPractitioner((string)$route[2]['slug']),
                 'practitioners'=>$this->catalog->practitioners(isset($request->query['service_id'])?(int)$request->query['service_id']:null),
                 'team'=>$this->catalog->team(),
                 'teamImage'=>$this->teamImage($request,(string)$route[2]['slug']),

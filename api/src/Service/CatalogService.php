@@ -72,9 +72,67 @@ final class CatalogService
         return $service;
     }
 
+    public function publicPractitioners(): array
+    {
+        $sql = "SELECT t.slug,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,
+                       p.discipline,p.credentials,t.display_order,
+                       CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image,
+                       i.content_hash image_version,
+                       CASE WHEN t.show_booking_action=1 THEN p.id ELSE NULL END booking_practitioner_id
+                  FROM public_team_profiles t
+                  JOIN users u ON u.id=t.user_id AND u.status='active' AND u.user_type='staff'
+                  JOIN practitioners p ON p.user_id=u.id AND p.active=1
+             LEFT JOIN user_profile_images i ON i.user_id=u.id
+                 WHERE t.published=1 AND t.section='practitioner'
+                   AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+              ORDER BY t.display_order,t.public_name";
+        $practitioners = $this->database->connection()->query($sql)->fetchAll();
+        if ($practitioners === []) return [];
+
+        $serviceSql = "SELECT t.slug practitioner_slug,s.slug,s.name,s.name_fr,c.name category
+                         FROM public_team_profiles t
+                         JOIN practitioners p ON p.user_id=t.user_id AND p.active=1
+                         JOIN practitioner_services ps ON ps.practitioner_id=p.id AND ps.active=1
+                         JOIN services s ON s.id=ps.service_id AND s.active=1 AND s.published=1
+                    LEFT JOIN service_categories c ON c.id=s.category_id AND c.clinic_id=s.clinic_id
+                        WHERE t.published=1 AND t.section='practitioner'
+                          AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                     ORDER BY c.name IS NULL,c.name,s.display_order,s.name";
+        $servicesByPractitioner = [];
+        foreach ($this->database->connection()->query($serviceSql)->fetchAll() as $service) {
+            $practitionerSlug = (string)$service['practitioner_slug'];
+            unset($service['practitioner_slug']);
+            $servicesByPractitioner[$practitionerSlug][] = $service;
+        }
+        foreach ($practitioners as &$practitioner) {
+            $practitioner['has_image'] = (bool)$practitioner['has_image'];
+            $practitioner['services'] = $servicesByPractitioner[(string)$practitioner['slug']] ?? [];
+        }
+        return $practitioners;
+    }
+
+    public function publicPractitioner(string $slug): array
+    {
+        if (preg_match('/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/', $slug) !== 1) {
+            throw new ApiException(404, 'practitioner_not_found', 'Published practitioner not found.');
+        }
+        $matches = array_values(array_filter(
+            $this->publicPractitioners(),
+            static fn(array $practitioner): bool => $practitioner['slug'] === $slug
+        ));
+        if ($matches === []) throw new ApiException(404, 'practitioner_not_found', 'Published practitioner not found.');
+        $practitioner = $matches[0];
+        $serviceSlugs = array_column($practitioner['services'], 'slug');
+        $practitioner['services'] = array_values(array_filter(
+            $this->publicServices(),
+            static fn(array $service): bool => in_array($service['slug'], $serviceSlugs, true)
+        ));
+        return $practitioner;
+    }
+
     public function practitioners(?int $serviceId = null): array
     {
-        $sql = "SELECT p.id,COALESCE(t.public_name,u.display_name) display_name,p.discipline,p.biography,p.credentials FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN public_team_profiles t ON t.user_id=u.id";
+        $sql = "SELECT p.id,COALESCE(t.booking_name,t.public_name,u.display_name) display_name,p.discipline,p.biography,p.credentials FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=u.clinic_id";
         $params=[];
         if($serviceId){$sql.=' JOIN practitioner_services ps ON ps.practitioner_id=p.id WHERE p.active=1 AND ps.active=1 AND ps.service_id=:service';$params['service']=$serviceId;}else{$sql.=' WHERE p.active=1';}
         $sql.=' ORDER BY u.display_name'; $statement=$this->database->connection()->prepare($sql);$statement->execute($params);return $statement->fetchAll();

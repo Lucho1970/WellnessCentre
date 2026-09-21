@@ -407,14 +407,14 @@ denial, MySQL conflict, exact-retry and notification-record scenarios in
 [Practitioner appointment management](PRACTITIONER_APPOINTMENTS.md) before extending its
 lifecycle scope.
 
-The R3 public service publishing slice is implemented in source: governed bilingual service
-fields, stable slugs, an allowlisted anonymous projection, category-filtered directory and
-detail routes, and direct handoff to the existing booking flow. Migration 009 and the signed-in
-administrative/public acceptance checks in [Public service catalogue](PUBLIC_SERVICE_CATALOGUE.md)
-remain deployment gates. The next public discovery slice is the practitioner directory and
-detail experience, reusing the published team projection and service relationships rather
-than creating a second profile source. Deliver New Clients/FAQ/static resources after that
-foundation. Guided discovery, analytics and search metadata follow once the owner has
+The R3 public service and practitioner discovery slices are implemented in source: governed
+bilingual service/profile fields, stable slugs, allowlisted anonymous projections, filtered
+directory and detail routes, and direct handoff to the existing booking flow. Practitioner
+profiles reuse published team data and active service assignments rather than creating a
+second source. Public booking supports service-first and practitioner-first filtering. Migration
+009/010 and the administrative/public acceptance checks in [Public service catalogue](PUBLIC_SERVICE_CATALOGUE.md)
+and [Public practitioner directory](PUBLIC_PRACTITIONER_DIRECTORY.md) remain deployment gates.
+Deliver New Clients/FAQ/static resources next. Guided discovery, analytics and search metadata follow once the owner has
 approved the content taxonomy and measurement policy. Do not start reviews/testimonials or
 classes/workshops as part of this slice.
 

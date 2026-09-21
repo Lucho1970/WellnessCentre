@@ -876,6 +876,7 @@ const en = {
     "No profile image has been uploaded. Initials will be shown.",
   "Public URL name": "Public URL name",
   "Public full name": "Public full name",
+  "Preferred public name": "Preferred public name",
   "Booking name": "Booking name",
   "Shown on public team and service pages.": "Shown on public team and service pages.",
   "Used in friendly actions such as “Book with Esther”.": "Used in friendly actions such as “Book with Esther”.",
@@ -925,6 +926,25 @@ const en = {
   "Contact the clinic for practitioner availability.":
     "Contact the clinic for practitioner availability.",
   "Book with {{name}}": "Book with {{name}}",
+  "View profile": "View profile",
+  "Our practitioners": "Our practitioners",
+  "Meet your care team.": "Meet your care team.",
+  "Explore practitioner profiles, the services they offer, and book with the person who feels right for you.":
+    "Explore practitioner profiles, the services they offer, and book with the person who feels right for you.",
+  "All services": "All services",
+  "Loading practitioners": "Loading practitioners",
+  "Practitioner profiles are being prepared.": "Practitioner profiles are being prepared.",
+  "No practitioners offer the selected service.": "No practitioners offer the selected service.",
+  "Unable to load this practitioner.": "Unable to load this practitioner.",
+  "Loading practitioner": "Loading practitioner",
+  "This practitioner profile is not available.": "This practitioner profile is not available.",
+  "Back to practitioners": "Back to practitioners",
+  "Practitioner profile": "Practitioner profile",
+  "Services offered": "Services offered",
+  "Contact the clinic for service availability.": "Contact the clinic for service availability.",
+  "Start with a practitioner (optional)": "Start with a practitioner (optional)",
+  "Choose a practitioner first to see only the services they offer.": "Choose a practitioner first to see only the services they offer.",
+  "Any practitioner": "Any practitioner",
   "On-Site": "On-Site",
 } as const;
 

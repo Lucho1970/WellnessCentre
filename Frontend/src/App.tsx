@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import { TeamSection } from "./public/TeamSection";
 import { ServiceDetails, ServicesDirectory } from "./public/Services";
+import { PractitionerDetails, PractitionersDirectory } from "./public/Practitioners";
 
 const ContentPage = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentPage })));
 const ContentSection = lazy(() => import("./content/MarkdownContent").then(module => ({ default: module.ContentSection })));
@@ -159,6 +160,9 @@ export default function App() {
               <Button component={Link} to="/services">
                 {t("Services")}
               </Button>
+              <Button component={Link} to="/practitioners">
+                {t("Practitioners")}
+              </Button>
               <Button component={Link} to="/new-clients">
                 {t("New clients")}
               </Button>
@@ -190,6 +194,8 @@ export default function App() {
           <Route path="/book" element={<Booking />} />
           <Route path="/services" element={<ServicesDirectory />} />
           <Route path="/services/:slug" element={<ServiceDetails />} />
+          <Route path="/practitioners" element={<PractitionersDirectory />} />
+          <Route path="/practitioners/:slug" element={<PractitionerDetails />} />
           <Route path="/about" element={<Suspense fallback={null}><ContentPage contentKey="pages/about" /></Suspense>} />
           <Route path="/new-clients" element={<Suspense fallback={null}><ContentPage contentKey="pages/new-clients" /></Suspense>} />
           <Route path="/faq" element={<Suspense fallback={null}><ContentPage contentKey="pages/faq" /></Suspense>} />
@@ -218,6 +224,7 @@ export default function App() {
           <Stack direction="row" spacing={1} flexWrap="wrap" mt={2}>
             <Button component={Link} to="/about" color="inherit" size="small">{t("About")}</Button>
             <Button component={Link} to="/services" color="inherit" size="small">{t("Services")}</Button>
+            <Button component={Link} to="/practitioners" color="inherit" size="small">{t("Practitioners")}</Button>
             <Button component={Link} to="/new-clients" color="inherit" size="small">{t("New clients")}</Button>
             <Button component={Link} to="/faq" color="inherit" size="small">{t("FAQs")}</Button>
             <Button component={Link} to="/contact" color="inherit" size="small">{t("Contact")}</Button>

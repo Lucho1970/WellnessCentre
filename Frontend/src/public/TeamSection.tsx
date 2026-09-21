@@ -47,7 +47,7 @@ function TeamMemberTile({ member }: { member: TeamMember }) {
           {summary && <Typography sx={{ whiteSpace: 'pre-line' }}>{summary}</Typography>}
         </Stack>
       </CardContent>
-      {member.practitioner_id && <CardActions sx={{ px: 3, pb: 3, pt: 0 }}><Button fullWidth component={Link} to={`/book?practitioner_id=${member.practitioner_id}`} variant="contained" startIcon={<CalendarDays size={18} />} aria-label={t('Book with {{name}}',{name:member.public_name})}>{t('Book with {{name}}',{name:member.booking_name||member.public_name})}</Button></CardActions>}
+      {member.section === 'practitioner' && <CardActions sx={{ px: 3, pb: 3, pt: 0, flexWrap: 'wrap' }}><Button component={Link} to={`/practitioners/${member.slug}`} sx={{ flexGrow: 1 }}>{t('View profile')}</Button>{member.practitioner_id && <Button component={Link} to={`/book?practitioner_id=${member.practitioner_id}`} variant="contained" startIcon={<CalendarDays size={18} />} aria-label={t('Book with {{name}}',{name:member.public_name})}>{t('Book with {{name}}',{name:member.booking_name||member.public_name})}</Button>}</CardActions>}
     </Card>;
 }
 

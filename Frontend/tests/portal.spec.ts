@@ -72,6 +72,16 @@ async function fixtures(
           credentials: "RMT",
         },
       ];
+    if (path === "/public/practitioners")
+      data = [
+        {
+          slug: "test-practitioner",
+          public_name: "Test Practitioner",
+          booking_name: "Test",
+          booking_practitioner_id: 3,
+          services: [],
+        },
+      ];
     if (path === "/availability")
       data = {
         timezone: "America/Toronto",
@@ -437,6 +447,7 @@ test("practitioners use list-first details, edit, and identity-linking panels", 
       given_name: "Esther",
       family_name: "Vanderpoel",
       display_name: "Esther Vanderpoel",
+      preferred_name: "Esther",
       email: "esther@example.test",
       status: "active",
       discipline: "Registered Massage Therapy",
@@ -492,6 +503,8 @@ test("practitioners use list-first details, edit, and identity-linking panels", 
   await expect(
     page.getByText("esther@example.test", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("Preferred public name", { exact: true })).toBeVisible();
+  await expect(page.getByText("Esther", { exact: true }).last()).toBeVisible();
   await page.getByRole("button", { name: "Close panel" }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page
@@ -1235,7 +1248,7 @@ test("contact page lists published practitioners first and carries a team bookin
   await page.getByRole("link", { name: "Book with Test Practitioner" }).click();
   await expect(page).toHaveURL(`${publicHost}/book?practitioner_id=3`);
   await expect(
-    page.getByRole("combobox", { name: "Practitioner" }),
+    page.getByRole("combobox", { name: /^Practitioner\b/ }),
   ).toContainText("Test Practitioner");
 });
 
@@ -1348,8 +1361,70 @@ test("published service catalogue filters categories and carries service and pra
     page.getByRole("combobox").filter({ hasText: "Massage Therapy" }),
   ).toHaveCount(1);
   await expect(
-    page.getByRole("combobox", { name: "Practitioner" }),
+    page.getByRole("combobox", { name: /^Practitioner\b/ }),
   ).toContainText("Test Practitioner");
+});
+
+test("public practitioner directory filters services and links profiles to booking", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const esther = {
+    slug: "esther-vanderpoel",
+    public_name: "Esther Vanderpoel",
+    booking_name: "Esther",
+    public_title: "Registered Massage Therapist",
+    public_title_fr: "Massothérapeute agréée",
+    summary: "Mobile therapeutic massage tailored to your goals.",
+    summary_fr: "Massothérapie mobile adaptée à vos objectifs.",
+    discipline: "Massage Therapy",
+    credentials: "RMT",
+    has_image: false,
+    image_version: null,
+    booking_practitioner_id: 3,
+    services: [
+      { slug: "massage-therapy", name: "Massage Therapy", name_fr: "Massothérapie", category: "Massage" },
+    ],
+  };
+  const nutrition = {
+    ...esther,
+    slug: "nutrition-practitioner",
+    public_name: "Nutrition Practitioner",
+    booking_name: "Nutrition Practitioner",
+    booking_practitioner_id: 4,
+    services: [{ slug: "nutrition", name: "Nutrition", name_fr: "Nutrition", category: "Nutrition" }],
+  };
+  await page.route("**/api/v1/public/practitioners", route => route.fulfill({ json: { data: [esther, nutrition] } }));
+  await page.route("**/api/v1/public/practitioners/esther-vanderpoel", route => route.fulfill({ json: { data: { ...esther, services: [{ ...esther.services[0], public_summary: "Treatment tailored to your goals.", public_summary_fr: "Un traitement adapté à vos objectifs.", description: "Massage treatment.", description_fr: "Traitement de massothérapie.", offers_clinic: false, offers_mobile: true, durations: [{ minutes: 60, price_cents: 12000 }] }] } } }));
+  await page.goto(`${publicHost}/practitioners`);
+  await expect(page.getByRole("heading", { name: "Meet your care team." })).toBeVisible();
+  await page.getByRole("combobox", { name: "Service" }).click();
+  await page.getByRole("option", { name: "Massage Therapy" }).click();
+  await expect(page.getByRole("heading", { name: "Esther Vanderpoel" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nutrition Practitioner" })).toHaveCount(0);
+  await page.getByRole("link", { name: "View profile" }).click();
+  await expect(page).toHaveURL(`${publicHost}/practitioners/esther-vanderpoel`);
+  await expect(page.getByRole("heading", { name: "Services offered" })).toBeVisible();
+  await expect(page.getByText("60 min — $120.00")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Book with Esther" })).toHaveAttribute("href", "/book?practitioner_id=3");
+  await expect(page.getByRole("link", { name: "Book", exact: true })).toHaveAttribute("href", "/book?service=massage-therapy&practitioner_id=3");
+});
+
+test("public booking can start with a practitioner and filters the service list", async ({ page }) => {
+  await fixtures(page);
+  const queries: string[] = [];
+  await page.route("**/api/v1/services**", route => {
+    const url = new URL(route.request().url());
+    queries.push(url.search);
+    const filtered = url.searchParams.get("practitioner_id") === "3";
+    return route.fulfill({ json: { data: filtered ? [{ id: 2, slug: "massage", name: "Massage", description: "Therapeutic care", price_cents: 10000, durations: [{ id: 4, minutes: 60, price_cents: 10000 }] }] : [{ id: 9, slug: "nutrition", name: "Nutrition", description: "Nutrition", price_cents: 8000, durations: [{ id: 8, minutes: 60, price_cents: 8000 }] }] } });
+  });
+  await page.goto(`${publicHost}/book`);
+  await page.getByRole("combobox", { name: "Start with a practitioner (optional)" }).click();
+  await page.getByRole("option", { name: "Test" }).click();
+  await expect.poll(() => queries.some(query => query.includes("practitioner_id=3"))).toBe(true);
+  await expect(page.getByRole("combobox", { name: /^Service\b/ })).toContainText("Massage");
+  await expect(page.getByRole("combobox", { name: /^Practitioner\b/ })).toContainText("Test Practitioner");
 });
 
 test("super admin deliberately publishes a bilingual public team profile", async ({
