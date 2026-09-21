@@ -1,0 +1,21 @@
+CREATE TABLE public_team_profiles (
+ user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ slug VARCHAR(100) NOT NULL,
+ section ENUM('practitioner','administration') NOT NULL,
+ public_title VARCHAR(150) NOT NULL,
+ public_title_fr VARCHAR(150),
+ summary VARCHAR(1000),
+ summary_fr VARCHAR(1000),
+ display_order SMALLINT UNSIGNED NOT NULL DEFAULT 100,
+ published BOOLEAN NOT NULL DEFAULT FALSE,
+ show_booking_action BOOLEAN NOT NULL DEFAULT FALSE,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ updated_by BIGINT UNSIGNED NULL,
+ UNIQUE KEY uq_public_team_slug(clinic_id,slug),
+ INDEX ix_public_team_listing(published,section,display_order),
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
