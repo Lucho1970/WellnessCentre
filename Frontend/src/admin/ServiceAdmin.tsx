@@ -22,6 +22,7 @@ type Service = {
   preparation_instructions: string | null; preparation_instructions_fr: string | null; published: number | boolean; display_order: number;
   price_cents: number; durations: number[]; duration_options?: DurationOption[];
   lead_time_minutes: number; booking_horizon_days: number; buffer_before_minutes: number;
+  cancellation_window_minutes: number; cancellation_fee_type: 'none'|'fixed'|'percentage'; cancellation_fee_value: number;
   buffer_after_minutes: number; requires_room: number | boolean; recurrence_allowed: number | boolean;
   active: number | boolean;
 };
@@ -29,12 +30,13 @@ type Form = {
   category_id: string; slug: string; name: string; name_fr: string; public_summary: string; public_summary_fr: string;
   description: string; description_fr: string; preparation_instructions: string; preparation_instructions_fr: string; duration_options: DurationForm[];
   lead_time_minutes: string; booking_horizon_days: string; buffer_before_minutes: string;
+  cancellation_window_minutes: string; cancellation_fee_type: 'none'|'fixed'|'percentage'; cancellation_fee_value: string;
   buffer_after_minutes: string; display_order: string; requires_room: boolean; recurrence_allowed: boolean; active: boolean; published: boolean;
 };
 type PanelMode = 'details' | 'new' | 'edit' | null;
 
 const duration = (minutes = '60', price = ''): DurationForm => ({ key: crypto.randomUUID(), minutes, price });
-const blank = (): Form => ({ category_id: '', slug: '', name: '', name_fr: '', public_summary: '', public_summary_fr: '', description: '', description_fr: '', preparation_instructions: '', preparation_instructions_fr: '', duration_options: [duration()], lead_time_minutes: '0', booking_horizon_days: '365', buffer_before_minutes: '0', buffer_after_minutes: '0', display_order: '100', requires_room: true, recurrence_allowed: false, active: true, published: false });
+const blank = (): Form => ({ category_id: '', slug: '', name: '', name_fr: '', public_summary: '', public_summary_fr: '', description: '', description_fr: '', preparation_instructions: '', preparation_instructions_fr: '', duration_options: [duration()], lead_time_minutes: '0', booking_horizon_days: '365', cancellation_window_minutes: '1440', cancellation_fee_type: 'none', cancellation_fee_value: '0', buffer_before_minutes: '0', buffer_after_minutes: '0', display_order: '100', requires_room: true, recurrence_allowed: false, active: true, published: false });
 const slugify = (value: string) => value.toLocaleLowerCase('en-CA').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 120);
 const normalizeService = (service: Service): Service => ({
   ...service,
@@ -45,6 +47,9 @@ const normalizeService = (service: Service): Service => ({
   duration_options: service.duration_options?.map(option => ({ minutes: Number(option.minutes), price_cents: Number(option.price_cents) })),
   lead_time_minutes: Number(service.lead_time_minutes),
   booking_horizon_days: Number(service.booking_horizon_days),
+  cancellation_window_minutes: Number(service.cancellation_window_minutes ?? 1440),
+  cancellation_fee_type: service.cancellation_fee_type ?? 'none',
+  cancellation_fee_value: Number(service.cancellation_fee_value ?? 0),
   buffer_before_minutes: Number(service.buffer_before_minutes),
   buffer_after_minutes: Number(service.buffer_after_minutes),
   display_order: Number(service.display_order),
@@ -116,6 +121,8 @@ export function ServiceAdmin() {
     category_id: service.category_id === null ? '' : String(service.category_id), slug: service.slug, name: service.name, name_fr: service.name_fr ?? '', public_summary: service.public_summary ?? '', public_summary_fr: service.public_summary_fr ?? '', description: service.description ?? '', description_fr: service.description_fr ?? '', preparation_instructions: service.preparation_instructions ?? '', preparation_instructions_fr: service.preparation_instructions_fr ?? '',
     duration_options: options(service).map(option => duration(String(option.minutes), (Number(option.price_cents) / 100).toFixed(2))),
     lead_time_minutes: String(service.lead_time_minutes), booking_horizon_days: String(service.booking_horizon_days),
+    cancellation_window_minutes: String(service.cancellation_window_minutes), cancellation_fee_type: service.cancellation_fee_type,
+    cancellation_fee_value: service.cancellation_fee_type === 'fixed' ? (service.cancellation_fee_value / 100).toFixed(2) : service.cancellation_fee_type === 'percentage' ? String(service.cancellation_fee_value / 100) : '0',
     buffer_before_minutes: String(service.buffer_before_minutes), buffer_after_minutes: String(service.buffer_after_minutes),
     display_order: String(service.display_order), requires_room: Boolean(Number(service.requires_room)), recurrence_allowed: Boolean(Number(service.recurrence_allowed)), active: Boolean(Number(service.active)), published: Boolean(Number(service.published)),
   });
@@ -141,7 +148,8 @@ export function ServiceAdmin() {
     event.preventDefault(); setBusy(true); setPanelError(''); setSaved('');
     try {
       const durationOptions = form.duration_options.map(option => ({ minutes: Number(option.minutes), price_cents: Math.round(Number(option.price) * 100) }));
-      const payload = { ...form, category_id: form.category_id ? Number(form.category_id) : null, duration_options: durationOptions, price_cents: Math.min(...durationOptions.map(option => option.price_cents)), durations: durationOptions.map(option => option.minutes), lead_time_minutes: Number(form.lead_time_minutes), booking_horizon_days: Number(form.booking_horizon_days), buffer_before_minutes: Number(form.buffer_before_minutes), buffer_after_minutes: Number(form.buffer_after_minutes), display_order: Number(form.display_order) };
+      const cancellationValue = form.cancellation_fee_type === 'fixed' ? Math.round(Number(form.cancellation_fee_value) * 100) : form.cancellation_fee_type === 'percentage' ? Math.round(Number(form.cancellation_fee_value) * 100) : 0;
+      const payload = { ...form, category_id: form.category_id ? Number(form.category_id) : null, duration_options: durationOptions, price_cents: Math.min(...durationOptions.map(option => option.price_cents)), durations: durationOptions.map(option => option.minutes), lead_time_minutes: Number(form.lead_time_minutes), booking_horizon_days: Number(form.booking_horizon_days), cancellation_window_minutes: Number(form.cancellation_window_minutes), cancellation_fee_value: cancellationValue, buffer_before_minutes: Number(form.buffer_before_minutes), buffer_after_minutes: Number(form.buffer_after_minutes), display_order: Number(form.display_order) };
       const token = await getAccessToken();
       const response = await fetch(editingId ? `${api}/admin/services/${editingId}` : `${api}/admin/services`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
@@ -220,6 +228,7 @@ function ServiceDetails({ service, options, money, edit, assignments }: { servic
     [t('Room requirement'), t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')],
     [t('Lead time'), t('{{minutes}} minutes', { minutes: service.lead_time_minutes })],
     [t('Booking horizon'), t('{{days}} days', { days: service.booking_horizon_days })],
+    [t('Cancellation policy'), service.cancellation_fee_type === 'none' ? t('No cancellation fee') : t('{{fee}} within {{minutes}} minutes', { fee: service.cancellation_fee_type === 'fixed' ? money(service.cancellation_fee_value) : `${service.cancellation_fee_value / 100}%`, minutes: service.cancellation_window_minutes })],
     [t('Buffers'), t('{{before}} min before · {{after}} min after', { before: service.buffer_before_minutes, after: service.buffer_after_minutes })],
     [t('Recurring bookings'), t(Boolean(Number(service.recurrence_allowed)) ? 'Allowed' : 'Not allowed')],
   ];
@@ -243,6 +252,10 @@ function ServiceFields({ form, categories, field, changeDuration, removeDuration
     {form.duration_options.map((option, index) => <Grid size={12} key={option.key}><Stack direction="row" spacing={1} alignItems="center"><TextField required fullWidth type="number" label={t('Duration {{number}} (minutes)', { number: index + 1 })} value={option.minutes} onChange={event => changeDuration(option.key, 'minutes', event.target.value)} inputProps={{ min: 15, max: 480, step: 15 }}/><TextField required fullWidth type="number" label={t('Price {{number}} (CAD)', { number: index + 1 })} value={option.price} onChange={event => changeDuration(option.key, 'price', event.target.value)} inputProps={{ min: 0, step: .01 }}/><IconButton aria-label={t('Remove duration {{number}}', { number: index + 1 })} disabled={form.duration_options.length === 1} onClick={() => removeDuration(option.key)}><Trash2 size={18}/></IconButton></Stack></Grid>)}
     <Grid size={12}><Button startIcon={<Plus size={16}/>} onClick={() => field('duration_options', [...form.duration_options, duration()])}>{t('Add duration and price')}</Button></Grid>
     {(Object.keys(fieldLabels) as (keyof typeof fieldLabels)[]).map(key => <Grid size={{ xs: 6 }} key={key}><TextField required fullWidth type="number" label={t(fieldLabels[key])} value={form[key]} onChange={event => field(key, event.target.value)}/></Grid>)}
+    <Grid size={12}><Divider><Typography variant="overline">{t('Cancellation policy')}</Typography></Divider></Grid>
+    <Grid size={{ xs: 12, sm: 6 }}><TextField required fullWidth type="number" label={t('Cancellation window minutes')} value={form.cancellation_window_minutes} onChange={event => field('cancellation_window_minutes', event.target.value)} inputProps={{ min: 0, max: 525600 }}/></Grid>
+    <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label={t('Cancellation fee type')} value={form.cancellation_fee_type} onChange={event => { const value=event.target.value as Form['cancellation_fee_type']; field('cancellation_fee_type', value); if(value==='none')field('cancellation_fee_value','0'); }}><MenuItem value="none">{t('No fee')}</MenuItem><MenuItem value="fixed">{t('Fixed amount')}</MenuItem><MenuItem value="percentage">{t('Percentage')}</MenuItem></TextField></Grid>
+    {form.cancellation_fee_type !== 'none' && <Grid size={12}><TextField required fullWidth type="number" label={t(form.cancellation_fee_type === 'fixed' ? 'Cancellation fee (CAD)' : 'Cancellation fee (%)')} value={form.cancellation_fee_value} onChange={event => field('cancellation_fee_value', event.target.value)} inputProps={{ min: 0, max: form.cancellation_fee_type === 'percentage' ? 100 : 100000, step: form.cancellation_fee_type === 'percentage' ? .01 : .01 }} helperText={t('This fee applies only when the client cancels inside the configured window. Existing appointments retain the policy accepted when booked.')}/></Grid>}
     <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Preparation instructions')} value={form.preparation_instructions} onChange={event => field('preparation_instructions', event.target.value)}/></Grid>
     <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Preparation instructions (French)')} value={form.preparation_instructions_fr} onChange={event => field('preparation_instructions_fr', event.target.value)}/></Grid>
     <Grid size={12}><Divider><Typography variant="overline">{t('Public catalogue')}</Typography></Divider></Grid>

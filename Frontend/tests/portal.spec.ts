@@ -1919,6 +1919,10 @@ test("practitioner mobile navigation can book and change only the scoped schedul
       },
     }),
   );
+  await page.route("**/api/v1/appointments/10/cancellation-preview", route => route.fulfill({ json: { data: {
+    window_minutes: 1440, deadline: "2030-09-30T14:00:00+00:00", inside_fee_window: false,
+    fee_cents: 0, appointment_total_cents: 10000, currency: "CAD",
+  } } }));
   await page.route("**/api/v1/appointments/10", (route) => {
     changes.push(route.request().postDataJSON());
     return route.fulfill({ json: { data: { ...appointment, version: 3 } } });

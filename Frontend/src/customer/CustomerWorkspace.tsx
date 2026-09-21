@@ -8,21 +8,23 @@ import { AddressEntry } from '../shared/AddressEntry';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { CustomerBooking } from './CustomerBooking';
 import { clearCustomerBookingIntent, customerBookingIntent } from './bookingIntent';
+import { CustomerAppointmentManager, type CustomerAppointment } from './CustomerAppointmentManager';
 
 export type CustomerStatus = { onboarding_status: 'not_linked' | 'pending_review' | 'linked'; review_code?: string; capabilities?: string[] };
 const emptyAddress = { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' };
 const emptyProfile = { given_name: '', family_name: '', email: '', phone: '', preferred_contact: 'email', address: emptyAddress, revision: '' };
 type Profile = typeof emptyProfile;
-type Appointment = { id: number; starts_at: string; ends_at: string; status: string; service: string; practitioner: string; location: string; timezone: string; delivery_mode: string };
+type Appointment = CustomerAppointment;
 type AppointmentView = 'upcoming' | 'past' | 'all';
 const appointmentInstant = (value: string) => new Date(`${value.replace(' ', 'T')}Z`).getTime();
 export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatus; onRefresh: () => void }) {
   const { t, i18n } = useTranslation();
   const canBook=status.capabilities?.includes('book_own_appointments')??false;
-  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking'>(status.onboarding_status === 'linked' ? (canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
+  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking' | 'manage'>(status.onboarding_status === 'linked' ? (canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
   const [appointmentView, setAppointmentView] = useState<AppointmentView>('upcoming');
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [managing, setManaging] = useState<Appointment | null>(null);
   const [token, setToken] = useState(() => sessionStorage.getItem('wellness.customer.invitation') ?? '');
   const [claimantName, setClaimantName] = useState('');
   const [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
@@ -77,9 +79,9 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
     {status.onboarding_status === 'linked' ? <Stack direction="row" spacing={1} flexWrap="wrap"><Button variant={mode === 'appointments' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('appointments')}>{t('My appointments')}</Button>{canBook&&<Button variant={mode === 'booking' ? 'contained' : 'text'} disabled={saving} onClick={() => { setNotice(''); setMode('booking'); }}>{t('Book appointment')}</Button>}<Button variant={mode === 'profile' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('profile')}>{t('My profile')}</Button></Stack>
       : <><Typography>{t('If the clinic has booked you before, request an invitation instead of creating another record. Email matching does not link accounts.')}</Typography><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}><Button onClick={() => setMode('profile')}>{t('I am a new client')}</Button><Button onClick={() => setMode('invite')}>{t('I have an invitation')}</Button></Stack></>}
     {error && <Alert severity="error">{error}{status.onboarding_status === 'linked' && <Button disabled={saving || loading} onClick={() => setReload(v => v + 1)}>{t('Reload saved information')}</Button>}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
-    {mode === 'booking' ? <CustomerBooking cancel={() => { clearCustomerBookingIntent(); setMode('appointments'); }} complete={id => { clearCustomerBookingIntent(); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : loading ? <CircularProgress aria-label={t(mode === 'appointments' ? 'Loading appointments' : 'Loading your information…')} /> : mode === 'appointments' ? <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+    {mode === 'booking' ? <CustomerBooking cancel={() => { clearCustomerBookingIntent(); setMode('appointments'); }} complete={id => { clearCustomerBookingIntent(); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : mode === 'manage' && managing ? <CustomerAppointmentManager appointment={managing} close={() => { setManaging(null); setMode('appointments'); }} complete={message => { setManaging(null); setNotice(message); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : loading ? <CircularProgress aria-label={t(mode === 'appointments' ? 'Loading appointments' : 'Loading your information…')} /> : mode === 'appointments' ? <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between" mb={2}>
-        <Box><Typography variant="h6">{t('My appointments')}</Typography><Typography color="text.secondary">{t('Book a new appointment here. Contact the clinic if you need help changing an existing appointment.')}</Typography></Box>
+        <Box><Typography variant="h6">{t('My appointments')}</Typography><Typography color="text.secondary">{t('Book a new appointment or manage an upcoming appointment here.')}</Typography></Box>
         <Stack direction="row" spacing={1} alignItems="center">
           <TextField select size="small" label={t('Show')} value={appointmentView} onChange={event => setAppointmentView(event.target.value as AppointmentView)} sx={{ minWidth: 170 }}>
             <MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem>
@@ -93,6 +95,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
           <Typography>{formatDateTime(`${appointment.starts_at.replace(' ', 'T')}Z`, i18n.resolvedLanguage, { timeZone: appointment.timezone, dateStyle: 'medium', timeStyle: 'short' })} – {formatDateTime(`${appointment.ends_at.replace(' ', 'T')}Z`, i18n.resolvedLanguage, { timeZone: appointment.timezone, dateStyle: 'medium', timeStyle: 'short' })}</Typography>
           <Typography>{appointment.practitioner}</Typography>
           <Typography color="text.secondary">{appointment.delivery_mode === 'mobile' ? t('On-Site (client location)') : `${t('In clinic')} · ${appointment.location}`} · {t('Appointment #{{id}}', { id: appointment.id })}</Typography>
+          {['requested','confirmed','rescheduled'].includes(appointment.status) && appointmentInstant(appointment.ends_at) > Date.now() && <Button size="small" onClick={() => { setManaging(appointment); setNotice(''); setMode('manage'); }}>{t('View or change')}</Button>}
         </Box>)}
       </Stack>}
     </Paper> : mode !== 'choose' && <Stack component="form" spacing={2} onSubmit={save} onChange={markDirty}>

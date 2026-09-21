@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ type Client = { id: number; display_name: string; email: string; phone: string |
 type Combination = { location_id: number; location_name: string; timezone: string; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
+type CancellationPreview = { window_minutes: number; deadline: string; inside_fee_window: boolean; fee_cents: number; appointment_total_cents: number; currency: string };
 type Destination = AddressValue & { instructions: string };
 type CoverageValidation = { destination: Destination; distance_km: number; radius_km: number; token: string; expires_at: string };
 const emptyDestination = (): Destination => ({address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',country:'Canada',instructions:''});
@@ -28,7 +29,7 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
   return [...new Map(rows.map(row => [String(row[key]), row])).values()];
 }
 
-export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean }) {
+export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean }) {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -64,7 +65,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
     {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
-    {managing && <ManageAppointment appointment={managing} request={request} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
+    {managing && <ManageAppointment appointment={managing} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" gap={2} justifyContent="space-between" mb={2}>
         <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
@@ -79,7 +80,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
           {item.delivery_mode==='mobile'&&<><Chip label={t('On-Site (client location)')} color="info" size="small"/><Typography>{addressText(item.destination_snapshot, t('Address unavailable'))}</Typography><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after',{minutes:item.travel_buffer_minutes})}</Typography></>}
           {item.base_price_cents!==null&&item.base_price_cents!==undefined&&<Typography variant="body2">{t('Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)', { treatment: formatCad(Number(item.base_price_cents), i18n.resolvedLanguage), mobile: formatCad(Number(item.mobile_fee_cents), i18n.resolvedLanguage) })}</Typography>}
           <Typography color="text.secondary">{item.practitioner_name} · {item.location_name}{item.room_name ? ` · ${item.room_name}` : ''} · #{item.id}</Typography>
-          {practitionerMode && ['requested','confirmed','rescheduled'].includes(item.status) && new Date(`${item.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now() && <Button size="small" onClick={() => { setCreating(false); setManaging(item); }}>{t('Change appointment')}</Button>}
+          {canBook && ['requested','confirmed','rescheduled'].includes(item.status) && new Date(`${item.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now() && <Button size="small" onClick={() => { setCreating(false); setManaging(item); }}>{t('Change appointment')}</Button>}
         </Box>)}
         <Stack direction="row" justifyContent="space-between" alignItems="center"><Button disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}',{page})}</Typography><Button disabled={appointments.length < 50} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
       </Stack>}
@@ -87,8 +88,8 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   </Stack>;
 }
 
-type ManageProps = { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; close: () => void; complete: (message: string) => void };
-function ManageAppointment({ appointment, request, close, complete }: ManageProps) {
+type ManageProps = { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; canAssessFees: boolean; canManageFees: boolean; close: () => void; complete: (message: string) => void };
+function ManageAppointment({ appointment, request, canAssessFees, canManageFees, close, complete }: ManageProps) {
   const { t, i18n } = useTranslation();
   const appointmentDate = new Intl.DateTimeFormat('en-CA', { timeZone: appointment.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(`${appointment.starts_at.replace(' ', 'T')}Z`));
   const [action, setAction] = useState<'choose'|'reschedule'|'cancel'>('choose');
@@ -100,8 +101,12 @@ function ManageAppointment({ appointment, request, close, complete }: ManageProp
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [cancellation, setCancellation] = useState<CancellationPreview | null>(null);
+  const [clientRequested, setClientRequested] = useState(false);
+  const [adjustedFee, setAdjustedFee] = useState('');
   useUnsavedChanges(date !== appointmentDate || slot !== null || room !== (appointment.room_id ? String(appointment.room_id) : '') || reason.trim() !== '');
   const needsRoom = appointment.room_id !== null;
+  const beginCancel = async () => { setBusy(true); setError(''); try { const preview=await request(`/appointments/${appointment.id}/cancellation-preview`); setCancellation(preview); setAdjustedFee((Number(preview.fee_cents)/100).toFixed(2)); setAction('cancel'); } catch(cause) { setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); } finally { setBusy(false); } };
   const loadSlots = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(''); setSlots([]); setSlot(null); setSearched(false);
     try {
@@ -116,7 +121,7 @@ function ManageAppointment({ appointment, request, close, complete }: ManageProp
     setBusy(true); setError('');
     try {
       const body = action === 'cancel'
-        ? { action, version: Number(appointment.version), reason }
+        ? { action, version: Number(appointment.version), reason, apply_cancellation_fee: clientRequested, ...(clientRequested && canManageFees && cancellation && Math.round(Number(adjustedFee)*100) !== Number(cancellation.fee_cents) ? { adjusted_fee_cents: Math.round(Number(adjustedFee)*100) } : {}) }
         : { action, version: Number(appointment.version), starts_at: slot!.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), reason };
       await request(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify(body) });
       complete(t(action === 'cancel' ? 'Appointment #{{id}} was canceled.' : 'Appointment #{{id}} was rescheduled.', { id: appointment.id }));
@@ -129,7 +134,7 @@ function ManageAppointment({ appointment, request, close, complete }: ManageProp
       <Button disabled={busy} onClick={close}>{t('Close')}</Button>
     </Stack>
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-    {action === 'choose' && <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}><Button variant="contained" onClick={() => setAction('reschedule')}>{t('Reschedule')}</Button><Button color="error" variant="outlined" onClick={() => setAction('cancel')}>{t('Cancel appointment')}</Button></Stack>}
+    {action === 'choose' && <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}><Button variant="contained" onClick={() => setAction('reschedule')}>{t('Reschedule')}</Button><Button color="error" variant="outlined" disabled={busy} onClick={() => void beginCancel()}>{t('Cancel appointment')}</Button></Stack>}
     {action === 'reschedule' && <Stack spacing={2}>
       <Typography>{t('Choose a new available time. The client, service, location, delivery mode, duration, and price remain unchanged.')}</Typography>
       <Stack component="form" direction={{ xs: 'column', sm: 'row' }} gap={2} onSubmit={loadSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(appointment.timezone) }} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(null); setSearched(false); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
@@ -141,8 +146,11 @@ function ManageAppointment({ appointment, request, close, complete }: ManageProp
     </Stack>}
     {action === 'cancel' && <Stack spacing={2}>
       <Alert severity="warning">{t('Canceling releases the time and room. The appointment remains in history.')}</Alert>
+      {canAssessFees && <FormControlLabel control={<Checkbox checked={clientRequested} onChange={event => setClientRequested(event.target.checked)}/>} label={t('This cancellation was requested by the client')}/>}
+      {cancellation && <Alert severity={clientRequested && cancellation.fee_cents > 0 ? 'warning' : 'info'}>{clientRequested ? (cancellation.fee_cents > 0 ? t('The calculated policy fee is {{fee}}.', { fee: formatCad(cancellation.fee_cents, i18n.resolvedLanguage) }) : t('No cancellation fee applies.')) : t('Clinic-initiated cancellations do not assess a client fee.')}</Alert>}
+      {clientRequested && canManageFees && cancellation && cancellation.fee_cents > 0 && <TextField required type="number" label={t('Assessed cancellation fee (CAD)')} value={adjustedFee} onChange={event => setAdjustedFee(event.target.value)} inputProps={{ min: 0, max: cancellation.fee_cents/100, step: .01 }} helperText={t('Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.')}/>}
       <TextField label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
-      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('choose')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
+      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('choose')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy || Boolean(clientRequested && canManageFees && cancellation && Math.round(Number(adjustedFee)*100) !== Number(cancellation.fee_cents) && !reason.trim())} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
     </Stack>}
   </Paper>;
 }

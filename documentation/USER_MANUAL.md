@@ -14,7 +14,7 @@ time is not reserved until confirmation succeeds. Keep the appointment number be
 email delivery is not enabled yet. Use the same confirmation button to retry an uncertain
 network result; do not start a second booking until the appointment list has been checked.
 
-The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Clients must currently contact the clinic to book, cancel, or reschedule.
+The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Linked clients can book, review, reschedule, and cancel their own eligible upcoming appointments. The portal rechecks availability before a reschedule. Before cancellation, the portal shows the server-calculated fee, if any, from the policy accepted when the appointment was booked. Confirming records the assessed fee but does not itself collect payment.
 
 After a duplicate client is merged, only the surviving client appears in client lists and booking searches. The merged record remains in protected history for audit purposes and is not deleted.
 
@@ -43,7 +43,7 @@ Open **Administration → Services** to manage the treatments or other services 
 2. Choose **Details** to review its status, duration and price choices, room requirement, booking rules, buffers, and recurring-booking setting.
 3. Choose **Edit** to change those settings, then choose **Save changes**.
 
-Changes to a service affect future booking choices. Existing appointments retain their saved appointment details and price snapshots.
+Changes to a service affect future booking choices. Existing appointments retain their saved appointment details, price snapshots, and cancellation policy. A service cancellation policy can have no fee, a fixed fee, or a percentage fee inside its configured window.
 
 ### Create a service
 

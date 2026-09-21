@@ -717,3 +717,54 @@ test("linked client books only for the signed-in client through the customer API
   expect(confirmations).toBe(1);
   expect(appointmentReads).toBeGreaterThanOrEqual(2);
 });
+
+test("linked client reschedules and cancels only their own upcoming appointment", async ({ page }) => {
+  await fixture(page, true);
+  await page.route("**/api/v1/customer/auth/me", route => route.fulfill({ json: { data: {
+    authenticated: true,
+    authentication_context: "customer",
+    onboarding_status: "linked",
+    capabilities: ["own_appointments", "book_own_appointments"],
+    session: { idle_expires_at: Date.now() / 1000 + 1800, absolute_expires_at: Date.now() / 1000 + 28800 },
+  } } }));
+  const appointment = {
+    id: 41, starts_at: "2099-09-20 14:00:00", ends_at: "2099-09-20 15:00:00",
+    status: "confirmed", version: 3, room_id: null, room_name: null, duration_option_id: 8,
+    service: "Therapeutic Massage", practitioner: "Esther Vanderpoel", location: "Holland Landing Clinic",
+    timezone: "America/Toronto", delivery_mode: "mobile",
+  };
+  const changes: Record<string, unknown>[] = [];
+  await page.route("**/api/v1/customer/appointments", route => route.fulfill({ json: { data: { items: [appointment], limit: 100 } } }));
+  await page.route("**/api/v1/customer/appointments/41/availability?**", route => route.fulfill({ json: { data: { availability: [
+    { duration_option_id: 8, starts_at: "2099-09-20T10:00:00-04:00", ends_at: "2099-09-20T11:00:00-04:00", available_room_ids: [] },
+    { duration_option_id: 8, starts_at: "2099-09-21T11:00:00-04:00", ends_at: "2099-09-21T12:00:00-04:00", available_room_ids: [] },
+  ] } } }));
+  await page.route("**/api/v1/customer/appointments/41/cancellation-preview", route => route.fulfill({ json: { data: {
+    window_minutes: 1440, deadline: "2099-09-19T14:00:00+00:00", inside_fee_window: true,
+    fee_type: "percentage", appointment_total_cents: 12000, fee_cents: 6000, currency: "CAD",
+  } } }));
+  await page.route("**/api/v1/customer/appointments/41", route => {
+    changes.push(route.request().postDataJSON());
+    return route.fulfill({ json: { data: { ...appointment, version: 4 } } });
+  });
+
+  await page.goto("http://localhost:5184/client");
+  await page.getByRole("button", { name: "View or change" }).click();
+  await page.getByRole("button", { name: "Reschedule" }).click();
+  await page.getByLabel("Appointment date").fill("2099-09-21");
+  await page.getByRole("button", { name: "Find times" }).click();
+  await expect(page.getByRole("button", { name: /Sep.*21.*2099/i })).toHaveCount(1);
+  await page.getByRole("button", { name: /Sep.*21.*2099/i }).click();
+  await page.getByRole("button", { name: "Confirm reschedule" }).click();
+  await expect(page.getByText("Appointment #41 was rescheduled.")).toBeVisible();
+  expect(changes[0]).toMatchObject({ action: "reschedule", version: 3, starts_at: "2099-09-21T11:00:00-04:00" });
+  expect(changes[0]).not.toHaveProperty("client_id");
+
+  await page.getByRole("button", { name: "View or change" }).click();
+  await page.getByRole("button", { name: "Cancel appointment" }).click();
+  await expect(page.getByText(/will apply a \$60.00 cancellation fee/)).toBeVisible();
+  await page.getByRole("button", { name: "Confirm cancellation" }).click();
+  await expect(page.getByText("Appointment #41 was canceled.")).toBeVisible();
+  expect(changes[1]).toMatchObject({ action: "cancel", version: 3 });
+  expect(changes[1]).not.toHaveProperty("client_id");
+});

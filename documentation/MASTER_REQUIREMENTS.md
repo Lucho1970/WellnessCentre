@@ -185,6 +185,15 @@ rejects browser-supplied client IDs and reuses the locked/idempotent booking tra
 Selection is not a hold. Client cancellation/rescheduling and actual notification delivery
 remain pending, so this slice must not be opened as an unattended production workflow.
 
+**21 September 2026 client appointment-management slice:** linked clients can now review an
+upcoming appointment and use the shared locked appointment mutation path to reschedule or
+cancel it. The API derives the client from the customer session, rejects access to another
+client's appointment, excludes the current appointment from replacement-slot conflicts,
+uses optimistic versions and records client cancellation status/history/audit/notification
+events. Cancellation policy windows and fee consequences are not yet calculated; the client
+UI states this explicitly. Hosted MySQL race acceptance and real notification delivery remain
+pending.
+
 **20 September 2026 public-content slice:** the public site now has a bilingual,
 version-controlled Markdown content layer with validated metadata, safe rendering, SEO
 title/description handling, and initial About, New Clients, FAQ and home-section content.
@@ -237,6 +246,8 @@ No broad phase is “complete” solely because a related UI or schema exists. E
 R5 confirmation delivery must be available before opening real client booking, even if R3 is tested privately first. Privacy/security safeguards are built throughout, not postponed until R8. Independent work can move earlier without bypassing dependencies. Secure messaging is retained product scope; its public launch timing must be explicitly approved if deferred.
 
 The **clinic of independent practitioners** is a cross-stage roadmap thread, not a late add-on. R3 identifies the practitioner/clinic relationship in discovery and booking without making unsupported employment claims. R4 enforces scheduling responsibility, reception delegation, shared resources and temporary coverage. R6 enforces client consent, care relationships, clinical-record stewardship and safe practitioner departure/transfer. R7 separates clinic and practitioner financial responsibility, compensation and reconciliation. R8 must test practitioner onboarding, role change, temporary absence and departure without orphaning appointments, client access, records, balances or audit history. Future multi-clinic commercialization must preserve these boundaries per tenant.
+
+21 September 2026 cancellation-policy checkpoint: service-level fixed/percentage policies, immutable appointment snapshots, client fee preview, fee-free clinic cancellations, client-requested staff cancellations, and reasoned Super Admin/Clinic Admin reductions or waivers are implemented. Assessed fees are recorded in appointment history and adjustments but are not invoiced or collected; payment integration remains a later finance milestone.
 
 Historical phase crosswalk: old phases 1–2 feed R1–R3/security gates; phase 3 catalogue is retained and verified during R1/R4; phases 4–5 scheduling feed R3–R4; phase 6 notifications feeds R5; phase 7 clients/forms/privacy feeds R3/R6; phase 8 waitlist and phase 9 billing feed R7; phase 10 reporting/launch feeds R7–R8; phase 11 calendar/email/integrations feeds R9. This renumbers delivery sequencing, not product commitments.
 
