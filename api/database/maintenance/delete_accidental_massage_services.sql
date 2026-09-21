@@ -134,9 +134,8 @@ WHERE clinic_id = 1
 SET @deleted_accidental_services = ROW_COUNT();
 COMMIT;
 
-SELECT
-  @deleted_accidental_appointment AS deleted_appointments,
-  @deleted_accidental_services AS deleted_services;
+SELECT @deleted_accidental_appointment AS deleted_appointments;
+SELECT @deleted_accidental_services AS deleted_services;
 -- Expected: deleted_appointments = 1 and deleted_services = 2.
 -- A result of 0 means a target changed or has retained references. Do not
 -- disable foreign keys or delete history to force removal.
