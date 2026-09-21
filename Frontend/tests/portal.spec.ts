@@ -1102,10 +1102,10 @@ test("public home has client-first login and no workforce authentication or fake
     page.getByRole("link", { name: "Sign In", exact: true }),
   ).toHaveAttribute("href", `${portalHost}/client?lang=en`);
   await expect(
-    page.getByRole("button", { name: "Language and region" }),
+    page.getByRole("button", { name: "LanguageAndRegion" }),
   ).toBeVisible();
   const globeBox = await page
-      .getByRole("button", { name: "Language and region" })
+      .getByRole("button", { name: "LanguageAndRegion" })
       .boundingBox(),
     signInBox = await page
       .getByRole("link", { name: "Sign In", exact: true })
@@ -1145,7 +1145,7 @@ test("public Markdown pages follow the selected language and publish safe metada
   await expect(
     page.getByRole("link", { name: "New clients" }).first(),
   ).toHaveAttribute("href", "/new-clients");
-  await page.getByRole("button", { name: "Language and region" }).click();
+  await page.getByRole("button", { name: "LanguageAndRegion" }).click();
   await page.getByRole("button", { name: /Français \(Canada\)/ }).click();
   await expect(
     page.getByRole("heading", { name: "À propos de notre centre", level: 1 }),
