@@ -126,10 +126,13 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/admin/services/{id:\\d+}/assignments','updateServiceAssignments');
                 $routes->addRoute('POST','/api/v1/admin/availability-rules','createAvailability');
                 $routes->addRoute('GET','/api/v1/admin/availability-rules','availabilityRules');
+                $routes->addRoute('PATCH','/api/v1/admin/availability-rules/{id:\\d+}','updateAvailabilityRule');
                 $routes->addRoute('DELETE','/api/v1/admin/availability-rules/{id:\\d+}','deleteAvailabilityRule');
                 $routes->addRoute('GET','/api/v1/admin/schedule-exceptions','scheduleExceptions');
                 $routes->addRoute('POST','/api/v1/admin/availability-overrides','createAvailabilityOverride');
+                $routes->addRoute('PATCH','/api/v1/admin/availability-overrides/{id:\\d+}','updateAvailabilityOverride');
                 $routes->addRoute('POST','/api/v1/admin/time-off','createTimeOff');
+                $routes->addRoute('PATCH','/api/v1/admin/time-off/{id:\\d+}','updateTimeOff');
                 $routes->addRoute('DELETE','/api/v1/admin/availability-overrides/{id:\\d+}','deleteAvailabilityOverride');
                 $routes->addRoute('DELETE','/api/v1/admin/time-off/{id:\\d+}','deleteTimeOff');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
@@ -220,10 +223,13 @@ final class Api
                 'updateServiceAssignments'=>$this->admin->updateServiceAssignments($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createAvailability'=>$this->admin->createAvailability($this->user($request),$request->body,$request->correlationId),
                 'availabilityRules'=>$this->admin->availabilityRules($this->user($request)),
+                'updateAvailabilityRule'=>$this->admin->updateAvailabilityRule($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'deleteAvailabilityRule'=>$this->admin->deleteAvailabilityRule($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'scheduleExceptions'=>$this->admin->scheduleExceptions($this->user($request)),
                 'createAvailabilityOverride'=>$this->admin->createAvailabilityOverride($this->user($request),$request->body,$request->correlationId),
+                'updateAvailabilityOverride'=>$this->admin->updateAvailabilityOverride($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createTimeOff'=>$this->admin->createTimeOff($this->user($request),$request->body,$request->correlationId),
+                'updateTimeOff'=>$this->admin->updateTimeOff($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'deleteAvailabilityOverride'=>$this->admin->deleteScheduleException($this->user($request),'availability_overrides',(int)$route[2]['id'],$request->correlationId),
                 'deleteTimeOff'=>$this->admin->deleteScheduleException($this->user($request),'time_off',(int)$route[2]['id'],$request->correlationId),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),

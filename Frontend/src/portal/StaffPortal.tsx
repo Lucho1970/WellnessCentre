@@ -45,7 +45,6 @@ const CatalogueSettings = lazy(() => import('../admin/CatalogueSettings').then(m
 const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ default: module.StaffAdmin })));
 const TeamAdmin = lazy(() => import('../admin/TeamAdmin').then(module => ({ default: module.TeamAdmin })));
 const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
-const ScheduleExceptions = lazy(() => import('../scheduling/ScheduleExceptions').then(module => ({ default: module.ScheduleExceptions })));
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
@@ -171,7 +170,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}
         {page === "widgets" && <DashboardWidgetAdmin />}
-        {page === "calendar" && <><AvailabilityAdmin /><ScheduleExceptions /></>}
+        {page === "calendar" && <AvailabilityAdmin />}
         {page === "profile" && <ProfileSettings />}
         </Suspense>
       </Box>

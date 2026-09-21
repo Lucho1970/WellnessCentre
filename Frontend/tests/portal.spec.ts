@@ -2171,3 +2171,34 @@ test("screenshots: public and mobile portal layouts", async ({ page }) => {
     .toBe(0);
   await page.screenshot({ path: "../.tmp/portal-mobile.png", fullPage: true });
 });
+test("availability is practitioner-first with selectable hours, changes, and time off", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  const rules = [{ id: "31", practitioner_id: "8", location_id: "1", practitioner_name: "Esther Vanderpoel", location_name: "Holland Landing", weekday: "1", start_time: "09:00:00", end_time: "17:00:00", valid_from: "2026-09-01", valid_until: null, recurrence_interval_weeks: "1", active: "1" }];
+  const exceptions = [
+    { id: "41", practitioner_id: "8", location_id: "1", practitioner_name: "Esther Vanderpoel", location_name: "Holland Landing", starts_at: "2026-09-28 13:00:00", ends_at: "2026-09-28 14:00:00", type: "blocked", reason: "Appointment", kind: "override" },
+    { id: "42", practitioner_id: "8", location_id: "1", practitioner_name: "Esther Vanderpoel", location_name: "Holland Landing", starts_at: "2026-10-05 13:00:00", ends_at: "2026-10-05 21:00:00", type: "vacation", reason: "Away", kind: "time_off" },
+  ];
+  let update: Record<string, unknown> | undefined;
+  await page.route("**/api/v1/admin/practitioners", route => route.fulfill({ json: { data: [{ practitioner_id: "8", display_name: "Esther Vanderpoel", preferred_name: "Esther", discipline: "Registered Massage Therapy", location_id: "1", active: "1" }] } }));
+  await page.route("**/api/v1/admin/locations", route => route.fulfill({ json: { data: [{ id: "1", name: "Holland Landing", timezone: "America/Toronto" }] } }));
+  await page.route("**/api/v1/admin/availability-rules**", async route => {
+    if (route.request().method() === "PATCH") update = route.request().postDataJSON();
+    await route.fulfill({ json: { data: route.request().method() === "GET" ? rules : { id: "31" } } });
+  });
+  await page.route("**/api/v1/admin/schedule-exceptions", route => route.fulfill({ json: { data: exceptions } }));
+
+  await page.goto(`${portalHost}/admin/availability`);
+  await expect(page.getByRole("button", { name: "Add hours", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: /Esther.*1 hour rules.*1 changes.*1 time off/ }).click();
+  await expect(page.getByRole("heading", { name: "Regular hours", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Changes", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Time off", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Details" })).toBeDisabled();
+  await page.getByRole("button", { name: /Monday.*09:00–17:00/ }).click();
+  await page.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByText("Schedule details", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).last().click();
+  await page.getByLabel("Ends").fill("18:00");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect.poll(() => update).toMatchObject({ practitioner_id: 8, location_id: 1, weekday: 1, end_time: "18:00" });
+});
