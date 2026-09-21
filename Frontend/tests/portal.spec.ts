@@ -410,9 +410,13 @@ test("locations and rooms use list-first actions with ID-safe create and edit pa
       createdRoom = route.request().postDataJSON();
       rooms.push({
         id: "22",
+        location_id: "12",
         location_name: "Holland Landing",
-        room_type: null,
-        equipment_notes: null,
+        name: "",
+        room_type: "",
+        equipment_notes: "",
+        turnover_minutes: "",
+        is_bookable: "1",
         ...createdRoom,
       } as (typeof rooms)[number]);
       data = { id: "22" };
@@ -1132,6 +1136,7 @@ test("role policies preserve current access without broadening permissions", () 
   expect(pagesFor(["practitioner"], "practitioner")).toEqual([
     "dashboard",
     "appointments",
+    "calendar",
     "profile",
   ]);
   expect(workspacesFor(["super_admin", "practitioner"])).toEqual([
