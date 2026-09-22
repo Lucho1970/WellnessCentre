@@ -191,8 +191,9 @@ cancel it. The API derives the client from the customer session, rejects access 
 client's appointment, excludes the current appointment from replacement-slot conflicts,
 uses optimistic versions and records client cancellation status/history/audit/notification
 events. Cancellation policy windows and fee consequences are not yet calculated; the client
-UI states this explicitly. Hosted MySQL race acceptance and real notification delivery remain
-pending.
+UI states this explicitly. Hosted MySQL race acceptance remains pending. A Graph appointment
+email worker has since been implemented but actual sending remains pending mailbox/tenant
+configuration, migration, scheduled execution, and hosted acceptance (see `EMAIL_DELIVERY.md`).
 
 **20 September 2026 public-content slice:** the public site now has a bilingual,
 version-controlled Markdown content layer with validated metadata, safe rendering, SEO

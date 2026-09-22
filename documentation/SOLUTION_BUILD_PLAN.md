@@ -24,7 +24,7 @@ The repository contains a deployed foundation and completed Phase 3 catalogue/ad
 | PHP API foundation | Deployed versioned API with Entra authentication, local authorization, audited Phase 3 administration, public catalogue, initial availability, and appointment endpoints | Scheduling policy completion, client identity, remaining domain endpoints, workers, rate limiting, production hardening, and tests |
 | MySQL schema | Broad normalized schema plus numbered avatar, service-delivery, and catalogue-settings migrations | Migration runner, production database identity, backup/restore validation, retention jobs, and later-phase migrations |
 | Authentication | Working Microsoft Entra staff sign-in with app-role/local-role intersection and Super Admin role management | Client identity, consent flows, broader isolation tests, and production-tenant configuration |
-| Notifications | Durable notification records exist in the data model | Email provider, templates, rendering, worker, retries, delivery webhooks, and monitoring |
+| Notifications | Durable records plus a Microsoft Graph appointment-email worker, minimal bilingual rendering, retries, and ambiguous-outcome review are implemented; see `EMAIL_DELIVERY.md` | Tenant/mailbox setup, hosted acceptance, admin review UI, editable templates, reminders, delivery webhooks, and monitoring |
 | Billing | Tables exist | Invoice lifecycle, taxes, payments, refunds, receipts, reconciliation, UI, and tests |
 | Deployment | No repeatable infrastructure or deployment workflow | Hosting decision, network configuration, secrets, environments, CI/CD, monitoring, and rollback process |
 
@@ -690,7 +690,7 @@ Exit criteria:
 
 Build:
 
-- Provider-neutral notification service and email provider adapter.
+- Provider-neutral notification service and email provider adapter. The initial Microsoft Graph appointment-email adapter and private CLI worker are implemented; tenant setup and hosted acceptance remain.
 - Editable versioned templates and global reminder schedules.
 - Worker with safe claims, retries, and failure review.
 - Booking, reminder, cancellation, change, and internal staff notifications.
