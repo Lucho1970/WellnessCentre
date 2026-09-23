@@ -6,11 +6,6 @@ declare(strict_types=1);
 ini_set('display_errors', '0');
 header('Cache-Control: no-store');
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
-    http_response_code(405);
-    exit;
-}
-
 $apiRoot = dirname(__DIR__, 3) . '/wellness-api';
 if (!is_file($apiRoot . '/vendor/autoload.php') || !is_file($apiRoot . '/.env')) {
     error_log('Wellness notification bridge: private API files are unavailable.');
@@ -25,14 +20,50 @@ try {
     $enabled = filter_var($env('MAIL_ENABLED'), FILTER_VALIDATE_BOOL);
     $allowedRaw = $env('MAIL_CRON_ALLOWED_IPS');
     $remoteIp = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $method = (string)($_SERVER['REQUEST_METHOD'] ?? '');
 
     // Initial probe: leave MAIL_ENABLED=false and the allowlist unset. The
     // scheduler's source address appears in the private PHP error log.
     if ($allowedRaw === '') {
         if (!$enabled && filter_var($remoteIp, FILTER_VALIDATE_IP)) {
-            error_log('Wellness notification bridge probe source IP: ' . $remoteIp);
+            error_log('Wellness notification bridge probe method=' . $method . ' source IP: ' . $remoteIp);
+            // A singleton row is easier to inspect in phpMyAdmin than hosting
+            // logs. The private lock caps unauthenticated probe writes to one
+            // every five seconds; it is never used once mail is enabled.
+            umask(0077);
+            $probeLock = @fopen($apiRoot . '/.mail-probe.lock', 'c+');
+            if ($probeLock === false) throw new \RuntimeException('Probe lock is unavailable.');
+            try {
+                if (flock($probeLock, LOCK_EX | LOCK_NB)) {
+                    $lastProbe = (int)trim((string)stream_get_contents($probeLock));
+                    if ($lastProbe === 0 || time() - $lastProbe >= 5) {
+                        $pdo = (new \Wellness\Database(\Wellness\Config::fromEnvironment()))->connection();
+                        $statement = $pdo->prepare(
+                            'INSERT INTO notification_scheduler_probe '
+                            . '(id,last_seen_at,last_source_ip,last_method,hit_count) '
+                            . 'VALUES (1,UTC_TIMESTAMP(),:source_ip,:method,1) '
+                            . 'ON DUPLICATE KEY UPDATE last_seen_at=UTC_TIMESTAMP(),'
+                            . 'last_source_ip=VALUES(last_source_ip),last_method=VALUES(last_method),'
+                            . 'hit_count=hit_count+1'
+                        );
+                        $statement->execute(['source_ip' => $remoteIp, 'method' => substr($method, 0, 12)]);
+                        rewind($probeLock);
+                        if (!ftruncate($probeLock, 0) || fwrite($probeLock, (string)time()) === false || !fflush($probeLock)) {
+                            throw new \RuntimeException('Probe lock could not be updated.');
+                        }
+                    }
+                }
+            } finally {
+                flock($probeLock, LOCK_UN);
+                fclose($probeLock);
+            }
         }
         http_response_code(503);
+        exit;
+    }
+
+    if ($method !== 'GET') {
+        http_response_code(405);
         exit;
     }
 

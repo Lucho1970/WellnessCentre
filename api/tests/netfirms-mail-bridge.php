@@ -22,7 +22,15 @@ class Config {
 }
 class Database {
     public function __construct($config) {}
-    public function connection(): object { return new \stdClass(); }
+    public function connection(): object { return new FakeDb(); }
+}
+class FakeDb {
+    public function prepare(string $sql): object { return new FakeStatement(); }
+}
+class FakeStatement {
+    public function execute(array $params): void {
+        file_put_contents(getenv('TEST_PROBE_FILE'), json_encode($params) . "\n", FILE_APPEND);
+    }
 }
 namespace Wellness\Service;
 class GraphMailClient {
@@ -41,6 +49,8 @@ PHP
 
 $countFile = $fixture . '/count.txt';
 putenv('TEST_COUNT_FILE=' . $countFile);
+$probeFile = $fixture . '/probe.txt';
+putenv('TEST_PROBE_FILE=' . $probeFile);
 $envPath = $privateDir . '/.env';
 $trigger = $webDir . '/wellness-notification-trigger.php';
 $assert = static function (bool $condition, string $message): void {
@@ -68,6 +78,9 @@ try {
     $writeEnv('false', '');
     $assert($invoke('192.0.2.10') === 503, 'Probe must not run the worker.');
     $assert(!file_exists($countFile), 'Probe consumed mail.');
+    $assert(file_exists($probeFile), 'Probe did not record a database marker.');
+    $probe = json_decode((string)file_get_contents($probeFile), true);
+    $assert($probe['source_ip'] === '192.0.2.10' && $probe['method'] === 'GET', 'Probe recorded incorrect request details.');
 
     $writeEnv('true', '192.0.2.10');
     $assert($invoke('198.51.100.9') === 404, 'Unlisted IP was accepted.');
