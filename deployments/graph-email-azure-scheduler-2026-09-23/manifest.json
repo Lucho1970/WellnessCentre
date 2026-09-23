@@ -1,0 +1,38 @@
+{
+  "source_commit": "a4e32d7b67451efce1643f92fe9216684d37bf70",
+  "built_at_utc": "2026-09-23T02:18:49.5769346Z",
+  "layout": "separate-public-and-portal",
+  "deployment_guide": "documentation/PORTAL_SEPARATION.md",
+  "archives": [
+    {
+      "file": "tuff-tar-mail-bridge.zip",
+      "bytes": 2150,
+      "entries": 1,
+      "sha256": "aa67976ec843661ee7b38ee1d37c412228b81643a58df73f793eb9ed2fd80bd9"
+    },
+    {
+      "file": "wellness-api-private.zip",
+      "bytes": 178265,
+      "entries": 128,
+      "sha256": "24f466b191edb080490ceb9141e2ac86aaf2f5ae163b4e8c9b365bb5ea2bf52f"
+    },
+    {
+      "file": "wellness-api-public.zip",
+      "bytes": 2212,
+      "entries": 3,
+      "sha256": "7d7672517b28052a8d89b04231875de572f177afa7567093176b52f6a60dbd8f"
+    },
+    {
+      "file": "wellness-portal.zip",
+      "bytes": 412897,
+      "entries": 51,
+      "sha256": "b8b6b14d158ab29a6913e3f40cafab224f01b211b457424ec10b1048e73efded"
+    },
+    {
+      "file": "wellness-public.zip",
+      "bytes": 323111,
+      "entries": 7,
+      "sha256": "76c2db85baa6faabe820febdb500013f4d63a079e4e1a89148f5e2b4dd83beb2"
+    }
+  ]
+}
