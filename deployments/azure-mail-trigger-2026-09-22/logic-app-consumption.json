@@ -45,8 +45,10 @@
                 "method": "POST",
                 "uri": "https://wellness.copihue.ca/api/cron/send-notifications.php",
                 "headers": {
-                  "X-Wellness-Cron-Key": "@parameters('mailTriggerSecret')"
+                  "X-Wellness-Cron-Key": "@parameters('mailTriggerSecret')",
+                  "Content-Type": "application/json"
                 },
+                "body": {},
                 "retryPolicy": { "type": "none" }
               },
               "runtimeConfiguration": {
