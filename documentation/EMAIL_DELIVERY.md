@@ -30,6 +30,19 @@ Graph uses the [client-credentials flow](https://learn.microsoft.com/en-us/graph
 4. Verify the mailbox and permission scope, then set `MAIL_ENABLED=true`. Run a private command-line smoke test with a safe test client address. Only then schedule the worker.
 5. On Netfirms, schedule PHP CLI (the same PHP 8.4 family as the site) to run every minute or every few minutes: `php /absolute/private/path/wellness-api/bin/send-notifications.php --limit=20`. Set the absolute path for the hosting account. If scheduled jobs are unavailable, leave `MAIL_ENABLED=false` and run the CLI manually; do not expose a web-triggered endpoint or claim delivery is live.
 
+### Netfirms URL-only scheduler (development bridge)
+
+The Netfirms Scheduled Jobs screen on this account accepts only an `http://tuff-tar.com` URL under `/public_html/tuff-tar.com`; it does **not** execute the private CLI worker. The release includes `tuff-tar-mail-bridge.zip` as a limited development workaround. Extract its `api/wellness-notification-trigger.php` entry under `/public_html/tuff-tar.com`, so the private `/wellness-api` remains outside `public_html`. The bridge has no credentials or recipient data in its URL, sends at most one due notification per invocation, uses an exact source-IP allowlist, a private lock and a five-minute cooldown, and returns no queue details. It is not a production-grade scheduler or a substitute for HTTPS.
+
+The bridge derives the private directory as three levels above its own `api` folder, followed by `/wellness-api`. Verify the hosting layout before use. Do not copy the private worker, `.env`, or `vendor` into the web root.
+
+1. Leave `MAIL_ENABLED=false` and **do not** set `MAIL_CRON_ALLOWED_IPS` yet. Schedule the bridge URL for one hourly run (no key or other query string). In the PHP error log, find `Wellness notification bridge probe source IP: ...` at the scheduled run time. Requests during this probe do not send mail. If the scheduler's IP is not visible or cannot be distinguished from ordinary web visitors, stop and use an HTTPS-capable scheduler instead.
+2. Set `MAIL_CRON_ALLOWED_IPS` in the private `.env` to only that observed address. Multiple literal IPs may be comma-separated; wildcards, ranges and proxy headers are not accepted. Test from a normal browser: the bridge must return 404 and must not consume the test event. If the browser is also allowed, stop; the hosting proxy makes the IP guard ineffective.
+3. Check the queue contains only a test event addressed to a mailbox you control. Set `MAIL_ENABLED=true` shortly before the next scheduled run. The bridge will process only one event. Inspect the PHP error log for the generic `sent`, `retry`, `review`, and `canceled` counts, the `notification_events` status, and the recipient mailbox. `sent` means Graph accepted the request, not that the recipient received it. Return `MAIL_ENABLED=false` if any check fails.
+4. Keep the interval hourly during development. For timely, production-grade delivery, replace this bridge with a private CLI scheduler or a strongly authenticated HTTPS trigger. Remove the public bridge once it is no longer needed. Never put a client secret or bearer token in an HTTP URL.
+
+The bridge relies on the source IP that PHP sees as `REMOTE_ADDR`; it does not trust `X-Forwarded-For`. A shared proxy or changing scheduler IP may make this option unusable. A 503 response means it is disabled, not configured, or failed; a 404 means the caller was not allowed; a 204 means the bridge completed or there was no due work. The bridge records only counts and error classes in the server error log, never message contents or addresses.
+
 The command prints only counts: `sent` (Graph accepted), `retry`, `review`, and `canceled`. It exits nonzero if disabled or if setup/database access fails. The queue is not processed merely because the API package is deployed.
 
 ## Monitoring and recovery
