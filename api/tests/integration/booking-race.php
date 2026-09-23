@@ -19,6 +19,8 @@ if (!in_array($mode, ['empty', 'isolated-clinic'], true) || $read('BOOKING_TEST_
 if ($mode === 'empty' && !preg_match('/^[a-zA-Z0-9_]*booking_test[a-zA-Z0-9_]*$/', $name)) throw new RuntimeException('An empty scratch database name must contain booking_test.');
 if ($mode === 'isolated-clinic' && $read('BOOKING_TEST_EXISTING_ACK') !== 'synthetic-clinic-only') throw new RuntimeException('Confirm isolated-clinic mode explicitly before writing synthetic records.');
 if (!function_exists('proc_open')) throw new RuntimeException('This PHP CLI must support proc_open for independent concurrent connections.');
+$phpCli = getenv('BOOKING_TEST_PHP_CLI') ?: PHP_BINARY;
+if (!is_file($phpCli)) throw new RuntimeException('The booking test PHP CLI path is unavailable.');
 $host = $read('BOOKING_TEST_DB_HOST');
 $port = (int)(getenv('BOOKING_TEST_DB_PORT') ?: 3306);
 $user = $read('BOOKING_TEST_DB_USER');
@@ -60,7 +62,7 @@ $closeSyntheticClinic = static function () use ($connection, $clinicId): bool {
         $connection->prepare("UPDATE clinics SET status='inactive' WHERE id=:clinic")->execute(['clinic' => $clinicId]);
         return true;
     } catch (Throwable $error) {
-        fwrite(STDERR, "Could not deactivate synthetic clinic ID {$clinicId}; inspect it before continuing.\n");
+        error_log("Could not deactivate synthetic booking test clinic ID {$clinicId}; inspect it before continuing.");
         return false;
     }
 };
@@ -102,7 +104,7 @@ $body = static fn(int $client, int $location, int $practitioner, int $room, stri
     'room_id' => $room, 'starts_at' => $start, 'idempotency_key' => $key,
 ];
 $credentials = compact('host', 'port', 'user', 'password') + ['database' => $name, 'clinic_id' => $clinicId, 'actor_id' => $userIds['staff']];
-$race = static function (array $jobs) use ($connection, $credentials, $clinicId): array {
+$race = static function (array $jobs) use ($connection, $credentials, $clinicId, $phpCli): array {
     $workers = [];
     $connection->beginTransaction();
     try {
@@ -110,7 +112,7 @@ $race = static function (array $jobs) use ($connection, $credentials, $clinicId)
         $lock->execute(['clinic' => $clinicId]);
         if ((int)$lock->fetchColumn() !== $clinicId) throw new RuntimeException('Synthetic clinic lock failed.');
         foreach ($jobs as $job) {
-            $process = proc_open([PHP_BINARY, __DIR__ . '/booking-race-worker.php'], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
+            $process = proc_open([$phpCli, __DIR__ . '/booking-race-worker.php'], [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
             if (!is_resource($process)) throw new RuntimeException('Could not start a booking race worker.');
             fwrite($pipes[0], json_encode($credentials + ['body' => $job], JSON_THROW_ON_ERROR));
             fclose($pipes[0]);
