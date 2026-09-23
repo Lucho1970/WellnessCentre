@@ -85,6 +85,12 @@ The **Practitioners** page is list-first. Select a practitioner to enable **Deta
 
 Create the Microsoft Entra account and assign the required practitioner application role before linking it in the portal. The immutable Entra tenant and object IDs are required only when creating the link. Editing the portal email does not rename or relink the Microsoft account. Use the two status controls carefully: the account status controls portal access, while **Available as a practitioner** controls whether the practitioner is available operationally.
 
+### My calendar
+
+Practitioners can open **My calendar** in their workspace to see their own clinic appointments by day, week, or month. Use the arrows or **Today** to move between periods; **Refresh** reloads current booking data. Select an event for its status, time, service, and base location. On-Site visits are labelled, but their destination address is not shown on the calendar. Use **Appointments** for the full booking workflow and authorized details.
+
+The calendar displays times in the device's timezone, which is shown above the grid. Turn on **Privacy mode** before sharing your screen to hide client names from calendar events and the detail panel. This is a display safeguard, not a change to account permissions. Google/Outlook connections and client calendar invitations are separate future features; this page does not put events into an external calendar.
+
 ## Quick verification after changing a service
 
 - Reopen **Assignments** and confirm the saved practitioner and location are listed.

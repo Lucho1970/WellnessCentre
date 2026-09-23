@@ -1138,6 +1138,7 @@ test("role policies preserve current access without broadening permissions", () 
   expect(pageAt("/admin/notifications", "admin")).toBe("notifications");
   expect(pagesFor(["practitioner"], "practitioner")).toEqual([
     "dashboard",
+    "schedule_calendar",
     "appointments",
     "calendar",
     "profile",
@@ -1150,6 +1151,44 @@ test("role policies preserve current access without broadening permissions", () 
   expect(pagePath("practitioner", "appointments")).toBe(
     "/practitioner/schedule",
   );
+  expect(pageAt("/practitioner/calendar", "practitioner")).toBe("schedule_calendar");
+});
+
+test("practitioner calendar shows the assigned schedule and masks names in privacy mode", async ({ page }) => {
+  await fixtures(page, ["practitioner"]);
+  const start = new Date(); start.setHours(14, 0, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  const sqlTime = (date: Date) => date.toISOString().slice(0, 19).replace("T", " ");
+  let requests = 0;
+  await page.route("**/api/v1/practitioner/calendar?*", route => {
+    requests++;
+    expect(route.request().headers().authorization).toBe("Bearer test-only-token");
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get("start")).toMatch(/Z$/);
+    expect(url.searchParams.get("end")).toMatch(/Z$/);
+    return route.fulfill({ json: { data: [{ id: 12, starts_at: sqlTime(start), ends_at: sqlTime(end), status: "confirmed", delivery_mode: "mobile", service_name: "Massage", client_name: "Test Client", location_name: "Holland Landing", timezone: "America/Toronto" }] } });
+  });
+  await page.goto(`${portalHost}/practitioner/calendar`);
+  await expect(page.getByRole("heading", { name: "My calendar" })).toBeVisible();
+  await expect(page.getByText("Test Client · Massage")).toBeVisible();
+  await page.getByLabel("Privacy mode — hide client names").check();
+  await expect(page.getByText("Test Client · Massage")).toHaveCount(0);
+  await expect(page.getByText("Private appointment")).toBeVisible();
+  await page.getByRole("button", { name: "Month", exact: true }).click();
+  await expect.poll(() => requests).toBeGreaterThan(1);
+  await expect(page.getByText("Private appointment")).toBeVisible();
+  await page.getByText("Private appointment").click();
+  await expect(page.getByText("Test Client · Massage")).toHaveCount(0);
+  await expect(page.getByText("Open appointments")).toHaveCount(0);
+});
+
+test("practitioner calendar starts in a day view on a small screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixtures(page, ["practitioner"]);
+  await page.goto(`${portalHost}/practitioner/calendar`);
+  await expect(page.getByRole("heading", { name: "My calendar" })).toBeVisible();
+  await expect(page.getByRole("grid")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Day", exact: true })).toHaveAttribute("class", /MuiButton-contained/);
 });
 
 test("public home has client-first login and no workforce authentication or fake address", async ({

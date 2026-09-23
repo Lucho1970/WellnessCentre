@@ -51,6 +51,7 @@ const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
 const NotificationStatusAdmin = lazy(() => import('../admin/NotificationStatusAdmin').then(module => ({ default: module.NotificationStatusAdmin })));
+const PractitionerCalendar = lazy(() => import('../scheduling/PractitionerCalendar').then(module => ({ default: module.PractitionerCalendar })));
 
 type NavigationItem = {
   id: PortalPage;
@@ -62,6 +63,7 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
   { id: "appointments", label: "Appointments", description: "Bookings and scheduled visits", icon: <CalendarDays size={20} /> },
+  { id: "schedule_calendar", label: "My calendar", description: "Your appointments by day, week, or month", icon: <CalendarDays size={20} /> },
   { id: "clients", label: "Clients", description: "Contact details and client records", icon: <Users size={20} /> },
   { id: "calendar", label: "Availability", description: "Working hours and schedules", icon: <CalendarRange size={20} /> },
   {
@@ -164,6 +166,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "dashboard" && <Dashboard workspace={workspace} />}
         {page === "clients" && <ClientManagement canMerge={roles.includes('super_admin')} />}
         {page === "appointments" && <StaffAppointments canManageFees={roles.some(role => ['super_admin', 'clinic_admin'].includes(role))} practitionerMode={workspace === 'practitioner'} canScheduleOthers={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('schedule_for_other_practitioners')} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
+        {page === "schedule_calendar" && <PractitionerCalendar />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}
         {page === "rooms" && <RoomAdmin />}

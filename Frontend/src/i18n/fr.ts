@@ -1148,6 +1148,13 @@ const fr: Record<string, string> = {
   "Page {{page}} of {{total}}": "Page {{page}} sur {{total}}", "Notification #{{id}}": "Notification no {{id}}",
   "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.": "Le résultat de la livraison peut être inconnu. Vérifiez auprès du fournisseur et du destinataire avant de décider d’un envoi manuel.",
   "Appointment ID": "ID du rendez-vous", "Event": "Événement", "Recipient": "Destinataire", "Scheduled": "Prévu", "Next attempt": "Prochaine tentative", "Provider accepted": "Accepté par le fournisseur", "Attempts": "Tentatives",
+  "My calendar": "Mon calendrier",
+  "Your appointments by day, week, or month": "Vos rendez-vous par jour, semaine ou mois",
+  "This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.": "Ce calendrier affiche vos rendez-vous à la clinique. Les heures utilisent le fuseau horaire de votre appareil ({{zone}}). Les calendriers personnels ne sont pas encore connectés.",
+  "Unable to load the calendar.": "Impossible de charger le calendrier.",
+  "Private appointment": "Rendez-vous privé", "Requested": "Demandé", "Today": "Aujourd’hui", "Week": "Semaine", "Month": "Mois", "Calendar view": "Vue du calendrier",
+  "Previous period": "Période précédente", "Next period": "Période suivante", "Privacy mode — hide client names": "Mode confidentialité — masquer les noms des clients", "Loading calendar": "Chargement du calendrier", "No appointments in this period.": "Aucun rendez-vous pendant cette période.",
+  "Clinic visit": "Visite à la clinique", "Open appointments": "Ouvrir les rendez-vous", "Close": "Fermer",
 };
 
 export default fr;

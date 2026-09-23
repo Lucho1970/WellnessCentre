@@ -1111,6 +1111,13 @@ const en = {
   "Page {{page}} of {{total}}": "Page {{page}} of {{total}}", "Notification #{{id}}": "Notification #{{id}}",
   "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.": "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.",
   "Appointment ID": "Appointment ID", "Event": "Event", "Recipient": "Recipient", "Scheduled": "Scheduled", "Next attempt": "Next attempt", "Provider accepted": "Provider accepted", "Attempts": "Attempts",
+  "My calendar": "My calendar",
+  "Your appointments by day, week, or month": "Your appointments by day, week, or month",
+  "This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.": "This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.",
+  "Unable to load the calendar.": "Unable to load the calendar.",
+  "Private appointment": "Private appointment", "Requested": "Requested", "Today": "Today", "Week": "Week", "Month": "Month", "Calendar view": "Calendar view",
+  "Previous period": "Previous period", "Next period": "Next period", "Privacy mode — hide client names": "Privacy mode — hide client names", "Loading calendar": "Loading calendar", "No appointments in this period.": "No appointments in this period.",
+  "Clinic visit": "Clinic visit", "Open appointments": "Open appointments", "Close": "Close",
 } as const;
 
 export default en;

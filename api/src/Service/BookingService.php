@@ -269,6 +269,39 @@ final class BookingService
         return $rows;
     }
 
+    /** Appointments for the signed-in practitioner's visible calendar range only. */
+    public function practitionerCalendar(AuthContext $actor,array $query): array
+    {
+        self::authorizePractitionerCalendar($actor);
+        [$start,$end]=self::calendarRange($query);
+        $sql="SELECT a.id,a.starts_at,a.ends_at,a.status,a.delivery_mode,s.name service_name,u.display_name client_name,l.name location_name,l.timezone FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1 JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.clinic_id=:clinic AND a.starts_at<:end AND a.ends_at>:start ORDER BY a.starts_at,a.id LIMIT 1001";
+        $statement=$this->database->connection()->prepare($sql);
+        $statement->execute(['user'=>$actor->userId,'clinic'=>$actor->clinicId,'start'=>$start,'end'=>$end]);
+        $rows=$statement->fetchAll();
+        if(count($rows)>1000)throw new ApiException(422,'calendar_range_too_busy','Too many appointments in this calendar range.');
+        return $rows;
+    }
+
+    public static function authorizePractitionerCalendar(AuthContext $actor): void
+    {
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner access is required.');
+    }
+
+    /** @return array{string,string} UTC SQL boundaries, end exclusive. */
+    public static function calendarRange(array $query): array
+    {
+        $values=[];
+        foreach(['start','end'] as $key){
+            $raw=$query[$key]??null;
+            if(!is_string($raw)||!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/',$raw))throw new ApiException(422,'validation_error','Calendar range must use UTC ISO timestamps.');
+            $date=DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s\Z',$raw,new DateTimeZone('UTC'));
+            if($date===false||$date->format('Y-m-d\TH:i:s\Z')!==$raw)throw new ApiException(422,'validation_error','Invalid calendar date.');
+            $values[]=$date;
+        }
+        if($values[1]<=$values[0]||$values[1]->getTimestamp()-$values[0]->getTimestamp()>62*86400)throw new ApiException(422,'validation_error','Calendar range must be between one second and 62 days.');
+        return [$values[0]->format('Y-m-d H:i:s'),$values[1]->format('Y-m-d H:i:s')];
+    }
+
     private function appointment(AuthContext $actor,int $id,bool $lock): array
     {
         $statement=$this->database->connection()->prepare('SELECT id,clinic_id,location_id,client_id,practitioner_id,service_id,duration_option_id,room_id,delivery_mode,starts_at,ends_at,buffer_starts_at,buffer_ends_at,base_price_cents,mobile_fee_cents,currency,cancellation_window_minutes,cancellation_fee_type,cancellation_fee_value,cancellation_fee_cents,status,version,created_at FROM appointments WHERE id=:id AND clinic_id=:clinic'.($lock?' FOR UPDATE':''));$statement->execute(['id'=>$id,'clinic'=>$actor->clinicId]);$row=$statement->fetch();if(!$row)throw new ApiException(404,'appointment_not_found','Appointment not found.');return $row;
