@@ -1,0 +1,69 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "type": "string",
+      "defaultValue": "wellness-mail-scheduler-dev",
+      "metadata": { "description": "Name of the existing Consumption Logic App to update." }
+    },
+    "logicAppLocation": {
+      "type": "string",
+      "defaultValue": "canadacentral",
+      "metadata": { "description": "Region of the existing Logic App." }
+    },
+    "mailTriggerSecret": {
+      "type": "securestring",
+      "minLength": 32,
+      "metadata": { "description": "The key already set as MAIL_TRIGGER_SECRET in the private Netfirms .env." }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "state": "Disabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "mailTriggerSecret": { "type": "SecureString" }
+          },
+          "triggers": {
+            "Every_15_minutes": {
+              "type": "Recurrence",
+              "recurrence": { "frequency": "Minute", "interval": 15 }
+            }
+          },
+          "actions": {
+            "Call_Wellness_Mail_Trigger": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "https://wellness.copihue.ca/api/cron/send-notifications.php",
+                "headers": {
+                  "X-Wellness-Cron-Key": "@parameters('mailTriggerSecret')"
+                },
+                "retryPolicy": { "type": "none" }
+              },
+              "runtimeConfiguration": {
+                "secureData": { "properties": ["inputs", "outputs"] }
+              },
+              "runAfter": {}
+            }
+          },
+          "outputs": {}
+        },
+        "parameters": {
+          "mailTriggerSecret": {
+            "value": "[parameters('mailTriggerSecret')]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
