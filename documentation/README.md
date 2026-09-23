@@ -10,6 +10,7 @@ Start with these two authoritative documents:
 - [Public practitioner directory](PUBLIC_PRACTITIONER_DIRECTORY.md): published practitioner projections, directory/profile behavior, preferred names and practitioner-first booking acceptance.
 - [Configurable branding](CONFIGURABLE_BRANDING.md): business logo/favicon roles, secure image constraints, migration and deployment acceptance.
 - [Dashboard widgets](DASHBOARD_WIDGETS.md): governed widget registry, authorized data projections, per-workspace personalization, delivery sequence and acceptance criteria.
+- [Limited testing readiness](PILOT_TEST_READINESS.md): hosted acceptance gates, safe pilot journeys, feedback capture and current scope limits.
 
 ## Supporting records and historical sources
 

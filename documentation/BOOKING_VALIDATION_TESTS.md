@@ -16,6 +16,7 @@ Run from `api`:
 composer run lint
 php tests/booking-request.php
 php tests/schedule-intervals.php
+php tests/dst-availability.php
 ```
 
 These tests cover request validation, timezone conversion, replay isolation, and interval calculations. They do not exercise MySQL locking. A local MySQL server was unavailable and the Docker engine was not running during this checkpoint.
@@ -33,4 +34,11 @@ Use development clients and a practitioner with configured working hours. These 
 7. As a practitioner, attempt to book another practitioner's schedule. Expect 403.
 8. From two independent authenticated sessions, submit the same free slot concurrently using distinct keys. Expect one success and one 409, with exactly one appointment in MySQL. Repeat with different practitioners competing for the same room and with the same practitioner across two locations.
 
-Concurrency acceptance remains pending until step 8 is run on MySQL. Phase 4 remains in progress; the next work is database integration coverage and the booking interface.
+An automated version of step 8 is in `api/tests/integration/booking-race.php`. It does not load the application `.env` or use any existing clinic record. Configure `BOOKING_TEST_DB_HOST`, `BOOKING_TEST_DB_PORT` (optional, default 3306), `BOOKING_TEST_DB_NAME`, `BOOKING_TEST_DB_USER`, `BOOKING_TEST_DB_PASSWORD`, and `BOOKING_TEST_CONFIRM` (the exact database name) as environment variables; keep credentials out of chat, source control, and shell history. Run `php api/tests/integration/booking-race.php` from the repository root with a PHP CLI that supports `proc_open`.
+
+- **Preferred:** use an empty disposable database whose name contains `booking_test`. The default `BOOKING_TEST_MODE=empty` refuses any nonempty database and installs the fresh schema there.
+- **Current development database:** set `BOOKING_TEST_MODE=isolated-clinic` and `BOOKING_TEST_EXISTING_ACK=synthetic-clinic-only`. This explicitly permits a populated database, but the harness creates a uniquely named synthetic clinic, users, practitioners, service, rooms, and appointments. Test email addresses are deliberately invalid, so the mail client cannot submit them to Graph. On completion or normal PHP shutdown, the harness cancels remaining synthetic notification events and marks the synthetic clinic inactive. It does **not** delete any records, and it never selects or modifies an existing clinic. Note the reported synthetic clinic ID for later inspection or carefully scoped cleanup.
+
+The harness races independent connections for the same practitioner, the same room, an identical idempotent retry, and one practitioner across two locations, then checks appointment/history/notification counts. It creates test data, so back up the development database first and run during a quiet testing window. If the process is forcibly terminated or reports that deactivation failed, the synthetic clinic may remain active; identify it by the `Synthetic booking race` name, cancel its notifications and deactivate only that clinic before continuing.
+
+Concurrency acceptance remains pending until this harness passes on real MySQL. Local PHP syntax checks alone do not close the gate. If the hosting CLI disables `proc_open` or remote MySQL access is unavailable, run the original two-session manual step 8 with synthetic records in a dedicated test clinic and record the results.
