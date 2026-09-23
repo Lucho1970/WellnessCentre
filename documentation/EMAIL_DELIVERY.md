@@ -1,6 +1,6 @@
 # Appointment email delivery (Microsoft 365 development tenant)
 
-The PHP API queues booking confirmation, change, and cancellation events in MySQL. A private CLI worker sends minimal bilingual email through Microsoft Graph. No public URL invokes the worker, and no Graph secret belongs in the frontend or Git.
+The PHP API queues booking confirmation, change, and cancellation events in MySQL. A private worker sends minimal bilingual email through Microsoft Graph. The optional HTTPS trigger is a small public pointer protected by a separate high-entropy key; no Graph secret belongs in the frontend or Git.
 
 ## Sender and tenant
 
@@ -28,7 +28,18 @@ Graph uses the [client-credentials flow](https://learn.microsoft.com/en-us/graph
    ```
 
 4. Verify the mailbox and permission scope, then set `MAIL_ENABLED=true`. Run a private command-line smoke test with a safe test client address. Only then schedule the worker.
-5. On Netfirms, schedule PHP CLI (the same PHP 8.4 family as the site) to run every minute or every few minutes: `php /absolute/private/path/wellness-api/bin/send-notifications.php --limit=20`. Set the absolute path for the hosting account. If scheduled jobs are unavailable, leave `MAIL_ENABLED=false` and run the CLI manually; do not expose a web-triggered endpoint or claim delivery is live.
+5. If Netfirms supports a real PHP CLI scheduled job, run `php /absolute/private/path/wellness-api/bin/send-notifications.php --limit=20`. Otherwise use the authenticated Azure Logic App trigger below. Leave `MAIL_ENABLED=false` until the trigger and its authentication have been tested; deployment alone does not enable delivery.
+
+### Azure Logic App Consumption scheduler (recommended for this hosting account)
+
+The Azure subscription can be in a different tenant from the Microsoft 365 mail sender. It only schedules an HTTPS request; the Graph app credentials stay in Netfirms' private `/wellness-api/.env`. Deploy `api/deploy/netfirms/public/cron/send-notifications.php` to `/public_html/wellness/api/cron/send-notifications.php`. The portal API package also contains the same pointer, but configure Azure to call **one** URL: `https://wellness.copihue.ca/api/cron/send-notifications.php`.
+
+1. Generate a random key of at least 32 characters. Keep it out of Git, chat, URL query strings, and logs. Put `MAIL_TRIGGER_SECRET=<key>` in the private `/wellness-api/.env`, with `MAIL_ENABLED=false`. The existing Graph settings remain there as before.
+2. Create a **Logic App (Consumption)** with a built-in **Recurrence** trigger every 15 minutes and one built-in **HTTP** action: method `POST`, URL above, no body, header `X-Wellness-Cron-Key` set to the same key. Store the key as a **Secure String** workflow parameter with an actual value, not a plaintext default, and turn on **Secure Inputs** for the HTTP action. Disable retries for this action initially so troubleshooting is unambiguous. Do not use a managed HTTP connector or Logic App Standard plan for this simple job.
+3. Save and run it while `MAIL_ENABLED=false`: the action should receive HTTP **503** and **no mail should be sent**. A normal browser GET receives 405; a POST without the key receives 404. Confirm the URL reaches the new pointer before enabling mail.
+4. Disable/delete the old Netfirms scheduled job so only Azure drives the worker. Confirm the queue contains only safe test mail addressed to a mailbox you control. Then set `MAIL_ENABLED=true` and trigger one run. A successful call returns 204. Check `notification_events`, the recipient inbox, and the generic count in the Netfirms PHP error log. `sent` means Graph accepted the request, not that it arrived in the inbox. If any check fails, set `MAIL_ENABLED=false` again.
+
+The pointer processes at most three events per run, uses a private lock and five-minute cooldown, and returns no patient or queue details. A 503 means disabled or failed; a 404 means the key was not accepted; a 204 means the worker completed or the cooldown applied. Rotate the key in both places if exposed. See [Microsoft's secure parameter](https://learn.microsoft.com/en-us/azure/logic-apps/create-parameters-workflows) and [secure run history](https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app) guidance.
 
 ### Netfirms URL-only scheduler (development bridge)
 
