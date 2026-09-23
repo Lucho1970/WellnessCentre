@@ -1101,6 +1101,16 @@ const en = {
   "Clinic-initiated cancellations do not assess a client fee.": "Clinic-initiated cancellations do not assess a client fee.",
   "Assessed cancellation fee (CAD)": "Assessed cancellation fee (CAD)",
   "Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.": "Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.",
+  "Email status": "Email status",
+  "Review appointment email delivery": "Review appointment email delivery",
+  "Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.": "Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.",
+  "Unable to load email status.": "Unable to load email status.",
+  "All statuses": "All statuses", "Needs review": "Needs review", "Failed": "Failed", "Queued": "Queued", "Sending": "Sending", "Accepted by provider": "Accepted by provider", "Delivered": "Delivered", "Canceled": "Canceled",
+  "Booking confirmation": "Booking confirmation", "Booking change": "Booking change", "Booking cancellation": "Booking cancellation",
+  "{{count}} notifications": "{{count}} notifications", "Loading email status…": "Loading email status…", "No notifications match this status.": "No notifications match this status.", "Email notifications": "Email notifications",
+  "Page {{page}} of {{total}}": "Page {{page}} of {{total}}", "Notification #{{id}}": "Notification #{{id}}",
+  "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.": "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.",
+  "Appointment ID": "Appointment ID", "Event": "Event", "Recipient": "Recipient", "Scheduled": "Scheduled", "Next attempt": "Next attempt", "Provider accepted": "Provider accepted", "Attempts": "Attempts",
 } as const;
 
 export default en;

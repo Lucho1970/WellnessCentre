@@ -1138,6 +1138,16 @@ const fr: Record<string, string> = {
   "Clinic-initiated cancellations do not assess a client fee.": "Les annulations initiées par la clinique n’entraînent aucuns frais pour le client.",
   "Assessed cancellation fee (CAD)": "Frais d’annulation imposés (CAD)",
   "Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.": "La réduction ou l’annulation des frais calculés exige un motif et est consignée dans l’historique d’audit.",
+  "Email status": "État des courriels",
+  "Review appointment email delivery": "Suivi des courriels de rendez-vous",
+  "Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.": "L’état reflète la file d’attente et l’acceptation par le fournisseur, sans confirmer la livraison en boîte de réception. Les éléments à vérifier ne sont jamais renvoyés automatiquement.",
+  "Unable to load email status.": "Impossible de charger l’état des courriels.",
+  "All statuses": "Tous les états", "Needs review": "À vérifier", "Failed": "Échec", "Queued": "En attente", "Sending": "En cours d’envoi", "Accepted by provider": "Accepté par le fournisseur", "Delivered": "Livré", "Canceled": "Annulé",
+  "Booking confirmation": "Confirmation de rendez-vous", "Booking change": "Modification de rendez-vous", "Booking cancellation": "Annulation de rendez-vous",
+  "{{count}} notifications": "{{count}} notifications", "Loading email status…": "Chargement de l’état des courriels…", "No notifications match this status.": "Aucune notification ne correspond à cet état.", "Email notifications": "Notifications par courriel",
+  "Page {{page}} of {{total}}": "Page {{page}} sur {{total}}", "Notification #{{id}}": "Notification no {{id}}",
+  "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.": "Le résultat de la livraison peut être inconnu. Vérifiez auprès du fournisseur et du destinataire avant de décider d’un envoi manuel.",
+  "Appointment ID": "ID du rendez-vous", "Event": "Événement", "Recipient": "Destinataire", "Scheduled": "Prévu", "Next attempt": "Prochaine tentative", "Provider accepted": "Accepté par le fournisseur", "Attempts": "Tentatives",
 };
 
 export default fr;

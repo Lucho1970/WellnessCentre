@@ -33,6 +33,7 @@ import {
   HandHeart,
   Users,
   CalendarRange,
+  MailCheck,
   X,
 } from "lucide-react";
 const BusinessSettings = lazy(() => import('../admin/BusinessSettings').then(module => ({ default: module.BusinessSettings })));
@@ -49,6 +50,7 @@ const ClientManagement = lazy(() => import('../clients/ClientManagement').then(m
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
+const NotificationStatusAdmin = lazy(() => import('../admin/NotificationStatusAdmin').then(module => ({ default: module.NotificationStatusAdmin })));
 
 type NavigationItem = {
   id: PortalPage;
@@ -73,6 +75,7 @@ const navigation: NavigationItem[] = [
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
+  { id: "notifications", label: "Email status", description: "Review appointment email delivery", icon: <MailCheck size={20} /> },
   {
     id: "profile",
     label: "My profile",
@@ -170,6 +173,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}
         {page === "widgets" && <DashboardWidgetAdmin />}
+        {page === "notifications" && <NotificationStatusAdmin />}
         {page === "calendar" && <AvailabilityAdmin practitionerMode={workspace === 'practitioner'} />}
         {page === "profile" && <ProfileSettings />}
         </Suspense>

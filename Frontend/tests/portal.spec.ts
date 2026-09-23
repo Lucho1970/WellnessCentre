@@ -1131,8 +1131,11 @@ test("role policies preserve current access without broadening permissions", () 
   expect(pagesFor(["accountant"], "admin")).toEqual(["dashboard", "profile"]);
   expect(pagesFor(["reception"], "admin")).toContain("clients");
   expect(pagesFor(["clinic_admin"], "admin")).not.toContain("staff");
+  expect(pagesFor(["clinic_admin"], "admin")).toContain("notifications");
+  expect(pagesFor(["reception"], "admin")).not.toContain("notifications");
   expect(pagesFor(["practitioner"], "admin")).toEqual([]);
   expect(pagesFor(["super_admin"], "admin")).toContain("business");
+  expect(pageAt("/admin/notifications", "admin")).toBe("notifications");
   expect(pagesFor(["practitioner"], "practitioner")).toEqual([
     "dashboard",
     "appointments",
