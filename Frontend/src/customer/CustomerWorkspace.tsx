@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
-import { RefreshCw } from 'lucide-react';
+import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { customerFetch } from './session';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../i18n/format';
@@ -29,6 +29,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
   const [claimantName, setClaimantName] = useState('');
   const [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [reload, setReload] = useState(0);
+  const [calendarDownloading, setCalendarDownloading] = useState<number | null>(null);
   const { markDirty, markClean } = useUnsavedForm();
   useEffect(() => {
     if (status.onboarding_status === 'linked' && (mode === 'choose' || mode === 'invite')) setMode(canBook&&customerBookingIntent() ? 'booking' : 'appointments');
@@ -68,6 +69,18 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
     finally { setSaving(false); }
   };
   const field = (key: 'given_name' | 'family_name' | 'email' | 'phone', label: string, maxLength: number) => <TextField fullWidth required label={label} value={profile[key] ?? ''} disabled={saving} type={key === 'email' ? 'email' : 'text'} inputProps={{ maxLength }} onChange={e => setProfile(p => ({ ...p, [key]: e.target.value }))} />;
+  const downloadCalendar = async (appointmentId: number) => {
+    setCalendarDownloading(appointmentId); setError('');
+    try {
+      const data = await customerFetch(`/appointments/${appointmentId}/calendar`);
+      if (typeof data.content !== 'string' || !/^appointment-\d+\.ics$/.test(data.filename)) throw new Error(t('The calendar file could not be prepared.'));
+      const url = URL.createObjectURL(new Blob([data.content], { type: 'text/calendar;charset=utf-8' }));
+      const link = document.createElement('a'); link.href = url; link.download = data.filename;
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to download the calendar file.')); }
+    finally { setCalendarDownloading(null); }
+  };
   if (status.onboarding_status === 'pending_review') return <Stack spacing={2}>
     <Alert severity="info">{t('Your invitation was accepted. Staff must verify your identity before you can view the client record.')}</Alert>
     <Typography>{t('Give this review code to the clinic through your established contact channel:')} <strong>{status.review_code}</strong></Typography>
@@ -95,6 +108,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
           <Typography>{formatDateTime(`${appointment.starts_at.replace(' ', 'T')}Z`, i18n.resolvedLanguage, { timeZone: appointment.timezone, dateStyle: 'medium', timeStyle: 'short' })} – {formatDateTime(`${appointment.ends_at.replace(' ', 'T')}Z`, i18n.resolvedLanguage, { timeZone: appointment.timezone, dateStyle: 'medium', timeStyle: 'short' })}</Typography>
           <Typography>{appointment.practitioner}</Typography>
           <Typography color="text.secondary">{appointment.delivery_mode === 'mobile' ? t('On-Site (client location)') : `${t('In clinic')} · ${appointment.location}`} · {t('Appointment #{{id}}', { id: appointment.id })}</Typography>
+          {!appointment.status.startsWith('canceled') && <Button size="small" startIcon={<CalendarPlus size={16} />} disabled={calendarDownloading === appointment.id} onClick={() => void downloadCalendar(appointment.id)}>{t('Add to calendar')}</Button>}
           {['requested','confirmed','rescheduled'].includes(appointment.status) && appointmentInstant(appointment.ends_at) > Date.now() && <Button size="small" onClick={() => { setManaging(appointment); setNotice(''); setMode('manage'); }}>{t('View or change')}</Button>}
         </Box>)}
       </Stack>}

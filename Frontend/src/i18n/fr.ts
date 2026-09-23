@@ -1155,6 +1155,9 @@ const fr: Record<string, string> = {
   "Private appointment": "Rendez-vous privé", "Requested": "Demandé", "Today": "Aujourd’hui", "Week": "Semaine", "Month": "Mois", "Calendar view": "Vue du calendrier",
   "Previous period": "Période précédente", "Next period": "Période suivante", "Privacy mode — hide client names": "Mode confidentialité — masquer les noms des clients", "Loading calendar": "Chargement du calendrier", "No appointments in this period.": "Aucun rendez-vous pendant cette période.",
   "Clinic visit": "Visite à la clinique", "Open appointments": "Ouvrir les rendez-vous", "Close": "Fermer",
+  "Add to calendar": "Ajouter au calendrier",
+  "The calendar file could not be prepared.": "Impossible de préparer le fichier de calendrier.",
+  "Unable to download the calendar file.": "Impossible de télécharger le fichier de calendrier.",
 };
 
 export default fr;

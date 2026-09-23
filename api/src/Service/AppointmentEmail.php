@@ -27,8 +27,10 @@ final class AppointmentEmail
         $url = rtrim($clientPortalUrl, '/');
         if (!filter_var($url, FILTER_VALIDATE_URL) || !str_starts_with($url, 'https://')) throw new InvalidArgumentException('Client portal URL must be HTTPS.');
         $body = $words[2] . "\n" . 'Appointment: ' . $local . "\n"
+            . 'A calendar file is attached. Your calendar may ask you to add or accept it.' . "\n"
             . 'Sign in to review your appointment: ' . $url . "\n\n"
             . $words[3] . "\n" . 'Rendez-vous : ' . $local . "\n"
+            . 'Un fichier de calendrier est joint. Votre calendrier pourrait vous demander de l’ajouter ou de l’accepter.' . "\n"
             . 'Ouvrez une session pour voir votre rendez-vous : ' . $url . "\n\n"
             . $clinic;
         return ['subject' => $clinic . ' — ' . $words[0] . ' / ' . $words[1], 'body' => $body];

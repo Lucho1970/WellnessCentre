@@ -1118,6 +1118,9 @@ const en = {
   "Private appointment": "Private appointment", "Requested": "Requested", "Today": "Today", "Week": "Week", "Month": "Month", "Calendar view": "Calendar view",
   "Previous period": "Previous period", "Next period": "Next period", "Privacy mode — hide client names": "Privacy mode — hide client names", "Loading calendar": "Loading calendar", "No appointments in this period.": "No appointments in this period.",
   "Clinic visit": "Clinic visit", "Open appointments": "Open appointments", "Close": "Close",
+  "Add to calendar": "Add to calendar",
+  "The calendar file could not be prepared.": "The calendar file could not be prepared.",
+  "Unable to download the calendar file.": "Unable to download the calendar file.",
 } as const;
 
 export default en;

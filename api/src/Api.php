@@ -299,6 +299,7 @@ final class Api
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/availability$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->updateAvailability($bookingActor(),(int)$matches[1],$r->query);
+        if($r->method==='GET'&&preg_match('#^appointments/(\d+)/calendar$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->customerCalendar($bookingActor(),(int)$matches[1],$this->config->clientPortalUrl);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/cancellation-preview$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->cancellationPreview($bookingActor(),(int)$matches[1]);
         if($r->method==='PATCH'&&preg_match('#^appointments/(\d+)$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->update($bookingActor(),(int)$matches[1],$r->body,$r->correlationId);
         return match ($route) {

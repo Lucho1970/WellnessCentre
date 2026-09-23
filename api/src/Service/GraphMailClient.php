@@ -22,17 +22,15 @@ final class GraphMailClient
         }
     }
 
-    public function send(string $recipient, string $subject, string $content): void
+    public function senderAddress(): string { return $this->fromAddress; }
+
+    public function send(string $recipient, string $subject, string $content, ?string $calendar = null): void
     {
         if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
             throw new MailSendException('Recipient email address is invalid.', false);
         }
         $token = $this->accessToken();
-        $body = json_encode(['message' => [
-            'subject' => $subject,
-            'body' => ['contentType' => 'Text', 'content' => $content],
-            'toRecipients' => [['emailAddress' => ['address' => $recipient]]],
-        ]], JSON_THROW_ON_ERROR);
+        $body = json_encode(self::mailPayload($recipient, $subject, $content, $calendar), JSON_THROW_ON_ERROR);
         $url = 'https://graph.microsoft.com/v1.0/users/' . rawurlencode($this->fromAddress) . '/sendMail';
         [$status, $retryAfter] = $this->request($url, [
             'Authorization: Bearer ' . $token,
@@ -40,6 +38,22 @@ final class GraphMailClient
         ], $body, true);
         if ($status === 202) return;
         throw new MailSendException('Graph sendMail returned HTTP ' . $status . '.', $status === 429 || $status >= 500, false, $retryAfter);
+    }
+
+    public static function mailPayload(string $recipient, string $subject, string $content, ?string $calendar = null): array
+    {
+        $message = [
+            'subject' => $subject,
+            'body' => ['contentType' => 'Text', 'content' => $content],
+            'toRecipients' => [['emailAddress' => ['address' => $recipient]]],
+        ];
+        if ($calendar !== null) $message['attachments'] = [[
+            '@odata.type' => '#microsoft.graph.fileAttachment',
+            'name' => 'appointment.ics',
+            'contentType' => 'text/calendar',
+            'contentBytes' => base64_encode($calendar),
+        ]];
+        return ['message' => $message];
     }
 
     private function accessToken(): string

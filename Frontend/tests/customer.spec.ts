@@ -487,6 +487,11 @@ test("linked client sees only their appointments and idle expiry removes private
       },
     });
   });
+  let calendarReads = 0;
+  await page.route("**/api/v1/customer/appointments/41/calendar", (route) => {
+    calendarReads++;
+    return route.fulfill({ json: { data: { filename: "appointment-41.ics", content: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n" } } });
+  });
   await page.goto("http://localhost:5184/client");
   await expect(
     page.getByText("Therapeutic Massage", { exact: true }),
@@ -494,6 +499,10 @@ test("linked client sees only their appointments and idle expiry removes private
   await expect(
     page.getByText(/On-Site \(client location\).*Appointment #41/),
   ).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Add to calendar" }).click();
+  expect((await download).suggestedFilename()).toBe("appointment-41.ics");
+  expect(calendarReads).toBe(1);
   await expect(page.getByText("Massage", { exact: true })).toHaveCount(0);
   await page.getByLabel("Show").click();
   await page.getByRole("option", { name: "Past", exact: true }).click();

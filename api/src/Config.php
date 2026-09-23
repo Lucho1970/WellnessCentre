@@ -30,6 +30,7 @@ final readonly class Config
         public string $googleMapsApiKey = '',
         public string $addressValidationSigningKey = '',
         public int $addressValidationTokenTtlSeconds = 900,
+        public string $clientPortalUrl = '',
     ) {}
 
     public static function fromEnvironment(): self
@@ -64,6 +65,7 @@ final readonly class Config
             $value('GOOGLE_MAPS_API_KEY'),
             $value('ADDRESS_VALIDATION_SIGNING_KEY'),
             max(60, min(3600, (int)$value('ADDRESS_VALIDATION_TOKEN_TTL_SECONDS', '900'))),
+            $value('CLIENT_PORTAL_URL'),
         );
     }
 

@@ -282,6 +282,18 @@ final class BookingService
         return $rows;
     }
 
+    /** Downloadable calendar event, limited to the linked client's own appointment. */
+    public function customerCalendar(AuthContext $actor,int $id,string $portalUrl): array
+    {
+        if($actor->userType!=='client')throw new ApiException(403,'forbidden','Client access is required.');
+        $statement=$this->database->connection()->prepare('SELECT id,clinic_id,version,starts_at,ends_at,status FROM appointments WHERE id=:id AND clinic_id=:clinic AND client_id=:client');
+        $statement->execute(['id'=>$id,'clinic'=>$actor->clinicId,'client'=>$actor->userId]);
+        $appointment=$statement->fetch();
+        if(!$appointment)throw new ApiException(404,'appointment_not_found','Appointment not found.');
+        if(in_array($appointment['status'],['canceled_by_client','canceled_by_clinic'],true))throw new ApiException(409,'appointment_canceled','Canceled appointments cannot be added to a calendar.');
+        return ['filename'=>'appointment-'.$id.'.ics','content'=>AppointmentCalendar::compose($appointment,$portalUrl)];
+    }
+
     public static function authorizePractitionerCalendar(AuthContext $actor): void
     {
         if($actor->userType!=='staff'||!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner access is required.');

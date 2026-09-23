@@ -10,9 +10,11 @@ Choose **Book appointment** to select a visit type, service, practitioner and du
 an On-Site visit, review the saved profile address (or replace it for this appointment),
 then validate the address and service radius. Choose a date, search current availability,
 select a time and any required room, and review the price before confirming. A selected
-time is not reserved until confirmation succeeds. Keep the appointment number because
-email delivery is not enabled yet. Use the same confirmation button to retry an uncertain
+time is not reserved until confirmation succeeds. Keep the appointment number for reference.
+Use the same confirmation button to retry an uncertain
 network result; do not start a second booking until the appointment list has been checked.
+
+For a current or past appointment, choose **Add to calendar** in **My appointments** to download its `.ics` file. Open the file with your preferred calendar and confirm the addition if prompted. Booking, change, and cancellation emails also include a calendar update. Whether an email automatically appears in Google, Outlook, or another calendar depends on that provider and the recipient's settings. Canceled appointments cannot be added from the portal.
 
 The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Linked clients can book, review, reschedule, and cancel their own eligible upcoming appointments. The portal rechecks availability before a reschedule. Before cancellation, the portal shows the server-calculated fee, if any, from the policy accepted when the appointment was booked. Confirming records the assessed fee but does not itself collect payment.
 
@@ -89,7 +91,7 @@ Create the Microsoft Entra account and assign the required practitioner applicat
 
 Practitioners can open **My calendar** in their workspace to see their own clinic appointments by day, week, or month. Use the arrows or **Today** to move between periods; **Refresh** reloads current booking data. Select an event for its status, time, service, and base location. On-Site visits are labelled, but their destination address is not shown on the calendar. Use **Appointments** for the full booking workflow and authorized details.
 
-The calendar displays times in the device's timezone, which is shown above the grid. Turn on **Privacy mode** before sharing your screen to hide client names from calendar events and the detail panel. This is a display safeguard, not a change to account permissions. Google/Outlook connections and client calendar invitations are separate future features; this page does not put events into an external calendar.
+The calendar displays times in the device's timezone, which is shown above the grid. Turn on **Privacy mode** before sharing your screen to hide client names from calendar events and the detail panel. This is a display safeguard, not a change to account permissions. Google/Outlook connections for practitioners remain future features; this page does not put events into an external calendar.
 
 ## Quick verification after changing a service
 

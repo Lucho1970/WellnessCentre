@@ -29,6 +29,7 @@ final class NotificationWorker
                 $details = $this->details((int)$event['id']);
                 $superseded = $details === null || $this->superseded($details);
                 $message = $superseded ? null : AppointmentEmail::compose($details, $this->clientPortalUrl);
+                $calendar = $superseded ? null : AppointmentCalendar::compose($details, $this->clientPortalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
             } catch (Throwable $e) {
                 $this->finish($event, 'needs_review', 'Notification could not be prepared (' . get_class($e) . ').');
                 $summary['review']++;
@@ -40,7 +41,7 @@ final class NotificationWorker
                 continue;
             }
             try {
-                $this->mailer->send((string)$event['recipient_address'], $message['subject'], $message['body']);
+                $this->mailer->send((string)$event['recipient_address'], $message['subject'], $message['body'], $calendar);
             } catch (MailSendException $e) {
                 $retry = $e->retryable && !$e->ambiguous && (int)$event['attempt_count'] < 5;
                 $this->finish($event, $retry ? 'failed' : 'needs_review', $e->getMessage(), $retry ? max($e->retryAfterSeconds, self::backoff((int)$event['attempt_count'])) : 0);
@@ -86,7 +87,7 @@ final class NotificationWorker
 
     private function details(int $eventId): ?array
     {
-        $query = $this->pdo->prepare('SELECT n.id,n.appointment_id,n.event_code,a.status appointment_status,a.starts_at,l.timezone,c.name clinic_name FROM notification_events n JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id JOIN locations l ON l.id=a.location_id JOIN clinics c ON c.id=n.clinic_id WHERE n.id=:id');
+        $query = $this->pdo->prepare('SELECT n.id,n.clinic_id,n.appointment_id,n.event_code,a.status appointment_status,a.version,a.starts_at,a.ends_at,l.timezone,c.name clinic_name FROM notification_events n JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id JOIN locations l ON l.id=a.location_id JOIN clinics c ON c.id=n.clinic_id WHERE n.id=:id');
         $query->execute(['id' => $eventId]);
         $row = $query->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
