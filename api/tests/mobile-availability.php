@@ -18,11 +18,12 @@ final class SlotPDO extends PDO
     public bool $occupied=false;
     public int $roomQueries=0;
     public string $date;
+    public array $durationMinutes=[60];
     public function __construct(){$this->date=(new DateTimeImmutable('tomorrow',new DateTimeZone('America/Toronto')))->format('Y-m-d');}
     public function prepare(string $query,array $options=[]):PDOStatement|false{return new SlotStatement($this,$query);}
     public function rows(string $sql,array $params):array
     {
-        if(str_contains($sql,'FROM services s'))return [['offers_mobile'=>1,'offers_clinic'=>1,'requires_room'=>1,'travel_buffer_minutes'=>30,'mobile_fee_cents'=>2500,'base_price_cents'=>12000,'lead_time_minutes'=>0,'booking_horizon_days'=>365,'buffer_before_minutes'=>0,'buffer_after_minutes'=>0,'duration_option_id'=>4,'duration_minutes'=>60,'timezone'=>'America/Toronto']];
+        if(str_contains($sql,'FROM services s'))return array_map(static fn(int $minutes):array=>['offers_mobile'=>1,'offers_clinic'=>1,'requires_room'=>1,'travel_buffer_minutes'=>30,'mobile_fee_cents'=>2500,'base_price_cents'=>12000,'lead_time_minutes'=>0,'booking_horizon_days'=>365,'buffer_before_minutes'=>0,'buffer_after_minutes'=>0,'duration_option_id'=>$minutes,'duration_minutes'=>$minutes,'timezone'=>'America/Toronto'],$this->durationMinutes);
         if(str_contains($sql,'FROM availability_rules'))return [['start_time'=>'09:00:00','end_time'=>'20:00:00']];
         if(str_contains($sql,'FROM rooms')){$this->roomQueries++;return [];}
         if(str_contains($sql,'FROM appointments')&&$this->occupied){
@@ -48,4 +49,9 @@ $pdo->occupied=true;$filtered=$engine->search($query)['availability'];
 foreach($filtered as $slot){$start=new DateTimeImmutable($slot['starts_at']);$end=new DateTimeImmutable($slot['ends_at']);if($start->modify('-30 minutes')->format('H:i')<'13:00'&&$end->modify('+30 minutes')->format('H:i')>'12:00')throw new RuntimeException('Travel conflict not excluded');}
 if(count($filtered)>=count($slots))throw new RuntimeException('Existing appointment did not block slots');
 $query['delivery_mode']='clinic';if($engine->search($query)['availability']!==[]||$pdo->roomQueries===0)throw new RuntimeException('Clinic room requirement bypassed');
-echo "6 mobile availability checks passed.\n";
+$pdo->occupied=false;$pdo->durationMinutes=[90,60,120];$query['delivery_mode']='mobile';
+$mixed=$engine->search($query)['availability'];
+$firstTime=$mixed[0]['starts_at'];
+$firstGroup=array_values(array_filter($mixed,static fn(array $slot):bool=>$slot['starts_at']===$firstTime));
+if(array_column($firstGroup,'duration_option_id')!==[60,90,120])throw new RuntimeException('Equal start times must sort by ascending duration');
+echo "7 mobile availability checks passed.\n";

@@ -47,7 +47,7 @@ final class CatalogService
         else $sql .= ' WHERE s.active=1 AND s.published=1';
         $sql .= ' GROUP BY s.id,s.slug,s.name,s.description,s.preparation_instructions,s.price_cents,c.name ORDER BY c.name,s.display_order,s.name';
         $statement=$this->database->connection()->prepare($sql); $statement->execute($params);
-        $rows=$statement->fetchAll(); foreach($rows as &$row) $row['durations']=json_decode($row['durations'],true); return $rows;
+        $rows=$statement->fetchAll(); foreach($rows as &$row) $row['durations']=self::sortedDurations($row['durations']); return $rows;
     }
 
     public function publicServices(): array
@@ -64,8 +64,15 @@ final class CatalogService
             GROUP BY s.id,s.slug,s.name,s.name_fr,s.public_summary,s.public_summary_fr,s.description,s.description_fr,s.preparation_instructions,s.preparation_instructions_fr,c.name,s.display_order
             ORDER BY c.name IS NULL,c.name,s.display_order,s.name";
         $rows=$this->database->connection()->query($sql)->fetchAll();
-        foreach($rows as &$row){$row['durations']=json_decode($row['durations'],true);$row['offers_clinic']=(bool)$row['offers_clinic'];$row['offers_mobile']=(bool)$row['offers_mobile'];}
+        foreach($rows as &$row){$row['durations']=self::sortedDurations($row['durations']);$row['offers_clinic']=(bool)$row['offers_clinic'];$row['offers_mobile']=(bool)$row['offers_mobile'];}
         return $rows;
+    }
+
+    private static function sortedDurations(string $json): array
+    {
+        $durations=json_decode($json,true,512,JSON_THROW_ON_ERROR);
+        usort($durations,static fn(array $a,array $b): int => ((int)$a['minutes']<=>(int)$b['minutes']) ?: ((int)($a['id']??0)<=>(int)($b['id']??0)));
+        return $durations;
     }
 
     public function publicService(string $slug): array

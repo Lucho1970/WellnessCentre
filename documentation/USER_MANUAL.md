@@ -47,6 +47,8 @@ Open **Administration → Services** to manage the treatments or other services 
 
 Changes to a service affect future booking choices. Existing appointments retain their saved appointment details, price snapshots, and cancellation policy. A service cancellation policy can have no fee, a fixed fee, or a percentage fee inside its configured window.
 
+Duration choices use one system-wide display rule: shortest to longest (for example, 60, 90, then 120 minutes). Set each duration and its price when editing the service; there is no separate duration display-order field. This order applies to the public catalogue, available-time choices, and staff and client booking selectors.
+
 ### Create a service
 
 1. Choose **New service**.

@@ -29,7 +29,8 @@ final class AvailabilityService
                 JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1
                 JOIN users u ON u.id=p.user_id AND u.status='active' AND u.clinic_id=s.clinic_id
                 JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=l.id AND pl.active=1
-               WHERE s.id=:service AND s.active=1 AND l.is_bookable=1 AND l.clinic_id=s.clinic_id";
+               WHERE s.id=:service AND s.active=1 AND l.is_bookable=1 AND l.clinic_id=s.clinic_id
+               ORDER BY d.duration_minutes,d.id";
         $statement=$this->database->connection()->prepare($sql);$statement->execute(['location'=>$locationId,'practitioner'=>$practitionerId,'service'=>$serviceId]);$options=$statement->fetchAll();
         if(!$options) throw new ApiException(404,'service_not_available','That practitioner does not offer this service at the selected location.');
         $timezone=new DateTimeZone($options[0]['timezone']); $slots=[];
@@ -54,7 +55,14 @@ final class AvailabilityService
                 }
             }}
         }
-        $slots=array_values($slots);usort($slots,fn($a,$b)=>strtotime($a['starts_at'])<=>strtotime($b['starts_at']));
+        $slots=array_values($slots);
+        usort($slots,static function(array $a,array $b): int {
+            $startOrder=strtotime($a['starts_at'])<=>strtotime($b['starts_at']);
+            if($startOrder!==0)return $startOrder;
+            $aMinutes=(strtotime($a['ends_at'])-strtotime($a['starts_at']))/60;
+            $bMinutes=(strtotime($b['ends_at'])-strtotime($b['starts_at']))/60;
+            return ($aMinutes<=>$bMinutes) ?: ($a['duration_option_id']<=>$b['duration_option_id']);
+        });
         return ['slot_increment_minutes'=>15,'availability'=>$slots];
     }
 
