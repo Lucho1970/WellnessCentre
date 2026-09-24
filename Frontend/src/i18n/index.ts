@@ -27,6 +27,10 @@ void i18n.use(initReactI18next).init({
   lng: initialLanguage(),
   fallbackLng: 'en',
   supportedLngs: supportedLanguages,
+  // Resource files use flat, literal English phrases as keys. In particular,
+  // `Email:` must not be parsed as a namespace and sentence dots are literal.
+  nsSeparator: false,
+  keySeparator: false,
   interpolation: { escapeValue: false },
   returnNull: false,
 });

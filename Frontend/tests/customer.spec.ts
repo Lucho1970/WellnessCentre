@@ -394,6 +394,11 @@ test("new customer registers once and pending invitation never exposes a profile
   });
   await page.goto("http://localhost:5184/client");
   await page.getByRole("button", { name: "I am a new client" }).click();
+  const preferredContact = page.getByRole("combobox", { name: "Preferred contact" });
+  await expect(preferredContact).toHaveText("Email");
+  await preferredContact.click();
+  await expect(page.getByRole("option", { name: "Email" })).toBeVisible();
+  await page.getByRole("option", { name: "Email" }).click();
   for (const [label, value] of Object.entries({
     "First name": "Test",
     "Last name": "Client",
