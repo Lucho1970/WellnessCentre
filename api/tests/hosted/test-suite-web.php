@@ -38,6 +38,32 @@ if (!is_array($urlParts) || ($urlParts['scheme'] ?? '') !== 'https' || empty($ur
     exit('Hosted test API base is not configured as an HTTPS /api URL.');
 }
 
+// Signed, same-endpoint HTTP workers bypass the browser session lock. They may
+// operate only on the test harness's synthetic clinic, never a real clinic.
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_SERVER['HTTP_X_WELLNESS_TEST_SIGNATURE'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $raw = file_get_contents('php://input');
+    $stamp = (string)($_SERVER['HTTP_X_WELLNESS_TEST_TIMESTAMP'] ?? '');
+    $signature = (string)$_SERVER['HTTP_X_WELLNESS_TEST_SIGNATURE'];
+    require $root . '/tests/hosted/HttpBookingWorker.php';
+    if ($raw === false || strlen($raw) > 4096 || !\Wellness\Tests\Hosted\HttpBookingWorker::authorized($secret, $stamp, $signature, $raw)) {
+        http_response_code(404);
+        exit;
+    }
+    try {
+        $input = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
+        $result = is_array($input)
+            ? \Wellness\Tests\Hosted\HttpBookingWorker::run(\Wellness\Config::fromEnvironment(), $input)
+            : ['ok' => false, 'status' => 400];
+        echo json_encode($result, JSON_THROW_ON_ERROR);
+    } catch (\Throwable $error) {
+        error_log('Hosted booking worker endpoint failed: ' . get_class($error));
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'unexpected' => 'worker_error']);
+    }
+    exit;
+}
+
 session_name('wellness_hosted_test_suite');
 session_set_cookie_params(['lifetime' => 0, 'path' => $_SERVER['SCRIPT_NAME'] ?? '/api/test-suite.php', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
 if (!session_start()) {
@@ -100,7 +126,7 @@ if ($method === 'POST') {
         $config = \Wellness\Config::fromEnvironment();
         $phpCli = $env('HOSTED_TEST_PHP_CLI') ?: PHP_BINARY;
         if (function_exists('set_time_limit')) @set_time_limit($id === 'booking-race' ? 120 : 35);
-        $result = \Wellness\Tests\Hosted\Suite::run($id, $config, $apiBase, $phpCli);
+        $result = \Wellness\Tests\Hosted\Suite::run($id, $config, $apiBase, $phpCli, $secret);
         echo json_encode(['id' => $id] + $result, JSON_THROW_ON_ERROR);
     } catch (\Throwable $error) {
         error_log('Hosted suite endpoint failed: ' . get_class($error) . ': ' . $error->getMessage());

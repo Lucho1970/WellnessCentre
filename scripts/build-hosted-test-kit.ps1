@@ -10,7 +10,7 @@ $public = Join-Path $stage 'public_html/wellness/api'
 New-Item -ItemType Directory -Path (Join-Path $private 'tests/hosted'),(Join-Path $private 'tests/integration'),$public -Force | Out-Null
 try {
     Get-ChildItem -LiteralPath (Join-Path $repo 'api/tests') -Filter '*.php' -File | Copy-Item -Destination (Join-Path $private 'tests') -ErrorAction Stop
-    Copy-Item -LiteralPath (Join-Path $repo 'api/tests/hosted/Suite.php'),(Join-Path $repo 'api/tests/hosted/database-read.php') -Destination (Join-Path $private 'tests/hosted')
+    Copy-Item -LiteralPath (Join-Path $repo 'api/tests/hosted/Suite.php'),(Join-Path $repo 'api/tests/hosted/database-read.php'),(Join-Path $repo 'api/tests/hosted/HttpBookingWorker.php') -Destination (Join-Path $private 'tests/hosted')
     foreach ($name in @('booking-race.php','booking-race-worker.php')) {
         Copy-Item -LiteralPath (Join-Path $repo "api/tests/integration/$name") -Destination (Join-Path $private 'tests/integration')
     }

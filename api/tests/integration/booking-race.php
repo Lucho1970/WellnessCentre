@@ -18,9 +18,21 @@ $mode = getenv('BOOKING_TEST_MODE') ?: 'empty';
 if (!in_array($mode, ['empty', 'isolated-clinic'], true) || $read('BOOKING_TEST_CONFIRM') !== $name) throw new RuntimeException('Confirm the exact database name and choose a supported test mode.');
 if ($mode === 'empty' && !preg_match('/^[a-zA-Z0-9_]*booking_test[a-zA-Z0-9_]*$/', $name)) throw new RuntimeException('An empty scratch database name must contain booking_test.');
 if ($mode === 'isolated-clinic' && $read('BOOKING_TEST_EXISTING_ACK') !== 'synthetic-clinic-only') throw new RuntimeException('Confirm isolated-clinic mode explicitly before writing synthetic records.');
-if (!function_exists('proc_open')) throw new RuntimeException('This PHP CLI must support proc_open for independent concurrent connections.');
+$httpWorkerUrl = (string)(getenv('BOOKING_TEST_HTTP_WORKER_URL') ?: '');
+$httpWorkerSecret = (string)(getenv('BOOKING_TEST_HTTP_WORKER_SECRET') ?: '');
+if ($httpWorkerUrl !== '') {
+    $workerParts = parse_url($httpWorkerUrl);
+    if (!function_exists('curl_multi_init') || strlen($httpWorkerSecret) < 32 || !is_array($workerParts)
+        || ($workerParts['scheme'] ?? '') !== 'https' || ($workerParts['path'] ?? '') !== '/api/test-suite.php'
+        || empty($workerParts['host']) || isset($workerParts['query']) || isset($workerParts['fragment'])
+        || isset($workerParts['user']) || isset($workerParts['pass'])) {
+        throw new RuntimeException('The signed HTTPS booking test worker is not configured safely.');
+    }
+} elseif (!function_exists('proc_open')) {
+    throw new RuntimeException('This PHP CLI must support proc_open for independent concurrent connections.');
+}
 $phpCli = getenv('BOOKING_TEST_PHP_CLI') ?: PHP_BINARY;
-if (!is_file($phpCli)) throw new RuntimeException('The booking test PHP CLI path is unavailable.');
+if ($httpWorkerUrl === '' && !is_file($phpCli)) throw new RuntimeException('The booking test PHP CLI path is unavailable.');
 $host = $read('BOOKING_TEST_DB_HOST');
 $port = (int)(getenv('BOOKING_TEST_DB_PORT') ?: 3306);
 $user = $read('BOOKING_TEST_DB_USER');
@@ -104,7 +116,7 @@ $body = static fn(int $client, int $location, int $practitioner, int $room, stri
     'room_id' => $room, 'starts_at' => $start, 'idempotency_key' => $key,
 ];
 $credentials = compact('host', 'port', 'user', 'password') + ['database' => $name, 'clinic_id' => $clinicId, 'actor_id' => $userIds['staff']];
-$race = static function (array $jobs) use ($connection, $credentials, $clinicId, $phpCli): array {
+$raceCli = static function (array $jobs) use ($connection, $credentials, $clinicId, $phpCli): array {
     $workers = [];
     $connection->beginTransaction();
     try {
@@ -132,6 +144,60 @@ $race = static function (array $jobs) use ($connection, $credentials, $clinicId,
     }
     return $results;
 };
+$raceHttp = static function (array $jobs) use ($connection, $credentials, $clinicId, $httpWorkerUrl, $httpWorkerSecret): array {
+    $multi = curl_multi_init();
+    $handles = [];
+    try {
+        $connection->beginTransaction();
+        try {
+            $lock = $connection->prepare('SELECT id FROM clinics WHERE id=:clinic FOR UPDATE');
+            $lock->execute(['clinic' => $clinicId]);
+            if ((int)$lock->fetchColumn() !== $clinicId) throw new RuntimeException('Synthetic clinic lock failed.');
+            foreach ($jobs as $job) {
+                $payload = json_encode(['clinic_id' => $clinicId, 'actor_id' => $credentials['actor_id'], 'body' => $job], JSON_THROW_ON_ERROR);
+                $timestamp = (string)time();
+                $signature = hash_hmac('sha256', $timestamp . "\n" . $payload, $httpWorkerSecret);
+                $handle = curl_init($httpWorkerUrl);
+                if ($handle === false) throw new RuntimeException('Could not initialize HTTPS worker.');
+                curl_setopt_array($handle, [
+                    CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20,
+                    CURLOPT_POST => true, CURLOPT_POSTFIELDS => $payload, CURLOPT_FOLLOWLOCATION => false,
+                    CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Wellness-Test-Timestamp: ' . $timestamp, 'X-Wellness-Test-Signature: ' . $signature],
+                ]);
+                curl_multi_add_handle($multi, $handle);
+                $handles[] = $handle;
+            }
+            $until = microtime(true) + 0.3;
+            do {
+                $code = curl_multi_exec($multi, $active);
+                if ($code !== CURLM_OK) throw new RuntimeException('Could not dispatch HTTPS workers.');
+                if ($active) curl_multi_select($multi, 0.05);
+            } while ($active && microtime(true) < $until);
+        } finally {
+            if ($connection->inTransaction()) $connection->commit();
+        }
+        $deadline = microtime(true) + 25;
+        do {
+            $code = curl_multi_exec($multi, $active);
+            if ($code !== CURLM_OK) throw new RuntimeException('HTTPS worker request failed.');
+            if ($active) curl_multi_select($multi, 0.1);
+        } while ($active && microtime(true) < $deadline);
+        if ($active) throw new RuntimeException('HTTPS booking workers timed out; inspect the synthetic clinic.');
+        $results = [];
+        foreach ($handles as $handle) {
+            $httpStatus = (int)curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+            $output = curl_multi_getcontent($handle);
+            if ($httpStatus !== 200 || $output === false || $output === '') throw new RuntimeException('HTTPS booking worker returned HTTP ' . $httpStatus . '.');
+            $results[] = json_decode($output, true, 16, JSON_THROW_ON_ERROR);
+        }
+        return $results;
+    } finally {
+        foreach ($handles as $handle) { curl_multi_remove_handle($multi, $handle); curl_close($handle); }
+        curl_multi_close($multi);
+    }
+};
+$race = $httpWorkerUrl !== '' ? $raceHttp : $raceCli;
 $assert = static function (bool $condition, string $message): void { if (!$condition) throw new RuntimeException($message); };
 
 $start = $slotAt($locationIds[0], $practitionerIds[0], '14:00');

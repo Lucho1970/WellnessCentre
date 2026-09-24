@@ -42,23 +42,27 @@ final class Suite
     }
 
     /** @return array{status:string,detail:string,seconds:float} */
-    public static function run(string $id, Config $config, string $apiBase, string $phpCli): array
+    public static function run(string $id, Config $config, string $apiBase, string $phpCli, string $workerSecret = ''): array
     {
         $cases = self::cases();
         if (!isset($cases[$id])) throw new RuntimeException('Unknown test case.');
         $case = $cases[$id];
         $started = microtime(true);
         $cliAvailable = function_exists('proc_open') && is_file($phpCli) && !preg_match('/(?:cgi|fpm)/i', basename($phpCli));
+        $httpRaceAvailable = $case['type'] === 'race' && !$cliAvailable
+            && function_exists('curl_multi_init') && strlen($workerSecret) >= 32;
         if ($case['type'] !== 'http' && !$cliAvailable
-            && ($case['type'] === 'race' || in_array($id, ['azure-mail-trigger', 'netfirms-mail-bridge', 'preflight-response'], true))) {
-            return ['status' => 'skipped', 'detail' => 'This case requires PHP CLI with proc_open on the host.', 'seconds' => 0.0];
+            && (($case['type'] === 'race' && !$httpRaceAvailable) || in_array($id, ['azure-mail-trigger', 'netfirms-mail-bridge', 'preflight-response'], true))) {
+            return ['status' => 'skipped', 'detail' => 'This case requires PHP CLI with proc_open, or the signed HTTPS worker for booking.', 'seconds' => 0.0];
         }
         try {
             $detail = $case['type'] === 'http'
                 ? self::http($apiBase . $case['target'], $id === 'api-health')
                 : ($cliAvailable
                     ? self::script($case['target'], $case['type'] === 'race', $config, $phpCli)
-                    : self::inProcess($case['target']));
+                    : ($httpRaceAvailable
+                        ? self::httpRace($case['target'], $config, $apiBase . '/test-suite.php', $workerSecret)
+                        : self::inProcess($case['target'])));
             return ['status' => 'passed', 'detail' => $detail, 'seconds' => round(microtime(true) - $started, 2)];
         } catch (\Throwable $error) {
             error_log('Hosted test ' . $id . ' failed: ' . get_class($error) . ': ' . $error->getMessage());
@@ -158,6 +162,36 @@ final class Suite
         } catch (\Throwable $error) {
             ob_end_clean();
             throw $error;
+        }
+    }
+
+    private static function httpRace(string $relative, Config $config, string $workerUrl, string $secret): string
+    {
+        $settings = [
+            'BOOKING_TEST_DB_HOST' => $config->dbHost,
+            'BOOKING_TEST_DB_PORT' => (string)$config->dbPort,
+            'BOOKING_TEST_DB_NAME' => $config->dbName,
+            'BOOKING_TEST_DB_USER' => $config->dbUser,
+            'BOOKING_TEST_DB_PASSWORD' => $config->dbPassword,
+            'BOOKING_TEST_CONFIRM' => $config->dbName,
+            'BOOKING_TEST_MODE' => 'isolated-clinic',
+            'BOOKING_TEST_EXISTING_ACK' => 'synthetic-clinic-only',
+            'BOOKING_TEST_HTTP_WORKER_URL' => $workerUrl,
+            'BOOKING_TEST_HTTP_WORKER_SECRET' => $secret,
+        ];
+        $previous = [];
+        foreach ($settings as $key => $value) {
+            $previous[$key] = [getenv($key), $_ENV[$key] ?? null];
+            putenv("{$key}={$value}");
+            $_ENV[$key] = $value;
+        }
+        try {
+            return self::inProcess($relative);
+        } finally {
+            foreach ($previous as $key => [$oldEnvironment, $oldArray]) {
+                $oldEnvironment === false ? putenv($key) : putenv("{$key}={$oldEnvironment}");
+                if ($oldArray === null) unset($_ENV[$key]); else $_ENV[$key] = $oldArray;
+            }
         }
     }
 }

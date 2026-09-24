@@ -9,6 +9,7 @@ mkdir($private . '/tests/hosted', 0700, true);
 mkdir($private . '/vendor', 0700, true);
 copy(__DIR__ . '/test-suite-web.php', $public . '/test-suite.php');
 copy(__DIR__ . '/Suite.php', $private . '/tests/hosted/Suite.php');
+copy(__DIR__ . '/HttpBookingWorker.php', $private . '/tests/hosted/HttpBookingWorker.php');
 file_put_contents($private . '/.env', "HOSTED_TEST_ENABLED=true\nHOSTED_TEST_DB_ACK=synthetic\nHOSTED_TEST_SECRET=" . str_repeat('a', 48) . "\nDB_NAME=synthetic\nHOSTED_TEST_API_BASE=https://example.test/api\n");
 file_put_contents($private . '/vendor/autoload.php', <<<'PHP'
 <?php
@@ -37,11 +38,11 @@ $server = proc_open([PHP_BINARY, '-S', $address, $fixture . '/router.php'], [0 =
 if (!is_resource($server)) throw new RuntimeException('Could not launch fixture web server.');
 fclose($pipes[0]);
 
-$request = static function (string $method, array $body = [], string $cookie = '') use ($address): array {
+$request = static function (string $method, array $body = [], string $cookie = '', array $headers = []) use ($address): array {
     $curl = curl_init('http://' . $address . '/api/test-suite.php');
     curl_setopt_array($curl, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true,
         CURLOPT_TIMEOUT => 5, CURLOPT_FOLLOWLOCATION => false, CURLOPT_POSTFIELDS => $method === 'POST' ? http_build_query($body) : null,
-        CURLOPT_HTTPHEADER => $cookie === '' ? [] : ['Cookie: ' . $cookie]]);
+        CURLOPT_HTTPHEADER => array_merge($cookie === '' ? [] : ['Cookie: ' . $cookie], $headers)]);
     $raw = curl_exec($curl);
     if ($raw === false) throw new RuntimeException(curl_error($curl));
     $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
@@ -64,6 +65,8 @@ try {
     $check($status === 200 && str_contains($page, 'Temporary test secret'), 'Login page is unavailable.');
     [$status] = $request('POST', ['action' => 'login', 'secret' => 'wrong']);
     $check($status === 404, 'Wrong secret was accepted.');
+    [$status] = $request('POST', ['clinic_id' => 1], '', ['X-Wellness-Test-Timestamp: ' . time(), 'X-Wellness-Test-Signature: bad']);
+    $check($status === 404, 'Unsigned booking worker request was accepted.');
     [$status, $headers] = $request('POST', ['action' => 'login', 'secret' => str_repeat('a', 48)]);
     $check($status === 303 && preg_match('/Set-Cookie: (wellness_hosted_test_suite=[^;]+)/i', $headers, $matches) === 1, 'Login did not establish a session.');
     $cookie = $matches[1];
