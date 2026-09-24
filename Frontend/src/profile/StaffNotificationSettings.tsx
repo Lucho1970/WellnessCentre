@@ -71,7 +71,7 @@ export function StaffNotificationSettings() {
       </TextField>
       <TextField label={t('Mobile number for SMS')} type="tel" value={form.mobile_phone ?? ''} fullWidth disabled={busy} onChange={e => setForm({ ...form, mobile_phone: e.target.value })} helperText={t('Canadian or US mobile number. This number is not shown to clients.')} />
       <FormControlLabel control={<Checkbox checked={form.sms_requested} disabled={busy} onChange={e => setForm({ ...form, sms_requested: e.target.checked })} />} label={t('Request SMS appointment notices')} />
-      <Alert severity="info">{t('SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.')}</Alert>
+      <Alert severity="info">{form.sms_delivery_active ? t('SMS notices are active for staff who requested them.') : t('SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.')}</Alert>
       {message && <Alert severity="success">{message}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
       <Box><Button variant="contained" disabled={busy} onClick={() => void perform(async () => { const data = await request('', 'PUT', { email_enabled: form.email_enabled, email_destination: form.email_destination, personal_email: form.personal_email ?? '', mobile_phone: form.mobile_phone ?? '', sms_requested: form.sms_requested }) as Preferences; setSaved(data); setForm(data); setMessage(t('Notification preferences saved.')); })}>{t('Save notification preferences')}</Button></Box>

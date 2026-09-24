@@ -28,7 +28,7 @@ final class StaffNotificationPreferences
             'personal_email_verified' => $row['personal_email_verified_at'] !== null,
             'mobile_phone' => $row['mobile_phone'],
             'sms_requested' => (bool)($row['sms_requested'] ?? false),
-            'sms_delivery_active' => false,
+            'sms_delivery_active' => filter_var($_ENV['SMS_ENABLED'] ?? getenv('SMS_ENABLED') ?: 'false', FILTER_VALIDATE_BOOL),
         ];
     }
 
@@ -76,6 +76,10 @@ final class StaffNotificationPreferences
             }
             if ($old !== null && ((bool)$old['email_enabled'] !== $emailEnabled || $old['email_destination'] !== $destination || strcasecmp((string)($old['personal_email'] ?? ''), $personal) !== 0)) {
                 $cancel = $pdo->prepare("UPDATE notification_events SET status='canceled',next_attempt_at=NULL,last_error='Staff delivery preference changed' WHERE recipient_user_id=:user AND channel='email' AND event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation') AND status IN ('queued','failed')");
+                $cancel->execute(['user' => $actor->userId]);
+            }
+            if ($old !== null && (!(bool)$smsRequested || $mobile !== $old['mobile_phone'])) {
+                $cancel = $pdo->prepare("UPDATE notification_events SET status='canceled',next_attempt_at=NULL,last_error='Staff SMS preference changed' WHERE recipient_user_id=:user AND channel='sms' AND event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation') AND status IN ('queued','failed')");
                 $cancel->execute(['user' => $actor->userId]);
             }
             $this->audit->write($actor->clinicId, $actor, $correlationId, 'staff.notification_preferences.update', 'user', $actor->userId, 'success', ['email_enabled' => $emailEnabled, 'email_destination' => $destination, 'sms_requested' => $smsRequested]);

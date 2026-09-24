@@ -132,3 +132,27 @@ Runtime Super Admin widget upload/version management additionally requires `data
 - `POST /api/v1/admin/service-categories` and `POST /api/v1/admin/taxes` (Super Admin only)
 - `PATCH /api/v1/admin/booking-settings` (Super Admin only)
 - `GET /api/v1/admin/room-practitioner-restrictions` and `PUT /api/v1/admin/rooms/{id}/practitioners` (Super Admin only)
+## VoIP.ms staff SMS (pending A2P approval)
+
+Staff may save a mobile number and request text notifications. Delivery remains
+off unless `SMS_ENABLED=true` is explicitly set in the private API `.env`.
+Do not enable it until VoIP.ms confirms that DID `2892975234` and the intended
+automated appointment use are approved. No client SMS is sent by this feature.
+
+After approval, set `VOIPMS_API_USERNAME` to the VoIP.ms account login email,
+`VOIPMS_API_PASSWORD` to the account's dedicated API password, and
+`VOIPMS_FROM_DID=2892975234`. The Netfirms outbound IP must be on the VoIP.ms
+API allowlist. Keep credentials only in `/wellness-api/.env`, never in the public
+web directory or deployment archives. The existing notification scheduler
+processes staff SMS alongside email when enabled. New appointments queue texts
+only for staff who explicitly requested them; disabling SMS stops new queuing
+and the worker ignores any outstanding SMS. A staff member changing their mobile
+number or turning SMS off cancels their queued messages.
+Queued texts older than one hour are canceled instead of being sent late.
+
+Text bodies contain no client name, address, service, or other clinical details.
+They link to the authenticated practitioner schedule and stay within one
+160-character SMS. Provider uncertainty goes to `needs_review` rather than
+being retried automatically, to avoid duplicate texts. Incoming SMS and STOP
+handling are not yet integrated; confirm VoIP.ms requirements before enabling
+live delivery.

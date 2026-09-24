@@ -57,10 +57,14 @@ try {
             $env('MAIL_CLIENT_SECRET'),
             $env('MAIL_FROM_ADDRESS')
         );
+        $sms = filter_var($env('SMS_ENABLED'), FILTER_VALIDATE_BOOL)
+            ? new \Wellness\Service\VoipMsSmsClient($env('VOIPMS_API_USERNAME'), $env('VOIPMS_API_PASSWORD'), $env('VOIPMS_FROM_DID'))
+            : null;
         $worker = new \Wellness\Service\NotificationWorker(
             (new \Wellness\Database(\Wellness\Config::fromEnvironment()))->connection(),
             $mailer,
-            $portalUrl
+            $portalUrl,
+            $sms
         );
         // Bound HTTP duration: each Graph operation has a 25-second timeout.
         $result = $worker->run(3);

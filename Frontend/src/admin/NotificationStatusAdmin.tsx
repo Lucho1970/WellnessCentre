@@ -32,13 +32,13 @@ export function NotificationStatusAdmin() {
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
       setData(normalizeNumericIds(body.data));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load email status.')); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load notification status.')); }
     finally { setLoading(false); }
   }, [getAccessToken, page, status, t]);
   useEffect(() => { void load(); }, [load]);
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.page_size ?? 25)));
   return <Stack spacing={2}>
-    <Alert severity="info">{t('Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.')}</Alert>
+    <Alert severity="info">{t('Notification status reflects the queue and provider acceptance, not proof of delivery. Items needing review are never resent automatically.')}</Alert>
     {error && <Alert severity="error">{error}</Alert>}
     <Paper variant="outlined"><Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems={{ sm: 'center' }} p={1.5}>
       <TextField select size="small" label={t('Status')} value={status} onChange={event => { setStatus(event.target.value); setPage(1); }} sx={{ minWidth: 220 }}>
@@ -48,9 +48,9 @@ export function NotificationStatusAdmin() {
       <Typography color="text.secondary" sx={{ ml: { sm: 'auto' } }}>{t('{{count}} notifications', { count: data?.total ?? 0 })}</Typography>
     </Stack></Paper>
     <Paper variant="outlined">
-      {loading && !data ? <Typography p={3} role="status">{t('Loading email status…')}</Typography> : !data?.items.length ? <Typography p={3}>{t('No notifications match this status.')}</Typography> : <List disablePadding aria-label={t('Email notifications')}>
+      {loading && !data ? <Typography p={3} role="status">{t('Loading notification status…')}</Typography> : !data?.items.length ? <Typography p={3}>{t('No notifications match this status.')}</Typography> : <List disablePadding aria-label={t('Notifications')}>
         {data.items.map(item => <ListItemButton divider key={item.id} onClick={() => setSelected(item)} sx={{ alignItems: 'flex-start', gap: 2 }}>
-          <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={700}>#{item.id} · {t(eventLabel[item.event_code] ?? item.event_code)}</Typography><Chip size="small" color={item.status === 'needs_review' ? 'warning' : item.status === 'failed' ? 'error' : item.status === 'sent' || item.status === 'delivered' ? 'success' : 'default'} label={t(statusLabel[item.status])} /></Stack>} secondary={`${item.recipient_address} · ${time(item.scheduled_at)}`} />
+          <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={700}>#{item.id} · {t(eventLabel[item.event_code] ?? item.event_code)}</Typography><Chip size="small" label={item.channel === 'sms' ? 'SMS' : t('Email')} /><Chip size="small" color={item.status === 'needs_review' ? 'warning' : item.status === 'failed' ? 'error' : item.status === 'sent' || item.status === 'delivered' ? 'success' : 'default'} label={t(statusLabel[item.status])} /></Stack>} secondary={`${item.recipient_address} · ${time(item.scheduled_at)}`} />
         </ListItemButton>)}
       </List>}
     </Paper>
@@ -61,6 +61,7 @@ export function NotificationStatusAdmin() {
         {selected.status === 'needs_review' && <Alert severity="warning">{t('Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.')}</Alert>}
         <Typography><strong>{t('Appointment ID')}:</strong> {selected.appointment_id ?? '—'}</Typography>
         <Typography><strong>{t('Event')}:</strong> {t(eventLabel[selected.event_code] ?? selected.event_code)}</Typography>
+        <Typography><strong>{t('Channel')}:</strong> {selected.channel === 'sms' ? 'SMS' : t('Email')}</Typography>
         <Typography><strong>{t('Recipient')}:</strong> {selected.recipient_address}</Typography>
         <Typography><strong>{t('Scheduled')}:</strong> {time(selected.scheduled_at)}</Typography>
         <Typography><strong>{t('Next attempt')}:</strong> {time(selected.next_attempt_at)}</Typography>

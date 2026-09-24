@@ -77,7 +77,7 @@ const navigation: NavigationItem[] = [
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
-  { id: "notifications", label: "Email status", description: "Review appointment email delivery", icon: <MailCheck size={20} /> },
+  { id: "notifications", label: "Notification status", description: "Review appointment notification delivery", icon: <MailCheck size={20} /> },
   {
     id: "profile",
     label: "My profile",
