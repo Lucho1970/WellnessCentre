@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 $source = dirname(__DIR__, 2) . '/hosting/netfirms/main-domain/api/wellness-notification-trigger.php';
+if (!is_file($source)) $source = dirname(__DIR__) . '/hosting/netfirms/main-domain/api/wellness-notification-trigger.php';
 $fixture = sys_get_temp_dir() . '/wellness-mail-bridge-test-' . bin2hex(random_bytes(8));
 $webDir = $fixture . '/public_html/tuff-tar.com/api';
 $privateDir = $fixture . '/wellness-api';

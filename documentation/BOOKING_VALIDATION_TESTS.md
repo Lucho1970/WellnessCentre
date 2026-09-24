@@ -45,6 +45,8 @@ Concurrency acceptance remains pending until this harness passes on real MySQL. 
 
 ### Run the automated test through Netfirms PHP
 
+For the current consolidated procedure, use the [temporary hosted test suite](HOSTED_TEST_SUITE.md); its results page includes this booking race and the other safe PHP checks. The standalone entry point below remains available for a booking-only run, but do not deploy both public test endpoints at the same time.
+
 If the development database is reachable only from Netfirms, a temporary [web entry point](../api/tests/integration/booking-race-web.php) can run the same four-scenario harness there. It starts **two independent PHP booking workers** for each race; it does not use a browser token or call the public API. It therefore validates the booking service and MySQL locking, while the normal portal journeys still need separate testing. The private API deployment archive does not include tests, and the public archive intentionally does not expose this runner.
 
 1. Back up the development database. Upload `api/tests/integration/booking-race.php` and `booking-race-worker.php` to `/wellness-api/tests/integration/` (create those private directories if needed). Upload `booking-race-web.php` to `/public_html/wellness/api/booking-race-web.php` **only for this test**.

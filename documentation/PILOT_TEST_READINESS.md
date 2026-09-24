@@ -6,7 +6,7 @@ This is a **development pilot**, not production launch approval. The deployed pu
 
 1. Record the deployed package manifest and verify that the private API, public site, and portal point to the same release. Confirm the site's HTTPS, branding, client sign-in, and staff sign-in in a fresh browser session.
 2. Back up the development database. Confirm test practitioner assignments, working hours, service durations/prices, travel radius, booking horizon, and cancellation policy. Use test-only clients and appointments where possible.
-3. Complete the hosted MySQL booking race acceptance in [Booking validation tests](BOOKING_VALIDATION_TESTS.md). Record database/server versions and the result; do not treat local browser mocks as this test.
+3. Complete the hosted MySQL booking race acceptance in [Booking validation tests](BOOKING_VALIDATION_TESTS.md), using the [temporary hosted test suite](HOSTED_TEST_SUITE.md) when CLI access is unavailable. Record database/server versions and the result; a skipped race or local browser mock does not close this gate.
 4. Confirm the mail scheduler is healthy, a test confirmation arrives, and the Email status page shows no unresolved `needs_review` events. `sent` means accepted by Graph, not necessarily delivered. Verify a change/cancellation email and its calendar attachment with a test mailbox.
 5. Create a short feedback channel outside the app. Ask testers to report the page, time, steps, expected versus actual result, and any on-screen correlation/reference ID. Do **not** ask them to send passwords, tokens, clinical details, or screenshots showing another person's data.
 

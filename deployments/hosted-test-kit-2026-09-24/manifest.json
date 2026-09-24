@@ -1,0 +1,9 @@
+﻿{
+    "built_at_utc":  "2026-09-24T14:38:12.2014267Z",
+    "archive":  "hosted-test-kit.zip",
+    "sha256":  "02df14430b6140395e8cc33c2296e192de3047441cb5e3a106460aed85e6c7ae",
+    "entries":  28,
+    "public_entry":  "public_html/wellness/api/test-suite.php",
+    "private_root":  "wellness-api/tests",
+    "deployment_guide":  "documentation/HOSTED_TEST_SUITE.md"
+}

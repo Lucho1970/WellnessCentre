@@ -11,6 +11,7 @@ Start with these two authoritative documents:
 - [Configurable branding](CONFIGURABLE_BRANDING.md): business logo/favicon roles, secure image constraints, migration and deployment acceptance.
 - [Dashboard widgets](DASHBOARD_WIDGETS.md): governed widget registry, authorized data projections, per-workspace personalization, delivery sequence and acceptance criteria.
 - [Limited testing readiness](PILOT_TEST_READINESS.md): hosted acceptance gates, safe pilot journeys, feedback capture and current scope limits.
+- [Temporary hosted test suite](HOSTED_TEST_SUITE.md): Netfirms upload layout, private PHP checks, one protected results page and required cleanup.
 
 ## Supporting records and historical sources
 
