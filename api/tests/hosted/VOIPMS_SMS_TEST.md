@@ -42,3 +42,18 @@ you not to use automated API messaging until verification, wait for approval.
 Leave `SMS_ENABLED=false` until the clinic deliberately activates staff SMS
 after checking applicable VoIP.ms account conditions. The test does not require
 turning it on.
+
+## Read-only API check if the send result is unclear
+
+If the one-time SMS marker exists but no message or VoIP.ms history appears,
+do **not** clear the marker or resend. Copy `voipms-api-check-web.php` to
+`/public_html/wellness/api/voipms-api-check-web.php` temporarily. With the same
+`SMS_TEST_ENABLED=true` and `SMS_TEST_SECRET` in the private `.env`, open
+`https://wellness.copihue.ca/api/voipms-api-check-web.php`, enter the test
+secret, and select **Check API access**. It calls only the read-only `getIP` and
+`getDIDsInfo` methods. The page and PHP log report safe status values, not the
+API password or VoIP.ms account data. Note the outbound IP and both statuses,
+then delete this public diagnostic file. Do not share the secret or credentials.
+The REST/JSON method used here authenticates with the account email and API
+password; VoIP.ms's separate SMS bearer token is used by other integrations
+such as 3CX and is not needed for this check or this application's `sendSMS` call.
