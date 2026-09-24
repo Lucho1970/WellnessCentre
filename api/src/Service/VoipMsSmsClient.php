@@ -42,7 +42,10 @@ final class VoipMsSmsClient
         $data = json_decode((string)$response, true);
         if (!is_array($data) || ($data['status'] ?? null) !== 'success') {
             // Do not retain provider responses: they may contain account details.
-            throw new SmsSendException('SMS provider did not confirm delivery acceptance.');
+            $providerStatus = is_array($data) ? ($data['status'] ?? null) : null;
+            $safeStatus = is_string($providerStatus) && preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $providerStatus)
+                ? ' (' . $providerStatus . ')' : '';
+            throw new SmsSendException('SMS provider did not confirm delivery acceptance' . $safeStatus . '.');
         }
         $id = $data['sms'] ?? null;
         return is_scalar($id) && (string)$id !== '' ? substr((string)$id, 0, 191) : null;
