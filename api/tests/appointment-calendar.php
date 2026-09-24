@@ -31,6 +31,15 @@ foreach ([[$initial, 'SEQUENCE:0'], [$changed, 'SEQUENCE:1'], [$canceled, 'SEQUE
 }
 if (!str_contains($initial, 'DTSTART:20260924T140000Z') || !str_contains($initial, 'DTEND:20260924T150000Z')) throw new RuntimeException('Calendar UTC times are wrong.');
 if (!str_contains($initial, 'METHOD:REQUEST') || !str_contains($canceled, 'METHOD:CANCEL') || !str_contains($canceled, 'STATUS:CANCELLED')) throw new RuntimeException('Calendar method is wrong.');
+foreach ([$initial, $changed] as $calendar) {
+    if (substr_count($calendar, "BEGIN:VALARM\r\n") !== 2 || substr_count($calendar, "END:VALARM\r\n") !== 2) throw new RuntimeException('Calendar request must include two reminders.');
+    foreach (['-P1D', '-PT1H'] as $trigger) {
+        if (!str_contains($calendar, "BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Appointment reminder / Rappel de rendez-vous\r\nTRIGGER:{$trigger}\r\nEND:VALARM\r\n")) {
+            throw new RuntimeException('Calendar reminder is missing or malformed.');
+        }
+    }
+}
+if (str_contains($canceled, 'BEGIN:VALARM') || str_contains($canceled, 'TRIGGER:')) throw new RuntimeException('Cancelled events must not request reminders.');
 $unfolded = str_replace("\r\n ", '', $initial);
 if (!str_contains($unfolded, 'ORGANIZER:mailto:wellness@example.com') || !str_contains($unfolded, 'ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:client@example.com')) throw new RuntimeException('Calendar parties are missing.');
 

@@ -40,6 +40,19 @@ final class AppointmentCalendar
         ];
         if ($organizer !== null) $lines[] = 'ORGANIZER:mailto:' . $organizer;
         if ($attendee !== null) $lines[] = 'ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:' . $attendee;
+        if ($method === 'REQUEST') {
+            // Separate display alarms are requested 24 hours and one hour before
+            // the start. Keep the reminder text as privacy-minimal as the event.
+            foreach (['-P1D', '-PT1H'] as $trigger) {
+                array_push($lines,
+                    'BEGIN:VALARM',
+                    'ACTION:DISPLAY',
+                    'DESCRIPTION:Appointment reminder / Rappel de rendez-vous',
+                    'TRIGGER:' . $trigger,
+                    'END:VALARM',
+                );
+            }
+        }
         $lines[] = 'END:VEVENT';
         $lines[] = 'END:VCALENDAR';
         return implode("\r\n", array_map(self::fold(...), $lines)) . "\r\n";
