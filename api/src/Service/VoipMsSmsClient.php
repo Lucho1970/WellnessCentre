@@ -26,7 +26,7 @@ final class VoipMsSmsClient
         if (!CanadianSmsNumber::isAllowed($recipient) || $message === '' || strlen($message) > 160 || preg_match('/[^\x20-\x7E]/', $message)) {
             throw new SmsSendException('SMS recipient or message is invalid.');
         }
-        $body = http_build_query([
+        $query = http_build_query([
             'api_username' => $this->username,
             'api_password' => $this->password,
             'method' => 'sendSMS',
@@ -35,7 +35,7 @@ final class VoipMsSmsClient
             'message' => $message,
             'content_type' => 'json',
         ], '', '&', PHP_QUERY_RFC3986);
-        [$status, $response] = $this->requester !== null ? ($this->requester)($body) : $this->request($body);
+        [$status, $response] = $this->requester !== null ? ($this->requester)($query) : $this->request($query);
         // A timeout may occur after the provider accepted the SMS. Never auto-retry.
         if ($response === false || $status === 0) throw new SmsSendException('SMS provider connection ended without a response.');
         if ($status !== 200) throw new SmsSendException('SMS provider returned HTTP ' . $status . '.');
@@ -52,14 +52,16 @@ final class VoipMsSmsClient
     }
 
     /** @return array{int,string|false} */
-    private function request(string $body): array
+    private function request(string $query): array
     {
-        $handle = curl_init(self::ENDPOINT);
+        // VoIP.ms routes form POSTs to SOAP and returns HTTP 500; the REST/JSON
+        // endpoint accepts method parameters in an HTTPS GET query string.
+        $handle = curl_init(self::ENDPOINT . '?' . $query);
         if ($handle === false) throw new SmsSendException('Could not start SMS request.');
         curl_setopt_array($handle, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $body,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded', 'Accept: application/json'],
+            CURLOPT_HTTPGET => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => 25,

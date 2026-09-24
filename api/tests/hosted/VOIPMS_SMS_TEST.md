@@ -57,3 +57,5 @@ then delete this public diagnostic file. Do not share the secret or credentials.
 The REST/JSON method used here authenticates with the account email and API
 password; VoIP.ms's separate SMS bearer token is used by other integrations
 such as 3CX and is not needed for this check or this application's `sendSMS` call.
+The VoIP.ms REST/JSON endpoint expects HTTPS GET parameters; a form POST can
+receive an HTTP 500 SOAP fault even when the credentials are correct.

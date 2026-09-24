@@ -70,17 +70,18 @@ if (!function_exists('curl_init')) {
 
 /** @return array{string,?array} */
 $check = static function (string $method) use ($username, $password): array {
-    $handle = curl_init('https://voip.ms/api/v1/rest.php');
+    // VoIP.ms REST/JSON expects GET parameters; POST reaches its SOAP handler.
+    $query = http_build_query([
+        'api_username' => $username,
+        'api_password' => $password,
+        'method' => $method,
+        'content_type' => 'json',
+    ], '', '&', PHP_QUERY_RFC3986);
+    $handle = curl_init('https://voip.ms/api/v1/rest.php?' . $query);
     if ($handle === false) return ['Could not start HTTPS request', null];
     curl_setopt_array($handle, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => http_build_query([
-            'api_username' => $username,
-            'api_password' => $password,
-            'method' => $method,
-            'content_type' => 'json',
-        ], '', '&', PHP_QUERY_RFC3986),
-        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded', 'Accept: application/json'],
+        CURLOPT_HTTPGET => true,
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_CONNECTTIMEOUT => 10,
