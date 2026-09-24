@@ -156,7 +156,12 @@ final class Suite
         if (!is_file($file)) throw new RuntimeException('Test file is missing from the private installation.');
         ob_start();
         try {
-            (static function (string $path): void { require $path; })($file);
+            (static function (string $path): void {
+                // Fixtures with assertion helpers use `global $checks`; keep their
+                // count in the same scope as the included test script.
+                global $checks;
+                require $path;
+            })($file);
             $output = (string)ob_get_clean();
             return trim(substr($output, 0, 500)) ?: 'Passed without output.';
         } catch (\Throwable $error) {

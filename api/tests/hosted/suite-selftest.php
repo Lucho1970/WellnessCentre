@@ -23,6 +23,10 @@ foreach ($cases as $id => $case) {
 if ($failed) throw new RuntimeException('Hosted PHP checks failed: ' . json_encode($failed, JSON_THROW_ON_ERROR));
 $fallback = Suite::run('booking-request', $config, 'https://example.test/api', '/nonexistent/php-cli');
 if ($fallback['status'] !== 'passed') throw new RuntimeException('Web-request fallback did not run a safe PHP fixture.');
+$counted = Suite::run('mobile-delivery', $config, 'https://example.test/api', '/nonexistent/php-cli');
+if ($counted['status'] !== 'passed' || !preg_match('/^[1-9][0-9]* mobile delivery checks passed\./', $counted['detail'])) {
+    throw new RuntimeException('Web-request fallback did not report fixture assertion counts.');
+}
 $skipped = Suite::run('booking-race', $config, 'https://example.test/api', '/nonexistent/php-cli');
 if ($skipped['status'] !== 'skipped') throw new RuntimeException('Booking race must be skipped when PHP CLI is unavailable.');
 echo "{$passed} hosted PHP fixture checks passed.\n";
