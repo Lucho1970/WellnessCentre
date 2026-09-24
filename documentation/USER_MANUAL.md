@@ -89,6 +89,12 @@ The **Practitioners** page is list-first. Select a practitioner to enable **Deta
 
 Create the Microsoft Entra account and assign the required practitioner application role before linking it in the portal. The immutable Entra tenant and object IDs are required only when creating the link. Editing the portal email does not rename or relink the Microsoft account. Use the two status controls carefully: the account status controls portal access, while **Available as a practitioner** controls whether the practitioner is available operationally.
 
+### My appointment notifications
+
+Open **My profile → Appointment notifications** to opt into email notices when an appointment is booked, changed, or canceled on your schedule. Choose the work sign-in email, a verified personal email, or both. To use a personal email, save it, request a verification code, enter the eight-digit code from that inbox, then select it as a destination and save again. Changing the personal address requires re-verification and never changes your Microsoft sign-in.
+
+You can save a mobile number and request SMS notices, but **no texts are sent yet**. The profile shows this as inactive until the clinic has an approved and tested SMS provider. Appointment emails include the time and a portal link, not client or visit details. Disabling email or changing an address before a queued notice is delivered cancels that pending staff notice.
+
 ### My calendar
 
 Practitioners can open **My calendar** in their workspace to see their own clinic appointments by day, week, or month. Use the arrows or **Today** to move between periods; **Refresh** reloads current booking data. Select an event for its status, time, service, and base location. On-Site visits are labelled, but their destination address is not shown on the calendar. Use **Appointments** for the full booking workflow and authorized details.

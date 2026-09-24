@@ -1158,6 +1158,22 @@ const fr: Record<string, string> = {
   "Add to calendar": "Ajouter au calendrier",
   "The calendar file could not be prepared.": "Impossible de préparer le fichier de calendrier.",
   "Unable to download the calendar file.": "Impossible de télécharger le fichier de calendrier.",
+  "Appointment notifications": "Avis de rendez-vous",
+  "Staff booking notice": "Avis de réservation au personnel", "Staff change notice": "Avis de modification au personnel", "Staff cancellation notice": "Avis d’annulation au personnel",
+  "These settings do not change your Microsoft sign-in address. Only assigned practitioners receive booking notices.": "Ces paramètres ne changent pas votre adresse de connexion Microsoft. Seuls les praticiens concernés reçoivent des avis de réservation.",
+  "Personal notification email": "Courriel personnel pour les avis",
+  "Save this address before requesting a verification code.": "Enregistrez cette adresse avant de demander un code de vérification.",
+  "Verified": "Vérifié", "Not verified": "Non vérifié", "Optional": "Facultatif",
+  "Send verification code": "Envoyer un code de vérification", "Eight-digit code": "Code à huit chiffres", "Verify email": "Vérifier le courriel",
+  "Send appointment notices by email": "Recevoir les avis de rendez-vous par courriel",
+  "Send email to": "Envoyer les courriels à", "Work email": "Courriel professionnel", "Verified personal email": "Courriel personnel vérifié", "Both email addresses": "Les deux adresses courriel",
+  "Mobile number for SMS": "Numéro mobile pour les textos",
+  "Canadian or US mobile number. This number is not shown to clients.": "Numéro mobile canadien ou américain. Il n’est pas montré aux clients.",
+  "Request SMS appointment notices": "Demander les avis de rendez-vous par texto",
+  "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.": "L’envoi de textos n’est pas encore actif. Ce choix enregistre votre préférence, mais aucun texto ne sera envoyé avant l’activation d’un fournisseur approuvé.",
+  "Save notification preferences": "Enregistrer les préférences d’avis", "Notification preferences saved.": "Préférences d’avis enregistrées.",
+  "Verification code sent to your personal email.": "Code de vérification envoyé à votre courriel personnel.", "Personal email verified.": "Courriel personnel vérifié.",
+  "Unable to update notification preferences.": "Impossible de mettre à jour les préférences d’avis.", "Unable to load notification preferences.": "Impossible de charger les préférences d’avis.",
 };
 
 export default fr;

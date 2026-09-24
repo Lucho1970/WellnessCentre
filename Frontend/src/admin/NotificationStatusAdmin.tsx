@@ -10,7 +10,7 @@ type Event = { id: number; appointment_id: number | null; recipient_address: str
 type Result = { items: Event[]; counts: Record<Status, number>; total: number; page: number; page_size: number };
 const statuses: Status[] = ['needs_review', 'failed', 'queued', 'sending', 'sent', 'delivered', 'canceled'];
 const statusLabel: Record<Status, string> = { needs_review: 'Needs review', failed: 'Failed', queued: 'Queued', sending: 'Sending', sent: 'Accepted by provider', delivered: 'Delivered', canceled: 'Canceled' };
-const eventLabel: Record<string, string> = { booking_confirmation: 'Booking confirmation', booking_change: 'Booking change', booking_cancellation: 'Booking cancellation' };
+const eventLabel: Record<string, string> = { booking_confirmation: 'Booking confirmation', booking_change: 'Booking change', booking_cancellation: 'Booking cancellation', staff_booking_confirmation: 'Staff booking notice', staff_booking_change: 'Staff change notice', staff_booking_cancellation: 'Staff cancellation notice' };
 const time = (value: string | null) => value ? new Date(`${value.replace(' ', 'T')}Z`).toLocaleString() : '—';
 
 export function NotificationStatusAdmin() {

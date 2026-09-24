@@ -1121,6 +1121,22 @@ const en = {
   "Add to calendar": "Add to calendar",
   "The calendar file could not be prepared.": "The calendar file could not be prepared.",
   "Unable to download the calendar file.": "Unable to download the calendar file.",
+  "Appointment notifications": "Appointment notifications",
+  "Staff booking notice": "Staff booking notice", "Staff change notice": "Staff change notice", "Staff cancellation notice": "Staff cancellation notice",
+  "These settings do not change your Microsoft sign-in address. Only assigned practitioners receive booking notices.": "These settings do not change your Microsoft sign-in address. Only assigned practitioners receive booking notices.",
+  "Personal notification email": "Personal notification email",
+  "Save this address before requesting a verification code.": "Save this address before requesting a verification code.",
+  "Verified": "Verified", "Not verified": "Not verified", "Optional": "Optional",
+  "Send verification code": "Send verification code", "Eight-digit code": "Eight-digit code", "Verify email": "Verify email",
+  "Send appointment notices by email": "Send appointment notices by email",
+  "Send email to": "Send email to", "Work email": "Work email", "Verified personal email": "Verified personal email", "Both email addresses": "Both email addresses",
+  "Mobile number for SMS": "Mobile number for SMS",
+  "Canadian or US mobile number. This number is not shown to clients.": "Canadian or US mobile number. This number is not shown to clients.",
+  "Request SMS appointment notices": "Request SMS appointment notices",
+  "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.": "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.",
+  "Save notification preferences": "Save notification preferences", "Notification preferences saved.": "Notification preferences saved.",
+  "Verification code sent to your personal email.": "Verification code sent to your personal email.", "Personal email verified.": "Personal email verified.",
+  "Unable to update notification preferences.": "Unable to update notification preferences.", "Unable to load notification preferences.": "Unable to load notification preferences.",
 } as const;
 
 export default en;

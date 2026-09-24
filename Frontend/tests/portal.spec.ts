@@ -50,6 +50,7 @@ async function fixtures(
       };
     if (path === "/auth/me") data = { roles: roles ?? [], permissions };
     if (path === "/profile/avatar") data = { image_base64: null };
+    if (path === "/profile/notifications") data = { work_email: "staff@example.test", email_enabled: false, email_destination: "work", personal_email: null, personal_email_verified: false, mobile_phone: null, sms_requested: false, sms_delivery_active: false };
     if (path === "/dashboard") {
       const workspace = url.searchParams.get("workspace") === "practitioner" ? "practitioner" : "admin";
       const definitions = workspace === "admin" ? [
@@ -1855,6 +1856,40 @@ test("reception routes support refresh, back, profile menu and restricted deep l
   await expect(
     page.getByText("You do not have permission to access this page."),
   ).toBeVisible();
+});
+
+test("practitioner stores notification preferences and verifies a separate personal email", async ({ page }) => {
+  await fixtures(page, ["practitioner"]);
+  let preferences = { work_email: "staff@example.test", email_enabled: false, email_destination: "work", personal_email: null as string | null, personal_email_verified: false, mobile_phone: null as string | null, sms_requested: false, sms_delivery_active: false };
+  await page.route("**/api/v1/profile/notifications**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = preferences;
+    if (path.endsWith("/send-code")) data = { sent: true };
+    else if (path.endsWith("/verify")) { preferences = { ...preferences, personal_email_verified: true }; data = preferences; }
+    else if (route.request().method() === "PUT") {
+      const body = route.request().postDataJSON();
+      preferences = { ...preferences, ...body, personal_email_verified: body.personal_email === preferences.personal_email && preferences.personal_email_verified };
+      data = preferences;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) });
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await expect(page.getByRole("heading", { name: "Appointment notifications" })).toBeVisible();
+  await expect(page.getByLabel("Microsoft sign-in email")).toHaveValue("staff@example.test");
+  await page.getByLabel("Personal notification email").fill("personal@example.test");
+  await page.getByRole("button", { name: "Save notification preferences" }).click();
+  await page.getByRole("button", { name: "Send verification code" }).click();
+  await page.getByLabel("Eight-digit code").fill("12345678");
+  await page.getByRole("button", { name: "Verify email" }).click();
+  await page.getByRole("checkbox", { name: "Send appointment notices by email" }).check();
+  await page.getByLabel("Send email to").click();
+  await page.getByRole("option", { name: "Verified personal email" }).click();
+  await page.getByLabel("Mobile number for SMS").fill("4165550123");
+  await page.getByRole("checkbox", { name: "Request SMS appointment notices" }).check();
+  await page.getByRole("button", { name: "Save notification preferences" }).click();
+  await expect(page.getByText("Notification preferences saved.")).toBeVisible();
+  await expect(page.getByText(/SMS delivery is not active yet/)).toBeVisible();
+  expect(preferences).toMatchObject({ email_enabled: true, email_destination: "personal", sms_requested: true });
 });
 
 test("practitioner mobile navigation can book and change only the scoped schedule", async ({

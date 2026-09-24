@@ -172,7 +172,7 @@ The user-facing term for a practitioner travelling to the client is **On-Site**.
 ## 11. Deferred integrations and extensions (retained)
 
 - **EXT-01:** Optional Outlook/Microsoft 365 then Google Calendar integration; start busy-only inbound conflict blocking and privacy-safe outbound events. Revocable iCal subscription/export may precede full sync. Per-user consent, minimal scopes, connection health, encrypted credentials, retry/revocation and clear source of truth. External event edits never silently cancel internal appointments. No personal titles/attendees or client/address details copied unnecessarily.
-- **EXT-02:** Verified personal-email delivery preferences, Apple/Meta sign-in, optional client email authentication, online payments, SMS and QuickBooks expansion remain tracked follow-on work, not forgotten requirements.
+- **EXT-02:** Staff personal-email verification and opt-in practitioner appointment emails are implemented; provider-backed SMS delivery, Apple/Meta sign-in, optional client email authentication, online payments, and QuickBooks expansion remain tracked follow-on work, not forgotten requirements.
 - **EXT-03:** Multi-centre expansion, native apps, telehealth, advanced analytics, document-sharing expansion, full payroll/tax filing and AI assistance require separate approved scopes, privacy/security review and operational budgets.
 
 ## 12. Verified source baseline versus remaining work

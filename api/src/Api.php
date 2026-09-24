@@ -23,6 +23,7 @@ use Wellness\Service\ClientService;
 use Wellness\Service\CustomerOnboarding;
 use Wellness\Service\DashboardService;
 use Wellness\Service\NotificationStatusService;
+use Wellness\Service\StaffNotificationPreferences;
 use function FastRoute\simpleDispatcher;
 
 final class Api
@@ -37,10 +38,11 @@ final class Api
     private AddressCoverageService $addressCoverage;
     private DashboardService $dashboard;
     private NotificationStatusService $notificationStatus;
+    private StaffNotificationPreferences $staffNotifications;
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
     }
 
     public function handle(): never
@@ -82,6 +84,10 @@ final class Api
                 $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
                 $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
                 $routes->addRoute('DELETE','/api/v1/profile/avatar','deleteProfileAvatar');
+                $routes->addRoute('GET','/api/v1/profile/notifications','staffNotificationPreferences');
+                $routes->addRoute('PUT','/api/v1/profile/notifications','saveStaffNotificationPreferences');
+                $routes->addRoute('POST','/api/v1/profile/notifications/send-code','sendStaffNotificationCode');
+                $routes->addRoute('POST','/api/v1/profile/notifications/verify','verifyStaffNotificationEmail');
                 $routes->addRoute('PUT','/api/v1/admin/users/{id:\\d+}/avatar','adminSaveAvatar');
                 $routes->addRoute('GET','/api/v1/admin/users/{id:\\d+}/avatar','adminAvatar');
                 $routes->addRoute('DELETE','/api/v1/admin/users/{id:\\d+}/avatar','adminDeleteAvatar');
@@ -183,6 +189,10 @@ final class Api
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
                 'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),
                 'deleteProfileAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId),
+                'staffNotificationPreferences'=>$this->staffNotifications->get($this->user($request)),
+                'saveStaffNotificationPreferences'=>$this->staffNotifications->save($this->user($request),$request->body,$request->correlationId),
+                'sendStaffNotificationCode'=>$this->staffNotifications->sendVerification($this->user($request),$request->correlationId),
+                'verifyStaffNotificationEmail'=>$this->staffNotifications->verify($this->user($request),$request->body,$request->correlationId),
                 'adminSaveAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
                 'adminAvatar'=>$this->profiles->avatar($this->user($request),(int)$route[2]['id']),
                 'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
