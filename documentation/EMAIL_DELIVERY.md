@@ -24,11 +24,13 @@ Graph uses the [client-credentials flow](https://learn.microsoft.com/en-us/graph
    MAIL_CLIENT_ID=<mail-app-client-guid>
    MAIL_CLIENT_SECRET=<secret-value>
    MAIL_FROM_ADDRESS=wellness@lucho1970.onmicrosoft.com
-   CLIENT_PORTAL_URL=https://wellness.copihue.ca/client
+   CLIENT_PORTAL_URL=https://portal.copihue.ca/client
    ```
 
 4. Verify the mailbox and permission scope, then set `MAIL_ENABLED=true`. Run a private command-line smoke test with a safe test client address. Only then schedule the worker.
 5. If Netfirms supports a real PHP CLI scheduled job, run `php /absolute/private/path/wellness-api/bin/send-notifications.php --limit=20`. Otherwise use the authenticated Azure Logic App trigger below. Leave `MAIL_ENABLED=false` until the trigger and its authentication have been tested; deployment alone does not enable delivery.
+
+After a public-site/portal domain change, update `CLIENT_PORTAL_URL` in the live private `.env` and send a new test appointment email. Confirm its sign-in link and the URL in its `.ics` attachment point to the portal. Source-package examples do not overwrite an existing private `.env`; already-sent emails and attachments retain their original URL.
 
 ### Azure Logic App Consumption scheduler (recommended for this hosting account)
 

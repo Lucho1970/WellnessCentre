@@ -121,6 +121,13 @@ function LegacyLinks() {
   }, [location]);
   return null;
 }
+function LegacyClientRedirect() {
+  useEffect(() => {
+    // Appointment emails sent before the portal split linked to public /client.
+    window.location.replace(portalLink("client"));
+  }, []);
+  return null;
+}
 export default function App() {
   const { config } = useClinicConfig();
   const { t } = useTranslation();
@@ -201,6 +208,7 @@ export default function App() {
           <Route path="/new-clients" element={<Suspense fallback={null}><ContentPage contentKey="pages/new-clients" /></Suspense>} />
           <Route path="/faq" element={<Suspense fallback={null}><ContentPage contentKey="pages/faq" /></Suspense>} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/client" element={<LegacyClientRedirect />} />
           <Route
             path="*"
             element={

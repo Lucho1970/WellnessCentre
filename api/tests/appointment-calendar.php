@@ -15,7 +15,7 @@ $appointment = [
     'client_name' => 'Private Client',
     'destination_snapshot' => 'Private Address',
 ];
-$url = 'https://wellness.copihue.ca/client';
+$url = 'https://portal.copihue.ca/client';
 $initial = AppointmentCalendar::compose($appointment, $url, 'REQUEST', 'wellness@example.com', 'client@example.com');
 $changed = AppointmentCalendar::compose(array_replace($appointment, ['version' => 2, 'starts_at' => '2026-09-25 14:00:00', 'ends_at' => '2026-09-25 15:00:00']), $url);
 $canceled = AppointmentCalendar::compose(array_replace($appointment, ['version' => 3]), $url, 'CANCEL');
