@@ -1138,7 +1138,7 @@ const en = {
   "Send appointment notices by email": "Send appointment notices by email",
   "Send email to": "Send email to", "Work email": "Work email", "Verified personal email": "Verified personal email", "Both email addresses": "Both email addresses",
   "Mobile number for SMS": "Mobile number for SMS",
-  "Canadian or US mobile number. This number is not shown to clients.": "Canadian or US mobile number. This number is not shown to clients.",
+  "SMS notices require a Canadian number. This number is not shown to clients.": "SMS notices require a Canadian number. This number is not shown to clients.",
   "Request SMS appointment notices": "Request SMS appointment notices",
   "SMS notices are active for staff who requested them.": "SMS notices are active for staff who requested them.",
   "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.": "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.",

@@ -21,6 +21,9 @@ final class Config {
 }
 namespace Wellness\Service;
 final class SmsSendException extends \RuntimeException {}
+final class CanadianSmsNumber {
+    public static function isAllowed(string $number): bool { return $number === '+14166166855'; }
+}
 final class VoipMsSmsClient {
     public function __construct(string $user, string $password, string $did) {
         if ($user !== 'private@example.test' || $password !== 'private-pass' || $did !== '2892975234') throw new \RuntimeException('Invalid configuration');

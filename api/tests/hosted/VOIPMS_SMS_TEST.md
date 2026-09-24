@@ -1,7 +1,7 @@
 # One-time VoIP.ms SMS API test on Netfirms
 
 This diagnostic sends **one** non-clinical SMS from DID `2892975234` to a
-mobile phone you control. It does not enable appointment SMS. VoIP.ms API
+Canadian mobile phone you control. US numbers are blocked. It does not enable appointment SMS. VoIP.ms API
 acceptance does not prove carrier delivery or A2P approval. If VoIP.ms tells
 you not to use automated API messaging until verification, wait for approval.
 
@@ -16,7 +16,7 @@ you not to use automated API messaging until verification, wait for approval.
    VOIPMS_FROM_DID=2892975234
    SMS_TEST_ENABLED=true
    SMS_TEST_SECRET=generate-a-new-random-secret-at-least-32-characters
-   SMS_TEST_TO=+1your-own-mobile-number
+   SMS_TEST_TO=+1your-own-Canadian-mobile-number
    ```
 
    Do not put credentials in a public directory, URL, Git, or chat. The API
@@ -39,6 +39,6 @@ you not to use automated API messaging until verification, wait for approval.
    records that an attempt happened. Do not remove it to retry until you have
    checked that the first attempt was not delivered.
 
-Leave `SMS_ENABLED=false` until VoIP.ms confirms approval and the operational
-opt-out requirements have been addressed. The test does not require turning it
-on.
+Leave `SMS_ENABLED=false` until the clinic deliberately activates staff SMS
+after checking applicable VoIP.ms account conditions. The test does not require
+turning it on.

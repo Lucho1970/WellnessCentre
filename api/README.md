@@ -132,12 +132,21 @@ Runtime Super Admin widget upload/version management additionally requires `data
 - `POST /api/v1/admin/service-categories` and `POST /api/v1/admin/taxes` (Super Admin only)
 - `PATCH /api/v1/admin/booking-settings` (Super Admin only)
 - `GET /api/v1/admin/room-practitioner-restrictions` and `PUT /api/v1/admin/rooms/{id}/practitioners` (Super Admin only)
-## VoIP.ms staff SMS (pending A2P approval)
+## VoIP.ms staff SMS (Canada-only)
 
 Staff may save a mobile number and request text notifications. Delivery remains
 off unless `SMS_ENABLED=true` is explicitly set in the private API `.env`.
-Do not enable it until VoIP.ms confirms that DID `2892975234` and the intended
-automated appointment use are approved. No client SMS is sent by this feature.
+Only numbers assigned Canadian area codes may receive SMS. US and unknown area
+codes are rejected at preference selection, queue creation, worker delivery,
+and the final VoIP.ms send; the temporary test page has the same restriction.
+The Canadian area-code list is maintained in `CanadianSmsNumber.php` from the
+Canadian Numbering Administrator and must be reviewed when new codes enter
+service. This identifies number allocation, not the handset's physical location.
+US 10DLC campaign registration is a US-carrier requirement, not a requirement
+we impose on Canada-only traffic from this Canadian local DID. VoIP.ms's
+general API guidance also mentions verification for business messaging without
+explaining its Canada-only policy; confirm any account-specific conditions
+before activating production delivery. No client SMS is sent by this feature.
 
 After approval, set `VOIPMS_API_USERNAME` to the VoIP.ms account login email,
 `VOIPMS_API_PASSWORD` to the account's dedicated API password, and

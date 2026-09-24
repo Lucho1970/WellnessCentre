@@ -1175,7 +1175,7 @@ const fr: Record<string, string> = {
   "Send appointment notices by email": "Recevoir les avis de rendez-vous par courriel",
   "Send email to": "Envoyer les courriels à", "Work email": "Courriel professionnel", "Verified personal email": "Courriel personnel vérifié", "Both email addresses": "Les deux adresses courriel",
   "Mobile number for SMS": "Numéro mobile pour les textos",
-  "Canadian or US mobile number. This number is not shown to clients.": "Numéro mobile canadien ou américain. Il n’est pas montré aux clients.",
+  "SMS notices require a Canadian number. This number is not shown to clients.": "Les avis par texto nécessitent un numéro canadien. Ce numéro n’est pas montré aux clients.",
   "Request SMS appointment notices": "Demander les avis de rendez-vous par texto",
   "SMS notices are active for staff who requested them.": "Les avis par texto sont actifs pour les membres du personnel qui les ont demandés.",
   "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.": "L’envoi de textos n’est pas encore actif. Ce choix enregistre votre préférence, mais aucun texto ne sera envoyé avant l’activation d’un fournisseur approuvé.",

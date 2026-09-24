@@ -51,6 +51,7 @@ final class StaffNotificationPreferences
             throw new ApiException(422, 'validation_error', 'Enter a valid Canadian or US mobile number.');
         }
         if ($smsRequested && $mobile === null) throw new ApiException(422, 'validation_error', 'A mobile number is required to request SMS notices.');
+        if ($smsRequested && !CanadianSmsNumber::isAllowed($mobile)) throw new ApiException(422, 'validation_error', 'SMS notices are available only to Canadian phone numbers.');
 
         $pdo = $this->database->connection();
         try {

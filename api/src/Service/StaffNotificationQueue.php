@@ -29,7 +29,7 @@ final class StaffNotificationQueue
         // An explicit deployment switch gates queue creation as well as delivery.
         // The saved staff request alone must never start sending SMS.
         $smsEnabled = filter_var($_ENV['SMS_ENABLED'] ?? getenv('SMS_ENABLED') ?: 'false', FILTER_VALIDATE_BOOL);
-        if ($smsEnabled && (bool)$row['sms_requested'] && preg_match('/^\+1[2-9]\d{2}[2-9]\d{6}$/', (string)$row['mobile_phone'])) {
+        if ($smsEnabled && (bool)$row['sms_requested'] && CanadianSmsNumber::isAllowed((string)$row['mobile_phone'])) {
             $sms = $pdo->prepare("INSERT INTO notification_events(clinic_id,appointment_id,recipient_user_id,recipient_address,event_code,channel,status,scheduled_at,payload) VALUES(:clinic,:appointment,:recipient,:address,:event,'sms','queued',UTC_TIMESTAMP(),JSON_OBJECT('appointment_id',:payload_id))");
             $sms->execute(['clinic' => $clinicId, 'appointment' => $appointmentId, 'recipient' => $row['id'], 'address' => $row['mobile_phone'], 'event' => 'staff_' . $eventCode, 'payload_id' => $appointmentId]);
         }

@@ -132,7 +132,7 @@ final class NotificationWorker
         $row = $query->fetch(PDO::FETCH_ASSOC);
         if (!$row) return false;
         $address = (string)$event['recipient_address'];
-        if ($event['channel'] === 'sms') return (bool)$row['sms_requested'] && hash_equals((string)$row['mobile_phone'], $address);
+        if ($event['channel'] === 'sms') return (bool)$row['sms_requested'] && CanadianSmsNumber::isAllowed($address) && hash_equals((string)$row['mobile_phone'], $address);
         return (bool)$row['email_enabled'] && ((in_array($row['email_destination'], ['work', 'both'], true) && strcasecmp($address, (string)$row['email']) === 0)
             || (in_array($row['email_destination'], ['personal', 'both'], true) && $row['personal_email_verified_at'] !== null && strcasecmp($address, (string)$row['personal_email']) === 0));
     }

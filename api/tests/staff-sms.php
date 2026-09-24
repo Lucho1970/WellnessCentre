@@ -4,10 +4,17 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use Wellness\Service\SmsSendException;
+use Wellness\Service\CanadianSmsNumber;
 use Wellness\Service\StaffAppointmentSms;
 use Wellness\Service\VoipMsSmsClient;
 
 $event = ['event_code' => 'staff_booking_confirmation', 'clinic_name' => 'Willow Wellness Centre', 'client_name' => 'Private Client', 'destination_snapshot' => 'Private Address'];
+foreach (['+14166166855', '+12892975234', '+19025551234', '+18675551234'] as $number) {
+    if (!CanadianSmsNumber::isAllowed($number)) throw new RuntimeException('Canadian number was rejected: ' . $number);
+}
+foreach (['+12025551234', '+12125551234', '+12735551234', '+19995551234', '4166166855', '+14161116855'] as $number) {
+    if (CanadianSmsNumber::isAllowed($number)) throw new RuntimeException('Non-Canadian or invalid number was accepted: ' . $number);
+}
 foreach (['staff_booking_confirmation', 'staff_booking_change', 'staff_booking_cancellation'] as $code) {
     $message = StaffAppointmentSms::compose(array_replace($event, ['event_code' => $code]), 'https://portal.copihue.ca/client');
     if (strlen($message) > 160 || !str_contains($message, 'https://portal.copihue.ca/practitioner/schedule')) {
@@ -32,6 +39,16 @@ try {
     $client->send('+14166166855', str_repeat('x', 161));
     throw new RuntimeException('Oversize SMS reached transport.');
 } catch (SmsSendException) {}
+$calls = 0;
+$guarded = new VoipMsSmsClient('private@example.test', 'secret', '2892975234', static function (string $body) use (&$calls): array {
+    $calls++;
+    return [200, '{"status":"success"}'];
+});
+try {
+    $guarded->send('+12025551234', 'Test message');
+    throw new RuntimeException('US SMS reached transport.');
+} catch (SmsSendException) {}
+if ($calls !== 0) throw new RuntimeException('US SMS invoked provider transport.');
 $client = new VoipMsSmsClient('private@example.test', 'secret', '2892975234', static function (string $body): array {
     parse_str($body, $fields);
     foreach (['api_username' => 'private@example.test', 'api_password' => 'secret', 'method' => 'sendSMS', 'did' => '2892975234', 'dst' => '+14166166855', 'content_type' => 'json'] as $key => $expected) {

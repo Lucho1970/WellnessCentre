@@ -69,7 +69,7 @@ export function StaffNotificationSettings() {
         <MenuItem value="personal" disabled={!form.personal_email_verified || personalChanged}>{t('Verified personal email')}</MenuItem>
         <MenuItem value="both" disabled={!form.personal_email_verified || personalChanged}>{t('Both email addresses')}</MenuItem>
       </TextField>
-      <TextField label={t('Mobile number for SMS')} type="tel" value={form.mobile_phone ?? ''} fullWidth disabled={busy} onChange={e => setForm({ ...form, mobile_phone: e.target.value })} helperText={t('Canadian or US mobile number. This number is not shown to clients.')} />
+      <TextField label={t('Mobile number for SMS')} type="tel" value={form.mobile_phone ?? ''} fullWidth disabled={busy} onChange={e => setForm({ ...form, mobile_phone: e.target.value })} helperText={t('SMS notices require a Canadian number. This number is not shown to clients.')} />
       <FormControlLabel control={<Checkbox checked={form.sms_requested} disabled={busy} onChange={e => setForm({ ...form, sms_requested: e.target.checked })} />} label={t('Request SMS appointment notices')} />
       <Alert severity="info">{form.sms_delivery_active ? t('SMS notices are active for staff who requested them.') : t('SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.')}</Alert>
       {message && <Alert severity="success">{message}</Alert>}

@@ -23,7 +23,7 @@ final class VoipMsSmsClient
     /** Returns the provider message ID when available. */
     public function send(string $recipient, string $message): ?string
     {
-        if (!preg_match('/^\+1[2-9]\d{2}[2-9]\d{6}$/', $recipient) || $message === '' || strlen($message) > 160 || preg_match('/[^\x20-\x7E]/', $message)) {
+        if (!CanadianSmsNumber::isAllowed($recipient) || $message === '' || strlen($message) > 160 || preg_match('/[^\x20-\x7E]/', $message)) {
             throw new SmsSendException('SMS recipient or message is invalid.');
         }
         $body = http_build_query([

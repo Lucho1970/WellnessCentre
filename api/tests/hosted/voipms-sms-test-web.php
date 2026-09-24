@@ -47,9 +47,9 @@ if (!filter_var($env('SMS_TEST_ENABLED'), FILTER_VALIDATE_BOOL)) {
 }
 $secret = $env('SMS_TEST_SECRET');
 $to = $env('SMS_TEST_TO');
-if (strlen($secret) < 32 || !preg_match('/^\+1[2-9]\d{2}[2-9]\d{6}$/', $to) || $env('VOIPMS_FROM_DID') !== '2892975234') {
+if (strlen($secret) < 32 || !\Wellness\Service\CanadianSmsNumber::isAllowed($to) || $env('VOIPMS_FROM_DID') !== '2892975234') {
     http_response_code(503);
-    $page('SMS test is not configured', '<p>Set the temporary test secret and your own receiving mobile number in the private API environment file.</p>');
+    $page('SMS test is not configured', '<p>Set the temporary test secret and your own Canadian receiving mobile number in the private API environment file.</p>');
     exit;
 }
 
