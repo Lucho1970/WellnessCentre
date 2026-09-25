@@ -1858,6 +1858,53 @@ test("reception routes support refresh, back, profile menu and restricted deep l
   ).toBeVisible();
 });
 
+test("staff access uses a selected-list ribbon and shared details, edit, and new panel", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  const people = [
+    { id: 1, display_name: "Test Staff", email: "staff@example.test", status: "active", roles: ["super_admin"], permissions: [] },
+    { id: 2, display_name: "Esther Test", email: "esther@example.test", status: "active", roles: ["practitioner"], permissions: [] },
+  ];
+  let created: Record<string, unknown> | null = null;
+  let updated: Record<string, unknown> | null = null;
+  await page.route("**/api/v1/admin/staff**", route => {
+    const method = route.request().method();
+    if (method === "POST") {
+      created = route.request().postDataJSON();
+      people.push({ id: 3, display_name: String(created?.display_name), email: String(created?.email), status: "active", roles: [String(created?.role)], permissions: [] });
+      return route.fulfill({ json: { data: { id: 3 } } });
+    }
+    if (method === "PATCH") {
+      updated = route.request().postDataJSON();
+      Object.assign(people[1], updated);
+      return route.fulfill({ json: { data: { id: 2 } } });
+    }
+    return route.fulfill({ json: { data: people } });
+  });
+  await page.goto(`${portalHost}/admin/users`);
+  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: /Esther Test/ }).click();
+  await page.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(page.getByText("Staff details")).toBeVisible();
+  await expect(page.getByText("esther@example.test")).toHaveCount(2);
+  await page.getByRole("button", { name: "Edit", exact: true }).last().click();
+  await page.getByRole("checkbox", { name: "Add clients and send invitations" }).check();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Staff access updated.")).toBeVisible();
+  expect(updated?.permissions).toEqual(["add_clients"]);
+  await page.getByRole("button", { name: "New staff member" }).click();
+  await page.getByRole("textbox", { name: "Display name" }).fill("New Staff");
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("new@example.test");
+  await page.getByRole("textbox", { name: "Microsoft Entra tenant ID" }).fill("11111111-1111-1111-1111-111111111111");
+  await page.getByRole("textbox", { name: "Microsoft Entra user object ID" }).fill("22222222-2222-2222-2222-222222222222");
+  await page.getByRole("button", { name: "Add staff member" }).click();
+  await expect(page.getByText("Staff account added.")).toBeVisible();
+  expect(created).toMatchObject({ email: "new@example.test", role: "reception" });
+  await page.getByRole("textbox", { name: "Filter staff" }).fill("Esther");
+  await expect(page.getByRole("button", { name: /Esther Test/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /New Staff/ })).toHaveCount(0);
+});
+
 test("practitioner stores notification preferences and verifies a separate personal email", async ({ page }) => {
   await fixtures(page, ["practitioner"]);
   let preferences = { work_email: "staff@example.test", email_enabled: false, email_destination: "work", personal_email: null as string | null, personal_email_verified: false, mobile_phone: null as string | null, sms_requested: false, sms_delivery_active: false };

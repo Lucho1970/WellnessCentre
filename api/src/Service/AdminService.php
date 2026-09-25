@@ -162,7 +162,7 @@ final class AdminService
 
     public function createStaff(AuthContext $actor,array $body,string $correlationId): array
     {
-        $this->admin($actor);$this->required($body,['tenant_id','object_id','email','display_name','role']);
+        $this->superAdmin($actor);$this->required($body,['tenant_id','object_id','email','display_name','role']);
         $allowed=['super_admin','clinic_admin','reception','practitioner','accountant'];if(!in_array($body['role'],$allowed,true))throw new ApiException(422,'validation_error','Invalid staff role.',['role'=>'Invalid role']);
         $pdo=$this->database->connection();
         try{$pdo->beginTransaction();$statement=$pdo->prepare("INSERT INTO users(clinic_id,email,display_name,user_type,status) VALUES(:clinic,:email,:name,'staff','active')");$statement->execute(['clinic'=>$actor->clinicId,'email'=>strtolower(trim($body['email'])),'name'=>$body['display_name']]);$id=(int)$pdo->lastInsertId();
