@@ -165,7 +165,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
         {page === "dashboard" && <Dashboard workspace={workspace} />}
         {page === "clients" && <ClientManagement canMerge={roles.includes('super_admin')} />}
-        {page === "appointments" && <StaffAppointments canManageFees={roles.some(role => ['super_admin', 'clinic_admin'].includes(role))} practitionerMode={workspace === 'practitioner'} canScheduleOthers={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('schedule_for_other_practitioners')} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
+        {page === "appointments" && <StaffAppointments canManageFees={roles.some(role => ['super_admin', 'clinic_admin'].includes(role))} practitionerMode={workspace === 'practitioner'} canScheduleOthers={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('schedule_for_other_practitioners')} canAddClients={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || (roles.includes('practitioner') && permissions.includes('add_clients'))} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
         {page === "schedule_calendar" && <PractitionerCalendar />}
         {page === "practitioners" && <PractitionerAdmin />}
         {page === "locations" && <LocationAdmin />}

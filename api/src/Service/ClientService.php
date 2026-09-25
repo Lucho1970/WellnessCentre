@@ -16,6 +16,22 @@ final class ClientService
         if ($actor->userType !== 'staff' || !$actor->hasAnyRole('super_admin','clinic_admin','reception')) throw new ApiException(403,'forbidden','Client administration requires administrator or reception access.');
     }
 
+    public static function authorizeCreate(AuthContext $actor): void
+    {
+        if ($actor->userType !== 'staff' || !($actor->hasAnyRole('super_admin','clinic_admin','reception') || ($actor->hasAnyRole('practitioner') && $actor->hasPermission('add_clients'))))
+            throw new ApiException(403,'forbidden','Client creation is not permitted for this staff account.');
+    }
+
+    public static function validatePractitionerCreation(AuthContext $actor, array $body): void
+    {
+        if ($actor->hasAnyRole('super_admin','clinic_admin','reception')) return;
+        $allowed = ['given_name','family_name','email','phone','date_of_birth','preferred_contact','status'];
+        foreach (array_keys($body) as $field) if (!in_array($field, $allowed, true))
+            throw new ApiException(422,'validation_error','This field is not available when a practitioner adds a client.');
+        if (($body['status'] ?? 'active') !== 'active' || ($body['preferred_contact'] ?? 'email') !== 'email')
+            throw new ApiException(422,'validation_error','Practitioner-created clients must be active with email as their initial contact method.');
+    }
+
     public static function authorizeMerge(AuthContext $actor): void
     {
         if ($actor->userType !== 'staff' || !$actor->hasAnyRole('super_admin')) throw new ApiException(403,'forbidden','Merging client records requires Super Admin access.');
@@ -90,7 +106,8 @@ final class ClientService
 
     public function save(AuthContext $actor,array $body,string $cid,?int $id=null): array
     {
-        self::authorize($actor);$data=self::validate($body);$pdo=$this->database->connection();
+        if($id===null){self::authorizeCreate($actor);self::validatePractitionerCreation($actor,$body);}else self::authorize($actor);
+        $data=self::validate($body);$pdo=$this->database->connection();
         try{
             $pdo->beginTransaction();
             if($id!==null){

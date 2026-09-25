@@ -213,7 +213,7 @@ final class Api
                 'clientMergePreview'=>$this->clients->mergePreview($this->user($request),(int)$route[2]['survivor'],(int)$route[2]['duplicate'],$request->correlationId),
                 'mergeClients'=>$this->clients->merge($this->user($request),(int)$route[2]['survivor'],(int)$route[2]['duplicate'],$request->body,$request->correlationId),
                 'clientInvitations'=>$this->onboarding()->invitations($this->user($request),(int)$route[2]['id']),
-                'issueClientInvitation'=>$this->onboarding()->invite($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'issueClientInvitation'=>$this->onboarding()->invite($this->user($request),(int)$route[2]['id'],$request->correlationId,(string)($request->body['delivery']??'manual')),
                 'reviewClientInvitation'=>$this->onboarding()->review($this->user($request),(int)$route[2]['id'],(int)$route[2]['invitation'],$request->body,$request->correlationId),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
                 'adminLocations'=>$this->admin->locations($this->user($request)),

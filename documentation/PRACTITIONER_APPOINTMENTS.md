@@ -1,5 +1,14 @@
 # Practitioner appointment management checkpoint
 
+Current extension (25 September 2026): a Super Admin can grant `add_clients` to an
+individual practitioner after applying migration `019_practitioner_client_creation.sql`.
+That practitioner can add an active client with minimal booking details from their own
+appointment form, then select the new client and explicitly send a private portal
+invitation email. They cannot browse or edit the general Clients directory, override
+duplicate warnings, invite clients created by others, or approve identity links.
+The client can accept the invitation, but an authorized clinic reviewer must verify
+the person's identity and approve the link before the account sees client records.
+
 ## Delivered scope
 
 Practitioners configured as **Practitioner managed** can use **Practitioner workspace →
@@ -36,9 +45,9 @@ booking defaults to the only eligible location, or the first configured eligible
 when the clinic has several; staff can change it before continuing.
 
 Every accepted change increments the appointment version, writes status history and an audit
-event, and queues a client notification event. The current environment still does not have a
-verified notification sender, so staff and practitioners must arrange confirmation directly
-until the communications phase is deployed.
+event, and queues a client notification event. Appointment email and opted-in Canadian staff
+SMS now have tested senders, immediate attempts, and a scheduled fallback. A provider's
+acceptance is not proof that the recipient received the message.
 
 ## API
 

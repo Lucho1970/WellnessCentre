@@ -187,18 +187,23 @@ final class CustomerOnboarding
         $rows = $this->query('SELECT a.id,a.starts_at,a.ends_at,a.status,a.version,a.room_id,a.duration_option_id,a.delivery_mode,a.cancellation_fee_cents,s.name AS service,p.display_name AS practitioner,l.name AS location,l.timezone,r.name AS room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN practitioners pr ON pr.id=a.practitioner_id JOIN users p ON p.id=pr.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.client_id=? AND a.clinic_id=? ORDER BY a.starts_at DESC LIMIT 100', [$link['client_id'], $this->config->customerClinicId])->fetchAll(PDO::FETCH_ASSOC);
         $this->audit('customer.appointments.view', (int)$link['client_id'], $cid, null, ['identity_id' => $identity]); return ['items' => $rows, 'limit' => 100];
     }
-    private function staffClient(AuthContext $actor, int $client): void {
-        ClientService::authorize($actor); $this->clinic();
+    private function staffClient(AuthContext $actor, int $client, bool $allowCreator = false): void {
+        if ($allowCreator && $actor->userType === 'staff' && !$actor->hasAnyRole('super_admin','clinic_admin','reception') && $actor->hasAnyRole('practitioner') && $actor->hasPermission('add_clients')) {
+            if (!$this->query("SELECT 1 FROM audit_logs WHERE clinic_id=? AND actor_user_id=? AND action='client.create' AND entity_type='client' AND entity_id=? LIMIT 1", [$actor->clinicId, $actor->userId, $client])->fetchColumn())
+                throw new ApiException(403, 'forbidden', 'You can invite only clients you created.');
+        } else ClientService::authorize($actor);
+        $this->clinic();
         if ($actor->clinicId !== $this->config->customerClinicId || !$this->query("SELECT id FROM users WHERE id=? AND clinic_id=? AND user_type='client'", [$client, $actor->clinicId])->fetchColumn()) throw new ApiException(404, 'client_not_found', 'Client not found.');
     }
     public function invitations(AuthContext $actor, int $client): array {
-        $this->staffClient($actor, $client);
+        $this->staffClient($actor, $client, true);
         return ['linked' => (bool)$this->query('SELECT identity_id FROM customer_client_links WHERE client_id=?', [$client])->fetchColumn(),
             'items' => $this->query('SELECT i.id,i.created_at,i.expires_at,i.consumed_at,i.revoked_at,c.id AS claim_id,c.claimant_name,c.status AS claim_status FROM client_link_invitations i LEFT JOIN client_link_claims c ON c.invitation_id=i.id WHERE i.client_id=? AND i.clinic_id=? ORDER BY i.id DESC LIMIT 20', [$client, $actor->clinicId])->fetchAll(PDO::FETCH_ASSOC)];
     }
-    public function invite(AuthContext $actor, int $client, string $cid): array {
-        $this->staffClient($actor, $client);
-        return $this->transaction(function () use ($actor, $client, $cid) {
+    public function invite(AuthContext $actor, int $client, string $cid, string $delivery = 'manual'): array {
+        if (!in_array($delivery, ['manual', 'email'], true)) throw new ApiException(422, 'validation_error', 'Select manual or email invitation delivery.');
+        $this->staffClient($actor, $client, true);
+        $result = $this->transaction(function () use ($actor, $client, $cid) {
             $this->clinic(true);
             $status = $this->query('SELECT status FROM users WHERE id=? FOR UPDATE', [$client])->fetchColumn();
             if ($status !== 'active' || $this->invitations($actor, $client)['linked']) throw new ApiException(409, 'invitation_unavailable', 'Only active, unlinked clients can be invited.');
@@ -209,6 +214,28 @@ final class CustomerOnboarding
             $id = (int)$this->db->lastInsertId(); $this->audit('customer.invitation.issue', $id, $cid, $actor);
             return ['id' => $id, 'token' => $token, 'expires_at' => $expires, 'delivery' => 'manual'];
         });
+        if ($delivery === 'email') {
+            try {
+                $env = static fn(string $key): string => trim((string)($_ENV[$key] ?? getenv($key) ?: ''));
+                if (!filter_var($env('MAIL_ENABLED'), FILTER_VALIDATE_BOOL)) throw new \RuntimeException('Mail is disabled.');
+                $portal = rtrim($this->config->clientPortalUrl, '/');
+                if (!filter_var($portal, FILTER_VALIDATE_URL) || !str_starts_with($portal, 'https://')) throw new \RuntimeException('Client portal URL is invalid.');
+                $recipient = (string)$this->query('SELECT email FROM users WHERE id=? AND clinic_id=?', [$client, $actor->clinicId])->fetchColumn();
+                $mailer = new GraphMailClient($env('MAIL_TENANT_ID'), $env('MAIL_CLIENT_ID'), $env('MAIL_CLIENT_SECRET'), $env('MAIL_FROM_ADDRESS'));
+                $mailer->send($recipient, 'Client portal invitation / Invitation au portail client',
+                    "You have been invited to create a client portal sign-in. Open this private link within 48 hours:\n{$portal}/invite#token={$result['token']}\n\n" .
+                    "Accepting an invitation does not provide access to a client record until the clinic independently verifies and approves your identity. If you did not expect this invitation, contact the clinic.\n\n" .
+                    "Vous êtes invité(e) à créer un compte pour le portail client. Ouvrez ce lien privé dans les 48 heures :\n{$portal}/invite#token={$result['token']}\n\n" .
+                    "L’acceptation de l’invitation ne donne pas accès à un dossier client tant que la clinique n’a pas vérifié et approuvé votre identité. Si vous n’attendiez pas cette invitation, communiquez avec la clinique.");
+                $result['delivery'] = 'email_accepted';
+            } catch (Throwable $e) {
+                // Keep the token available once for manual delivery. A transport
+                // timeout may have sent the message, so do not retry automatically.
+                error_log('Wellness invitation email failed: ' . get_class($e) . ' correlation_id=' . $cid);
+                $result['delivery'] = 'manual';
+            }
+        }
+        return $result;
     }
     public function accept(int $identity, array $body, string $cid): array {
         $this->rate('invitation', (string)$identity, 10, 600);

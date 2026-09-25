@@ -233,6 +233,32 @@ const en = {
     "No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.",
   "No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.":
     "No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.",
+  "No active clients matched. Search again before adding a new client to avoid duplicates.":
+    "No active clients matched. Search again before adding a new client to avoid duplicates.",
+  "Add new client": "Add new client",
+  "Cancel new client": "Cancel new client",
+  "Search for an existing client before creating a record. Saving a record does not link a sign-in account.":
+    "Search for an existing client before creating a record. Saving a record does not link a sign-in account.",
+  "Unable to create the client.": "Unable to create the client.",
+  "Possible duplicate client. Select an existing match from search or ask clinic staff to review before creating another record.":
+    "Possible duplicate client. Select an existing match from search or ask clinic staff to review before creating another record.",
+  "Save new client": "Save new client",
+  "This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.":
+    "This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.",
+  "Send a private portal invitation to {{email}}?": "Send a private portal invitation to {{email}}?",
+  "Send portal invitation email": "Send portal invitation email",
+  "Sending invitation…": "Sending invitation…",
+  "The mail provider accepted the invitation. The client must still complete sign-in and identity review.":
+    "The mail provider accepted the invitation. The client must still complete sign-in and identity review.",
+  "The invitation email was not confirmed. Copy and send this private link through a verified contact channel.":
+    "The invitation email was not confirmed. Copy and send this private link through a verified contact channel.",
+  "Unable to send the invitation.": "Unable to send the invitation.",
+  "Add clients and send invitations": "Add clients and send invitations",
+  "Allows creation of client records and invitations for clients this practitioner created. Identity-link approval remains with clinic administration.":
+    "Allows creation of client records and invitations for clients this practitioner created. Identity-link approval remains with clinic administration.",
+  "Send a private invitation email or copy the one-time link. The client cannot view records until staff independently verify and approve the identity link.":
+    "Send a private invitation email or copy the one-time link. The client cannot view records until staff independently verify and approve the identity link.",
+  "Create invitation link (48 hours)": "Create invitation link (48 hours)",
   "That practitioner does not offer this service at the selected location.":
     "This appointment uses a service configuration that is no longer active for this practitioner and location. Cancel and rebook it with an active service, or ask an administrator to restore the assignment.",
   "Matching active clients": "Matching active clients",
@@ -326,11 +352,8 @@ const en = {
   "Approve this identity link?": "Approve this identity link?",
   "Reject/revoke this invitation?": "Reject/revoke this invitation?",
   "Client portal access": "Client portal access",
-  "Invitation links are copied and sent manually. No email is sent by this application. Confirm the recipient through an established contact channel.":
-    "Invitation links are copied and sent manually. No email is sent by this application. Confirm the recipient through an established contact channel.",
   "This client record has an approved customer identity link.":
     "This client record has an approved customer identity link.",
-  "Create invitation (48 hours)": "Create invitation (48 hours)",
   "Private invitation link — shown only now":
     "Private invitation link — shown only now",
   "Select and copy the link manually.": "Select and copy the link manually.",

@@ -7,6 +7,7 @@ import { formatCad, formatDateTime } from '../i18n/format';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
+import { portalLink } from '../shared/urls';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
@@ -20,7 +21,7 @@ const emptyDestination = (): Destination => ({address_line1:'',address_line2:'',
 function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
 type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
-class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string) { super(message); } }
+class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string, readonly fields: Record<string, unknown> = {}) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
   return formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, language, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
 }
@@ -29,7 +30,7 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
   return [...new Map(rows.map(row => [String(row[key]), row])).values()];
 }
 
-export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean }) {
+export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false, canAddClients = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean; canAddClients?: boolean }) {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -47,7 +48,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
     const text = await response.text();
     let body;
     try { body = JSON.parse(text); } catch { throw new RequestError(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.', { status: response.status }), response.status, 'invalid_response'); }
-    if (!response.ok) throw new RequestError(apiErrorMessage(body, response.status, t('Request failed (HTTP {{status}}).', { status: response.status })), response.status, body?.error?.code ?? 'request_failed');
+    if (!response.ok) throw new RequestError(apiErrorMessage(body, response.status, t('Request failed (HTTP {{status}}).', { status: response.status })), response.status, body?.error?.code ?? 'request_failed', body?.error?.fields ?? {});
     return normalizeNumericIds(body.data);
   }, [getAccessToken, t]);
   useEffect(() => {
@@ -64,7 +65,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
       {canBook && !creating && <Button variant="contained" startIcon={<CalendarPlus size={18} />} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     {managing && <ManageAppointment appointment={managing} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack direction="row" gap={2} justifyContent="space-between" mb={2}>
@@ -155,8 +156,8 @@ function ManageAppointment({ appointment, request, canAssessFees, canManageFees,
   </Paper>;
 }
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; cancel: () => void; complete: (id: number) => void };
-function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, complete }: FormProps) {
+type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; cancel: () => void; complete: (id: number) => void };
+function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClients, cancel, complete }: FormProps) {
   const { t, i18n } = useTranslation();
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
@@ -172,6 +173,15 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   const [clientMore, setClientMore] = useState(false);
   const [clientError, setClientError] = useState('');
   const [clientSearched, setClientSearched] = useState(false);
+  const [addingClient, setAddingClient] = useState(false);
+  const [newClient, setNewClient] = useState({ given_name: '', family_name: '', email: '', phone: '', date_of_birth: '' });
+  const [newClientBusy, setNewClientBusy] = useState(false);
+  const [newClientError, setNewClientError] = useState('');
+  const [duplicateClients, setDuplicateClients] = useState<Client[]>([]);
+  const [createdClientId, setCreatedClientId] = useState<number | null>(null);
+  const [invitationBusy, setInvitationBusy] = useState(false);
+  const [invitationStatus, setInvitationStatus] = useState('');
+  const [invitationLink, setInvitationLink] = useState('');
   const [mode,setMode]=useState<'clinic'|'mobile'>('mobile');
   const [destination,setDestination]=useState<Destination>(emptyDestination);
   const [clientAddressState,setClientAddressState]=useState<'idle'|'loading'|'saved'|'missing'|'custom'|'error'>('idle');
@@ -205,6 +215,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
   const assignedPractitioner=practitionerLocked?unique(options,'practitioner_id')[0]:undefined;
   useUnsavedChanges(Boolean(
     clientQuery.trim() || clientBirthdate || client || location || service || duration || date || slot || room || pending ||
+    (addingClient && Object.values(newClient).some(value => value.trim())) ||
     destination.address_line1 || destination.address_line2 || destination.city || destination.postal_code || destination.instructions
   ));
   useEffect(() => {
@@ -248,6 +259,27 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
     return()=>controller.abort();
   },[client?.id,mode,request]);
   const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); setError(''); };
+  const createClient = async (event: FormEvent) => {
+    event.preventDefault(); setNewClientBusy(true); setNewClientError(''); setDuplicateClients([]);
+    try {
+      const created: Client = await request('/clients', { method: 'POST', body: JSON.stringify({ ...newClient, preferred_contact: 'email', status: 'active' }) });
+      setClient(created); setCreatedClientId(Number(created.id)); setAddingClient(false); setClientQuery(''); setClientBirthdate(''); setClients([]);
+      setInvitationStatus(''); setInvitationLink('');
+    } catch (cause) {
+      if (cause instanceof RequestError && cause.code === 'possible_duplicate' && Array.isArray(cause.fields.candidates)) setDuplicateClients(cause.fields.candidates as Client[]);
+      setNewClientError(cause instanceof Error ? cause.message : t('Unable to create the client.'));
+    } finally { setNewClientBusy(false); }
+  };
+  const sendInvitation = async () => {
+    if (!client || createdClientId !== Number(client.id) || !window.confirm(t('Send a private portal invitation to {{email}}?', { email: client.email }))) return;
+    setInvitationBusy(true); setInvitationStatus(''); setInvitationLink('');
+    try {
+      const result = await request(`/clients/${client.id}/invitations`, { method: 'POST', body: JSON.stringify({ delivery: 'email' }) });
+      if (result.delivery === 'email_accepted') setInvitationStatus(t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.'));
+      else { setInvitationStatus(t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.')); setInvitationLink(`${portalLink('client/invite')}#token=${result.token}`); }
+    } catch (cause) { setInvitationStatus(cause instanceof Error ? cause.message : t('Unable to send the invitation.')); }
+    finally { setInvitationBusy(false); }
+  };
   const findSlots = async (event: FormEvent) => {
     event.preventDefault(); if (!selected) return; setBusy(true); clearSlots();
     try {
@@ -291,7 +323,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
         </Grid>}
         {clientBusy && <Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20} /><Typography>{t('Searching active clients…')}</Typography></Stack>}
         {clientError && <Alert severity="error">{clientError}</Alert>}
-        {!client && clientSearched && clients.length === 0 && <Alert severity="info">{t(practitionerMode ? 'No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.' : 'No active clients matched. Try a name, email, or phone number, or add the client from the Clients page.')}</Alert>}
+        {!client && clientSearched && clients.length === 0 && <Alert severity="info">{t(canAddClients ? 'No active clients matched. Search again before adding a new client to avoid duplicates.' : 'No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.')}</Alert>}
         {!client && clients.length > 0 && <Stack spacing={1} role="list" aria-label={t('Matching active clients')}>
           {clients.map(item => <Box key={item.id} role="listitem"><ButtonBase aria-label={t('Select {{name}}', { name: item.display_name })} onClick={() => setClient(item)} sx={{ width: '100%', p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, textAlign: 'left' }}><Stack width="100%" direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
             <Box><Typography fontWeight={700}>{item.display_name}</Typography><Typography variant="body2">{item.email}</Typography><Typography variant="body2" color="text.secondary">{item.phone || t('No phone number on file')}</Typography></Box>
@@ -299,10 +331,31 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, cancel, com
           </Stack></ButtonBase></Box>)}
           {clientMore && <Alert severity="info">{t('Showing the first 25 matches. Continue typing to narrow the results.')}</Alert>}
         </Stack>}
+        {!client && canAddClients && <Box>
+          <Button variant="outlined" onClick={() => { setAddingClient(value => !value); setNewClientError(''); setDuplicateClients([]); }}>{t(addingClient ? 'Cancel new client' : 'Add new client')}</Button>
+          {addingClient && <Stack component="form" onSubmit={event => void createClient(event)} spacing={2} sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <Alert severity="info">{t('Search for an existing client before creating a record. Saving a record does not link a sign-in account.')}</Alert>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth required label={t('First name')} value={newClient.given_name} inputProps={{ maxLength: 100 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, given_name: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth required label={t('Last name')} value={newClient.family_name} inputProps={{ maxLength: 100 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, family_name: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth required type="email" label={t('Email')} value={newClient.email} inputProps={{ maxLength: 190 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, email: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth type="tel" label={t('Phone')} value={newClient.phone} inputProps={{ maxLength: 40 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, phone: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth type="date" label={t('Date of birth (optional)')} value={newClient.date_of_birth} InputLabelProps={{ shrink: true }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, date_of_birth: event.target.value }))} /></Grid>
+            </Grid>
+            {newClientError && <Alert severity="error">{newClientError}</Alert>}
+            {duplicateClients.length > 0 && <Alert severity="warning">{t('Possible duplicate client. Select an existing match from search or ask clinic staff to review before creating another record.')}{duplicateClients.map(candidate => <Typography key={candidate.id} variant="body2">{candidate.display_name} — {candidate.email}</Typography>)}</Alert>}
+            <Button type="submit" variant="contained" disabled={newClientBusy}>{t(newClientBusy ? 'Saving…' : 'Save new client')}</Button>
+          </Stack>}
+        </Box>}
         {client && <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main', borderWidth: 2 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
           <Box><Typography variant="overline" color="primary">{t('Selected client')}</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || t('No phone number on file')}</Typography></Box>
           <Button onClick={() => { setClient(null); setClientQuery(''); setClientBirthdate(''); setClients([]); setDestination(emptyDestination()); setClientAddressState('idle'); setCoverage(null); }}>{t('Change client')}</Button>
-        </Stack></Paper>}
+        </Stack>{createdClientId === Number(client.id) && <Stack spacing={1} mt={2}>
+          <Typography variant="body2">{t('This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.')}</Typography>
+          <Button variant="outlined" disabled={invitationBusy} onClick={() => void sendInvitation()}>{t(invitationBusy ? 'Sending invitation…' : 'Send portal invitation email')}</Button>
+          {invitationStatus && <Alert severity={invitationLink ? 'warning' : 'info'}>{invitationStatus}</Alert>}
+          {invitationLink && <><TextField fullWidth label={t('Private invitation link — shown only now')} value={invitationLink} slotProps={{ input: { readOnly: true } }} /><Button onClick={() => void navigator.clipboard.writeText(invitationLink)}>{t('Copy invitation link')}</Button></>}
+        </Stack>}</Paper>}
         <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);clearSlots();}}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
         <Grid container spacing={2}>

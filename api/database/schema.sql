@@ -90,7 +90,8 @@ INSERT INTO roles(code,name,description) VALUES
 ('accountant','Accountant','Financial records, exports, reconciliation, and accounting settings');
 
 INSERT INTO permissions(code,name,description) VALUES
-('schedule_for_other_practitioners','Schedule for other practitioners','Book, reschedule, and cancel appointments assigned to another practitioner');
+('schedule_for_other_practitioners','Schedule for other practitioners','Book, reschedule, and cancel appointments assigned to another practitioner'),
+('add_clients','Add clients','Create a new client record for booking and invite that client to the portal; does not grant editing or identity-link approval');
 
 -- Mobile booking extension (also available as migration 004 for existing databases).
 -- MySQL 5.7+. Back up first; run once before deploying the matching API.

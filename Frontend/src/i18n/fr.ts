@@ -240,6 +240,32 @@ const fr: Record<string, string> = {
     "Aucun client actif ne correspond. Essayez un nom, un courriel ou un numéro de téléphone, ou ajoutez le client depuis la page Clients.",
   "No active clients matched. Try a name, email, or phone number, or ask clinic staff to add the client.":
     "Aucun client actif ne correspond. Essayez un nom, un courriel ou un numéro de téléphone, ou demandez au personnel de la clinique d’ajouter le client.",
+  "No active clients matched. Search again before adding a new client to avoid duplicates.":
+    "Aucun client actif ne correspond. Effectuez une autre recherche avant d’ajouter un client pour éviter les doublons.",
+  "Add new client": "Ajouter un client",
+  "Cancel new client": "Annuler l’ajout du client",
+  "Search for an existing client before creating a record. Saving a record does not link a sign-in account.":
+    "Recherchez un client existant avant de créer un dossier. L’enregistrement d’un dossier ne lie pas un compte de connexion.",
+  "Unable to create the client.": "Impossible de créer le client.",
+  "Possible duplicate client. Select an existing match from search or ask clinic staff to review before creating another record.":
+    "Doublon possible. Sélectionnez un client existant dans les résultats ou demandez au personnel de la clinique de vérifier avant de créer un autre dossier.",
+  "Save new client": "Enregistrer le nouveau client",
+  "This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.":
+    "Vous pouvez maintenant réserver pour ce nouveau client. Une invitation au portail ne donne pas accès au dossier tant que la vérification d’identité n’est pas approuvée.",
+  "Send a private portal invitation to {{email}}?": "Envoyer une invitation privée au portail à {{email}}?",
+  "Send portal invitation email": "Envoyer l’invitation par courriel",
+  "Sending invitation…": "Envoi de l’invitation…",
+  "The mail provider accepted the invitation. The client must still complete sign-in and identity review.":
+    "Le fournisseur de courriel a accepté l’invitation. Le client doit encore se connecter et faire vérifier son identité.",
+  "The invitation email was not confirmed. Copy and send this private link through a verified contact channel.":
+    "L’envoi du courriel d’invitation n’a pas été confirmé. Copiez ce lien privé et envoyez-le par un canal de contact vérifié.",
+  "Unable to send the invitation.": "Impossible d’envoyer l’invitation.",
+  "Add clients and send invitations": "Ajouter des clients et envoyer des invitations",
+  "Allows creation of client records and invitations for clients this practitioner created. Identity-link approval remains with clinic administration.":
+    "Permet de créer des dossiers clients et d’inviter les clients créés par ce praticien. L’approbation du lien d’identité reste réservée à l’administration de la clinique.",
+  "Send a private invitation email or copy the one-time link. The client cannot view records until staff independently verify and approve the identity link.":
+    "Envoyez une invitation privée par courriel ou copiez le lien à usage unique. Le client ne peut consulter son dossier qu’après une vérification indépendante et l’approbation du lien d’identité par le personnel.",
+  "Create invitation link (48 hours)": "Créer un lien d’invitation (48 heures)",
   "That practitioner does not offer this service at the selected location.":
     "Ce rendez-vous utilise une configuration de service qui n’est plus active pour ce praticien et cet emplacement. Annulez-le et réservez-le de nouveau avec un service actif, ou demandez à un administrateur de rétablir l’affectation.",
   "Matching active clients": "Clients actifs correspondants",
@@ -335,11 +361,8 @@ const fr: Record<string, string> = {
   "Approve this identity link?": "Approuver ce lien d’identité?",
   "Reject/revoke this invitation?": "Rejeter ou révoquer cette invitation?",
   "Client portal access": "Accès au portail client",
-  "Invitation links are copied and sent manually. No email is sent by this application. Confirm the recipient through an established contact channel.":
-    "Les liens d’invitation sont copiés et envoyés manuellement. Cette application n’envoie aucun courriel. Confirmez le destinataire par un moyen de communication établi.",
   "This client record has an approved customer identity link.":
     "Ce dossier client possède un lien d’identité client approuvé.",
-  "Create invitation (48 hours)": "Créer une invitation (48 heures)",
   "Private invitation link — shown only now":
     "Lien d’invitation privé — affiché uniquement maintenant",
   "Select and copy the link manually.":

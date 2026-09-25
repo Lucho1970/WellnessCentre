@@ -9,6 +9,7 @@ import { useUnsavedChanges } from '../shared/UnsavedChanges';
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const roleOptions = ['super_admin', 'clinic_admin', 'reception', 'practitioner', 'accountant'];
 const scheduleOthers = 'schedule_for_other_practitioners';
+const addClients = 'add_clients';
 type Staff = { id: number; display_name: string; email: string; status: string; roles: string[]; permissions: string[] };
 
 export function StaffAdmin() {
@@ -65,6 +66,8 @@ export function StaffAdmin() {
           <Typography fontWeight={700}>{t('Additional permissions')}</Typography>
           <FormControlLabel control={<Checkbox checked={editing.permissions.includes(scheduleOthers)} onChange={event => set('permissions', event.target.checked ? [...editing.permissions, scheduleOthers] : editing.permissions.filter(item => item !== scheduleOthers))}/>} label={t('Schedule for other practitioners')}/>
           <Typography variant="body2" color="text.secondary">{t('Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.')}</Typography>
+          <FormControlLabel control={<Checkbox checked={editing.permissions.includes(addClients)} onChange={event => set('permissions', event.target.checked ? [...editing.permissions, addClients] : editing.permissions.filter(item => item !== addClients))}/>} label={t('Add clients and send invitations')}/>
+          <Typography variant="body2" color="text.secondary">{t('Allows creation of client records and invitations for clients this practitioner created. Identity-link approval remains with clinic administration.')}</Typography>
         </>}
       </Stack></DialogContent>}
       <DialogActions><Button onClick={() => { setEditing(null);setOriginal(null); }}>{t('Cancel')}</Button><Button variant="contained" startIcon={<Save size={16}/>} onClick={save}>{t('Save')}</Button></DialogActions>

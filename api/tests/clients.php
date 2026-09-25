@@ -23,6 +23,17 @@ $address=['address_line1'=>'123 Test Street','address_line2'=>'','city'=>'Test C
 if(ClientService::validate($valid+['address'=>$address])['address']['postal_code']!=='A1A 1A1')throw new RuntimeException('Address normalization failed');$count++;
 try{ClientService::validate($valid+['address'=>array_replace($address,['city'=>''])]);throw new RuntimeException('Incomplete address accepted');}catch(ApiException $e){if($e->status!==422)throw $e;$count++;}
 foreach(['super_admin','clinic_admin','reception'] as $role){ClientService::authorize(new AuthContext(1,1,'','test@example.com','Test','staff',[$role]));$count++;}
+foreach(['super_admin','clinic_admin','reception'] as $role){ClientService::authorizeCreate(new AuthContext(1,1,'','test@example.com','Test','staff',[$role]));$count++;}
+$creator=new AuthContext(1,1,'','test@example.com','Test','staff',['practitioner'],['add_clients']);
+ClientService::authorizeCreate($creator);$count++;
+ClientService::validatePractitionerCreation($creator,['given_name'=>'New','family_name'=>'Client','email'=>'new@example.test']);$count++;
+foreach([['confirm_possible_duplicate'=>true],['administrative_notes'=>'note'],['status'=>'inactive'],['preferred_contact'=>'phone']] as $unsafe){
+    try{ClientService::validatePractitionerCreation($creator,$unsafe);throw new RuntimeException('Practitioner client creation accepted an unsafe field');}catch(ApiException $e){if($e->status!==422)throw $e;$count++;}
+}
+try{ClientService::authorize($creator);throw new RuntimeException('Practitioner gained client administration access');}catch(ApiException $e){if($e->status!==403)throw $e;$count++;}
+foreach([new AuthContext(1,1,'','','','staff',['practitioner']),new AuthContext(1,1,'','','','staff',[],['add_clients']),new AuthContext(1,1,'','','','client',['practitioner'],['add_clients'])] as $denied){
+    try{ClientService::authorizeCreate($denied);throw new RuntimeException('Unauthorized client creator accepted');}catch(ApiException $e){if($e->status!==403)throw $e;$count++;}
+}
 ClientService::authorizeMerge(new AuthContext(1,1,'','test@example.com','Test','staff',['super_admin']));$count++;
 try{ClientService::authorizeMerge(new AuthContext(1,1,'','test@example.com','Test','staff',['clinic_admin']));throw new RuntimeException('Unauthorized merge accepted');}catch(ApiException $e){if($e->status!==403)throw $e;$count++;}
 foreach([['staff',['practitioner']],['staff',['accounting']],['client',['super_admin']],['staff',[]]] as [$type,$roles]){

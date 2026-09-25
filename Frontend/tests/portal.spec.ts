@@ -2082,6 +2082,42 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   ).toBeVisible();
 });
 
+test("permitted practitioner adds a booking client and emails a portal invitation without identity approval", async ({ page }) => {
+  await fixtures(page, ["practitioner"], ["add_clients"]);
+  const created: Record<string, unknown>[] = [];
+  const invitations: Record<string, unknown>[] = [];
+  await page.route("**/api/v1/appointments?**", route => route.fulfill({ json: { data: [] } }));
+  await page.route("**/api/v1/booking-options?**", route => route.fulfill({ json: { data: { rooms: [], default_location_id: 1, combinations: [{
+    location_id: 1, location_name: "Mobile area", timezone: "America/Toronto", service_id: 2, service_name: "Massage", requires_room: 0,
+    offers_mobile: 1, offers_clinic: 0, travel_buffer_minutes: 30, mobile_fee_cents: 0, base_price_cents: 10000,
+    practitioner_id: 3, practitioner_name: "Test Practitioner", duration_option_id: 4, duration_minutes: 60,
+  }] } } }));
+  await page.route("**/api/v1/clients", route => {
+    created.push(route.request().postDataJSON());
+    return route.fulfill({ json: { data: { id: 42, display_name: "New Client", email: "new-client@example.test", phone: "9055550100" } } });
+  });
+  await page.route("**/api/v1/clients/42/invitations", route => {
+    invitations.push(route.request().postDataJSON());
+    return route.fulfill({ json: { data: { id: 7, token: "a".repeat(64), delivery: "email_accepted" } } });
+  });
+  page.on("dialog", dialog => void dialog.accept());
+  await page.goto(`${portalHost}/practitioner/schedule`);
+  await page.getByRole("button", { name: "Book appointment", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Add new client" })).toBeVisible();
+  await page.getByRole("button", { name: "Add new client" }).click();
+  await page.getByRole("textbox", { name: "First name" }).fill("New");
+  await page.getByRole("textbox", { name: "Last name" }).fill("Client");
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("new-client@example.test");
+  await page.getByRole("button", { name: "Save new client" }).click();
+  await expect(page.getByText("Selected client")).toBeVisible();
+  await page.getByRole("button", { name: "Send portal invitation email" }).click();
+  await expect(page.getByText(/mail provider accepted the invitation/i)).toBeVisible();
+  expect(created).toMatchObject([{ given_name: "New", family_name: "Client", email: "new-client@example.test", preferred_contact: "email" }]);
+  expect(invitations).toEqual([{ delivery: "email" }]);
+  await expect(page.getByRole("link", { name: "Clients" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Approve client link" })).toHaveCount(0);
+});
+
 test("delegated scheduling permission allows a practitioner to choose another practitioner", async ({
   page,
 }) => {

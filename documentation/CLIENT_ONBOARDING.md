@@ -190,7 +190,7 @@ contain exception class + correlation ID, not SQL values, proofs or stack argume
    `auth_time`/object-ID evidence. Turn the flag off and resolve provider configuration;
    do not weaken the check. Local tests cannot establish what the live provider emits.
 6. Test new registration, refresh/profile save, client-created duplicate email refusal,
-   staff-issued invitation, manual delivery, pending privacy, review-code + independent
+   staff-issued invitation, email and manual delivery, pending privacy, review-code + independent
    verification approval, own appointments, logout and both timeout limits. Repeat
    staff booking/practitioner access checks. Use synthetic development records only.
 7. Revert the flag to false if acceptance fails. Roll back matching code packages if
@@ -224,10 +224,21 @@ With a synthetic linked client account:
    number visible so clients have a reference even if email delivery is delayed.
 
 Existing client invitations are in **Clients → edit a client → Client portal access**.
-Links expire after 48 hours and are displayed once; send them manually through a known
-channel. The customer gives staff the review code during independent verification.
+Authorized staff may email the private link through the configured Wellness mailbox or copy
+it for manual delivery through a known channel. A mail-provider acceptance is not proof
+of inbox delivery. Links expire after 48 hours and are displayed once only when manual
+delivery is needed. The customer gives staff the review code during independent verification.
 Expired pending claims remain pending until staff reject/revoke or replace the invitation;
 this intentionally avoids offering a new duplicate registration while a claim is unresolved.
+
+Selected practitioners may be granted the `add_clients` permission by a Super Admin after
+applying `019_practitioner_client_creation.sql`. In their own booking form, they can create
+a client record, select it for booking, and explicitly email that new client an invitation.
+The permission does not expose the full Clients list, permit editing existing client
+records, or approve identity links. A practitioner can reissue an invitation only for a
+client they created; the API checks the audited creation event. Clinic administration or
+reception still performs independent identity verification and link approval. If Graph
+does not accept the invitation email, the one-time link is returned for manual delivery.
 
 Optional daily bounded cleanup: `api/database/maintenance/purge_expired_customer_sessions.sql`.
 It removes old expired challenges/rate buckets/sessions only, never clinical/link/audit data.

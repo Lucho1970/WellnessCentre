@@ -9,7 +9,7 @@ export function ClientInvitations({ clientId, request }: { clientId: number; req
   const { t } = useTranslation();
   const [items, setItems] = useState<Invitation[]>([]), [linked, setLinked] = useState(false);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [link, setLink] = useState('');
-  const [code, setCode] = useState(''), [verified, setVerified] = useState(false);
+  const [code, setCode] = useState(''), [verified, setVerified] = useState(false), [deliveryNotice, setDeliveryNotice] = useState('');
   const [refresh, setRefresh] = useState(0);
   useUnsavedChanges(code.trim() !== '' || verified);
   useEffect(() => {
@@ -20,10 +20,11 @@ export function ClientInvitations({ clientId, request }: { clientId: number; req
     return () => controller.abort();
   }, [clientId, request, refresh]);
   const run = async (action: () => Promise<void>) => { setBusy(true); setError(''); try { await action(); setCode(''); setVerified(false); setRefresh(v => v + 1); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to update invitation.')); } finally { setBusy(false); } };
-  const issue = () => void run(async () => {
+  const issue = (delivery: 'email' | 'manual') => void run(async () => {
     if (!window.confirm(t('Create a new invitation? Previous invitations and pending claims for this client will be revoked.'))) return;
-    const result = await request(`/${clientId}/invitations`, { method: 'POST', body: '{}' });
-    setLink(`${portalLink('client/invite')}#token=${result.token}`);
+    const result = await request(`/${clientId}/invitations`, { method: 'POST', body: JSON.stringify({ delivery }) });
+    setDeliveryNotice(result.delivery === 'email_accepted' ? t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.') : delivery === 'email' ? t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.') : '');
+    setLink(result.delivery === 'email_accepted' ? '' : `${portalLink('client/invite')}#token=${result.token}`);
   });
   const review = (id: number, action: string) => void run(async () => {
     if (!window.confirm(t(action === 'approve' ? 'Approve this identity link?' : 'Reject/revoke this invitation?'))) return;
@@ -32,9 +33,10 @@ export function ClientInvitations({ clientId, request }: { clientId: number; req
   });
   return <Stack spacing={2} mt={3}>
     <Divider /><Typography variant="h6">{t('Client portal access')}</Typography>
-    <Typography variant="body2">{t('Invitation links are copied and sent manually. No email is sent by this application. Confirm the recipient through an established contact channel.')}</Typography>
+    <Typography variant="body2">{t('Send a private invitation email or copy the one-time link. The client cannot view records until staff independently verify and approve the identity link.')}</Typography>
     {error && <Alert severity="warning">{error}</Alert>}
-    {ready && (linked ? <Alert severity="success">{t('This client record has an approved customer identity link.')}</Alert> : <Button disabled={busy} onClick={issue}>{t('Create invitation (48 hours)')}</Button>)}
+    {deliveryNotice && <Alert severity={link ? 'warning' : 'info'}>{deliveryNotice}</Alert>}
+    {ready && (linked ? <Alert severity="success">{t('This client record has an approved customer identity link.')}</Alert> : <Stack direction="row" gap={1}><Button disabled={busy} onClick={() => issue('email')}>{t('Send portal invitation email')}</Button><Button disabled={busy} onClick={() => issue('manual')}>{t('Create invitation link (48 hours)')}</Button></Stack>)}
     {link && <><TextField label={t('Private invitation link — shown only now')} value={link} slotProps={{ input: { readOnly: true } }} /><Button onClick={() => void navigator.clipboard.writeText(link).catch(() => setError(t('Select and copy the link manually.')))}>{t('Copy invitation link')}</Button></>}
     {items.map(item => <Stack key={item.id} spacing={1} sx={{ p: 2, border: '1px solid', borderColor: 'divider' }}>
       <Typography>{t('Invitation #{{id}} · {{status}} · Expires {{expires}} UTC',{id:item.id,status:item.revoked_at?t('Revoked'):item.claim_status??t('Awaiting acceptance'),expires:item.expires_at})}</Typography>
