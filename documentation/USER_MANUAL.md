@@ -93,7 +93,7 @@ Create the Microsoft Entra account and assign the required practitioner applicat
 
 Open **My profile → Appointment notifications** to opt into email notices when an appointment is booked, changed, or canceled on your schedule. Choose the work sign-in email, a verified personal email, or both. To use a personal email, save it, request a verification code, enter the eight-digit code from that inbox, then select it as a destination and save again. Changing the personal address requires re-verification and never changes your Microsoft sign-in.
 
-You can save a mobile number and request SMS notices, but **no texts are sent yet**. The profile shows this as inactive until the clinic has an approved and tested SMS provider. Appointment emails include the time and a portal link, not client or visit details. Disabling email or changing an address before a queued notice is delivered cancels that pending staff notice.
+You can save a Canadian mobile number and request SMS notices. The profile shows whether SMS delivery is active for the clinic; when active, opted-in practitioners receive appointment texts. Appointment emails include the time and a portal link, not client or visit details. Disabling email or changing an address before a queued notice is delivered cancels that pending staff notice.
 
 ### My calendar
 

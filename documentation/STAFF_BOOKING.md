@@ -33,7 +33,7 @@ The confirm button is guarded against duplicate clicks. A failed or unreadable r
 
 No database migration is needed. Deploy the new frontend and private API together. Preserve the private `.env` and public `api/` folder. If installing a full private-API package, replace its complete `vendor` folder together: do not mix generated Composer files from different packages. The public API entry files are included for completeness.
 
-Email confirmation is queued by the API, but email delivery remains disabled. The interface tells staff to arrange confirmation directly. Public client confirmation and payments are not part of this checkpoint; later practitioner appointment capabilities are documented separately.
+Current status: the API queues appointment confirmations and attempts email delivery immediately after booking, with the 15-minute worker as backup. Staff should still verify the booking in the appointment list if an email is delayed or fails. Public client booking and practitioner appointment management were added after this original checkpoint; payments remain separate work.
 
 ## Verification and development acceptance
 

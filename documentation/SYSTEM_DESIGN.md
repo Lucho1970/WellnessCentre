@@ -334,7 +334,7 @@ Do not cache API/auth responses in a service worker. Cache only explicitly selec
 
 ## 8. Background work, communications and integration boundaries
 
-Notification records and an email delivery worker exist. A VoIP.ms staff-SMS adapter is staged but disabled pending A2P approval and live verification; client SMS and a complete reminder service do not yet exist. Continue toward a durable, provider-neutral worker using pending/leased/delivered/failed states, attempt counts, next-attempt time, lease expiry, retry backoff and dead-letter/operator review. Use an atomic MySQL-5.7-compatible claim mechanism; do not assume `SKIP LOCKED` support. Jobs must be idempotent, bounded and recover from process interruption.
+Notification records, immediate post-booking dispatch, and a scheduled email/SMS delivery worker exist. VoIP.ms staff SMS has passed a live Canadian-number test and is gated by clinic configuration and practitioner opt-in; client SMS and a complete reminder service do not yet exist. Continue toward a durable, provider-neutral worker using pending/leased/delivered/failed states, attempt counts, next-attempt time, lease expiry, retry backoff and dead-letter/operator review. Use an atomic MySQL-5.7-compatible claim mechanism; do not assume `SKIP LOCKED` support. Jobs must be idempotent, bounded and recover from process interruption.
 
 Import commits use the same bounded-worker principles but a separate queue/state machine and dedicated permission. An import worker never selects a newer upload or mapping after approval: it consumes the frozen dry-run revision and checksum. Pause on tenant/scope mismatch, changed source revision, excessive error threshold or unreconciled domain failure, and require an authorized review before resuming.
 

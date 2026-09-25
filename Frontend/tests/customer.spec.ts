@@ -725,7 +725,7 @@ test("linked client books only for the signed-in client through the customer API
   await page.getByRole("button", { name: "Confirm appointment" }).click();
   await expect(
     page.getByText(
-      "Appointment #91 confirmed. Confirmation email is queued; delivery is not yet enabled.",
+      "Appointment #91 confirmed. A confirmation email is being sent.",
     ),
   ).toBeVisible();
   expect(confirmations).toBe(1);

@@ -219,8 +219,9 @@ With a synthetic linked client account:
    event. Race the last offered slot from two sessions and verify only one succeeds.
 6. Change price, assignment, availability, room or coverage after search but before
    confirmation; verify confirmation fails safely and requires refreshed choices.
-7. Repeat in English/French, mobile/desktop and after session expiry. Email remains queued
-   but unsent, so retain the explicit appointment-number notice and operational follow-up.
+7. Repeat in English/French, mobile/desktop and after session expiry. Confirmation email
+   is attempted after booking, with the scheduled worker as backup. Keep the appointment
+   number visible so clients have a reference even if email delivery is delayed.
 
 Existing client invitations are in **Clients → edit a client → Client portal access**.
 Links expire after 48 hours and are displayed once; send them manually through a known

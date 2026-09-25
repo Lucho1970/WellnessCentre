@@ -172,7 +172,7 @@ The user-facing term for a practitioner travelling to the client is **On-Site**.
 ## 11. Deferred integrations and extensions (retained)
 
 - **EXT-01:** Optional Outlook/Microsoft 365 then Google Calendar integration; start busy-only inbound conflict blocking and privacy-safe outbound events. Revocable iCal subscription/export may precede full sync. Per-user consent, minimal scopes, connection health, encrypted credentials, retry/revocation and clear source of truth. External event edits never silently cancel internal appointments. No personal titles/attendees or client/address details copied unnecessarily.
-- **EXT-02:** Staff personal-email verification and opt-in practitioner appointment emails are implemented. A VoIP.ms staff-SMS adapter is staged behind a default-off deployment switch; live delivery remains pending A2P approval, credential configuration, and an authorized end-to-end test. Client SMS, Apple/Meta sign-in, optional client email authentication, online payments, and QuickBooks expansion remain tracked follow-on work, not forgotten requirements.
+- **EXT-02:** Staff personal-email verification and opt-in practitioner appointment emails are implemented. VoIP.ms practitioner SMS is enabled for opted-in Canadian numbers and has passed a live delivery test; US delivery and applicable registration requirements remain out of scope. Client SMS, Apple/Meta sign-in, optional client email authentication, online payments, and QuickBooks expansion remain tracked follow-on work, not forgotten requirements.
 - **EXT-03:** Multi-centre expansion, native apps, telehealth, advanced analytics, document-sharing expansion, full payroll/tax filing and AI assistance require separate approved scopes, privacy/security review and operational budgets.
 
 ## 12. Verified source baseline versus remaining work
@@ -182,8 +182,8 @@ public availability preferences into the client portal, choose or revise care de
 validate an On-Site destination, search current availability, review the current price and
 confirm an appointment for self. The API derives the client from the signed identity link,
 rejects browser-supplied client IDs and reuses the locked/idempotent booking transaction.
-Selection is not a hold. Client cancellation/rescheduling and actual notification delivery
-remain pending, so this slice must not be opened as an unattended production workflow.
+Selection is not a hold. Client cancellation/rescheduling and appointment email delivery
+were added in later slices; this paragraph records the original checkpoint rather than current availability.
 
 **21 September 2026 client appointment-management slice:** linked clients can now review an
 upcoming appointment and use the shared locked appointment mutation path to reschedule or
@@ -192,8 +192,8 @@ client's appointment, excludes the current appointment from replacement-slot con
 uses optimistic versions and records client cancellation status/history/audit/notification
 events. Cancellation policy windows and fee consequences are not yet calculated; the client
 UI states this explicitly. Hosted MySQL race acceptance remains pending. A Graph appointment
-email worker has since been implemented but actual sending remains pending mailbox/tenant
-configuration, migration, scheduled execution, and hosted acceptance (see `EMAIL_DELIVERY.md`).
+email worker, immediate dispatch, and scheduled fallback have since been implemented and
+live email delivery tested (see `EMAIL_DELIVERY.md`).
 
 **20 September 2026 public-content slice:** the public site now has a bilingual,
 version-controlled Markdown content layer with validated metadata, safe rendering, SEO

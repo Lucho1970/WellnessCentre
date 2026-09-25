@@ -257,8 +257,8 @@ const en = {
   "Review appointment": "Review appointment",
   "Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.":
     "Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.",
-  "Availability is checked again when you confirm. Email delivery is not enabled yet; arrange confirmation directly with the client.":
-    "Availability is checked again when you confirm. Email delivery is not enabled yet; arrange confirmation directly with the client.",
+  "Availability is checked again when you confirm. A confirmation email will be sent to the client.":
+    "Availability is checked again when you confirm. A confirmation email will be sent to the client.",
   "Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.":
     "Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.",
   Cancel: "Cancel",
@@ -649,8 +649,8 @@ const en = {
   "The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.":
     "The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.",
   "Request failed (HTTP {{status}}).": "Request failed (HTTP {{status}}).",
-  "Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.":
-    "Appointment #{{id}} confirmed. Confirmation email is queued; delivery is not yet enabled.",
+  "Appointment #{{id}} confirmed. A confirmation email is being sent.":
+    "Appointment #{{id}} confirmed. A confirmation email is being sent.",
   "Address unavailable": "Address unavailable",
   "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)":
     "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)",
@@ -880,8 +880,8 @@ const en = {
   Unavailable: "Unavailable",
   "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
     "Choose a service, practitioner, and visit type. No time is reserved until you confirm.",
-  "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.":
-    "Availability is checked again when you confirm. Email delivery is not enabled yet, so keep the appointment number shown after confirmation.",
+  "Availability is checked again when you confirm. We will email your confirmation; keep the appointment number for reference.":
+    "Availability is checked again when you confirm. We will email your confirmation; keep the appointment number for reference.",
   "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
     "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.",
   "Unable to load booking options.": "Unable to load booking options.",

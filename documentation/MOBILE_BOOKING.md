@@ -29,7 +29,7 @@ checks a supplied quote against current pricing. Appointment snapshots preserve 
 price, surcharge, CAD currency, travel minutes and destination. Legacy appointments have
 unknown/null historical treatment prices; no prices are invented for them. Amounts are
 explicitly **before applicable taxes**: tax calculation, invoicing and payment remain future
-work. Confirmation email remains queued but not delivered by the current system.
+work. Confirmation email is now attempted after booking, with the scheduled worker as backup.
 
 ## Security and current scope
 
