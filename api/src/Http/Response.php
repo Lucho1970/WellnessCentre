@@ -6,6 +6,12 @@ namespace Wellness\Http;
 final class Response
 {
     private const STRING_IDENTIFIER_KEYS = ['object_id', 'tenant_id', 'correlation_id', 'external_id', 'source_event_id', 'home_account_id'];
+    private static ?\Closure $afterJson = null;
+
+    public static function afterJson(callable $callback): void
+    {
+        self::$afterJson = \Closure::fromCallable($callback);
+    }
 
     /**
      * PDO MySQL can return integer columns as strings. Keep the JSON contract
@@ -43,6 +49,23 @@ final class Response
         }
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(self::normalizeNumericIds($payload), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        if (self::$afterJson !== null) {
+            $callback = self::$afterJson;
+            self::$afterJson = null;
+            ignore_user_abort(true);
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } elseif (function_exists('litespeed_finish_request')) {
+                litespeed_finish_request();
+            } else {
+                // Some shared hosts cannot detach PHP from the request. The
+                // committed booking remains successful even if this takes time.
+                while (ob_get_level() > 0) ob_end_flush();
+                flush();
+            }
+            try { $callback(); }
+            catch (\Throwable $e) { error_log('Wellness immediate notification failed: ' . get_class($e)); }
+        }
         exit;
     }
 

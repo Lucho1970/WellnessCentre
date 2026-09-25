@@ -16,15 +16,16 @@ final class NotificationWorker
     ) {}
 
     /** @return array{sent:int,retry:int,review:int,canceled:int} */
-    public function run(int $limit = 20): array
+    public function run(int $limit = 20, ?int $appointmentId = null): array
     {
         $limit = max(1, min(100, $limit));
+        if ($appointmentId !== null && $appointmentId < 1) throw new \InvalidArgumentException('Invalid appointment ID.');
         // The former worker might have reached Graph before stopping. Never resend
         // an expired lease automatically because Graph sendMail is not idempotent.
         $this->pdo->exec("UPDATE notification_events SET status='needs_review',lease_token=NULL,leased_until=NULL,last_error='Worker stopped while sending; delivery outcome is unknown' WHERE status='sending' AND leased_until<UTC_TIMESTAMP()");
         $summary = ['sent' => 0, 'retry' => 0, 'review' => 0, 'canceled' => 0];
         for ($processed = 0; $processed < $limit; $processed++) {
-            $event = $this->claim();
+            $event = $this->claim($appointmentId);
             if ($event === null) break;
             try {
                 $details = $this->details((int)$event['id']);
@@ -81,12 +82,13 @@ final class NotificationWorker
         return match (min(4, max(1, $attempt))) { 1 => 60, 2 => 300, 3 => 900, default => 3600 };
     }
 
-    private function claim(): ?array
+    private function claim(?int $appointmentId): ?array
     {
         $this->pdo->beginTransaction();
         try {
             $channels = $this->sms === null ? "channel='email'" : "(channel='email' OR (channel='sms' AND event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation')))";
-            $query = $this->pdo->query("SELECT id,channel,recipient_address,attempt_count FROM notification_events WHERE {$channels} AND status IN ('queued','failed') AND scheduled_at<=UTC_TIMESTAMP() AND (next_attempt_at IS NULL OR next_attempt_at<=UTC_TIMESTAMP()) AND attempt_count<5 ORDER BY scheduled_at,id LIMIT 1 FOR UPDATE");
+            $query = $this->pdo->prepare("SELECT id,channel,recipient_address,attempt_count FROM notification_events WHERE {$channels} AND status IN ('queued','failed') AND scheduled_at<=UTC_TIMESTAMP() AND (next_attempt_at IS NULL OR next_attempt_at<=UTC_TIMESTAMP()) AND attempt_count<5" . ($appointmentId === null ? '' : ' AND appointment_id=:appointment') . ($appointmentId === null ? ' ORDER BY scheduled_at,id' : " ORDER BY CASE WHEN channel='sms' THEN 0 ELSE 1 END,scheduled_at,id") . ' LIMIT 1 FOR UPDATE');
+            $query->execute($appointmentId === null ? [] : ['appointment' => $appointmentId]);
             $event = $query->fetch(PDO::FETCH_ASSOC);
             if ($event === false) { $this->pdo->commit(); return null; }
             $token = bin2hex(random_bytes(16));

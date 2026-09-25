@@ -33,6 +33,11 @@ if (($argv[1] ?? '') === '--probe-204') {
     Response::json(['must_not_be_written' => true], 204, 'response-test-id');
 }
 
+if (($argv[1] ?? '') === '--probe-after-json') {
+    Response::afterJson(static function (): void { file_put_contents((string)getenv('WELLNESS_AFTER_JSON_TEST_FILE'), 'called'); });
+    Response::json(['data' => ['ok' => true]], 201, 'response-test-id');
+}
+
 $checks = 0;
 function check(bool $ok, string $message): void
 {
@@ -49,6 +54,22 @@ $error = stream_get_contents($pipes[2]);
 fclose($pipes[1]); fclose($pipes[2]);
 check(proc_close($probe) === 0 && $error === '', 'Response probe failed: ' . $error);
 check($result['status'] === 204 && $result['body'] === '', '204 emitted content before the HTTP server could suppress it.');
+
+$afterJsonFile = tempnam(sys_get_temp_dir(), 'wellness-after-json-');
+if ($afterJsonFile === false) throw new RuntimeException('Cannot create response test file.');
+try {
+    putenv('WELLNESS_AFTER_JSON_TEST_FILE=' . $afterJsonFile);
+    $probe = proc_open([PHP_BINARY, __FILE__, '--probe-after-json'], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    if (!is_resource($probe)) throw new RuntimeException('Cannot run post-response probe.');
+    fclose($pipes[0]);
+    $body = stream_get_contents($pipes[1]);
+    $error = stream_get_contents($pipes[2]);
+    fclose($pipes[1]); fclose($pipes[2]);
+    check(proc_close($probe) === 0 && $error === '', 'Post-response probe failed: ' . $error);
+    check(json_decode($body, true) === ['data' => ['ok' => true]] && file_get_contents($afterJsonFile) === 'called', 'Post-response callback did not run after JSON output.');
+} finally {
+    unlink($afterJsonFile);
+}
 
 $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
 if ($socket === false) throw new RuntimeException($error);
