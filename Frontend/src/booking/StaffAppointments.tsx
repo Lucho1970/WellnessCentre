@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, Grid, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
-import { CalendarPlus, RefreshCw } from 'lucide-react';
+import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, Drawer, FormControlLabel, Grid, IconButton, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
+import { CalendarClock, CalendarPlus, CalendarX, Eye, RefreshCw, X } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
@@ -41,7 +41,12 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   const [listError, setListError] = useState('');
   const [notice, setNotice] = useState('');
   const [creating, setCreating] = useState(false);
-  const [managing, setManaging] = useState<Appointment | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [managing, setManaging] = useState<{ appointment: Appointment; action: 'reschedule' | 'cancel' } | null>(null);
+  const selected = appointments.find(item => item.id === selectedId) ?? null;
+  const canChangeSelected = Boolean(!creating && canBook && selected && ['requested','confirmed','rescheduled'].includes(selected.status) && new Date(`${selected.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now());
+  useEffect(() => { if (detailsOpen && !selected) setDetailsOpen(false); }, [detailsOpen, selected]);
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
     const response = await fetch(`${api}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
@@ -54,60 +59,76 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   useEffect(() => {
     const controller = new AbortController(); setListBusy(true); setListError('');
     void request(`/appointments?view=${view}&page=${page}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
-      .then(data => { if (!controller.signal.aborted) setAppointments(data); })
+      .then(data => { if (!controller.signal.aborted) { setAppointments(data); setSelectedId(current => data.some((item: Appointment) => item.id === current) ? current : null); } })
       .catch(error => { if (!controller.signal.aborted) setListError(error.message); })
       .finally(() => { if (!controller.signal.aborted) setListBusy(false); });
     return () => controller.abort();
   }, [request, view, page, refresh, practitionerMode]);
-  return <Stack spacing={3}>
-    <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between">
-      <Box><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Times are shown in each clinic location’s timezone.')}</Typography></Box>
-      {canBook && !creating && <Button variant="contained" startIcon={<CalendarPlus size={18} />} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
-    </Stack>
+  const startChange = (action: 'reschedule' | 'cancel') => { if (!selected || !canChangeSelected) return; setCreating(false); setDetailsOpen(false); setManaging({ appointment: selected, action }); };
+  return <Stack spacing={2}>
+    <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Appointment actions')} direction={{ xs: 'column', md: 'row' }} gap={1} alignItems={{ md: 'center' }}>
+      {canBook && <Button variant="contained" startIcon={<CalendarPlus size={17}/>} disabled={creating} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
+      <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
+      <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={() => setDetailsOpen(true)}>{t('More details')}</Button>
+      {canBook && <><Button startIcon={<CalendarClock size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" startIcon={<CalendarX size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button></>}
+      <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); setSelectedId(null); setDetailsOpen(false); }} sx={{ ml: { md: 'auto' }, minWidth: { md: 170 } }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
+      <Button startIcon={<RefreshCw size={16}/>} disabled={listBusy} onClick={() => setRefresh(value => value + 1)}>{t('Refresh')}</Button>
+    </Stack></Paper>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
     {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
-    {managing && <ManageAppointment appointment={managing} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
-    <Paper variant="outlined" sx={{ p: 3 }}>
-      <Stack direction="row" gap={2} justifyContent="space-between" mb={2}>
-        <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
-        <Button startIcon={<RefreshCw size={16} />} disabled={listBusy} onClick={() => setRefresh(value => value + 1)}>{t('Refresh')}</Button>
-      </Stack>
+    {managing && <ManageAppointment key={`${managing.appointment.id}-${managing.action}`} appointment={managing.appointment} initialAction={managing.action} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
+    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+      <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.')}</Typography></Box>
       {listError && <Alert severity="error">{listError}</Alert>}
-      {listBusy ? <CircularProgress aria-label={t('Loading appointments')} /> : !listError && <Stack spacing={2}>
-        {appointments.length === 0 && <Typography color="text.secondary">{t('No appointments in this view.')}</Typography>}
-        {appointments.map(item => <Box key={item.id} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-          <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={700}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>
-          <Typography>{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography>
-          {item.delivery_mode==='mobile'&&<><Chip label={t('On-Site (client location)')} color="info" size="small"/><Typography>{addressText(item.destination_snapshot, t('Address unavailable'))}</Typography><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after',{minutes:item.travel_buffer_minutes})}</Typography></>}
-          {item.base_price_cents!==null&&item.base_price_cents!==undefined&&<Typography variant="body2">{t('Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)', { treatment: formatCad(Number(item.base_price_cents), i18n.resolvedLanguage), mobile: formatCad(Number(item.mobile_fee_cents), i18n.resolvedLanguage) })}</Typography>}
-          <Typography color="text.secondary">{item.practitioner_name} · {item.location_name}{item.room_name ? ` · ${item.room_name}` : ''} · #{item.id}</Typography>
-          {canBook && ['requested','confirmed','rescheduled'].includes(item.status) && new Date(`${item.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now() && <Button size="small" onClick={() => { setCreating(false); setManaging(item); }}>{t('Change appointment')}</Button>}
-        </Box>)}
-        <Stack direction="row" justifyContent="space-between" alignItems="center"><Button disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}',{page})}</Typography><Button disabled={appointments.length < 50} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
+      {listBusy ? <Box sx={{ p: 3 }}><CircularProgress aria-label={t('Loading appointments')} /></Box> : !listError && <Stack>
+        <List disablePadding aria-label={t('Appointments')}>
+          {appointments.map(item => <ListItemButton key={item.id} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} divider sx={{ py: 1.75, px: 2.5 }}>
+            <ListItemText primary={<Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={750}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>} secondary={<Stack><Typography variant="body2" color="text.secondary">{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography><Typography variant="body2" color="text.secondary">{item.practitioner_name} · {item.location_name} · #{item.id}</Typography></Stack>} />
+          </ListItemButton>)}
+          {appointments.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography color="text.secondary">{t('No appointments in this view.')}</Typography></Box>}
+        </List>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2 }}><Button disabled={page === 1} onClick={() => { setPage(value => value - 1); setSelectedId(null); setDetailsOpen(false); }}>{t('Previous')}</Button><Typography>{t('Page {{page}}',{page})}</Typography><Button disabled={appointments.length < 50} onClick={() => { setPage(value => value + 1); setSelectedId(null); setDetailsOpen(false); }}>{t('Next')}</Button></Stack>
       </Stack>}
     </Paper>
+    <Drawer anchor="right" open={detailsOpen && Boolean(selected)} onClose={() => setDetailsOpen(false)} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
+      {selected && <><Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t('Appointment details')}</Typography><Typography variant="h5">{selected.client_name} · {selected.service_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={() => setDetailsOpen(false)}><X/></IconButton></Stack><Stack spacing={2} sx={{ p: 3, overflowY: 'auto' }}>
+        {[[t('Status'), t(selected.status.replaceAll('_', ' '))], [t('Starts'), displayTime(selected.starts_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Ends'), displayTime(selected.ends_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Practitioner'), selected.practitioner_name], [t('Location'), selected.location_name], [t('Room'), selected.room_name || t('Not set')], [t('Visit type'), t(selected.delivery_mode === 'mobile' ? 'On-Site (client location)' : 'In clinic')], [t('Appointment ID'), String(selected.id)]].map(([label, value]) => <Box key={label}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}
+        {selected.delivery_mode === 'mobile' && <><Box><Typography variant="caption" color="text.secondary">{t('Visit address')}</Typography><Typography fontWeight={600}>{addressText(selected.destination_snapshot, t('Address unavailable')) || t('Address unavailable')}</Typography></Box><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after', { minutes: selected.travel_buffer_minutes })}</Typography></>}
+        {selected.base_price_cents !== null && selected.base_price_cents !== undefined && <Typography variant="body2">{t('Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)', { treatment: formatCad(Number(selected.base_price_cents), i18n.resolvedLanguage), mobile: formatCad(Number(selected.mobile_fee_cents), i18n.resolvedLanguage) })}</Typography>}
+        {canBook && <Stack direction="row" gap={1}><Button disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button></Stack>}
+      </Stack></>}
+    </Drawer>
   </Stack>;
 }
 
-type ManageProps = { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; canAssessFees: boolean; canManageFees: boolean; close: () => void; complete: (message: string) => void };
-function ManageAppointment({ appointment, request, canAssessFees, canManageFees, close, complete }: ManageProps) {
+type ManageProps = { appointment: Appointment; initialAction: 'reschedule' | 'cancel'; request: (path: string, init?: RequestInit) => Promise<any>; canAssessFees: boolean; canManageFees: boolean; close: () => void; complete: (message: string) => void };
+function ManageAppointment({ appointment, initialAction, request, canAssessFees, canManageFees, close, complete }: ManageProps) {
   const { t, i18n } = useTranslation();
   const appointmentDate = new Intl.DateTimeFormat('en-CA', { timeZone: appointment.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(`${appointment.starts_at.replace(' ', 'T')}Z`));
-  const [action, setAction] = useState<'choose'|'reschedule'|'cancel'>('choose');
+  const action = initialAction;
   const [date, setDate] = useState(appointmentDate);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [room, setRoom] = useState(appointment.room_id ? String(appointment.room_id) : '');
   const [reason, setReason] = useState('');
   const [searched, setSearched] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(initialAction === 'cancel');
   const [error, setError] = useState('');
   const [cancellation, setCancellation] = useState<CancellationPreview | null>(null);
   const [clientRequested, setClientRequested] = useState(false);
   const [adjustedFee, setAdjustedFee] = useState('');
-  useUnsavedChanges(date !== appointmentDate || slot !== null || room !== (appointment.room_id ? String(appointment.room_id) : '') || reason.trim() !== '');
+  const dirty = date !== appointmentDate || slot !== null || room !== (appointment.room_id ? String(appointment.room_id) : '') || reason.trim() !== '' || clientRequested || (cancellation !== null && adjustedFee !== (Number(cancellation.fee_cents)/100).toFixed(2));
+  useUnsavedChanges(dirty);
+  const closeSafely = () => { if (busy || (dirty && !window.confirm(t('Discard your unsaved changes?')))) return; close(); };
   const needsRoom = appointment.room_id !== null;
-  const beginCancel = async () => { setBusy(true); setError(''); try { const preview=await request(`/appointments/${appointment.id}/cancellation-preview`); setCancellation(preview); setAdjustedFee((Number(preview.fee_cents)/100).toFixed(2)); setAction('cancel'); } catch(cause) { setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); } finally { setBusy(false); } };
+  useEffect(() => {
+    if (initialAction !== 'cancel') return;
+    let active = true;
+    void request(`/appointments/${appointment.id}/cancellation-preview`).then(preview => {
+      if (active) { setCancellation(preview); setAdjustedFee((Number(preview.fee_cents)/100).toFixed(2)); }
+    }).catch(cause => { if (active) setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }).finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [appointment.id, initialAction, request, t]);
   const loadSlots = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(''); setSlots([]); setSlot(null); setSearched(false);
     try {
@@ -129,13 +150,13 @@ function ManageAppointment({ appointment, request, canAssessFees, canManageFees,
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to change the appointment.')); }
     finally { setBusy(false); }
   };
-  return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
-    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2} mb={2}>
-      <Box><Typography variant="h5">{t('Change appointment #{{id}}', { id: appointment.id })}</Typography><Typography color="text.secondary">{appointment.client_name} · {appointment.service_name}</Typography></Box>
-      <Button disabled={busy} onClick={close}>{t('Close')}</Button>
+  return <Drawer anchor="right" open onClose={closeSafely} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2} sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Box><Typography variant="overline" color="primary">{t(action === 'reschedule' ? 'Reschedule' : 'Cancel appointment')}</Typography><Typography variant="h5">{t('Appointment #{{id}}', { id: appointment.id })}</Typography><Typography color="text.secondary">{appointment.client_name} · {appointment.service_name}</Typography></Box>
+      <IconButton aria-label={t('Close panel')} disabled={busy} onClick={closeSafely}><X/></IconButton>
     </Stack>
+    <Stack spacing={2} sx={{ p: 3, overflowY: 'auto' }}>
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-    {action === 'choose' && <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}><Button variant="contained" onClick={() => setAction('reschedule')}>{t('Reschedule')}</Button><Button color="error" variant="outlined" disabled={busy} onClick={() => void beginCancel()}>{t('Cancel appointment')}</Button></Stack>}
     {action === 'reschedule' && <Stack spacing={2}>
       <Typography>{t('Choose a new available time. The client, service, location, delivery mode, duration, and price remain unchanged.')}</Typography>
       <Stack component="form" direction={{ xs: 'column', sm: 'row' }} gap={2} onSubmit={loadSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(appointment.timezone) }} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(null); setSearched(false); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
@@ -143,7 +164,7 @@ function ManageAppointment({ appointment, request, canAssessFees, canManageFees,
       <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, appointment.timezone, i18n.resolvedLanguage)}</Button>)}</Stack>
       {slot && needsRoom && <TextField select required label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(id => <MenuItem key={id} value={String(id)}>{id === Number(appointment.room_id) && appointment.room_name ? appointment.room_name : t('Room {{number}}', { number: id })}</MenuItem>)}</TextField>}
       <TextField label={t('Reason or note (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
-      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('choose')}>{t('Back')}</Button><Button variant="contained" disabled={busy || !slot || (needsRoom && !room)} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm reschedule')}</Button></Stack>
+      <Stack direction="row" gap={2}><Button disabled={busy} onClick={closeSafely}>{t('Cancel')}</Button><Button variant="contained" disabled={busy || !slot || (needsRoom && !room)} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm reschedule')}</Button></Stack>
     </Stack>}
     {action === 'cancel' && <Stack spacing={2}>
       <Alert severity="warning">{t('Canceling releases the time and room. The appointment remains in history.')}</Alert>
@@ -151,9 +172,10 @@ function ManageAppointment({ appointment, request, canAssessFees, canManageFees,
       {cancellation && <Alert severity={clientRequested && cancellation.fee_cents > 0 ? 'warning' : 'info'}>{clientRequested ? (cancellation.fee_cents > 0 ? t('The calculated policy fee is {{fee}}.', { fee: formatCad(cancellation.fee_cents, i18n.resolvedLanguage) }) : t('No cancellation fee applies.')) : t('Clinic-initiated cancellations do not assess a client fee.')}</Alert>}
       {clientRequested && canManageFees && cancellation && cancellation.fee_cents > 0 && <TextField required type="number" label={t('Assessed cancellation fee (CAD)')} value={adjustedFee} onChange={event => setAdjustedFee(event.target.value)} inputProps={{ min: 0, max: cancellation.fee_cents/100, step: .01 }} helperText={t('Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.')}/>}
       <TextField label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
-      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('choose')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy || Boolean(clientRequested && canManageFees && cancellation && Math.round(Number(adjustedFee)*100) !== Number(cancellation.fee_cents) && !reason.trim())} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
+      <Stack direction="row" gap={2}><Button disabled={busy} onClick={closeSafely}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy || !cancellation || Boolean(clientRequested && canManageFees && Math.round(Number(adjustedFee)*100) !== Number(cancellation.fee_cents) && !reason.trim())} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
     </Stack>}
-  </Paper>;
+    </Stack>
+  </Drawer>;
 }
 
 type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; cancel: () => void; complete: (id: number) => void };

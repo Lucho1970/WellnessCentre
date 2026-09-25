@@ -222,6 +222,10 @@ const fr: Record<string, string> = {
   "Contact the clinic to book or make changes.":
     "Communiquez avec la clinique pour réserver ou apporter des changements.",
   "Appointment #{{id}}": "Rendez-vous no {{id}}",
+  "Appointment actions": "Actions pour les rendez-vous",
+  "Appointment details": "Détails du rendez-vous",
+  "More details": "Plus de détails",
+  "Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.": "Sélectionnez un rendez-vous pour voir ses détails ou activer les actions. Les heures sont affichées selon le fuseau horaire de chaque clinique.",
   "Travel reserved: {{minutes}} minutes before and after":
     "Déplacement réservé : {{minutes}} minutes avant et après",
   Previous: "Précédent",

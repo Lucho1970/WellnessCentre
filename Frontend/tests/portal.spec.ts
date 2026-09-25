@@ -1939,6 +1939,37 @@ test("practitioner stores notification preferences and verifies a separate perso
   expect(preferences).toMatchObject({ email_enabled: true, email_destination: "personal", sms_requested: true });
 });
 
+test("appointment ribbon filters, refreshes, and enables actions only for a selected future booking", async ({ page }) => {
+  await fixtures(page, ["super_admin"]);
+  let listRequests = 0;
+  const base = { id: 10, client_name: "Future Client", service_name: "Massage", practitioner_name: "Esther Test", location_name: "Holland Landing", timezone: "America/Toronto", room_id: null, room_name: null, duration_option_id: 4, delivery_mode: "clinic", destination_snapshot: null, travel_buffer_minutes: 0, base_price_cents: 12000, mobile_fee_cents: 0, status: "confirmed", version: 1 };
+  const future = { ...base, starts_at: "2030-10-01 14:00:00", ends_at: "2030-10-01 15:00:00" };
+  const past = { ...base, id: 11, client_name: "Past Client", starts_at: "2020-10-01 14:00:00", ends_at: "2020-10-01 15:00:00" };
+  await page.route("**/api/v1/appointments?**", route => {
+    listRequests++;
+    const view = new URL(route.request().url()).searchParams.get("view");
+    return route.fulfill({ json: { data: view === "past" ? [past] : [future] } });
+  });
+  await page.goto(`${portalHost}/admin/appointments`);
+  await expect(page.getByRole("button", { name: "More details" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Reschedule", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: /Future Client.*Massage/ }).click();
+  await expect(page.getByRole("button", { name: "Reschedule", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "More details" }).click();
+  await expect(page.getByText("Appointment details")).toBeVisible();
+  await expect(page.getByText("Holland Landing").last()).toBeVisible();
+  await page.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("combobox", { name: "Show" }).click();
+  await page.getByRole("option", { name: "Past" }).click();
+  await expect(page.getByRole("button", { name: /Past Client.*Massage/ })).toBeVisible();
+  await page.getByRole("button", { name: /Past Client.*Massage/ }).click();
+  await expect(page.getByRole("button", { name: "Reschedule", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Cancel appointment" })).toBeDisabled();
+  const before = listRequests;
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect.poll(() => listRequests).toBeGreaterThan(before);
+});
+
 test("practitioner mobile navigation can book and change only the scoped schedule", async ({
   page,
 }) => {
@@ -2094,8 +2125,11 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   await page.getByRole("button", { name: "Select New Clinic Client" }).click();
   await expect(page.getByText("Selected client")).toBeVisible();
   await expect(page.getByText("New Clinic Client")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reschedule", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("button", { name: "Change appointment" }).click();
+  await expect(page.getByRole("button", { name: "Reschedule", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: /Existing Client.*Massage/ }).click();
+  await expect(page.getByRole("button", { name: "More details" })).toBeEnabled();
   await page.getByRole("button", { name: "Reschedule", exact: true }).click();
   await page.getByLabel("Appointment date").fill("2030-10-01");
   await page.getByRole("button", { name: "Find times", exact: true }).click();
@@ -2112,7 +2146,6 @@ test("practitioner mobile navigation can book and change only the scoped schedul
     version: 2,
     starts_at: "2030-10-01T11:00:00-04:00",
   });
-  await page.getByRole("button", { name: "Change appointment" }).click();
   await page.getByRole("button", { name: "Cancel appointment" }).click();
   await page.getByRole("button", { name: "Confirm cancellation" }).click();
   await expect(page.getByText("Appointment #10 was canceled.")).toBeVisible();

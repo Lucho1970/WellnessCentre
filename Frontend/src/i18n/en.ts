@@ -215,6 +215,10 @@ const en = {
   "Contact the clinic to book or make changes.":
     "Contact the clinic to book or make changes.",
   "Appointment #{{id}}": "Appointment #{{id}}",
+  "Appointment actions": "Appointment actions",
+  "Appointment details": "Appointment details",
+  "More details": "More details",
+  "Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.": "Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.",
   "Travel reserved: {{minutes}} minutes before and after":
     "Travel reserved: {{minutes}} minutes before and after",
   Previous: "Previous",
