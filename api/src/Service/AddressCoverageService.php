@@ -62,6 +62,7 @@ final class AddressCoverageService
             'service_id' => (int)$body['service_id'],
             'practitioner_id' => (int)$body['practitioner_id'],
             'destination_hash' => self::destinationHash($destination),
+            'origin_hash' => self::addressHash($origin),
             'distance_meters' => $distanceMeters,
             'radius_meters' => $radiusMeters,
             'iat' => time(),
@@ -79,9 +80,65 @@ final class AddressCoverageService
 
     public function verifyBooking(AuthContext $actor, array $body, array $destination): array
     {
-        $this->assertConfigured();
         $token = $body['address_validation_token'] ?? null;
-        if (!is_string($token) || $token === '') throw new ApiException(422, 'coverage_validation_required', 'Validate the visit address before booking.');
+        if (!is_string($token) || $token === '') {
+            if ($this->approvalStatus($actor, $body, $destination)['approved']) return ['staff_approved' => true];
+            throw new ApiException(422, 'coverage_validation_required', 'Validate the visit address before booking.');
+        }
+        $proof = $this->verifyToken($actor, $body, $destination, $token);
+        $rule = $this->rule($actor, $body);
+        if (($proof['origin_hash'] ?? null) !== self::addressHash($this->origin($rule)) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
+        return $proof;
+    }
+
+    public function approvalStatus(AuthContext $actor, array $body, ?array $destination = null): array
+    {
+        $this->assertCanBook($actor);
+        $clientId = $this->clientId($actor, $body);
+        $destination ??= Delivery::destination(['delivery_mode' => 'mobile', 'destination' => $body['destination'] ?? null]);
+        $rule = $this->rule($actor, $body);
+        $origin = $this->origin($rule);
+        $statement = $this->database->connection()->prepare('SELECT 1 FROM onsite_area_approvals WHERE clinic_id=:clinic AND client_id=:client AND location_id=:location AND practitioner_id=:practitioner AND service_id=:service AND destination_hash=:destination AND origin_hash=:origin AND radius_km=:radius LIMIT 1');
+        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => self::addressHash($origin), 'radius' => (int)$rule['mobile_radius_km']]);
+        return ['approved' => (bool)$statement->fetchColumn()];
+    }
+
+    public function approve(AuthContext $actor, array $body, string $correlationId): array
+    {
+        $this->assertCanApprove($actor);
+        $clientId = $this->clientId($actor, $body);
+        $destination = Delivery::destination(['delivery_mode' => 'mobile', 'destination' => $body['destination'] ?? null]);
+        $rule = $this->rule($actor, $body);
+        $origin = $this->origin($rule);
+        $token = $body['address_validation_token'] ?? null;
+        if (!is_string($token)) throw new ApiException(422, 'coverage_validation_required', 'Validate the visit address before approving it.');
+        $proof = $this->verifyToken($actor, $body, $destination, $token);
+        if (($proof['origin_hash'] ?? null) !== self::addressHash($origin) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
+        $statement = $this->database->connection()->prepare("SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'");
+        $statement->execute(['id' => $clientId, 'clinic' => $actor->clinicId]);
+        if (!$statement->fetchColumn()) throw new ApiException(422, 'invalid_client', 'Select an active client in this clinic.');
+        $statement = $this->database->connection()->prepare('INSERT INTO onsite_area_approvals(clinic_id,client_id,location_id,practitioner_id,service_id,destination_hash,origin_hash,radius_km,approved_by) VALUES(:clinic,:client,:location,:practitioner,:service,:destination,:origin,:radius,:staff) ON DUPLICATE KEY UPDATE approved_by=VALUES(approved_by),approved_at=UTC_TIMESTAMP()');
+        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => self::addressHash($origin), 'radius' => (int)$rule['mobile_radius_km'], 'staff' => $actor->userId]);
+        (new AuditLogger($this->database))->write($actor->clinicId, $actor, $correlationId, 'onsite_area.approve', 'client', $clientId, 'success', ['location_id' => (int)$body['location_id'], 'practitioner_id' => (int)$body['practitioner_id'], 'service_id' => (int)$body['service_id']]);
+        return ['approved' => true];
+    }
+
+    public function revoke(AuthContext $actor, array $body, string $correlationId): array
+    {
+        $this->assertCanApprove($actor);
+        $clientId = $this->clientId($actor, $body);
+        $destination = Delivery::destination(['delivery_mode' => 'mobile', 'destination' => $body['destination'] ?? null]);
+        $rule = $this->rule($actor, $body);
+        $statement = $this->database->connection()->prepare('DELETE FROM onsite_area_approvals WHERE clinic_id=:clinic AND client_id=:client AND location_id=:location AND practitioner_id=:practitioner AND service_id=:service AND destination_hash=:destination AND origin_hash=:origin AND radius_km=:radius');
+        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => self::addressHash($this->origin($rule)), 'radius' => (int)$rule['mobile_radius_km']]);
+        if ($statement->rowCount()) (new AuditLogger($this->database))->write($actor->clinicId, $actor, $correlationId, 'onsite_area.revoke', 'client', $clientId, 'success', ['location_id' => (int)$body['location_id'], 'practitioner_id' => (int)$body['practitioner_id'], 'service_id' => (int)$body['service_id']]);
+        return ['approved' => false];
+    }
+
+    private function verifyToken(AuthContext $actor, array $body, array $destination, string $token): array
+    {
+        $this->assertConfigured();
+        if ($token === '') throw new ApiException(422, 'coverage_validation_required', 'Validate the visit address before booking.');
         $parts = explode('.', $token);
         if (count($parts) !== 2) throw new ApiException(422, 'invalid_coverage_validation', 'The address validation is invalid. Validate the address again.');
         [$encoded, $signature] = $parts;
@@ -125,6 +182,30 @@ final class AddressCoverageService
             throw new ApiException(403, 'forbidden', 'Practitioners can only validate addresses for their own practitioner-managed appointments.');
         }
         return $rule;
+    }
+
+    private function clientId(AuthContext $actor, array $body): int
+    {
+        if ($actor->userType === 'client') {
+            if (array_key_exists('client_id', $body) && (int)$body['client_id'] !== $actor->userId) throw new ApiException(403, 'forbidden', 'Clients can only check their own address.');
+            return $actor->userId;
+        }
+        $id = (int)($body['client_id'] ?? 0);
+        if ($id < 1) throw new ApiException(422, 'validation_error', 'Select a client before checking a saved service-area approval.');
+        return $id;
+    }
+
+    private function origin(array $rule): array
+    {
+        return ['address_line1' => trim((string)($rule['address_line1'] ?? '')), 'address_line2' => trim((string)($rule['address_line2'] ?? '')), 'city' => trim((string)($rule['city'] ?? '')), 'province' => trim((string)($rule['province'] ?? '')), 'postal_code' => trim((string)($rule['postal_code'] ?? '')), 'country' => 'Canada'];
+    }
+
+    private static function addressHash(array $address): string
+    {
+        $fields = ['address_line1', 'address_line2', 'city', 'province', 'postal_code', 'country'];
+        $values = [];
+        foreach ($fields as $field) $values[$field] = strtolower(trim((string)($address[$field] ?? '')));
+        return hash('sha256', json_encode($values, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 
     private function validateAddress(array $address): array
@@ -188,6 +269,11 @@ final class AddressCoverageService
     {
         if ($actor->userType === 'client') return;
         if ($actor->userType !== 'staff' || !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception', 'practitioner')) throw new ApiException(403, 'forbidden', 'Your role cannot validate On-Site visit addresses.');
+    }
+
+    private function assertCanApprove(AuthContext $actor): void
+    {
+        if ($actor->userType !== 'staff' || !($actor->hasAnyRole('super_admin', 'clinic_admin', 'reception') || $actor->hasPermission('approve_onsite_service_area'))) throw new ApiException(403, 'forbidden', 'Only authorized clinic staff can approve an On-Site service area.');
     }
 
     private function assertConfigured(): void

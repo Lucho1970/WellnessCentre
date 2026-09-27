@@ -172,6 +172,7 @@ final class CustomerOnboarding
             // Current locking reads, not an earlier REPEATABLE READ snapshot, protect staff edits.
             $current = $this->ownProfile($identity, true);
             if (!is_string($body['revision'] ?? null) || !hash_equals($current['revision'], $body['revision'])) throw new ApiException(409, 'profile_changed', 'Your profile changed. Reload it before saving.');
+            if (json_encode($current['address'] ?? null, JSON_THROW_ON_ERROR) !== json_encode($data['address'], JSON_THROW_ON_ERROR)) $this->query('DELETE FROM onsite_area_approvals WHERE client_id=?', [$client]);
             if ($this->query('SELECT client_id FROM client_email_addresses WHERE clinic_id=? AND email=? AND client_id<>? FOR UPDATE', [$this->config->customerClinicId, $data['email'], $client])->fetchColumn()) throw new ApiException(409, 'email_in_use', 'This email is already used by another account in this clinic.');
             $this->query('UPDATE users SET given_name=?,family_name=?,display_name=?,email=? WHERE id=?', [$data['given_name'], $data['family_name'], $data['display_name'], $data['email'], $client]);
             $this->query('UPDATE client_email_addresses SET is_primary=0 WHERE client_id=?', [$client]);

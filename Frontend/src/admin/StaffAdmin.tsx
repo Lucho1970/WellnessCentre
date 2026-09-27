@@ -10,6 +10,7 @@ const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const roleOptions = ['super_admin', 'clinic_admin', 'reception', 'practitioner', 'accountant'];
 const scheduleOthers = 'schedule_for_other_practitioners';
 const addClients = 'add_clients';
+const approveOnsiteArea = 'approve_onsite_service_area';
 type Staff = { id: number; display_name: string; email: string; status: string; roles: string[]; permissions: string[] };
 type NewStaff = { display_name: string; email: string; tenant_id: string; object_id: string; role: string };
 type PanelMode = 'new' | 'details' | 'edit' | null;
@@ -136,6 +137,8 @@ export function StaffAdmin() {
               <Typography variant="body2" color="text.secondary">{t('Allows this practitioner to book, reschedule, and cancel appointments assigned to another practitioner.')}</Typography>
               <FormControlLabel control={<Checkbox checked={editing.permissions.includes(addClients)} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, addClients] : editing.permissions.filter(item => item !== addClients))}/>} label={t('Add clients and send invitations')}/>
               <Typography variant="body2" color="text.secondary">{t('Allows creation of client records and invitations for clients this practitioner created. Identity-link approval remains with clinic administration.')}</Typography>
+              <FormControlLabel control={<Checkbox checked={editing.permissions.includes(approveOnsiteArea)} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, approveOnsiteArea] : editing.permissions.filter(item => item !== approveOnsiteArea))}/>} label={t('Approve On-Site service areas')}/>
+              <Typography variant="body2" color="text.secondary">{t('Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.')}</Typography>
             </>}
           </>}
           {panelError && <Alert severity="error">{panelError}</Alert>}

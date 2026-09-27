@@ -113,6 +113,7 @@ final class ClientService
             if($id!==null){
                 $current=$this->find($actor,$id,true);
                 if(!is_string($body['revision']??null)||!hash_equals($current['revision'],$body['revision']))throw new ApiException(409,'client_changed','This client was changed by another staff member. Reopen the record before saving.');
+                if(json_encode($current['address']??null,JSON_THROW_ON_ERROR)!==json_encode($data['address'],JSON_THROW_ON_ERROR))$pdo->prepare('DELETE FROM onsite_area_approvals WHERE client_id=:client')->execute(['client'=>$id]);
             }
             $s=$pdo->prepare('SELECT client_id FROM client_email_addresses WHERE clinic_id=:clinic AND email=:email AND client_id<>:id FOR UPDATE');$s->execute(['clinic'=>$actor->clinicId,'email'=>$data['email'],'id'=>$id??0]);
             if($s->fetchColumn())throw new ApiException(409,'email_in_use','This email is already used by another account in this clinic.');
@@ -190,6 +191,7 @@ final class ClientService
             $links=$this->customerLinks([$survivorId,$duplicateId]);
             if(count(array_unique(array_column($links,'identity_id')))>1||$this->hasLegacyIdentityConflict($survivorId,$duplicateId))throw new ApiException(409,'identity_conflict','Both records are linked to different customer sign-ins. Resolve the identity links before merging.');
             $counts=$this->relationshipCounts($duplicateId);
+            $pdo->prepare('DELETE FROM onsite_area_approvals WHERE client_id IN(:survivor,:duplicate)')->execute(['survivor'=>$survivorId,'duplicate'=>$duplicateId]);
             if($profileSource==='duplicate')$this->copyProfile($duplicateId,$survivorId);
             if($addressSource==='duplicate')$this->copyAddress($duplicateId,$survivorId);
             $this->moveClientRelationships($duplicateId,$survivorId);

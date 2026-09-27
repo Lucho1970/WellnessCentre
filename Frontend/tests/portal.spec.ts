@@ -967,6 +967,11 @@ test("mobile-only booking captures destination and price without requesting a ro
       },
     });
   });
+  await page.route("**/api/v1/address-coverage/approve", (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({ client_id: 5, location_id: 1, service_id: 2, practitioner_id: 3, address_validation_token: "signed-address-proof" });
+    return route.fulfill({ json: { data: { approved: true } } });
+  });
+  page.on("dialog", (dialog) => dialog.accept());
   await page.route("**/api/v1/appointments", (route) => {
     booking = route.request().postDataJSON();
     return route.fulfill({ json: { data: { id: 99 } } });
@@ -1008,6 +1013,8 @@ test("mobile-only booking captures destination and price without requesting a ro
   await expect(
     page.getByText("Address confirmed: 8.4 km driving distance (25 km limit)."),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Approve this address for future On-Site bookings" }).click();
+  await expect(page.getByText(/No new distance check is needed/)).toBeVisible();
   await page.getByRole("button", { name: "Find a time", exact: true }).click();
   await page.getByLabel("Appointment date").fill("2030-10-01");
   await page.getByRole("button", { name: "Find times", exact: true }).click();
@@ -1025,11 +1032,11 @@ test("mobile-only booking captures destination and price without requesting a ro
   expect(booking).toMatchObject({
     delivery_mode: "mobile",
     destination: { address_line1: "123 Test Street" },
-    address_validation_token: "signed-address-proof",
     quoted_base_price_cents: 12000,
     quoted_mobile_fee_cents: 2500,
   });
   expect(booking).not.toHaveProperty("coverage_confirmed");
+  expect(booking).not.toHaveProperty("address_validation_token");
   expect(booking).not.toHaveProperty("room_id");
 });
 

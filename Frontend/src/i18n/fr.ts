@@ -788,6 +788,18 @@ const fr: Record<string, string> = {
   "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.":
     "Google valide l’adresse et calcule la distance routière depuis le lieu de départ sélectionné. L’adresse doit se trouver dans la zone de service sur place configurée.",
   "Validate address and coverage": "Valider l’adresse et la zone desservie",
+  "Clinic staff approved this address for the selected On-Site service. You can book without another distance check.": "Le personnel de la clinique a approuvé cette adresse pour le service à domicile sélectionné. Vous pouvez réserver sans nouveau calcul de distance.",
+  "Clinic staff approved this address for the selected On-Site service. No new distance check is needed.": "Le personnel de la clinique a approuvé cette adresse pour le service à domicile sélectionné. Aucun nouveau calcul de distance n’est nécessaire.",
+  "Approve this address for future On-Site bookings": "Approuver cette adresse pour de futures réservations à domicile",
+  "Saving approval…": "Enregistrement de l’approbation…",
+  "I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?": "Je confirme de façon indépendante que cette adresse respecte la politique de déplacement de la clinique pour ce praticien, ce service et ce lieu de départ. Enregistrer cette approbation pour les futures réservations?",
+  "Unable to save the On-Site approval.": "Impossible d’enregistrer l’approbation du service à domicile.",
+  "Remove On-Site approval": "Retirer l’approbation du service à domicile",
+  "Removing approval…": "Retrait de l’approbation…",
+  "Remove this On-Site approval? Future bookings will require a new distance check.": "Retirer cette approbation? Les futures réservations nécessiteront un nouveau calcul de distance.",
+  "Unable to remove the On-Site approval.": "Impossible de retirer l’approbation du service à domicile.",
+  "Approve On-Site service areas": "Approuver les zones de service à domicile",
+  "Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.": "Permet à ce praticien d’approuver une adresse de visite pour de futures réservations avec le service et le lieu de départ sélectionnés.",
   "Validating address…": "Validation de l’adresse…",
   "Address confirmed: {{distance}} km driving distance ({{radius}} km limit).":
     "Adresse confirmée : distance routière de {{distance}} km (limite de {{radius}} km).",

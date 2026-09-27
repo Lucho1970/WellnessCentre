@@ -101,6 +101,9 @@ final class Api
                 $routes->addRoute('GET','/api/v1/booking-clients','bookingClients');
                 $routes->addRoute('GET','/api/v1/booking-clients/{id:\\d+}/address','bookingClientAddress');
                 $routes->addRoute('POST','/api/v1/address-coverage/validate','validateAddressCoverage');
+                $routes->addRoute('POST','/api/v1/address-coverage/approval','addressCoverageApproval');
+                $routes->addRoute('POST','/api/v1/address-coverage/approve','approveAddressCoverage');
+                $routes->addRoute('POST','/api/v1/address-coverage/revoke','revokeAddressCoverage');
                 $routes->addRoute('GET','/api/v1/clients','clients');
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
@@ -202,6 +205,9 @@ final class Api
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
                 'bookingClientAddress'=>$this->bookings->bookingClientAddress($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'validateAddressCoverage'=>$this->addressCoverage->validate($this->user($request),$request->body),
+                'addressCoverageApproval'=>$this->addressCoverage->approvalStatus($this->user($request),$request->body),
+                'approveAddressCoverage'=>$this->addressCoverage->approve($this->user($request),$request->body,$request->correlationId),
+                'revokeAddressCoverage'=>$this->addressCoverage->revoke($this->user($request),$request->body,$request->correlationId),
                 'createAppointment'=>$this->bookings->create($this->user($request),$request->body,$request->correlationId),
                 'updateAppointment'=>$this->bookings->update($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'appointmentAvailability'=>$this->bookings->updateAvailability($this->user($request),(int)$route[2]['id'],$request->query),
@@ -322,6 +328,7 @@ final class Api
             'GET booking-options' => $this->bookings->options($bookingActor()),
             'GET availability' => $this->bookings->customerAvailability($bookingActor(), $r->query),
             'POST address-coverage/validate' => $this->addressCoverage->validate($bookingActor(), $r->body),
+            'POST address-coverage/approval' => $this->addressCoverage->approvalStatus($bookingActor(), $r->body),
             'POST appointments' => $this->bookings->createForCustomer($bookingActor(), $r->body, $r->correlationId),
             default => throw new ApiException(404, 'not_found', 'Route not found.'),
         };

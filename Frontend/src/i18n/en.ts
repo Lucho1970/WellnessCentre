@@ -762,6 +762,18 @@ const en = {
   "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.":
     "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.",
   "Validate address and coverage": "Validate address and coverage",
+  "Clinic staff approved this address for the selected On-Site service. You can book without another distance check.": "Clinic staff approved this address for the selected On-Site service. You can book without another distance check.",
+  "Clinic staff approved this address for the selected On-Site service. No new distance check is needed.": "Clinic staff approved this address for the selected On-Site service. No new distance check is needed.",
+  "Approve this address for future On-Site bookings": "Approve this address for future On-Site bookings",
+  "Saving approval…": "Saving approval…",
+  "I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?": "I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?",
+  "Unable to save the On-Site approval.": "Unable to save the On-Site approval.",
+  "Remove On-Site approval": "Remove On-Site approval",
+  "Removing approval…": "Removing approval…",
+  "Remove this On-Site approval? Future bookings will require a new distance check.": "Remove this On-Site approval? Future bookings will require a new distance check.",
+  "Unable to remove the On-Site approval.": "Unable to remove the On-Site approval.",
+  "Approve On-Site service areas": "Approve On-Site service areas",
+  "Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.": "Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.",
   "Validating address…": "Validating address…",
   "Address confirmed: {{distance}} km driving distance ({{radius}} km limit).":
     "Address confirmed: {{distance}} km driving distance ({{radius}} km limit).",

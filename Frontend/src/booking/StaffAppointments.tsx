@@ -30,7 +30,7 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
   return [...new Map(rows.map(row => [String(row[key]), row])).values()];
 }
 
-export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false, canAddClients = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean; canAddClients?: boolean }) {
+export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false, canAddClients = false, canApproveOnsiteArea = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean; canAddClients?: boolean; canApproveOnsiteArea?: boolean }) {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -75,7 +75,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
       <Button startIcon={<RefreshCw size={16}/>} disabled={listBusy} onClick={() => setRefresh(value => value + 1)}>{t('Refresh')}</Button>
     </Stack></Paper>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} canApproveOnsiteArea={canApproveOnsiteArea} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     {managing && <ManageAppointment key={`${managing.appointment.id}-${managing.action}`} appointment={managing.appointment} initialAction={managing.action} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.')}</Typography></Box>
@@ -178,8 +178,8 @@ function ManageAppointment({ appointment, initialAction, request, canAssessFees,
   </Drawer>;
 }
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; cancel: () => void; complete: (id: number) => void };
-function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClients, cancel, complete }: FormProps) {
+type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; cancel: () => void; complete: (id: number) => void };
+function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClients, canApproveOnsiteArea, cancel, complete }: FormProps) {
   const { t, i18n } = useTranslation();
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
@@ -209,8 +209,11 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
   const [clientAddressState,setClientAddressState]=useState<'idle'|'loading'|'saved'|'missing'|'custom'|'error'>('idle');
   const [coverage,setCoverage]=useState<CoverageValidation|null>(null);
   const [coverageBusy,setCoverageBusy]=useState(false);
+  const [areaApproved,setAreaApproved]=useState(false);
+  const [approvalBusy,setApprovalBusy]=useState(false);
+  const approvalLookup=useRef<AbortController|null>(null);
   const addressComplete=(['address_line1','city','province','postal_code','country'] as const).every(key=>destination[key].trim());
-  const addressReady=mode==='clinic'||(addressComplete&&Boolean(coverage));
+  const addressReady=mode==='clinic'||(addressComplete&&(Boolean(coverage)||areaApproved));
   const [location, setLocation] = useState('');
   const [preferredLocation, setPreferredLocation] = useState('');
   const [service, setService] = useState('');
@@ -280,6 +283,15 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
       .catch(()=>{if(!controller.signal.aborted)setClientAddressState('error');});
     return()=>controller.abort();
   },[client?.id,mode,request]);
+  useEffect(() => {
+    setAreaApproved(false);
+    if (!client || mode !== 'mobile' || !selected || !addressComplete) return;
+    const controller = new AbortController();
+    approvalLookup.current = controller;
+    void request('/address-coverage/approval', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }), signal:controller.signal })
+      .then(result => { if (!controller.signal.aborted) setAreaApproved(Boolean(result.approved)); }).catch(() => {});
+    return () => controller.abort();
+  }, [request,client?.id,mode,location,service,practitioner,selected?.duration_option_id,destination.address_line1,destination.address_line2,destination.city,destination.province,destination.postal_code,destination.country,addressComplete]);
   const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); setError(''); };
   const createClient = async (event: FormEvent) => {
     event.preventDefault(); setNewClientBusy(true); setNewClientError(''); setDuplicateClients([]);
@@ -319,16 +331,36 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to validate this address.')); }
     finally { setCoverageBusy(false); }
   };
+  const approveCoverage = async () => {
+    if (!client || !coverage || !selected || !canApproveOnsiteArea || !window.confirm(t('I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?'))) return;
+    setApprovalBusy(true); setError('');
+    try {
+      await request('/address-coverage/approve', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination, address_validation_token:coverage.token }) });
+      approvalLookup.current?.abort();
+      setAreaApproved(true);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save the On-Site approval.')); }
+    finally { setApprovalBusy(false); }
+  };
+  const revokeCoverage = async () => {
+    if (!client || !selected || !canApproveOnsiteArea || !window.confirm(t('Remove this On-Site approval? Future bookings will require a new distance check.'))) return;
+    setApprovalBusy(true); setError('');
+    try {
+      await request('/address-coverage/revoke', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
+      approvalLookup.current?.abort();
+      setAreaApproved(false); setCoverage(null);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to remove the On-Site approval.')); }
+    finally { setApprovalBusy(false); }
+  };
   const confirm = async () => {
     if (sending.current || !client || !selected || !slot) return;
     sending.current = true; setBusy(true); setError('');
-    const payload = pendingRef.current ?? { delivery_mode:mode, ...(mode==='mobile'?{destination,address_validation_token:coverage!.token}:{}), quoted_base_price_cents:Number(selected.base_price_cents),quoted_mobile_fee_cents:mobileFee, client_id: Number(client.id), location_id: Number(location), service_id: Number(service), practitioner_id: Number(practitioner), duration_option_id: Number(duration), starts_at: slot.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), idempotency_key: crypto.randomUUID() };
+    const payload = pendingRef.current ?? { delivery_mode:mode, ...(mode==='mobile'?{destination,...(!areaApproved&&coverage?{address_validation_token:coverage.token}:{})}:{}), quoted_base_price_cents:Number(selected.base_price_cents),quoted_mobile_fee_cents:mobileFee, client_id: Number(client.id), location_id: Number(location), service_id: Number(service), practitioner_id: Number(practitioner), duration_option_id: Number(duration), starts_at: slot.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), idempotency_key: crypto.randomUUID() };
     pendingRef.current = payload; setPending(payload);
     try { const result = await request('/appointments', { method: 'POST', body: JSON.stringify(payload) }); pendingRef.current = null; setPending(null); complete(result.id); }
     catch (cause) {
       const rejected = cause instanceof RequestError && cause.status >= 400 && cause.status < 500 && cause.code !== 'invalid_response';
       const coverageRejected = cause instanceof RequestError && ['coverage_validation_required','invalid_coverage_validation','coverage_validation_mismatch','coverage_validation_expired'].includes(cause.code);
-      if (rejected) { pendingRef.current = null; setPending(null); setStep(coverageRejected ? 0 : 1); if (coverageRejected) setCoverage(null); clearSlots(); }
+      if (rejected) { pendingRef.current = null; setPending(null); setStep(coverageRejected ? 0 : 1); if (coverageRejected) { setCoverage(null); setAreaApproved(false); } clearSlots(); }
       setError(cause instanceof Error ? cause.message : t('Unable to confirm appointment.'));
     } finally { sending.current = false; setBusy(false); }
   };
@@ -371,21 +403,21 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
         </Box>}
         {client && <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main', borderWidth: 2 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
           <Box><Typography variant="overline" color="primary">{t('Selected client')}</Typography><Typography fontWeight={700}>{client.display_name}</Typography><Typography variant="body2">{client.email}</Typography><Typography variant="body2" color="text.secondary">{client.phone || t('No phone number on file')}</Typography></Box>
-          <Button onClick={() => { setClient(null); setClientQuery(''); setClientBirthdate(''); setClients([]); setDestination(emptyDestination()); setClientAddressState('idle'); setCoverage(null); }}>{t('Change client')}</Button>
+          <Button onClick={() => { setClient(null); setClientQuery(''); setClientBirthdate(''); setClients([]); setDestination(emptyDestination()); setClientAddressState('idle'); setCoverage(null); setAreaApproved(false); }}>{t('Change client')}</Button>
         </Stack>{createdClientId === Number(client.id) && <Stack spacing={1} mt={2}>
           <Typography variant="body2">{t('This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.')}</Typography>
           <Button variant="outlined" disabled={invitationBusy} onClick={() => void sendInvitation()}>{t(invitationBusy ? 'Sending invitation…' : 'Send portal invitation email')}</Button>
           {invitationStatus && <Alert severity={invitationLink ? 'warning' : 'info'}>{invitationStatus}</Alert>}
           {invitationLink && <><TextField fullWidth label={t('Private invitation link — shown only now')} value={invitationLink} slotProps={{ input: { readOnly: true } }} /><Button onClick={() => void navigator.clipboard.writeText(invitationLink)}>{t('Copy invitation link')}</Button></>}
         </Stack>}</Paper>}
-        <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);clearSlots();}}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
+        <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);setAreaApproved(false);clearSlots();}}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); setCoverage(null); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); setCoverage(null); setAreaApproved(false); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{practitionerLocked
             ? <TextField fullWidth label={t('Practitioner')} value={assignedPractitioner?.practitioner_name ?? ''} InputProps={{ readOnly: true }} helperText={t('Appointments booked in your practitioner workspace are assigned to you.')} />
-            : comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); clearSlots(); })}</Grid>
+            : comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, practitionerRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
         </Grid>
         {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography>
@@ -394,7 +426,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
           {clientAddressState==='custom'&&<Alert severity="info">{t('Visit address changes apply only to this appointment and do not update the client profile.')}</Alert>}
           {clientAddressState==='missing'&&<Alert severity="info">{t('This client has no saved service address. Find an address with Google or enter it manually.')}</Alert>}
           {clientAddressState==='error'&&<Alert severity="warning">{t('The saved client address could not be loaded. Find an address with Google or enter it manually.')}</Alert>}
-          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.')}</Alert><Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}</Stack>}
+          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.')}</Alert>{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. No new distance check is needed.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}{coverage&&client&&canApproveOnsiteArea&&!areaApproved&&<Button variant="outlined" disabled={approvalBusy} onClick={()=>void approveCoverage()}>{t(approvalBusy?'Saving approval…':'Approve this address for future On-Site bookings')}</Button>}{areaApproved&&canApproveOnsiteArea&&<Button variant="text" color="warning" disabled={approvalBusy} onClick={()=>void revokeCoverage()}>{t(approvalBusy?'Removing approval…':'Remove On-Site approval')}</Button>}</Stack>}
         <Button variant="contained" disabled={!client || !selected || !addressReady} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
       </Stack>}
       {step === 1 && <Stack spacing={2}>

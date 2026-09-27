@@ -22,17 +22,28 @@ $body = ['location_id' => 2, 'service_id' => 3, 'practitioner_id' => 4, 'address
 
 $hash = new ReflectionMethod(AddressCoverageService::class, 'destinationHash');
 $sign = new ReflectionMethod(AddressCoverageService::class, 'sign');
+$verify = new ReflectionMethod(AddressCoverageService::class, 'verifyToken');
 $proof = ['clinic_id' => 1, 'user_id' => 7, 'location_id' => 2, 'service_id' => 3, 'practitioner_id' => 4, 'destination_hash' => $hash->invoke(null, $destination), 'distance_meters' => 8400, 'radius_meters' => 25000, 'iat' => time(), 'exp' => time() + 900];
 $body['address_validation_token'] = $sign->invoke($service, $proof);
 
-coverageCheck($service->verifyBooking($actor, $body, $destination)['distance_meters'] === 8400);
+coverageCheck($verify->invoke($service, $actor, $body, $destination, $body['address_validation_token'])['distance_meters'] === 8400);
 $changed = $destination; $changed['postal_code'] = 'B2B 2B2';
-coverageRejected(fn() => $service->verifyBooking($actor, $body, $changed), 'coverage_validation_mismatch');
+coverageRejected(fn() => $verify->invoke($service, $actor, $body, $changed, $body['address_validation_token']), 'coverage_validation_mismatch');
 $wrongService = $body; $wrongService['service_id'] = 99;
-coverageRejected(fn() => $service->verifyBooking($actor, $wrongService, $destination), 'coverage_validation_mismatch');
+coverageRejected(fn() => $verify->invoke($service, $actor, $wrongService, $destination, $body['address_validation_token']), 'coverage_validation_mismatch');
 $tampered = $body; $tampered['address_validation_token'][5] = $tampered['address_validation_token'][5] === 'a' ? 'b' : 'a';
-coverageRejected(fn() => $service->verifyBooking($actor, $tampered, $destination), 'invalid_coverage_validation');
+coverageRejected(fn() => $verify->invoke($service, $actor, $tampered, $destination, $tampered['address_validation_token']), 'invalid_coverage_validation');
 $proof['exp'] = time() - 1; $expired = $body; $expired['address_validation_token'] = $sign->invoke($service, $proof);
-coverageRejected(fn() => $service->verifyBooking($actor, $expired, $destination), 'coverage_validation_expired');
+coverageRejected(fn() => $verify->invoke($service, $actor, $expired, $destination, $expired['address_validation_token']), 'coverage_validation_expired');
+
+$addressHash = new ReflectionMethod(AddressCoverageService::class, 'addressHash');
+$instructionsChanged = $destination; $instructionsChanged['instructions'] = 'Front door';
+coverageCheck($addressHash->invoke(null, $destination) === $addressHash->invoke(null, $instructionsChanged));
+$streetChanged = $destination; $streetChanged['address_line1'] = '124 Test Street';
+coverageCheck($addressHash->invoke(null, $destination) !== $addressHash->invoke(null, $streetChanged));
+$clientActor = new AuthContext(42, 1, 'client', 'client@example.test', 'Client', 'client', []);
+coverageRejected(fn() => $service->approve($clientActor, $body, 'test'), 'forbidden');
+coverageRejected(fn() => $service->revoke($clientActor, $body, 'test'), 'forbidden');
+coverageRejected(fn() => $service->approvalStatus($clientActor, $body + ['client_id' => 43]), 'forbidden');
 
 echo "{$checks} address coverage proof checks passed.\n";
