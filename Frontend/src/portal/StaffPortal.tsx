@@ -128,7 +128,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
     }
   }, [roles, workspace, preferenceKey]);
   if (!defaultWorkspace) return <Alert severity="warning">{t('This account has no available staff workspace. Please contact the clinic administrator.')}</Alert>;
-  if (['/', '/login', '/staff/login', '/profile'].includes(location.pathname)) {
+  if (['/', '/login', '/staff/login', '/staff/external', '/profile'].includes(location.pathname)) {
     const requested = location.pathname === '/profile' ? 'profile' : legacyPage(new URLSearchParams(location.search).get('portal')) ?? 'dashboard';
     return <Navigate replace to={pagePath(defaultWorkspace, requested)} />;
   }

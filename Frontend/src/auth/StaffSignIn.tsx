@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 type StaffAccess = { roles: string[]; permissions: string[] };
 
 export function StaffSignIn({ children }: { children: (access: StaffAccess) => ReactNode }) {
+  const externalStaff = import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.provider') === 'external';
   const { t } = useTranslation();
   const { account, configured, isAuthenticated, sessionExpired, signIn, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';
@@ -34,10 +35,11 @@ export function StaffSignIn({ children }: { children: (access: StaffAccess) => R
   if (!isAuthenticated) return <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, maxWidth: 650, mx: 'auto' }}>
     <Stack spacing={2} alignItems="center" textAlign="center"><ShieldCheck size={44} color="#176b62" />
       <Typography variant="h4" component="h1">{t('Staff portal')}</Typography>
-      <Typography color="text.secondary">{t('Admins, practitioners, reception, and accounting staff sign in with their organization Microsoft account.')}</Typography>
+      <Typography color="text.secondary">{externalStaff ? t('Invited practitioners sign in with their approved staff account.') : t('Admins, practitioners, reception, and accounting staff sign in with their organization Microsoft account.')}</Typography>
       {!configured && <Alert severity="warning">{t('Staff sign-in is not configured for this environment. Please contact the administrator.')}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
-      <Button variant="contained" size="large" startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <LogIn size={18} />} disabled={busy || !configured} onClick={() => void login()}>{t('Sign in with Microsoft')}</Button>
+      <Button variant="contained" size="large" startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <LogIn size={18} />} disabled={busy || !configured} onClick={() => void login()}>{externalStaff ? t('Invited practitioner sign-in') : t('Sign in with Microsoft')}</Button>
+      {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <Button href={`${import.meta.env.BASE_URL}staff/${externalStaff ? 'login' : 'external'}`}>{externalStaff ? t('Existing workforce staff sign-in') : t('Invited practitioner sign-in')}</Button>}
       <Button href={`${import.meta.env.BASE_URL}client`}>{t('Client sign in / booking')}</Button>
     </Stack>
   </Paper>;

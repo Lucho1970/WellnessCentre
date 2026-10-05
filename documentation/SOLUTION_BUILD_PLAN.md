@@ -837,6 +837,10 @@ These decisions should be made at or before the phase that depends on them:
 
 ## 19 Recommended next build piece
 
+### Developed: disabled practitioner invitation pilot (5 October 2026)
+
+The owner confirmed administrator and Esther sign-in after the selected membership import. The next identity slice is a disabled practitioner invitation and approval workflow, with separate External ID staff app registrations. See [Practitioner invitation pilot](PRACTITIONER_INVITATIONS.md) for configuration, API contracts, deployment prerequisites and acceptance limits. No automatic rebinding of Esther, customer-to-staff promotion or hosted rollout is included. Complete provider/MFA setup, disposable MySQL rehearsal and isolation/revocation checks before activation; then design a supervised migration preserving Esther's local user ID 2.
+
 ### Planned: appointments from admin client details (5 October 2026)
 
 Add a **View appointments** button to the selected client's **More details** view in the admin/staff Clients workflow. Open a client-specific appointment list that clearly identifies the client and offers upcoming appointments and past history, including cancelled appointments with visible status. Each entry should show date/time in the location timezone, service, practitioner, location or delivery mode, and status; authorized users can open the existing appointment details/actions. Provide a clear return to client details and loading, empty, error and paginated states. The admin should not need to search the general schedule manually.

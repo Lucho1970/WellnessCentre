@@ -65,3 +65,12 @@ expect(str_contains($pdo->sql,'identity_links')); // recovery administrator/nonp
 $pdo->row['id']=7;$pdo->membershipRow=$pdo->row;$pdo->membershipRow['id']=9;
 denies(fn()=>$pilot->authenticateForClinic($sign($claims),$clinic),'membership_binding_mismatch');
 echo "$checks identity/membership checks passed.\n";
+
+$pdo->membershipRow=null;
+$pdo->row=['id'=>7,'clinic_id'=>1,'email'=>'staff@example.test','display_name'=>'Staff','user_type'=>'staff','status'=>'active','roles'=>'super_admin,practitioner','permissions'=>'add_clients,unknown_admin_permission'];
+$external=$resolver->resolve(new VerifiedIdentity('entra-external-staff','https://external.test','subject-A','tenant'),$clinic);
+expect($external->roles===['practitioner']&&$external->permissions===['add_clients']);
+expect($pdo->params['adapter']==='entra-external-staff');
+$pdo->row['roles']='super_admin';
+denies(fn()=>$resolver->resolve(new VerifiedIdentity('entra-external-staff','https://external.test','subject-A','tenant'),$clinic),'role_assignment_mismatch');
+echo "3 external membership permission checks passed.\n";

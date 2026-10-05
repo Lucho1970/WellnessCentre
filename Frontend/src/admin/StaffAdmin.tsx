@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
+import { StaffInvitations } from './StaffInvitations';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const roleOptions = ['super_admin', 'clinic_admin', 'reception', 'practitioner', 'accountant'];
@@ -109,6 +110,7 @@ export function StaffAdmin() {
         {!busy && filtered.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching staff' : 'No staff members yet')}</Typography><Typography color="text.secondary">{t(query ? 'Try another name, email, or role.' : 'Add a staff account after configuring its Microsoft Entra identity.')}</Typography></Box>}
       </List>
     </Paper>
+    {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <StaffInvitations/>}
     <Drawer anchor="right" open={panelMode !== null} onClose={closePanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'new' ? 'New staff member' : panelMode === 'details' ? 'Staff details' : 'Edit staff access')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Add staff access') : selected?.display_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={closePanel}><X/></IconButton></Stack>
       {panelMode === 'details' && selected && <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{[[t('Email'), selected.email], [t('Status'), t(selected.status === 'active' ? 'Active' : selected.status === 'inactive' ? 'Inactive' : 'Locked')], [t('Local roles'), selected.roles.join(', ') || t('No role')], [t('Additional permissions'), selected.permissions.join(', ') || t('None')]].map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} disabled={isSelf(selected)} onClick={() => startEdit(selected)}>{t('Edit')}</Button></Stack>}

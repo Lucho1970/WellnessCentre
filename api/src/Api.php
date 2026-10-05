@@ -172,6 +172,11 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/admin/rooms/{id:\\d+}/practitioners','updateRoomPractitioners');
                 $routes->addRoute('POST','/api/v1/admin/staff','createStaff');
                 $routes->addRoute('GET','/api/v1/admin/staff','adminStaff');
+                $routes->addRoute('GET','/api/v1/admin/staff-invitations','staffInvitations');
+                $routes->addRoute('POST','/api/v1/admin/staff-invitations','createStaffInvitation');
+                $routes->addRoute('POST','/api/v1/admin/staff-invitations/{id:\\d+}/approve','approveStaffInvitation');
+                $routes->addRoute('POST','/api/v1/admin/staff-invitations/{id:\\d+}/revoke','revokeStaffInvitation');
+                $routes->addRoute('POST','/api/v1/staff-invitations/claim','claimStaffInvitation');
                 $routes->addRoute('PATCH','/api/v1/admin/staff/{id:\\d+}','updateStaff');
                 $routes->addRoute('GET','/api/v1/admin/team-profiles','teamProfiles');
                 $routes->addRoute('PUT','/api/v1/admin/team-profiles/{id:\\d+}','updateTeamProfile');
@@ -217,6 +222,11 @@ final class Api
                 $this->clinicContext->assertActive($this->database);
             }
             $data=match($route[1]){
+                'staffInvitations'=>$this->staffInvitations()->list($this->user($request)),
+                'createStaffInvitation'=>$this->staffInvitations()->create($this->user($request),$request->body,$request->correlationId),
+                'approveStaffInvitation'=>$this->staffInvitations()->approve($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'revokeStaffInvitation'=>$this->staffInvitations()->revoke($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'claimStaffInvitation'=>$this->staffInvitationClaim($request),
                 'health'=>['status'=>'ok','time'=>gmdate(DATE_ATOM),'environment'=>$this->config->environment],
                 'databaseHealth'=>$this->databaseHealth(),
                 'siteConfig'=>$this->catalog->siteConfig(),
@@ -446,9 +456,21 @@ final class Api
 
     private function user(Request $request): AuthContext
     {
-        $actor = $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
+        $external = new \Wellness\Auth\ExternalStaffAuthenticator($this->config);
+        $actor = $external->isCandidate($request->bearerToken())
+            ? (new \Wellness\Auth\StaffMembershipResolver($this->database))->resolve($external->verify($request->bearerToken()),$this->clinicContext)
+            : $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
         $this->clinicContext->assertActive($this->database);
         return $actor;
+    }
+    private function staffInvitations(): \Wellness\Service\StaffInvitationService
+    {
+        return new \Wellness\Service\StaffInvitationService($this->database,$this->config,new AuditLogger($this->database));
+    }
+    private function staffInvitationClaim(Request $request): array
+    {
+        $this->clinicContext->assertActive($this->database);
+        return $this->staffInvitations()->claim($this->clinicContext->clinicId,(new \Wellness\Auth\ExternalStaffAuthenticator($this->config))->verify($request->bearerToken()),$request->body,$request->correlationId);
     }
     private function me(AuthContext $user): array{return ['id'=>$user->userId,'clinic_id'=>$user->clinicId,'email'=>$user->email,'display_name'=>$user->displayName,'user_type'=>$user->userType,'roles'=>$user->roles,'permissions'=>$user->permissions];}
 

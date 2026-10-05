@@ -34,6 +34,11 @@ final readonly class Config
         public array $clinicHostMap = [],
         public bool $staffMembershipPilotEnabled = false,
         public array $staffMembershipPilotUserIds = [],
+        public bool $staffInvitationsEnabled = false,
+        public string $staffExternalTenantId = '',
+        public string $staffExternalSubdomain = '',
+        public string $staffExternalApiClientId = '',
+        public string $staffExternalSpaClientId = '',
     ) {}
 
     public static function fromEnvironment(): self
@@ -72,6 +77,11 @@ final readonly class Config
             self::hostMap($value('CLINIC_HOST_MAP', '{}')),
             filter_var($value('STAFF_MEMBERSHIP_PILOT_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             self::pilotUserIds($value('STAFF_MEMBERSHIP_PILOT_USER_IDS', '')),
+            filter_var($value('STAFF_INVITATIONS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            $value('STAFF_EXTERNAL_TENANT_ID'),
+            $value('STAFF_EXTERNAL_SUBDOMAIN'),
+            $value('STAFF_EXTERNAL_API_CLIENT_ID'),
+            $value('STAFF_EXTERNAL_SPA_CLIENT_ID'),
         );
     }
 

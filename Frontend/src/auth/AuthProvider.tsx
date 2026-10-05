@@ -6,25 +6,27 @@ import { selectAccount } from './accountSelection';
 import i18n from '../i18n';
 import { claimStaffSessionRecovery, clearStaffSessionRecovery, needsInteractiveStaffAuth } from './staffSessionRecovery';
 
-const tenantId = import.meta.env.VITE_ENTRA_TENANT_ID ?? '';
-const spaClientId = import.meta.env.VITE_ENTRA_SPA_CLIENT_ID ?? '';
-const apiClientId = import.meta.env.VITE_ENTRA_API_CLIENT_ID ?? '';
-const configured = Boolean(tenantId && spaClientId && apiClientId);
-const apiScopes = apiClientId ? [`api://${apiClientId}/access_as_user`] : [];
+export const externalStaff = import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.provider') === 'external';
+const tenantId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_TENANT_ID : import.meta.env.VITE_ENTRA_TENANT_ID) ?? '';
+const spaClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_SPA_CLIENT_ID : import.meta.env.VITE_ENTRA_SPA_CLIENT_ID) ?? '';
+const apiClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_API_CLIENT_ID : import.meta.env.VITE_ENTRA_API_CLIENT_ID) ?? '';
+const externalHost = `${import.meta.env.VITE_STAFF_EXTERNAL_SUBDOMAIN ?? ''}.ciamlogin.com`;
+const configured = Boolean(tenantId && spaClientId && apiClientId && (!externalStaff || /^[a-z0-9][a-z0-9-]{0,62}$/.test(import.meta.env.VITE_STAFF_EXTERNAL_SUBDOMAIN ?? '')));
+const apiScopes = apiClientId ? [`api://${apiClientId}/${externalStaff ? 'access_as_staff' : 'access_as_user'}`] : [];
 const portalRoot = new URL(import.meta.env.BASE_URL, window.location.origin).href;
-const redirect = new URL(import.meta.env.VITE_ENTRA_REDIRECT_URI || portalRoot);
+const redirect = new URL(externalStaff ? `${import.meta.env.BASE_URL}staff/external` : import.meta.env.VITE_ENTRA_REDIRECT_URI || portalRoot,window.location.origin);
 if (redirect.origin !== window.location.origin || !redirect.pathname.startsWith(import.meta.env.BASE_URL) || redirect.search || redirect.hash) {
   throw new Error(i18n.t('Staff authentication must return to this portal, without query or fragment.'));
 }
 const redirectUri = redirect.href;
 
 export const msalInstance = new PublicClientApplication({
-  auth: { clientId: spaClientId || '00000000-0000-0000-0000-000000000000', authority: `https://login.microsoftonline.com/${tenantId || 'organizations'}`, redirectUri, postLogoutRedirectUri: portalRoot },
+  auth: { clientId: spaClientId || '00000000-0000-0000-0000-000000000000', authority: externalStaff ? `https://${externalHost}/${tenantId}` : `https://login.microsoftonline.com/${tenantId || 'organizations'}`, knownAuthorities: externalStaff ? [externalHost] : [], redirectUri, postLogoutRedirectUri: portalRoot },
   cache: { cacheLocation: 'sessionStorage' },
 });
 
 export function selectStaffAccount(preferred = msalInstance.getActiveAccount()) {
-  return selectAccount(msalInstance.getAllAccounts(), preferred, tenantId, ['login.windows.net', 'login.microsoftonline.com', 'login.microsoft.com', 'sts.windows.net']);
+  return selectAccount(msalInstance.getAllAccounts(), preferred, tenantId, externalStaff ? [externalHost,`${tenantId}.ciamlogin.com`] : ['login.windows.net', 'login.microsoftonline.com', 'login.microsoft.com', 'sts.windows.net']);
 }
 
 type StaffAuthValue = { account: AccountInfo | null; configured: boolean; isAuthenticated: boolean; sessionExpired: boolean; signIn: () => Promise<void>; signOut: () => Promise<void>; getAccessToken: () => Promise<string> };

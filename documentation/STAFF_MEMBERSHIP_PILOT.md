@@ -42,4 +42,6 @@ Use local account deactivation as the compatibility-safe revocation mechanism wh
 
 ## Validation limits
 
+Hosted owner report, 5 October 2026: Esther (local user 2, clinic 1) was imported with the protected runner; the runner was removed and its flags disabled. Recovery administrator login works, and Esther can sign in with her existing workforce account and reports her usual workflow working. This establishes basic hosted sign-in acceptance, while explicit wrong-host, revocation and real database concurrency acceptance remain outstanding. The next disabled source slice is documented in [Practitioner invitation pilot](PRACTITIONER_INVITATIONS.md).
+
 Signed-token tests cover disabled/enabled pilot selection, nonpilot legacy access, denied membership without fallback and local binding mismatch. Candidate tests reject ambiguous/inactive/wrong-provider data. PDO-double tests exercise dry-run, whole-batch rollback, idempotency and no reactivation. Real MySQL transaction, constraint, idempotency and concurrent backfill checks still require the disposable database rehearsal; unit tests do not establish those hosted results. No code or backfill has been deployed or executed by the agent.
