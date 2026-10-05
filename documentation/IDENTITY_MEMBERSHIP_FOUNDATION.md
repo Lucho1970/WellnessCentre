@@ -1,5 +1,7 @@
 # Identity and staff membership foundation
 
+This document records the initial foundation. The subsequent [selected staff pilot](STAFF_MEMBERSHIP_PILOT.md) adds a disabled configuration gate and reviewed backfill tool; use that guide for the current deployment sequence.
+
 This is an additive source foundation, not a login cutover or portal invitation release. Existing Entra login still resolves `identity_links` and intersects directory roles with local roles. No live user IDs, roles, customer links or sessions are migrated.
 
 `IdentityAdapter::verify` returns an immutable `VerifiedIdentity` after provider verification. The Entra implementation preserves signature, expiry, tenant, issuer, audience and scope checks, and its legacy tenant/object-ID mapping. Subjects are provider-specific: workforce uses Entra object ID, not an email or a customer subject. The interface does not imply a new provider has been selected.

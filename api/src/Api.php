@@ -446,7 +446,7 @@ final class Api
 
     private function user(Request $request): AuthContext
     {
-        $actor = $this->clinicContext->assertActor($this->auth->authenticate($request->bearerToken()));
+        $actor = $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
         $this->clinicContext->assertActive($this->database);
         return $actor;
     }

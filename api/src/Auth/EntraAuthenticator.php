@@ -24,6 +24,17 @@ final class EntraAuthenticator implements IdentityAdapter
         return $this->loadUser($identity->tenantId, $identity->subject, $identity->directoryRoles);
     }
 
+    public function authenticateForClinic(?string $token, \Wellness\ClinicContext $clinic): AuthContext
+    {
+        $identity = $this->verify($token);
+        $legacy = $clinic->assertActor($this->loadUser($identity->tenantId, $identity->subject, $identity->directoryRoles));
+        if (!$this->config->staffMembershipPilotEnabled || !in_array($legacy->userId, $this->config->staffMembershipPilotUserIds, true)) return $legacy;
+        // A revoked/missing pilot membership must never fall back to legacy access.
+        $member = (new StaffMembershipResolver($this->database))->resolve($identity, $clinic);
+        if ($member->userId !== $legacy->userId) throw new ApiException(403, 'membership_binding_mismatch', 'Staff membership does not match the existing account.');
+        return $member;
+    }
+
     public function verify(?string $token): VerifiedIdentity
     {
         if (!$token) throw new ApiException(401, 'unauthorized', 'A bearer access token is required.');

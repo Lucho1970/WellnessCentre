@@ -6,7 +6,7 @@ use Wellness\Database;
 use Wellness\ClinicContext;
 use Wellness\Http\ApiException;
 
-/** Foundation for a later gated cutover; not wired into the live API. */
+/** Used only for explicitly selected legacy accounts in the workforce pilot. */
 final class StaffMembershipResolver
 {
     public function __construct(private readonly Database $database) {}

@@ -17,13 +17,14 @@ final class MemberPDO extends PDO {
     public array $params=[];
     public string $sql='';
     public array|false $row=false;
+    public array|false|null $membershipRow=null;
     public function __construct(){}
     public function prepare(string $query,array $options=[]): PDOStatement|false {$this->sql=$query;return new MemberStatement($this);}
 }
 final class MemberStatement extends PDOStatement {
     public function __construct(private MemberPDO $db){}
     public function execute(?array $params=null): bool {$this->db->params=$params??[];return true;}
-    public function fetch(int $mode=PDO::FETCH_DEFAULT,int $orientation=PDO::FETCH_ORI_NEXT,int $offset=0): mixed {return $this->db->row;}
+    public function fetch(int $mode=PDO::FETCH_DEFAULT,int $orientation=PDO::FETCH_ORI_NEXT,int $offset=0): mixed {return str_contains($this->db->sql,'staff_memberships') && $this->db->membershipRow!==null ? $this->db->membershipRow : $this->db->row;}
 }
 $config=new Config('test',false,'test',[],'',3306,'','','','staff-tenant','staff-api','access_as_user',300,clinicHostMap:['a.test'=>1,'b.test'=>2]);
 $pdo=new MemberPDO();$db=new Database($config);(new ReflectionProperty(Database::class,'connection'))->setValue($db,$pdo);
@@ -49,4 +50,18 @@ foreach(["i.status='active'","m.status='active'","c.status='active'","u.status='
 denies(fn()=>$resolver->resolve(new VerifiedIdentity('customer','https://other.test','object-A',''),$clinic),'staff_identity_required');
 denies(fn()=>$resolver->resolve($identity,ClinicContext::forHost($config,'b.test')),'clinic_access_denied');
 $pdo->row=false;denies(fn()=>$resolver->resolve($identity,$clinic),'membership_required');
+$pdo->row=['id'=>7,'clinic_id'=>1,'email'=>'staff@example.test','display_name'=>'Staff','user_type'=>'staff','status'=>'active','roles'=>'practitioner','permissions'=>''];
+expect($auth->authenticateForClinic($sign($claims),$clinic)->userId===7);
+expect(str_contains($pdo->sql,'identity_links'));
+$pilotConfig=new Config('test',false,'test',[],'',3306,'','','','staff-tenant','staff-api','access_as_user',300,
+    clinicHostMap:['a.test'=>1],staffMembershipPilotEnabled:true,staffMembershipPilotUserIds:[7]);
+$pilot=new EntraAuthenticator($pilotConfig,$db,fn()=>['keys'=>[$jwk]]);
+expect($pilot->authenticateForClinic($sign($claims),$clinic)->userId===7);
+expect(str_contains($pdo->sql,'staff_memberships'));
+$pdo->membershipRow=false;denies(fn()=>$pilot->authenticateForClinic($sign($claims),$clinic),'membership_required');
+$pdo->row['id']=8;
+expect($pilot->authenticateForClinic($sign($claims),$clinic)->userId===8);
+expect(str_contains($pdo->sql,'identity_links')); // recovery administrator/nonpilot never consults memberships
+$pdo->row['id']=7;$pdo->membershipRow=$pdo->row;$pdo->membershipRow['id']=9;
+denies(fn()=>$pilot->authenticateForClinic($sign($claims),$clinic),'membership_binding_mismatch');
 echo "$checks identity/membership checks passed.\n";
