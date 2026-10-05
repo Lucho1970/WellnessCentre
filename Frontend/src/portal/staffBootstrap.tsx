@@ -5,6 +5,10 @@ import { StaffAuthProvider, msalInstance, selectStaffAccount } from '../auth/Aut
 import { PortalApp } from './PortalApp';
 
 export async function bootstrap() {
+  // MSAL may load the portal redirect URI in a hidden iframe for silent token
+  // renewal. The parent frame reads the response hash; rendering the portal in
+  // the iframe could start another token request and make renewal time out.
+  if (window.self !== window.top) return;
   await msalInstance.initialize();
   const result = await msalInstance.handleRedirectPromise();
   const account = selectStaffAccount(result?.account ?? msalInstance.getActiveAccount());

@@ -30,18 +30,25 @@ class GraphMailClient {
     public function __construct($tenant, $client, $secret, $sender) {}
 }
 class NotificationWorker {
-    public function __construct($db, $mailer, $portal) {}
+    public function __construct($db, $mailer, $portal, $sms = null) {}
     public function run(int $limit): array {
         if ($limit !== 3) throw new \RuntimeException('Unsafe batch size');
         file_put_contents(getenv('TEST_COUNT_FILE'), "run\n", FILE_APPEND);
         return ['sent' => 1, 'retry' => 0, 'review' => 0, 'canceled' => 0];
     }
 }
+class NotificationSchedulerHealth {
+    public static function start($db): void { file_put_contents(getenv('TEST_HEALTH_FILE'), "start\n", FILE_APPEND); }
+    public static function succeed($db, array $result): void { file_put_contents(getenv('TEST_HEALTH_FILE'), "succeed\n", FILE_APPEND); }
+    public static function fail($db, \Throwable $error): void { file_put_contents(getenv('TEST_HEALTH_FILE'), "fail\n", FILE_APPEND); }
+}
 PHP
 );
 
 $countFile = $fixture . '/count.txt';
+$healthFile = $fixture . '/health.txt';
 putenv('TEST_COUNT_FILE=' . $countFile);
+putenv('TEST_HEALTH_FILE=' . $healthFile);
 $envPath = $privateDir . '/.env';
 $trigger = $webDir . '/send-notifications.php';
 $secret = str_repeat('a', 48);
@@ -76,8 +83,10 @@ try {
     $writeEnv('true');
     $assert($invoke('POST', $secret) === 204, 'Valid call did not run.');
     $assert(count(file($countFile)) === 1, 'Worker did not run exactly once.');
+    $assert(file($healthFile, FILE_IGNORE_NEW_LINES) === ['start', 'succeed'], 'Scheduler health was not recorded.');
     $assert($invoke('POST', $secret) === 204, 'Cooldown call failed.');
     $assert(count(file($countFile)) === 1, 'Cooldown allowed another worker run.');
+    $assert(file($healthFile, FILE_IGNORE_NEW_LINES) === ['start', 'succeed'], 'Cooldown changed scheduler health.');
     echo "Azure mail trigger checks passed.\n";
 } finally {
     if (str_starts_with($fixture, sys_get_temp_dir() . '/wellness-azure-trigger-test-')) {

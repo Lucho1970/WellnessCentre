@@ -31,6 +31,9 @@ import {
 import { CustomerWorkspace, type CustomerStatus } from "./CustomerWorkspace";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { bookingSignInKey, customerBookingIntent } from "./bookingIntent";
+import { savedSession } from './session';
+import { BetaFeedbackLink } from "../shared/BetaFeedbackLink";
 
 export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const { config } = useClinicConfig();
@@ -48,6 +51,21 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [status, setStatus] = useState<CustomerStatus | null>(null);
   const [session, setSession] = useState<SessionTimes | null>(null);
+  useEffect(() => {
+    const bookingRequested=sessionStorage.getItem(bookingSignInKey)==='pending';
+    const browseRequested=sessionStorage.getItem('wellness.customer.return-to-browse.v1')==='pending';
+    if (!customerConfigured || initialError || (!bookingRequested&&!browseRequested)) return;
+    if (bookingRequested) sessionStorage.removeItem(bookingSignInKey);
+    const existing = savedSession();
+    if (existing && Math.min(existing.idle_expires_at, existing.absolute_expires_at) * 1000 > Date.now()) return;
+    setBusy(true);
+    void customerSignIn().catch(() => setError(t('Unable to start client sign-in. Please try again.'))).finally(() => setBusy(false));
+  }, [initialError, t]);
+  useEffect(() => {
+    if (!verified || sessionStorage.getItem('wellness.customer.return-to-browse.v1')!=='pending') return;
+    sessionStorage.removeItem('wellness.customer.return-to-browse.v1');
+    if(status?.onboarding_status==='linked')window.location.replace(import.meta.env.BASE_URL);
+  }, [verified,status]);
   useEffect(() => {
     const end = () => {
       clearCustomerSession();
@@ -299,6 +317,11 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
               {t("Sign in to continue booking. No appointment has been requested or reserved.")}
             </Alert>
           )}
+          {!verified && customerBookingIntent() && (
+            <Alert severity="success" sx={{ my: 2 }}>
+              {t("We saved your selected service and time for this sign-in. We will check availability again before you confirm.")}
+            </Alert>
+          )}
           {verified && !status && (
             <Typography>
               {t(
@@ -337,11 +360,12 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
             <Button href={publicLink("contact")}>
               {t("Contact the clinic")}
             </Button>
-            <Button href={publicLink("book")}>
+            <Button href={import.meta.env.BASE_URL}>
               {t("Browse availability")}
             </Button>
           </Stack>
         </Paper>
+        <Box sx={{ maxWidth: 700, mx: 'auto', mt: 2 }}><BetaFeedbackLink /></Box>
       </Container>
     </>
   );

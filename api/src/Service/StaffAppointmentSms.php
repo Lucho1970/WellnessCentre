@@ -13,6 +13,7 @@ final class StaffAppointmentSms
             'staff_booking_confirmation' => 'New booking / Nouveau rendez-vous.',
             'staff_booking_change' => 'Booking changed / Rendez-vous modifie.',
             'staff_booking_cancellation' => 'Booking canceled / Rendez-vous annule.',
+            'staff_booking_reassigned_away' => 'Booking moved off your schedule / Rendez-vous reattribue.',
             default => throw new InvalidArgumentException('Unsupported staff SMS event.'),
         };
         $parts = parse_url($clientPortalUrl);

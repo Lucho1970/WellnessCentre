@@ -4,6 +4,18 @@ The public site uses version-controlled Markdown for editorial content. This is 
 content layer, not a database CMS. Content changes are reviewed in Git, validated during
 the frontend build, and released in `wellness-public.zip`.
 
+The public homepage is assembled from `Frontend/content/site-layout.json`. Its ordered
+`sections` array controls the order and navigation of the continuous public page. A
+`markdown` section references an existing bilingual content key; `services`,
+`practitioners`, `team`, and `contact` are approved component types. `navLabel` adds a
+section to the sticky desktop/mobile navigation. Stable `id` values become shareable
+URLs such as `/#services`; changing an ID requires a redirect plan. `surface` selects
+an approved plain or soft background, not arbitrary CSS. The content validator checks
+unique IDs, supported types and labels, and published bilingual Markdown references.
+Markdown sections may use `presentation: "split"` for an editorial two-column layout
+or `presentation: "faq"` for expandable questions. Both use the same safe Markdown
+files; they do not introduce HTML editing.
+
 ## Where content lives
 
 ```text
@@ -15,10 +27,13 @@ Frontend/content/
 Frontend/public/content-assets/  Reviewed public images copied into the build
 ```
 
-The relative filename is the stable content key. For example, the `/about` route renders
-`pages/about.md` from the selected language. `sections/home-welcome.md` is embedded on the
-home page. English and French must contain the same relative filenames; the build fails
-when a counterpart is missing.
+The relative filename is the stable content key. For example, `pages/about.md` is
+embedded in the `/#about` homepage section in the selected language;
+the old `/about` URL redirects there. `sections/home-welcome.md` remains available but
+is not currently placed on the page. Page headings are demoted when embedded so the
+homepage retains one main heading. English
+and French must contain the same relative filenames; the build fails when a counterpart
+is missing.
 
 ## File format
 
@@ -38,6 +53,8 @@ Page content is written in Markdown.
 `status` is either `draft` or `published`. Draft content is bundled only as source input
 and is not rendered. A page requires exactly one `#` heading. An embedded section cannot
 contain a `#` heading because its parent page owns the main heading.
+For a split or FAQ presentation, follow the introductory heading and paragraph with
+`##` subheadings for details or questions in both languages.
 
 Supported authoring includes headings, paragraphs, emphasis, lists, tables, blockquotes,
 horizontal rules, links and images. Raw HTML is deliberately rejected. Links may use an
@@ -48,7 +65,8 @@ referenced file exists. A fuller governed media workflow is a later slice.
 
 ## Editing and publishing
 
-1. Edit both language files locally or through GitHub's text editor.
+1. Edit both language files locally or through GitHub's text editor. Reorder sections or
+   choose an approved surface in `site-layout.json` when changing the page structure.
 2. Keep factual statements, professional claims, policies and translations reviewed by
    the clinic owner or appropriate professional.
 3. Run `npm run validate:content` from `Frontend`.
@@ -69,7 +87,7 @@ clinical content and unpublished operational notes never belong in this content 
 
 ## Adding a page or section
 
-Add the matching English and French files, then reference their shared content key from a
-public route or `ContentSection`. Public navigation changes remain code-reviewed so an
+Add the matching English and French files, then reference their shared content key from
+the reviewed layout manifest. Public navigation changes remain code-reviewed so an
 uploaded file cannot silently add a misleading or privileged route. Future resource
 articles may use a validated manifest generated from reviewed Markdown metadata.

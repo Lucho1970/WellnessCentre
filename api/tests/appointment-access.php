@@ -31,6 +31,11 @@ foreach([['staff',[]],['staff',['accounting']],['unknown',['super_admin']]] as [
     catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}
 }
 foreach(['super_admin','clinic_admin','reception'] as $role){BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',[$role]),false,'');$checks++;}
+foreach(['super_admin','clinic_admin'] as $role){BookingService::authorizeReassign(new AuthContext(1,1,'','','','staff',[$role]));$checks++;}
+foreach([['staff',['reception']],['staff',['practitioner']],['staff',['accounting']],['client',['clinic_admin']]] as [$type,$roles]){
+    try{BookingService::authorizeReassign(new AuthContext(1,1,'','','',$type,$roles));throw new RuntimeException('Unauthorized reassignment accepted.');}
+    catch(ApiException $e){if($e->status!==403)throw $e;$checks++;}
+}
 BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',['practitioner']),true,'practitioner_managed');$checks++;
 BookingService::authorizeChange(new AuthContext(1,1,'','','','staff',['practitioner'],['schedule_for_other_practitioners']),false,'clinic_managed');$checks++;
 BookingService::authorizeCustomerChange(new AuthContext(27,1,'','','','client',[]),27);$checks++;

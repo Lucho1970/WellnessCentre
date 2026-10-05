@@ -15,9 +15,9 @@ foreach (['+14166166855', '+12892975234', '+19025551234', '+18675551234'] as $nu
 foreach (['+12025551234', '+12125551234', '+12735551234', '+19995551234', '4166166855', '+14161116855'] as $number) {
     if (CanadianSmsNumber::isAllowed($number)) throw new RuntimeException('Non-Canadian or invalid number was accepted: ' . $number);
 }
-foreach (['staff_booking_confirmation', 'staff_booking_change', 'staff_booking_cancellation'] as $code) {
-    $message = StaffAppointmentSms::compose(array_replace($event, ['event_code' => $code]), 'https://portal.copihue.ca/client');
-    if (strlen($message) > 160 || !str_contains($message, 'https://portal.copihue.ca/practitioner/schedule')) {
+foreach (['staff_booking_confirmation', 'staff_booking_change', 'staff_booking_cancellation', 'staff_booking_reassigned_away'] as $code) {
+    $message = StaffAppointmentSms::compose(array_replace($event, ['event_code' => $code]), 'https://willowwellness.copihue.ca/client');
+    if (strlen($message) > 160 || !str_contains($message, 'https://willowwellness.copihue.ca/practitioner/schedule')) {
         throw new RuntimeException('Staff SMS length or portal link is wrong.');
     }
     if (str_contains($message, 'Private Client') || str_contains($message, 'Private Address')) {
@@ -57,7 +57,7 @@ $client = new VoipMsSmsClient('private@example.test', 'secret', '2892975234', st
     if (!str_contains($fields['message'] ?? '', 'practitioner/schedule')) throw new RuntimeException('SMS request message is wrong.');
     return [200, '{"status":"success","sms":"12345"}'];
 });
-if ($client->send('+14166166855', StaffAppointmentSms::compose($event, 'https://portal.copihue.ca/client')) !== '12345') {
+if ($client->send('+14166166855', StaffAppointmentSms::compose($event, 'https://willowwellness.copihue.ca/client')) !== '12345') {
     throw new RuntimeException('SMS provider ID was not recorded.');
 }
 $rejected = new VoipMsSmsClient('private@example.test', 'secret', '2892975234', static fn(string $body): array => [200, '{"status":"permission_denied"}']);

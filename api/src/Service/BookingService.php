@@ -85,6 +85,7 @@ final class BookingService
             $snapshot->execute(['mode'=>$mode,'destination'=>$destination?json_encode($destination,JSON_THROW_ON_ERROR):null,'travel'=>$terms['travel'],'base'=>$terms['base'],'fee'=>$terms['fee'],'actor'=>$mode==='mobile'?$actor->userId:null,'id'=>$id]);
             $history=$pdo->prepare("INSERT INTO appointment_status_history(appointment_id,to_status,actor_user_id) VALUES(:id,'confirmed',:actor)");$history->execute(['id'=>$id,'actor'=>$actor->userId]);
             $notify=$pdo->prepare("INSERT INTO notification_events(clinic_id,appointment_id,recipient_user_id,recipient_address,event_code,channel,status,scheduled_at,payload) SELECT :clinic,:appointment_id,u.id,u.email,'booking_confirmation','email','queued',UTC_TIMESTAMP(),JSON_OBJECT('appointment_id',:payload_appointment_id) FROM users u WHERE u.id=:client");$notify->execute(['clinic'=>$actor->clinicId,'appointment_id'=>$id,'payload_appointment_id'=>$id,'client'=>$clientId]);
+            AppointmentReminderQueue::replace($pdo,$actor->clinicId,$id,$clientId,$startsUtc->format('Y-m-d H:i:s'),1);
             StaffNotificationQueue::enqueue($pdo,$actor->clinicId,$id,(int)$body['practitioner_id'],'booking_confirmation');
             $this->audit->write($actor->clinicId,$actor,$correlationId,'appointment.create','appointment',$id);
             $pdo->commit();
@@ -196,7 +197,9 @@ final class BookingService
 
     public function update(AuthContext $actor,int $id,array $body,string $correlationId): array
     {
-        $action=$body['action']??'';if(!in_array($action,['reschedule','cancel'],true))throw new ApiException(422,'validation_error','Select reschedule or cancel.');
+        $action=$body['action']??'';
+        if($action==='reassign')return $this->reassign($actor,$id,$body,$correlationId);
+        if(!in_array($action,['reschedule','cancel'],true))throw new ApiException(422,'validation_error','Select reschedule, cancel, or reassign.');
         $version=(int)($body['version']??0);if($version<1)throw new ApiException(422,'validation_error','version is required.',['version'=>'Required']);
         $reason=trim((string)($body['reason']??''));if(strlen($reason)>1000)throw new ApiException(422,'validation_error','Reason must be at most 1000 characters.');
         $requested=null;if($action==='reschedule'){if(empty($body['starts_at']))throw new ApiException(422,'validation_error','starts_at is required.',['starts_at'=>'Required']);$requested=BookingRequest::timestamp($body['starts_at'])->setTimezone(new DateTimeZone('UTC'));}
@@ -243,6 +246,8 @@ final class BookingService
                 $statement=$pdo->prepare("UPDATE appointments SET room_id=:room,starts_at=:starts,ends_at=:ends,buffer_starts_at=:buffer_start,buffer_ends_at=:buffer_end,status='rescheduled',version=version+1 WHERE id=:id AND version=:version");$statement->execute(['room'=>$roomId,'starts'=>$requested->format('Y-m-d H:i:s'),'ends'=>$newEnd->format('Y-m-d H:i:s'),'buffer_start'=>$requested->modify('-'.$before.' seconds')->format('Y-m-d H:i:s'),'buffer_end'=>$newEnd->modify('+'.$after.' seconds')->format('Y-m-d H:i:s'),'id'=>$id,'version'=>$version]);
                 $this->history($id,$from,'rescheduled',$actor->userId,$reason);$event='booking_change';$audit='appointment.reschedule';
             }
+            if($action==='cancel')AppointmentReminderQueue::cancel($pdo,$actor->clinicId,$id);
+            else AppointmentReminderQueue::replace($pdo,$actor->clinicId,$id,(int)$appointment['client_id'],$requested->format('Y-m-d H:i:s'),$version+1);
             $notify=$pdo->prepare("INSERT INTO notification_events(clinic_id,appointment_id,recipient_user_id,recipient_address,event_code,channel,status,scheduled_at,payload) SELECT :clinic,:appointment,u.id,u.email,:event,'email','queued',UTC_TIMESTAMP(),JSON_OBJECT('appointment_id',:payload_id) FROM users u WHERE u.id=:client");$notify->execute(['clinic'=>$actor->clinicId,'appointment'=>$id,'event'=>$event,'payload_id'=>$id,'client'=>$appointment['client_id']]);
             StaffNotificationQueue::enqueue($pdo,$actor->clinicId,$id,(int)$appointment['practitioner_id'],$event);
             $this->audit->write($actor->clinicId,$actor,$correlationId,$audit,'appointment',$id,'success',$reason===''?[]:['reason'=>$reason]);$result=$this->appointment($actor,$id,false);$pdo->commit();
@@ -265,9 +270,11 @@ final class BookingService
         if(($query['scope']??'')==='practitioner'&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
         if($actor->userType==='client'){$sql.=' AND a.client_id=:user';$params['user']=$actor->userId;}elseif($practitionerScope){$sql.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user)';$params['user']=$actor->userId;}
         $view=$query['view']??'all';
-        if(!in_array($view,['all','upcoming','past'],true))throw new ApiException(422,'validation_error','Invalid appointment view.');
+        if(!in_array($view,['all','upcoming','past','needs_outcome'],true))throw new ApiException(422,'validation_error','Invalid appointment view.');
         if($view==='upcoming')$sql.=' AND a.ends_at>=UTC_TIMESTAMP()';
         if($view==='past')$sql.=' AND a.ends_at<UTC_TIMESTAMP()';
+        if($view==='needs_outcome')$sql.=" AND a.ends_at<UTC_TIMESTAMP() AND a.status IN ('confirmed','rescheduled')";
+        if(($query['show_canceled']??'1')==='0')$sql.=" AND a.status NOT IN ('canceled_by_client','canceled_by_clinic')";
         $page=max(1,min(100000,(int)($query['page']??1)));$offset=($page-1)*50;
         $sql.=$view==='upcoming'?' ORDER BY a.starts_at ASC,a.id ASC':' ORDER BY a.starts_at DESC,a.id DESC';
         $sql.=" LIMIT 50 OFFSET {$offset}";$statement=$this->database->connection()->prepare($sql);$statement->execute($params);$rows=$statement->fetchAll();
@@ -275,16 +282,128 @@ final class BookingService
         return $rows;
     }
 
-    /** Appointments for the signed-in practitioner's visible calendar range only. */
+    public static function authorizeReassign(AuthContext $actor): void
+    {
+        if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin'))throw new ApiException(403,'forbidden','Clinic administrator access is required to change an appointment practitioner.');
+    }
+
+    /** Available same-time, same-price practitioners for an existing in-clinic booking. */
+    public function reassignmentOptions(AuthContext $actor,int $id): array
+    {
+        self::authorizeReassign($actor);
+        $appointment=$this->appointment($actor,$id,false);
+        $this->assertReassignable($appointment);
+        return $this->reassignmentCandidates($actor,$appointment);
+    }
+
+    private function reassign(AuthContext $actor,int $id,array $body,string $correlationId): array
+    {
+        self::authorizeReassign($actor);
+        $version=filter_var($body['version']??null,FILTER_VALIDATE_INT);
+        $newPractitionerId=filter_var($body['practitioner_id']??null,FILTER_VALIDATE_INT);
+        $reason=trim((string)($body['reason']??''));
+        if($version===false||$version<1||$newPractitionerId===false||$newPractitionerId<1||$reason===''||strlen($reason)>1000)throw new ApiException(422,'validation_error','A practitioner, current version, and reason are required.');
+        $pdo=$this->database->connection();
+        try{
+            $pdo->beginTransaction();
+            $lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);
+            if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $appointment=$this->appointment($actor,$id,true);
+            if((int)$appointment['version']!==$version){
+                if((int)$appointment['version']===$version+1&&(int)$appointment['practitioner_id']===$newPractitionerId){
+                    $replay=$pdo->prepare('SELECT 1 FROM appointment_reassignments WHERE clinic_id=:clinic AND appointment_id=:appointment AND new_practitioner_id=:practitioner AND actor_user_id=:actor AND reason=:reason ORDER BY id DESC LIMIT 1');
+                    $replay->execute(['clinic'=>$actor->clinicId,'appointment'=>$id,'practitioner'=>$newPractitionerId,'actor'=>$actor->userId,'reason'=>$reason]);
+                    if($replay->fetchColumn()){$pdo->commit();return $appointment;}
+                }
+                throw new ApiException(409,'appointment_changed','This appointment changed. Refresh it before making another change.');
+            }
+            $this->assertReassignable($appointment);
+            if((int)$appointment['practitioner_id']===$newPractitionerId)throw new ApiException(422,'practitioner_unchanged','Choose a different practitioner.');
+            $chosen=null;
+            foreach($this->reassignmentCandidates($actor,$appointment) as $candidate)if((int)$candidate['practitioner_id']===$newPractitionerId){$chosen=$candidate;break;}
+            if($chosen===null)throw new ApiException(409,'reassignment_unavailable','That practitioner cannot take this appointment at the current time, room, and price. Refresh the choices.');
+            $statement=$pdo->prepare('UPDATE appointments SET practitioner_id=:practitioner,version=version+1 WHERE id=:id AND clinic_id=:clinic AND version=:version');
+            $statement->execute(['practitioner'=>$newPractitionerId,'id'=>$id,'clinic'=>$actor->clinicId,'version'=>$version]);
+            if($statement->rowCount()!==1)throw new ApiException(409,'appointment_changed','This appointment changed. Refresh it before making another change.');
+            $record=$pdo->prepare('INSERT INTO appointment_reassignments(clinic_id,appointment_id,old_practitioner_id,new_practitioner_id,actor_user_id,reason) VALUES(:clinic,:appointment,:old,:new,:actor,:reason)');
+            $record->execute(['clinic'=>$actor->clinicId,'appointment'=>$id,'old'=>(int)$appointment['practitioner_id'],'new'=>$newPractitionerId,'actor'=>$actor->userId,'reason'=>$reason]);
+            $reassignmentId=(int)$pdo->lastInsertId();
+            AppointmentReminderQueue::replace($pdo,$actor->clinicId,$id,(int)$appointment['client_id'],(string)$appointment['starts_at'],$version+1);
+            $notify=$pdo->prepare("INSERT INTO notification_events(clinic_id,appointment_id,recipient_user_id,recipient_address,event_code,channel,status,scheduled_at,payload) SELECT :clinic,:appointment,u.id,u.email,'booking_change','email','queued',UTC_TIMESTAMP(),JSON_OBJECT('appointment_id',:payload_id,'change_type','practitioner_reassignment','practitioner_name',:name) FROM users u WHERE u.id=:client");
+            $notify->execute(['clinic'=>$actor->clinicId,'appointment'=>$id,'payload_id'=>$id,'name'=>$chosen['practitioner_name'],'client'=>$appointment['client_id']]);
+            StaffNotificationQueue::enqueue($pdo,$actor->clinicId,$id,(int)$appointment['practitioner_id'],'booking_reassigned_away',$reassignmentId);
+            StaffNotificationQueue::enqueue($pdo,$actor->clinicId,$id,$newPractitionerId,'booking_confirmation');
+            $this->audit->write($actor->clinicId,$actor,$correlationId,'appointment.reassign','appointment',$id,'success',['old_practitioner_id'=>(int)$appointment['practitioner_id'],'new_practitioner_id'=>$newPractitionerId,'reason'=>$reason]);
+            $result=$this->appointment($actor,$id,false);$pdo->commit();
+            ImmediateNotificationDispatch::schedule($this->database,$id);
+            return $result;
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
+
+    private function assertReassignable(array $appointment): void
+    {
+        if($appointment['delivery_mode']!=='clinic')throw new ApiException(422,'reassignment_unsupported','On-Site appointments need a separate travel and coverage review before reassignment.');
+        if(!in_array($appointment['status'],['requested','confirmed','rescheduled'],true)||strtotime((string)$appointment['starts_at'].' UTC')<=time())throw new ApiException(409,'appointment_not_editable','Only future active appointments can be reassigned.');
+        if($appointment['base_price_cents']===null)throw new ApiException(422,'reassignment_unsupported','The appointment needs a saved price before practitioner reassignment.');
+    }
+
+    private function reassignmentCandidates(AuthContext $actor,array $appointment): array
+    {
+        $pdo=$this->database->connection();
+        $query=$pdo->prepare("SELECT p.id practitioner_id,u.display_name practitioner_name,COALESCE(ps.price_override_cents,d.price_cents,s.price_cents) base_price_cents,s.requires_room,s.buffer_before_minutes,s.buffer_after_minutes,l.timezone FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.id=:duration AND d.active=1 JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1 AND ps.offers_clinic=1 JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1 JOIN users u ON u.id=p.user_id AND u.clinic_id=s.clinic_id AND u.status='active' JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=:location_pl AND pl.active=1 JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=:location_sl AND sl.active=1 JOIN locations l ON l.id=:location_l AND l.clinic_id=s.clinic_id AND l.is_bookable=1 WHERE s.id=:service AND s.clinic_id=:clinic AND s.active=1 AND p.id<>:old ORDER BY u.display_name,p.id LIMIT 100");
+        $query->execute(['duration'=>$appointment['duration_option_id'],'location_pl'=>$appointment['location_id'],'location_sl'=>$appointment['location_id'],'location_l'=>$appointment['location_id'],'service'=>$appointment['service_id'],'clinic'=>$actor->clinicId,'old'=>$appointment['practitioner_id']]);
+        $result=[];$start=strtotime((string)$appointment['starts_at'].' UTC');$end=strtotime((string)$appointment['ends_at'].' UTC');
+        foreach($query->fetchAll() as $row){
+            if((int)$row['base_price_cents']!==(int)$appointment['base_price_cents'])continue;
+            if((bool)$row['requires_room']!==($appointment['room_id']!==null))continue;
+            if($start-strtotime((string)$appointment['buffer_starts_at'].' UTC')!==(int)$row['buffer_before_minutes']*60)continue;
+            if(strtotime((string)$appointment['buffer_ends_at'].' UTC')-$end!==(int)$row['buffer_after_minutes']*60)continue;
+            $date=(new DateTimeImmutable((string)$appointment['starts_at'],new DateTimeZone('UTC')))->setTimezone(new DateTimeZone((string)$row['timezone']))->format('Y-m-d');
+            $availability=(new AvailabilityService($this->database))->search(['delivery_mode'=>'clinic','service_id'=>$appointment['service_id'],'practitioner_id'=>$row['practitioner_id'],'location_id'=>$appointment['location_id'],'date_from'=>$date,'date_to'=>$date],(int)$appointment['id'],false,true);
+            foreach($availability['availability'] as $slot){
+                if((int)$slot['duration_option_id']!==(int)$appointment['duration_option_id']||strtotime((string)$slot['starts_at'])!==$start||strtotime((string)$slot['ends_at'])!==$end)continue;
+                if($appointment['room_id']!==null&&!in_array((int)$appointment['room_id'],$slot['available_room_ids'],true))continue;
+                $result[]=['practitioner_id'=>(int)$row['practitioner_id'],'practitioner_name'=>(string)$row['practitioner_name']];
+                break;
+            }
+        }
+        return $result;
+    }
+
+    /** One clinic-scoped appointment for a staff deep link, including paginated-out bookings. */
+    public function getForStaff(AuthContext $actor,int $id,array $query,string $correlationId): array
+    {
+        if($actor->userType!=='staff')throw new ApiException(403,'forbidden','Staff access is required.');
+        self::authorizeList($actor);
+        $scope=$query['scope']??'';
+        if($scope!==''&&$scope!=='practitioner')throw new ApiException(422,'validation_error','Invalid appointment scope.');
+        if($scope==='practitioner'&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
+        $sql="SELECT a.delivery_mode,a.destination_snapshot,a.travel_buffer_minutes,a.base_price_cents,a.mobile_fee_cents,a.cancellation_fee_cents,a.currency,a.id,a.client_id,a.practitioner_id,a.service_id,a.duration_option_id,a.room_id,a.starts_at,a.ends_at,a.status,a.version,s.name service_name,u.display_name client_name,u.email client_email,cp.phone client_phone,cp.preferred_contact client_preferred_contact,pu.display_name practitioner_name,l.name location_name,l.timezone,r.name room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id LEFT JOIN client_profiles cp ON cp.user_id=u.id JOIN practitioners p ON p.id=a.practitioner_id JOIN users pu ON pu.id=p.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.id=:id AND a.clinic_id=:clinic";
+        $params=['id'=>$id,'clinic'=>$actor->clinicId];
+        $ownOnly=(($scope==='practitioner')||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')))&&!$actor->hasPermission('schedule_for_other_practitioners');
+        if($ownOnly){$sql.=' AND p.user_id=:user';$params['user']=$actor->userId;}
+        $statement=$this->database->connection()->prepare($sql);$statement->execute($params);$row=$statement->fetch();
+        if(!$row)throw new ApiException(404,'appointment_not_found','Appointment not found.');
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'appointment.client_contact.view','appointment',$id);
+        if($row['delivery_mode']==='mobile')$this->audit->write($actor->clinicId,$actor,$correlationId,'appointment.destination.view','appointment',$id);
+        return $row;
+    }
+
+    /** Appointments and time off for the signed-in practitioner's visible calendar range only. */
     public function practitionerCalendar(AuthContext $actor,array $query): array
     {
         self::authorizePractitionerCalendar($actor);
         [$start,$end]=self::calendarRange($query);
-        $sql="SELECT a.id,a.starts_at,a.ends_at,a.status,a.delivery_mode,s.name service_name,u.display_name client_name,l.name location_name,l.timezone FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1 JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.clinic_id=:clinic AND a.starts_at<:end AND a.ends_at>:start ORDER BY a.starts_at,a.id LIMIT 1001";
+        $sql="SELECT 'appointment' kind,a.id,a.starts_at,a.ends_at,a.status,a.delivery_mode,s.name service_name,u.display_name client_name,l.name location_name,l.timezone FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1 JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.clinic_id=:clinic AND a.starts_at<:end AND a.ends_at>:start ORDER BY a.starts_at,a.id LIMIT 1001";
         $statement=$this->database->connection()->prepare($sql);
         $statement->execute(['user'=>$actor->userId,'clinic'=>$actor->clinicId,'start'=>$start,'end'=>$end]);
         $rows=$statement->fetchAll();
         if(count($rows)>1000)throw new ApiException(422,'calendar_range_too_busy','Too many appointments in this calendar range.');
+        $timeOff=$this->database->connection()->prepare("SELECT 'time_off' kind,t.id,t.starts_at,t.ends_at,t.reason_type,l.name location_name FROM time_off t JOIN practitioners p ON p.id=t.practitioner_id AND p.user_id=:user AND p.active=1 JOIN users u ON u.id=p.user_id AND u.clinic_id=:clinic LEFT JOIN locations l ON l.id=t.location_id AND l.clinic_id=u.clinic_id WHERE t.starts_at<:end AND t.ends_at>:start ORDER BY t.starts_at,t.id LIMIT 1001");
+        $timeOff->execute(['user'=>$actor->userId,'clinic'=>$actor->clinicId,'start'=>$start,'end'=>$end]);
+        $rows=array_merge($rows,$timeOff->fetchAll());
+        if(count($rows)>1000)throw new ApiException(422,'calendar_range_too_busy','Too many calendar entries in this range.');
+        usort($rows,static fn(array $a,array $b): int=>[$a['starts_at'],$a['kind'],$a['id']]<=>[$b['starts_at'],$b['kind'],$b['id']]);
         return $rows;
     }
 

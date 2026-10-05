@@ -15,14 +15,21 @@ use Wellness\Http\Response;
 use Wellness\Service\AuditLogger;
 use Wellness\Service\AdminService;
 use Wellness\Service\AddressCoverageService;
+use Wellness\Service\AppointmentLogisticsNotesService;
 use Wellness\Service\AvailabilityService;
 use Wellness\Service\BookingService;
 use Wellness\Service\CatalogService;
 use Wellness\Service\ProfileService;
+use Wellness\Service\PractitionerPublicProfileService;
+use Wellness\Service\PractitionerTravelService;
+use Wellness\Service\PractitionerVisitService;
+use Wellness\Service\PractitionerQualificationService;
 use Wellness\Service\ClientService;
 use Wellness\Service\CustomerOnboarding;
 use Wellness\Service\DashboardService;
 use Wellness\Service\NotificationStatusService;
+use Wellness\Service\NotificationReviewService;
+use Wellness\Service\ReminderScheduleService;
 use Wellness\Service\StaffNotificationPreferences;
 use function FastRoute\simpleDispatcher;
 
@@ -32,17 +39,24 @@ final class Api
     private CatalogService $catalog;
     private AvailabilityService $availability;
     private BookingService $bookings;
+    private AppointmentLogisticsNotesService $appointmentLogisticsNotes;
     private AdminService $admin;
     private ProfileService $profiles;
+    private PractitionerPublicProfileService $publicProfiles;
     private ClientService $clients;
     private AddressCoverageService $addressCoverage;
+    private PractitionerTravelService $practitionerTravel;
+    private PractitionerVisitService $practitionerVisits;
+    private PractitionerQualificationService $practitionerQualifications;
     private DashboardService $dashboard;
     private NotificationStatusService $notificationStatus;
+    private NotificationReviewService $notificationReviews;
+    private ReminderScheduleService $reminderSchedules;
     private StaffNotificationPreferences $staffNotifications;
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
     }
 
     public function handle(): never
@@ -76,6 +90,11 @@ final class Api
                 $routes->addRoute('DELETE','/api/v1/dashboard/preferences','resetDashboardPreferences');
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets','adminDashboardWidgets');
                 $routes->addRoute('GET','/api/v1/admin/notifications','adminNotifications');
+                $routes->addRoute('GET','/api/v1/practitioner/notifications','practitionerNotifications');
+                $routes->addRoute('POST','/api/v1/admin/notifications/{id:\d+}/review','reviewNotification');
+                $routes->addRoute('GET','/api/v1/admin/reminder-schedules','reminderSchedules');
+                $routes->addRoute('POST','/api/v1/admin/reminder-schedules','createReminderSchedule');
+                $routes->addRoute('PATCH','/api/v1/admin/reminder-schedules/{id:\d+}','toggleReminderSchedule');
                 $routes->addRoute('POST','/api/v1/admin/dashboard-widgets','uploadDashboardWidget');
                 $routes->addRoute('PATCH','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}','toggleDashboardWidget');
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions','dashboardWidgetVersions');
@@ -84,6 +103,15 @@ final class Api
                 $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
                 $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
                 $routes->addRoute('DELETE','/api/v1/profile/avatar','deleteProfileAvatar');
+                $routes->addRoute('GET','/api/v1/profile/public-card','myPublicCard');
+                $routes->addRoute('PUT','/api/v1/profile/public-card','updateMyPublicCard');
+                $routes->addRoute('GET','/api/v1/qualifications/types','qualificationTypes');
+                $routes->addRoute('POST','/api/v1/admin/qualifications/types','createQualificationType');
+                $routes->addRoute('GET','/api/v1/profile/qualifications','myQualifications');
+                $routes->addRoute('POST','/api/v1/profile/qualifications','submitMyQualification');
+                $routes->addRoute('GET','/api/v1/admin/practitioners/{id:\d+}/qualifications','practitionerQualifications');
+                $routes->addRoute('POST','/api/v1/admin/practitioners/{id:\d+}/qualifications','submitPractitionerQualification');
+                $routes->addRoute('PATCH','/api/v1/admin/qualifications/{id:\d+}/review','reviewQualification');
                 $routes->addRoute('GET','/api/v1/profile/notifications','staffNotificationPreferences');
                 $routes->addRoute('PUT','/api/v1/profile/notifications','saveStaffNotificationPreferences');
                 $routes->addRoute('POST','/api/v1/profile/notifications/send-code','sendStaffNotificationCode');
@@ -92,13 +120,25 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/users/{id:\\d+}/avatar','adminAvatar');
                 $routes->addRoute('DELETE','/api/v1/admin/users/{id:\\d+}/avatar','adminDeleteAvatar');
                 $routes->addRoute('GET','/api/v1/appointments','appointments');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}','appointmentDetails');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/reassignment-options','appointmentReassignmentOptions');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/logistics-notes','appointmentLogisticsNotes');
+                $routes->addRoute('POST','/api/v1/appointments/{id:\\d+}/logistics-notes','createAppointmentLogisticsNote');
                 $routes->addRoute('GET','/api/v1/practitioner/calendar','practitionerCalendar');
+                $routes->addRoute('GET','/api/v1/practitioner/next-onsite','practitionerNextOnsite');
+                $routes->addRoute('POST','/api/v1/practitioner/next-onsite/{id:\d+}/travel-estimate','practitionerTravelEstimate');
+                $routes->addRoute('GET','/api/v1/practitioner/today','practitionerToday');
+                $routes->addRoute('GET','/api/v1/practitioner/visit-summary','practitionerVisitSummary');
+                $routes->addRoute('GET','/api/v1/practitioner/appointments/{id:\d+}/visit-history','practitionerVisitHistory');
+                $routes->addRoute('POST','/api/v1/practitioner/today/{id:\d+}/milestone','practitionerVisitMilestone');
+                $routes->addRoute('POST','/api/v1/practitioner/today/{id:\d+}/outcome','practitionerVisitOutcome');
                 $routes->addRoute('POST','/api/v1/appointments','createAppointment');
                 $routes->addRoute('PATCH','/api/v1/appointments/{id:\\d+}','updateAppointment');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/availability','appointmentAvailability');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/cancellation-preview','appointmentCancellationPreview');
                 $routes->addRoute('GET','/api/v1/booking-options','bookingOptions');
                 $routes->addRoute('GET','/api/v1/booking-clients','bookingClients');
+                $routes->addRoute('GET','/api/v1/practitioner/clients','practitionerClients');
                 $routes->addRoute('GET','/api/v1/booking-clients/{id:\\d+}/address','bookingClientAddress');
                 $routes->addRoute('POST','/api/v1/address-coverage/validate','validateAddressCoverage');
                 $routes->addRoute('POST','/api/v1/address-coverage/approval','addressCoverageApproval');
@@ -146,16 +186,21 @@ final class Api
                 $routes->addRoute('POST','/api/v1/admin/availability-overrides','createAvailabilityOverride');
                 $routes->addRoute('PATCH','/api/v1/admin/availability-overrides/{id:\\d+}','updateAvailabilityOverride');
                 $routes->addRoute('POST','/api/v1/admin/time-off','createTimeOff');
+                $routes->addRoute('POST','/api/v1/admin/time-off/impact','previewTimeOffImpact');
+                $routes->addRoute('GET','/api/v1/admin/time-off/{id:\\d+}/impact','timeOffImpact');
                 $routes->addRoute('PATCH','/api/v1/admin/time-off/{id:\\d+}','updateTimeOff');
                 $routes->addRoute('DELETE','/api/v1/admin/availability-overrides/{id:\\d+}','deleteAvailabilityOverride');
                 $routes->addRoute('DELETE','/api/v1/admin/time-off/{id:\\d+}','deleteTimeOff');
                 $routes->addRoute('GET','/api/v1/practitioner/availability-context','practitionerAvailabilityContext');
                 $routes->addRoute('PATCH','/api/v1/admin/clinic','updateClinic');
+                $routes->addRoute('PUT','/api/v1/admin/clinic/portal-theme','updatePortalTheme');
+                $routes->addRoute('PUT','/api/v1/admin/clinic/portal-welcome','updatePortalWelcome');
                 $routes->addRoute('GET','/api/v1/admin/clinic/branding','branding');
                 $routes->addRoute('PUT','/api/v1/admin/clinic/branding/{type:logo|favicon}','saveBrandAsset');
                 $routes->addRoute('DELETE','/api/v1/admin/clinic/branding/{type:logo|favicon}','deleteBrandAsset');
                 $routes->addRoute('GET','/api/v1/admin/catalogue-settings','catalogueSettings');
                 $routes->addRoute('POST','/api/v1/admin/service-categories','createServiceCategory');
+                $routes->addRoute('PATCH','/api/v1/admin/service-categories/{id:\\d+}','updateServiceCategory');
                 $routes->addRoute('POST','/api/v1/admin/taxes','createTax');
                 $routes->addRoute('PATCH','/api/v1/admin/booking-settings','updateBookingSettings');
             });
@@ -176,7 +221,7 @@ final class Api
                 'practitioners'=>$this->catalog->practitioners(isset($request->query['service_id'])?(int)$request->query['service_id']:null),
                 'team'=>$this->catalog->team(),
                 'teamImage'=>$this->teamImage($request,(string)$route[2]['slug']),
-                'availability'=>$this->availability->search($request->query),
+                'availability'=>$this->availability->publicSearch($request->query),
                 'me'=>$this->me($this->user($request)),
                 'dashboard'=>$this->dashboard->summary($this->user($request),(string)($request->query['workspace']??'')),
                 'dashboardPreferences'=>$this->dashboard->preferences($this->user($request),(string)($request->query['workspace']??'')),
@@ -184,6 +229,11 @@ final class Api
                 'resetDashboardPreferences'=>$this->dashboard->resetPreferences($this->user($request),(string)($request->query['workspace']??'')),
                 'adminDashboardWidgets'=>$this->dashboard->adminList($this->user($request)),
                 'adminNotifications'=>$this->notificationStatus->list($this->user($request),$request->query),
+                'practitionerNotifications'=>$this->notificationStatus->practitionerList($this->user($request),$request->query),
+                'reviewNotification'=>$this->notificationReviews->review($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'reminderSchedules'=>$this->reminderSchedules->list($this->user($request)),
+                'createReminderSchedule'=>$this->reminderSchedules->create($this->user($request),$request->body,$request->correlationId),
+                'toggleReminderSchedule'=>$this->reminderSchedules->setActive($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'uploadDashboardWidget'=>$this->dashboard->upload($this->user($request),$request->body,$request->correlationId),
                 'toggleDashboardWidget'=>$this->dashboard->setEnabled($this->user($request),(string)$route[2]['id'],$request->body,$request->correlationId),
                 'dashboardWidgetVersions'=>$this->dashboard->versions($this->user($request),(string)$route[2]['id']),
@@ -192,6 +242,15 @@ final class Api
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
                 'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),
                 'deleteProfileAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId),
+                'myPublicCard'=>$this->publicProfiles->get($this->user($request)),
+                'updateMyPublicCard'=>$this->publicProfiles->update($this->user($request),$request->body,$request->correlationId),
+                'qualificationTypes'=>$this->practitionerQualifications->types($this->user($request)),
+                'createQualificationType'=>$this->practitionerQualifications->createType($this->user($request),$request->body,$request->correlationId),
+                'myQualifications'=>$this->practitionerQualifications->list($this->user($request)),
+                'submitMyQualification'=>$this->practitionerQualifications->submit($this->user($request),$request->body,$request->correlationId),
+                'practitionerQualifications'=>$this->practitionerQualifications->list($this->user($request),(int)$route[2]['id']),
+                'submitPractitionerQualification'=>$this->practitionerQualifications->submit($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'reviewQualification'=>$this->practitionerQualifications->review($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'staffNotificationPreferences'=>$this->staffNotifications->get($this->user($request)),
                 'saveStaffNotificationPreferences'=>$this->staffNotifications->save($this->user($request),$request->body,$request->correlationId),
                 'sendStaffNotificationCode'=>$this->staffNotifications->sendVerification($this->user($request),$request->correlationId),
@@ -200,9 +259,21 @@ final class Api
                 'adminAvatar'=>$this->profiles->avatar($this->user($request),(int)$route[2]['id']),
                 'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
+                'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'appointmentReassignmentOptions'=>$this->bookings->reassignmentOptions($this->user($request),(int)$route[2]['id']),
+                'appointmentLogisticsNotes'=>$this->appointmentLogisticsNotes->list($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'createAppointmentLogisticsNote'=>$this->appointmentLogisticsNotes->create($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'practitionerCalendar'=>$this->bookings->practitionerCalendar($this->user($request),$request->query),
+                'practitionerNextOnsite'=>$this->practitionerTravel->next($this->user($request)),
+                'practitionerTravelEstimate'=>$this->practitionerTravel->estimate($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'practitionerToday'=>$this->practitionerVisits->today($this->user($request),$request->correlationId),
+                'practitionerVisitSummary'=>$this->practitionerVisits->summary($this->user($request)),
+                'practitionerVisitHistory'=>$this->practitionerVisits->history($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'practitionerVisitMilestone'=>$this->practitionerVisits->milestone($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'practitionerVisitOutcome'=>$this->practitionerVisits->outcome($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
+                'practitionerClients'=>$this->clients->practitionerList($this->user($request),$request->query),
                 'bookingClientAddress'=>$this->bookings->bookingClientAddress($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'validateAddressCoverage'=>$this->addressCoverage->validate($this->user($request),$request->body),
                 'addressCoverageApproval'=>$this->addressCoverage->approvalStatus($this->user($request),$request->body),
@@ -254,16 +325,21 @@ final class Api
                 'createAvailabilityOverride'=>$this->admin->createAvailabilityOverride($this->user($request),$request->body,$request->correlationId),
                 'updateAvailabilityOverride'=>$this->admin->updateAvailabilityOverride($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createTimeOff'=>$this->admin->createTimeOff($this->user($request),$request->body,$request->correlationId),
+                'previewTimeOffImpact'=>$this->admin->previewTimeOffImpact($this->user($request),$request->body),
+                'timeOffImpact'=>$this->admin->timeOffImpact($this->user($request),(int)$route[2]['id']),
                 'updateTimeOff'=>$this->admin->updateTimeOff($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'deleteAvailabilityOverride'=>$this->admin->deleteScheduleException($this->user($request),'availability_overrides',(int)$route[2]['id'],$request->correlationId),
                 'deleteTimeOff'=>$this->admin->deleteScheduleException($this->user($request),'time_off',(int)$route[2]['id'],$request->correlationId),
                 'practitionerAvailabilityContext'=>$this->admin->practitionerAvailabilityContext($this->user($request)),
                 'updateClinic'=>$this->admin->updateClinic($this->user($request),$request->body,$request->correlationId),
+                'updatePortalTheme'=>$this->admin->updatePortalTheme($this->user($request),$request->body,$request->correlationId),
+                'updatePortalWelcome'=>$this->admin->updatePortalWelcome($this->user($request),$request->body,$request->correlationId),
                 'branding'=>$this->admin->branding($this->user($request)),
                 'saveBrandAsset'=>$this->admin->saveBrandAsset($this->user($request),(string)$route[2]['type'],$request->body,$request->correlationId),
                 'deleteBrandAsset'=>$this->admin->deleteBrandAsset($this->user($request),(string)$route[2]['type'],$request->correlationId),
                 'catalogueSettings'=>$this->admin->catalogueSettings($this->user($request)),
                 'createServiceCategory'=>$this->admin->createServiceCategory($this->user($request),$request->body,$request->correlationId),
+                'updateServiceCategory'=>$this->admin->updateServiceCategory($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createTax'=>$this->admin->createTax($this->user($request),$request->body,$request->correlationId),
                 'updateBookingSettings'=>$this->admin->updateBookingSettings($this->user($request),$request->body,$request->correlationId),
                 default=>throw new ApiException(500,'route_handler_missing','Route handler is not configured.'),
@@ -324,7 +400,7 @@ final class Api
             'POST invitations/accept' => $service->accept($identity, $r->body, $r->correlationId),
             'GET profile' => $service->profile($identity, $r->correlationId),
             'PATCH profile' => $service->saveProfile($identity, $r->body, $r->correlationId),
-            'GET appointments' => $service->appointments($identity, $r->correlationId),
+            'GET appointments' => $service->appointments($identity, $r->correlationId, ($r->query['show_canceled'] ?? '1') !== '0'),
             'GET booking-options' => $this->bookings->options($bookingActor()),
             'GET availability' => $this->bookings->customerAvailability($bookingActor(), $r->query),
             'POST address-coverage/validate' => $this->addressCoverage->validate($bookingActor(), $r->body),

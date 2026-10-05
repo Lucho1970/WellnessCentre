@@ -8,13 +8,15 @@ export type CustomerBookingIntent = {
 };
 
 const key = 'wellness.customer.booking-intent.v1';
+export const bookingSignInKey = 'wellness.customer.booking-sign-in.v1';
 
-export function captureCustomerBookingIntent(url = new URL(window.location.href)): void {
-  if (!url.pathname.endsWith('/client/book')) return;
+export function captureCustomerBookingIntent(url = new URL(window.location.href)): boolean {
+  if (!url.pathname.endsWith('/client/book') && !url.pathname.endsWith('/book')) return false;
   const value = Object.fromEntries(['delivery_mode','location_id','service_id','practitioner_id','duration_option_id','starts_at'].map(name => [name, url.searchParams.get(name) ?? ''])) as CustomerBookingIntent;
   const numeric = ['location_id','service_id','practitioner_id','duration_option_id'] as const;
-  if (!['clinic','mobile'].includes(value.delivery_mode) || numeric.some(name => !/^\d+$/.test(value[name])) || Number.isNaN(Date.parse(value.starts_at))) return;
+  if (!['clinic','mobile'].includes(value.delivery_mode) || numeric.some(name => !/^\d+$/.test(value[name])) || Number.isNaN(Date.parse(value.starts_at))) return false;
   sessionStorage.setItem(key, JSON.stringify(value));
+  return true;
 }
 
 export function customerBookingIntent(): CustomerBookingIntent | null {
@@ -24,4 +26,11 @@ export function customerBookingIntent(): CustomerBookingIntent | null {
   } catch { return null; }
 }
 
-export function clearCustomerBookingIntent(): void { sessionStorage.removeItem(key); }
+export function clearCustomerBookingIntent(): void {
+  sessionStorage.removeItem(key);
+  if ((window.location.pathname.endsWith('/client/book') || window.location.pathname.endsWith('/book')) && window.location.search) {
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState(null, '', url.href);
+  }
+}

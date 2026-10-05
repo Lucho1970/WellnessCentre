@@ -23,14 +23,15 @@ const settingLabels: Record<keyof Settings, string> = {
 export function CatalogueSettings() {
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
-  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: number; name: string; name_fr: string | null; description: string | null; description_fr: string | null }[]>([]);
   const [taxes, setTaxes] = useState<{ id: number; code: string; name: string; rate_basis_points: number }[]>([]);
   const [settings, setSettings] = useState<Settings>({
     default_lead_time_minutes: 60,
     default_booking_horizon_days: 90,
     default_cancellation_window_minutes: 1440,
   });
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState({ name: '', name_fr: '', description: '', description_fr: '' });
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [tax, setTax] = useState({ code: 'HST', name: 'Harmonized Sales Tax', rate: '13' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -70,9 +71,15 @@ export function CatalogueSettings() {
       markClean();
       await load();
       setMessage(text);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t('Unable to save settings.'));
+      return false;
     }
+  };
+  const saveCategory = async () => {
+    const saved=await done(() => request(editingCategoryId ? `/admin/service-categories/${editingCategoryId}` : '/admin/service-categories', editingCategoryId ? 'PATCH' : 'POST', category), t(editingCategoryId ? 'Category updated.' : 'Category added.'), categoryGuard.markClean);
+    if (saved) { setCategory({ name: '', name_fr: '', description: '', description_fr: '' });setEditingCategoryId(null); }
   };
 
   return (
@@ -95,11 +102,14 @@ export function CatalogueSettings() {
         <Grid size={{ xs: 12, md: 6 }}>
           <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
             <Typography variant="h5">{t('Service categories')}</Typography>
-            <Stack direction="row" spacing={1} my={2} onChange={categoryGuard.markDirty}>
-              <TextField fullWidth label={t('Category name')} value={category} onChange={(event) => setCategory(event.target.value)} />
-              <Button startIcon={<Plus size={16} />} onClick={() => done(() => request('/admin/service-categories', 'POST', { name: category }), t('Category added.'), categoryGuard.markClean)}>{t('Add')}</Button>
+            <Stack spacing={1} my={2} onChange={categoryGuard.markDirty}>
+              <TextField label={t('Category name (English)')} value={category.name} onChange={(event) => setCategory(current => ({...current,name:event.target.value}))} inputProps={{maxLength:120}} />
+              <TextField label={t('Category name (French)')} value={category.name_fr} onChange={(event) => setCategory(current => ({...current,name_fr:event.target.value}))} inputProps={{maxLength:120}} />
+              <TextField label={t('Category description (English)')} multiline minRows={2} value={category.description} onChange={(event) => setCategory(current => ({...current,description:event.target.value}))} inputProps={{maxLength:500}} />
+              <TextField label={t('Category description (French)')} multiline minRows={2} value={category.description_fr} onChange={(event) => setCategory(current => ({...current,description_fr:event.target.value}))} inputProps={{maxLength:500}} />
+              <Stack direction="row" gap={1}><Button startIcon={editingCategoryId ? <Save size={16}/> : <Plus size={16}/>} onClick={() => void saveCategory()} disabled={!category.name.trim()}>{t(editingCategoryId ? 'Save category' : 'Add')}</Button>{editingCategoryId&&<Button onClick={()=>{setEditingCategoryId(null);setCategory({name:'',name_fr:'',description:'',description_fr:''});categoryGuard.markClean();}}>{t('Cancel')}</Button>}</Stack>
             </Stack>
-            {categories.map((item) => <Typography key={item.id} sx={{ py: 0.5 }}>{item.name}</Typography>)}
+            {categories.map((item) => <Stack key={item.id} direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{py:0.5}}><Typography>{item.name}{item.name_fr ? ` / ${item.name_fr}` : ''}</Typography><Button size="small" onClick={()=>{setEditingCategoryId(item.id);setCategory({name:item.name,name_fr:item.name_fr??'',description:item.description??'',description_fr:item.description_fr??''});}}>{t('Edit')}</Button></Stack>)}
           </Paper>
         </Grid>
 

@@ -9,6 +9,18 @@ duplicate warnings, invite clients created by others, or approve identity links.
 The client can accept the invitation, but an authorized clinic reviewer must verify
 the person's identity and approve the link before the account sees client records.
 
+The practitioner workspace also has **My clients**, a read-only, searchable contact
+list limited to clients with an appointment assigned to the signed-in practitioner
+or clients that practitioner created for booking. It shows minimal contact details,
+appointment count, and a link to the latest assigned appointment. It never exposes
+the clinic-wide Clients directory, administrative notes, clinical records, or
+another practitioner's clients. The client detail panel has **Book appointment**,
+which opens the existing booking form with that client selected. The Operations
+client and service detail panels, the practitioner calendar, availability page,
+and dashboard also provide direct booking actions. A service-initiated booking
+preselects the service when it is offered in the staff booking options; all normal
+booking validation and permissions still apply.
+
 ## Delivered scope
 
 Practitioners configured as **Practitioner managed** can use **Practitioner workspace →
@@ -86,3 +98,24 @@ Before production use, verify against deployed MySQL and signed-in Entra users:
 Local acceptance includes PHP syntax and policy tests, production frontend builds, resource
 catalog parity, and the Playwright practitioner booking/rescheduling workflow. Hosted MySQL
 race and notification-delivery acceptance remain required.
+
+## Appointment logistics notes
+
+The appointment details panel has an append-only logistics history for directions such as
+“use the side entrance,” “call on arrival,” and “bring a portable table.” Notes are attached
+to one appointment, not to the client's general profile or treatment record. Each entry
+shows its author and creation time. This is **not** a place for symptoms, treatment plans,
+or other health information. Notes are not inserted into email, SMS, or calendar invitations.
+
+Clinic administrators and reception can read and add notes for appointments in their clinic.
+A practitioner can read and add notes only for appointments assigned to them, including
+past or canceled appointments. Clients and accountants cannot access this API. The server
+enforces clinic and assignment scope on both reads and writes and audits each operation
+without recording note contents in the audit log.
+
+For an existing database, apply `api/database/migrations/025_appointment_logistics_notes.sql`
+once **before** deploying the matching private API and portal frontend. Fresh installations
+get the table from `api/database/schema.sql`. The API contract is in
+`api/practitioner-appointments.openapi.yaml`. Test with two practitioner accounts to
+verify that one cannot access the other's notes by changing the appointment ID, then
+check that an authorized note appears with author/time and nowhere in client messages.

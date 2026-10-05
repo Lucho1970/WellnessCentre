@@ -103,7 +103,7 @@ final class AdminService
         if($data===false||strlen($data)>750_000)throw new ApiException(422,'validation_error','The image is invalid or larger than 750 KB.');
         $info=@getimagesizefromstring($data);$actualMime=$info['mime']??'';$width=(int)($info[0]??0);$height=(int)($info[1]??0);
         if($info===false||$actualMime!==$mime)throw new ApiException(422,'validation_error','The image content does not match its format.');
-        if($type==='logo'&&($width<64||$height<32||$width>1200||$height>600))throw new ApiException(422,'validation_error','The logo must be between 64×32 and 1200×600 pixels.');
+        if($type==='logo'&&($width<64||$height<32||$width>1200||$height>600))throw new ApiException(422,'validation_error','The logo must be between 64Ã—32 and 1200Ã—600 pixels.');
         if($type==='favicon'&&($width!==$height||$width<32||$width>512))throw new ApiException(422,'validation_error','The favicon must be square and between 32 and 512 pixels.');
         $statement=$this->database->connection()->prepare('INSERT INTO clinic_brand_assets(clinic_id,asset_type,mime_type,image_data,byte_size,width_px,height_px,content_hash,updated_by) VALUES(:clinic,:type,:mime,:data,:size,:width,:height,:hash,:actor) ON DUPLICATE KEY UPDATE mime_type=VALUES(mime_type),image_data=VALUES(image_data),byte_size=VALUES(byte_size),width_px=VALUES(width_px),height_px=VALUES(height_px),content_hash=VALUES(content_hash),updated_by=VALUES(updated_by)');
         $statement->bindValue(':clinic',$actor->clinicId,\PDO::PARAM_INT);$statement->bindValue(':type',$type);$statement->bindValue(':mime',$mime);$statement->bindValue(':data',$data,\PDO::PARAM_LOB);$statement->bindValue(':size',strlen($data),\PDO::PARAM_INT);$statement->bindValue(':width',$width,\PDO::PARAM_INT);$statement->bindValue(':height',$height,\PDO::PARAM_INT);$statement->bindValue(':hash',hash('sha256',$data));$statement->bindValue(':actor',$actor->userId,\PDO::PARAM_INT);$statement->execute();
@@ -118,8 +118,21 @@ final class AdminService
         $this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.branding.delete','clinic',$actor->clinicId,'success',['asset_type'=>$type]);
         return ['asset_type'=>$type,'deleted'=>$statement->rowCount()>0];
     }
-    public function catalogueSettings(AuthContext $actor): array{$this->superAdmin($actor);$pdo=$this->database->connection();$c=$pdo->prepare('SELECT id,name,description FROM service_categories WHERE clinic_id=:clinic ORDER BY name');$c->execute(['clinic'=>$actor->clinicId]);$t=$pdo->prepare('SELECT id,code,name,rate_basis_points,active FROM taxes WHERE clinic_id=:clinic ORDER BY name');$t->execute(['clinic'=>$actor->clinicId]);$s=$pdo->prepare('SELECT default_lead_time_minutes,default_booking_horizon_days,default_cancellation_window_minutes,slot_increment_minutes,currency FROM clinic_booking_settings WHERE clinic_id=:clinic');$s->execute(['clinic'=>$actor->clinicId]);return ['categories'=>$c->fetchAll(),'taxes'=>$t->fetchAll(),'settings'=>$s->fetch()?:null];}
-    public function createServiceCategory(AuthContext $actor,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['name']);$name=trim((string)$body['name']);if(strlen($name)>120)throw new ApiException(422,'validation_error','Category name is too long.');$s=$this->database->connection()->prepare('INSERT INTO service_categories(clinic_id,name,description) VALUES(:clinic,:name,:description)');$s->execute(['clinic'=>$actor->clinicId,'name'=>$name,'description'=>$this->optional($body,'description')]);return $this->created($actor,$cid,'service_category',(int)$this->database->connection()->lastInsertId());}
+    public function catalogueSettings(AuthContext $actor): array{$this->superAdmin($actor);$pdo=$this->database->connection();$c=$pdo->prepare('SELECT id,name,name_fr,description,description_fr FROM service_categories WHERE clinic_id=:clinic ORDER BY name');$c->execute(['clinic'=>$actor->clinicId]);$t=$pdo->prepare('SELECT id,code,name,rate_basis_points,active FROM taxes WHERE clinic_id=:clinic ORDER BY name');$t->execute(['clinic'=>$actor->clinicId]);$s=$pdo->prepare('SELECT default_lead_time_minutes,default_booking_horizon_days,default_cancellation_window_minutes,slot_increment_minutes,currency FROM clinic_booking_settings WHERE clinic_id=:clinic');$s->execute(['clinic'=>$actor->clinicId]);return ['categories'=>$c->fetchAll(),'taxes'=>$t->fetchAll(),'settings'=>$s->fetch()?:null];}
+    private function categoryCopy(array $body): array
+    {
+        $name=trim((string)($body['name']??''));$nameFr=trim((string)($body['name_fr']??''));$description=trim((string)($body['description']??''));$descriptionFr=trim((string)($body['description_fr']??''));
+        if($name===''||strlen($name)>120||strlen($nameFr)>120||strlen($description)>500||strlen($descriptionFr)>500)throw new ApiException(422,'validation_error','Choose valid category names and descriptions.');
+        return ['name'=>$name,'name_fr'=>$nameFr?:null,'description'=>$description?:null,'description_fr'=>$descriptionFr?:null];
+    }
+    public function createServiceCategory(AuthContext $actor,array $body,string $cid): array
+    {
+        $this->superAdmin($actor);$copy=$this->categoryCopy($body);$s=$this->database->connection()->prepare('INSERT INTO service_categories(clinic_id,name,name_fr,description,description_fr) VALUES(:clinic,:name,:name_fr,:description,:description_fr)');$s->execute(['clinic'=>$actor->clinicId]+$copy);return $this->created($actor,$cid,'service_category',(int)$this->database->connection()->lastInsertId());
+    }
+    public function updateServiceCategory(AuthContext $actor,int $id,array $body,string $cid): array
+    {
+        $this->superAdmin($actor);$copy=$this->categoryCopy($body);$s=$this->database->connection()->prepare('UPDATE service_categories SET name=:name,name_fr=:name_fr,description=:description,description_fr=:description_fr WHERE id=:id AND clinic_id=:clinic');$s->execute($copy+['id'=>$id,'clinic'=>$actor->clinicId]);$check=$this->database->connection()->prepare('SELECT 1 FROM service_categories WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$id,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'category_not_found','Category not found.');$this->audit->write($actor->clinicId,$actor,$cid,'service_category.update','service_category',$id);return ['id'=>$id];
+    }
     public function createTax(AuthContext $actor,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['code','name','rate_basis_points']);$rate=(int)$body['rate_basis_points'];if($rate<0||$rate>10000)throw new ApiException(422,'validation_error','Tax rate must be between 0 and 100%.');$s=$this->database->connection()->prepare('INSERT INTO taxes(clinic_id,code,name,rate_basis_points) VALUES(:clinic,:code,:name,:rate)');$s->execute(['clinic'=>$actor->clinicId,'code'=>strtoupper(trim((string)$body['code'])),'name'=>trim((string)$body['name']),'rate'=>$rate]);return $this->created($actor,$cid,'tax',(int)$this->database->connection()->lastInsertId());}
     public function updateBookingSettings(AuthContext $actor,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['default_lead_time_minutes','default_booking_horizon_days','default_cancellation_window_minutes']);$s=$this->database->connection()->prepare("INSERT INTO clinic_booking_settings(clinic_id,default_lead_time_minutes,default_booking_horizon_days,default_cancellation_window_minutes,slot_increment_minutes,currency) VALUES(:clinic,:lead,:horizon,:cancel,15,'CAD') ON DUPLICATE KEY UPDATE default_lead_time_minutes=VALUES(default_lead_time_minutes),default_booking_horizon_days=VALUES(default_booking_horizon_days),default_cancellation_window_minutes=VALUES(default_cancellation_window_minutes)");$s->execute(['clinic'=>$actor->clinicId,'lead'=>(int)$body['default_lead_time_minutes'],'horizon'=>(int)$body['default_booking_horizon_days'],'cancel'=>(int)$body['default_cancellation_window_minutes']]);$this->audit->write($actor->clinicId,$actor,$cid,'booking.settings.update','clinic',$actor->clinicId);return ['updated'=>true];}
 
@@ -213,7 +226,7 @@ final class AdminService
         $this->superAdmin($actor);
         $statement = $this->database->connection()->prepare(
             "SELECT u.id AS user_id,u.given_name,u.family_name,u.display_name,u.status,p.id AS practitioner_id,
-                    t.slug,t.section,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.display_order,t.published,t.show_booking_action,
+                    t.slug,t.section,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.public_website_url,t.public_contact_email,t.public_contact_phone,t.public_contact_sms,t.display_order,t.published,t.show_booking_action,
                     CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image
                FROM users u
                JOIN staff_accounts a ON a.user_id=u.id
@@ -239,6 +252,7 @@ final class AdminService
         $titleFr = $this->optional($body, 'public_title_fr');
         $summary = $this->optional($body, 'summary');
         $summaryFr = $this->optional($body, 'summary_fr');
+        $contact = $section === 'practitioner' ? PublicCardContact::fromInput($body) : ['email' => null, 'phone' => null, 'sms' => 0, 'website' => null];
         $order = (int)($body['display_order'] ?? 100);
         $published = (bool)($body['published'] ?? false);
         $showBooking = (bool)($body['show_booking_action'] ?? false);
@@ -256,11 +270,11 @@ final class AdminService
         if (!$staff) throw new ApiException(404,'staff_not_found','Staff member not found.');
         if ($section==='practitioner' && !$staff['practitioner_id']) throw new ApiException(422,'validation_error','Only an active practitioner can appear in the practitioner section.',['section'=>'Active practitioner required']);
         if ($showBooking && ($section!=='practitioner' || !$staff['practitioner_id'])) throw new ApiException(422,'validation_error','Booking can only be shown for an active practitioner.',['show_booking_action'=>'Active practitioner required']);
-        $statement = $pdo->prepare("INSERT INTO public_team_profiles(user_id,clinic_id,slug,section,public_name,booking_name,public_title,public_title_fr,summary,summary_fr,display_order,published,show_booking_action,updated_by)
-            VALUES(:user,:clinic,:slug,:section,:public_name,:booking_name,:title,:title_fr,:summary,:summary_fr,:display_order,:published,:booking,:actor)
-            ON DUPLICATE KEY UPDATE slug=VALUES(slug),section=VALUES(section),public_name=VALUES(public_name),booking_name=VALUES(booking_name),public_title=VALUES(public_title),public_title_fr=VALUES(public_title_fr),summary=VALUES(summary),summary_fr=VALUES(summary_fr),display_order=VALUES(display_order),published=VALUES(published),show_booking_action=VALUES(show_booking_action),updated_by=VALUES(updated_by)");
+        $statement = $pdo->prepare("INSERT INTO public_team_profiles(user_id,clinic_id,slug,section,public_name,booking_name,public_title,public_title_fr,summary,summary_fr,public_website_url,public_contact_email,public_contact_phone,public_contact_sms,display_order,published,show_booking_action,updated_by)
+            VALUES(:user,:clinic,:slug,:section,:public_name,:booking_name,:title,:title_fr,:summary,:summary_fr,:website,:contact_email,:contact_phone,:contact_sms,:display_order,:published,:booking,:actor)
+            ON DUPLICATE KEY UPDATE slug=VALUES(slug),section=VALUES(section),public_name=VALUES(public_name),booking_name=VALUES(booking_name),public_title=VALUES(public_title),public_title_fr=VALUES(public_title_fr),summary=VALUES(summary),summary_fr=VALUES(summary_fr),public_website_url=VALUES(public_website_url),public_contact_email=VALUES(public_contact_email),public_contact_phone=VALUES(public_contact_phone),public_contact_sms=VALUES(public_contact_sms),display_order=VALUES(display_order),published=VALUES(published),show_booking_action=VALUES(show_booking_action),updated_by=VALUES(updated_by)");
         try {
-            $statement->execute(['user'=>$userId,'clinic'=>$actor->clinicId,'slug'=>$slug,'section'=>$section,'public_name'=>$publicName,'booking_name'=>$bookingName,'title'=>$title,'title_fr'=>$titleFr,'summary'=>$summary,'summary_fr'=>$summaryFr,'display_order'=>$order,'published'=>$published?1:0,'booking'=>$showBooking?1:0,'actor'=>$actor->userId]);
+            $statement->execute(['user'=>$userId,'clinic'=>$actor->clinicId,'slug'=>$slug,'section'=>$section,'public_name'=>$publicName,'booking_name'=>$bookingName,'title'=>$title,'title_fr'=>$titleFr,'summary'=>$summary,'summary_fr'=>$summaryFr,'website'=>$contact['website'],'contact_email'=>$contact['email'],'contact_phone'=>$contact['phone'],'contact_sms'=>$contact['sms'],'display_order'=>$order,'published'=>$published?1:0,'booking'=>$showBooking?1:0,'actor'=>$actor->userId]);
         } catch (\PDOException $e) {
             if ((string)$e->getCode()==='23000') throw new ApiException(409,'slug_already_exists','That public profile URL is already in use.',['slug'=>'Already in use']);
             throw $e;
@@ -311,11 +325,97 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
     public function updateAvailabilityRule(AuthContext $actor,int $id,array $body,string $cid): array{$this->scheduleRecordAccess($actor,'availability_rules',$id,'availability_rule_not_found');$this->validateAvailabilityRule($actor,$body);$s=$this->database->connection()->prepare('UPDATE availability_rules SET practitioner_id=:p,location_id=:l,weekday=:weekday,start_time=:start,end_time=:end,valid_from=:valid_from,valid_until=:valid_until,recurrence_interval_weeks=:interval WHERE id=:id');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'weekday'=>(int)$body['weekday'],'start'=>$body['start_time'],'end'=>$body['end_time'],'valid_from'=>$body['valid_from'],'valid_until'=>$body['valid_until']??null,'interval'=>(int)($body['recurrence_interval_weeks']??1),'id'=>$id]);$this->audit->write($actor->clinicId,$actor,$cid,'availability_rule.update','availability_rule',$id);return ['id'=>$id];}
     public function deleteAvailabilityRule(AuthContext $actor,int $id,string $cid): array{$this->scheduleRecordAccess($actor,'availability_rules',$id,'availability_rule_not_found');$s=$this->database->connection()->prepare('UPDATE availability_rules SET active=0 WHERE id=:id AND active=1');$s->execute(['id'=>$id]);if(!$s->rowCount())throw new ApiException(404,'availability_rule_not_found','Availability rule not found.');$this->audit->write($actor->clinicId,$actor,$cid,'availability_rule.archive','availability_rule',$id);return ['archived'=>true];}
 
-    public function scheduleExceptions(AuthContext $actor): array{$this->scheduleRole($actor);$own=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin');$where=$own?' AND p.user_id=:actor':'';$params=['clinic'=>$actor->clinicId];if($own)$params['actor']=$actor->userId;$pdo=$this->database->connection();$o=$pdo->prepare("SELECT o.id,o.practitioner_id,o.location_id,o.starts_at,o.ends_at,o.override_type type,o.reason,u.display_name practitioner_name,l.name location_name,'override' kind FROM availability_overrides o JOIN practitioners p ON p.id=o.practitioner_id JOIN users u ON u.id=p.user_id JOIN locations l ON l.id=o.location_id WHERE u.clinic_id=:clinic{$where}");$o->execute($params);$t=$pdo->prepare("SELECT t.id,t.practitioner_id,t.location_id,t.starts_at,t.ends_at,t.reason_type type,t.notes reason,u.display_name practitioner_name,l.name location_name,'time_off' kind FROM time_off t JOIN practitioners p ON p.id=t.practitioner_id JOIN users u ON u.id=p.user_id LEFT JOIN locations l ON l.id=t.location_id WHERE u.clinic_id=:clinic{$where}");$t->execute($params);$rows=array_merge($o->fetchAll(),$t->fetchAll());usort($rows,fn($a,$b)=>strcmp($a['starts_at'],$b['starts_at']));return $rows;}
+    public function scheduleExceptions(AuthContext $actor): array{$this->scheduleRole($actor);$own=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin');$where=$own?' AND p.user_id=:actor':'';$params=['clinic'=>$actor->clinicId];if($own)$params['actor']=$actor->userId;$pdo=$this->database->connection();$o=$pdo->prepare("SELECT o.id,o.practitioner_id,o.location_id,o.starts_at,o.ends_at,o.override_type type,o.reason,u.display_name practitioner_name,l.name location_name,'override' kind FROM availability_overrides o JOIN practitioners p ON p.id=o.practitioner_id JOIN users u ON u.id=p.user_id JOIN locations l ON l.id=o.location_id WHERE u.clinic_id=:clinic{$where}");$o->execute($params);$t=$pdo->prepare("SELECT t.id,t.practitioner_id,t.location_id,t.starts_at,t.ends_at,t.reason_type type,t.notes reason,u.display_name practitioner_name,l.name location_name,'time_off' kind,(SELECT COUNT(*) FROM appointments a WHERE a.clinic_id=u.clinic_id AND a.practitioner_id=t.practitioner_id AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.starts_at<t.ends_at AND a.ends_at>t.starts_at) affected_appointment_count FROM time_off t JOIN practitioners p ON p.id=t.practitioner_id JOIN users u ON u.id=p.user_id LEFT JOIN locations l ON l.id=t.location_id WHERE u.clinic_id=:clinic{$where}");$t->execute($params);$rows=array_merge($o->fetchAll(),$t->fetchAll());usort($rows,fn($a,$b)=>strcmp($a['starts_at'],$b['starts_at']));return $rows;}
     public function createAvailabilityOverride(AuthContext $actor,array $body,string $cid): array{$this->required($body,['practitioner_id','location_id','starts_at','ends_at','override_type']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);[$start,$end]=$this->utcInterval($body,(int)$body['location_id']);if(!in_array($body['override_type'],['available','blocked'],true))throw new ApiException(422,'validation_error','Invalid override type.');$s=$this->database->connection()->prepare('INSERT INTO availability_overrides(practitioner_id,location_id,starts_at,ends_at,override_type,reason,created_by) VALUES(:p,:l,:starts,:ends,:type,:reason,:actor)');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['override_type'],'reason'=>$this->optional($body,'reason'),'actor'=>$actor->userId]);return $this->created($actor,$cid,'availability_override',(int)$this->database->connection()->lastInsertId());}
     public function updateAvailabilityOverride(AuthContext $actor,int $id,array $body,string $cid): array{$this->scheduleRecordAccess($actor,'availability_overrides',$id,'schedule_exception_not_found');$this->required($body,['practitioner_id','location_id','starts_at','ends_at','override_type']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);[$start,$end]=$this->utcInterval($body,(int)$body['location_id']);if(!in_array($body['override_type'],['available','blocked'],true))throw new ApiException(422,'validation_error','Invalid override type.');$s=$this->database->connection()->prepare('UPDATE availability_overrides SET practitioner_id=:p,location_id=:l,starts_at=:starts,ends_at=:ends,override_type=:type,reason=:reason WHERE id=:id');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['override_type'],'reason'=>$this->optional($body,'reason'),'id'=>$id]);$this->audit->write($actor->clinicId,$actor,$cid,'availability_override.update','availability_override',$id);return ['id'=>$id];}
-    public function createTimeOff(AuthContext $actor,array $body,string $cid): array{$this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);[$start,$end]=$this->utcInterval($body,(int)$body['location_id']);if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');$s=$this->database->connection()->prepare('INSERT INTO time_off(practitioner_id,location_id,starts_at,ends_at,reason_type,notes,created_by) VALUES(:p,:l,:starts,:ends,:type,:notes,:actor)');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['reason_type'],'notes'=>$this->optional($body,'notes'),'actor'=>$actor->userId]);return $this->created($actor,$cid,'time_off',(int)$this->database->connection()->lastInsertId());}
-    public function updateTimeOff(AuthContext $actor,int $id,array $body,string $cid): array{$this->scheduleRecordAccess($actor,'time_off',$id,'schedule_exception_not_found');$this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);[$start,$end]=$this->utcInterval($body,(int)$body['location_id']);if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');$s=$this->database->connection()->prepare('UPDATE time_off SET practitioner_id=:p,location_id=:l,starts_at=:starts,ends_at=:ends,reason_type=:type,notes=:notes WHERE id=:id');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['reason_type'],'notes'=>$this->optional($body,'notes'),'id'=>$id]);$this->audit->write($actor->clinicId,$actor,$cid,'time_off.update','time_off',$id);return ['id'=>$id];}
+    public function previewTimeOffImpact(AuthContext $actor,array $body): array
+    {
+        $this->required($body,['practitioner_id','location_id','starts_at','ends_at']);
+        $practitionerId=(int)$body['practitioner_id'];
+        $this->scheduleAccess($actor,$practitionerId);
+        $this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
+        [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
+        return ['appointments'=>$this->timeOffAppointments($actor->clinicId,$practitionerId,$start,$end)];
+    }
+
+    public function updatePortalTheme(AuthContext $actor,array $body,string $correlationId): array
+    {
+        $this->superAdmin($actor);
+        $primary=$body['primary_color']??null;$secondary=$body['secondary_color']??null;$font=$body['font_family']??null;
+        if(!is_string($primary)||!preg_match('/^#[0-9a-fA-F]{6}$/',$primary)||!is_string($secondary)||!preg_match('/^#[0-9a-fA-F]{6}$/',$secondary)||!in_array($font,['Inter','Arial','Georgia'],true))throw new ApiException(422,'validation_error','Choose valid portal colours and font.');
+        $pdo=$this->database->connection();
+        try{$pdo->beginTransaction();$save=$pdo->prepare('INSERT INTO clinic_portal_themes(clinic_id,primary_color,secondary_color,font_family,updated_by) VALUES(:clinic,:primary,:secondary,:font,:actor) ON DUPLICATE KEY UPDATE primary_color=VALUES(primary_color),secondary_color=VALUES(secondary_color),font_family=VALUES(font_family),updated_by=VALUES(updated_by)');$save->execute(['clinic'=>$actor->clinicId,'primary'=>strtolower($primary),'secondary'=>strtolower($secondary),'font'=>$font,'actor'=>$actor->userId]);$this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.portal_theme.update','clinic',$actor->clinicId);$pdo->commit();return ['primary_color'=>strtolower($primary),'secondary_color'=>strtolower($secondary),'font_family'=>$font];}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
+    public function updatePortalWelcome(AuthContext $actor,array $body,string $correlationId): array
+    {
+        $this->superAdmin($actor);
+        $copy=[];
+        foreach(['welcome_title_en'=>160,'welcome_title_fr'=>160,'welcome_body_en'=>3000,'welcome_body_fr'=>3000] as $field=>$limit){
+            $value=$body[$field]??null;
+            if(!is_string($value)||trim($value)===''||strlen($value)>$limit)throw new ApiException(422,'validation_error','Provide the welcome title and message in English and French.');
+            $copy[$field]=trim($value);
+        }
+        $pdo=$this->database->connection();
+        try{
+            $pdo->beginTransaction();
+            $statement=$pdo->prepare('INSERT INTO clinic_portal_themes(clinic_id,welcome_title_en,welcome_title_fr,welcome_body_en,welcome_body_fr,updated_by) VALUES(:clinic,:welcome_title_en,:welcome_title_fr,:welcome_body_en,:welcome_body_fr,:actor) ON DUPLICATE KEY UPDATE welcome_title_en=VALUES(welcome_title_en),welcome_title_fr=VALUES(welcome_title_fr),welcome_body_en=VALUES(welcome_body_en),welcome_body_fr=VALUES(welcome_body_fr),updated_by=VALUES(updated_by)');
+            $statement->execute(['clinic'=>$actor->clinicId,'actor'=>$actor->userId]+$copy);
+            $this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.portal_welcome.update','clinic',$actor->clinicId);
+            $pdo->commit();
+            return $copy;
+        }catch(Throwable $error){if($pdo->inTransaction())$pdo->rollBack();throw $error;}
+    }
+    public function timeOffImpact(AuthContext $actor,int $id): array
+    {
+        $this->scheduleRole($actor);
+        $sql='SELECT t.practitioner_id,t.starts_at,t.ends_at FROM time_off t JOIN practitioners p ON p.id=t.practitioner_id JOIN users u ON u.id=p.user_id WHERE t.id=:id AND u.clinic_id=:clinic';
+        $params=['id'=>$id,'clinic'=>$actor->clinicId];
+        if($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin')){$sql.=' AND p.user_id=:actor';$params['actor']=$actor->userId;}
+        $statement=$this->database->connection()->prepare($sql);$statement->execute($params);$timeOff=$statement->fetch();
+        if(!$timeOff)throw new ApiException(404,'schedule_exception_not_found','Schedule item not found.');
+        return ['appointments'=>$this->timeOffAppointments($actor->clinicId,(int)$timeOff['practitioner_id'],$timeOff['starts_at'],$timeOff['ends_at'])];
+    }
+    private function timeOffAppointments(int $clinicId,int $practitionerId,string $start,string $end): array
+    {
+        $statement=$this->database->connection()->prepare("SELECT a.id,a.starts_at,a.ends_at,a.status,u.display_name client_name,s.name service_name,l.name location_name,l.timezone FROM appointments a JOIN users u ON u.id=a.client_id AND u.clinic_id=a.clinic_id JOIN services s ON s.id=a.service_id AND s.clinic_id=a.clinic_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.clinic_id=:clinic AND a.practitioner_id=:practitioner AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.starts_at<:end AND a.ends_at>:start ORDER BY a.starts_at,a.id LIMIT 501");
+        $statement->execute(['clinic'=>$clinicId,'practitioner'=>$practitionerId,'start'=>$start,'end'=>$end]);$rows=$statement->fetchAll();
+        if(count($rows)>500)throw new ApiException(422,'too_many_affected_appointments','This time-off period affects more than 500 appointments. Shorten the period and review it in parts.');
+        return $rows;
+    }
+    private function assertTimeOffImpactMatches(array $body,array $affected): void
+    {
+        if(!array_key_exists('expected_affected_appointment_ids',$body))return;
+        $expected=$body['expected_affected_appointment_ids'];
+        if(!is_array($expected)||count($expected)>500||count($expected)!==count(array_unique($expected))||array_filter($expected,static fn($id)=>filter_var($id,FILTER_VALIDATE_INT)===false||(int)$id<=0))throw new ApiException(422,'validation_error','Review the affected appointments again.');
+        $actual=array_map(static fn(array $row): int=>(int)$row['id'],$affected);$expected=array_map('intval',$expected);sort($actual);sort($expected);
+        if($actual!==$expected)throw new ApiException(409,'time_off_impact_changed','Appointments changed during review. Review the affected appointments again before saving.');
+    }
+    public function createTimeOff(AuthContext $actor,array $body,string $cid): array
+    {
+        $this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
+        $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
+        [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
+        if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');
+        $pdo=$this->database->connection();
+        try{$pdo->beginTransaction();$lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $affected=$this->timeOffAppointments($actor->clinicId,$practitionerId,$start,$end);$this->assertTimeOffImpactMatches($body,$affected);
+            $s=$pdo->prepare('INSERT INTO time_off(practitioner_id,location_id,starts_at,ends_at,reason_type,notes,created_by) VALUES(:p,:l,:starts,:ends,:type,:notes,:actor)');$s->execute(['p'=>$practitionerId,'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['reason_type'],'notes'=>$this->optional($body,'notes'),'actor'=>$actor->userId]);
+            $result=$this->created($actor,$cid,'time_off',(int)$pdo->lastInsertId());$pdo->commit();return $result+['affected_appointment_count'=>count($affected)];
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
+    public function updateTimeOff(AuthContext $actor,int $id,array $body,string $cid): array
+    {
+        $this->scheduleRecordAccess($actor,'time_off',$id,'schedule_exception_not_found');$this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
+        $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
+        [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
+        if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');
+        $pdo=$this->database->connection();
+        try{$pdo->beginTransaction();$lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $affected=$this->timeOffAppointments($actor->clinicId,$practitionerId,$start,$end);$this->assertTimeOffImpactMatches($body,$affected);
+            $s=$pdo->prepare('UPDATE time_off SET practitioner_id=:p,location_id=:l,starts_at=:starts,ends_at=:ends,reason_type=:type,notes=:notes WHERE id=:id');$s->execute(['p'=>$practitionerId,'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['reason_type'],'notes'=>$this->optional($body,'notes'),'id'=>$id]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'time_off.update','time_off',$id);$pdo->commit();return ['id'=>$id,'affected_appointment_count'=>count($affected)];
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
     public function deleteScheduleException(AuthContext $actor,string $table,int $id,string $cid): array{$this->scheduleRecordAccess($actor,$table,$id,'schedule_exception_not_found');$s=$this->database->connection()->prepare("DELETE FROM {$table} WHERE id=:id");$s->execute(['id'=>$id]);if(!$s->rowCount())throw new ApiException(404,'schedule_exception_not_found','Schedule exception not found.');$this->audit->write($actor->clinicId,$actor,$cid,'schedule_exception.delete',$table,$id);return ['deleted'=>true];}
 
     private function admin(AuthContext $actor): void{if(!$actor->hasAnyRole('super_admin','clinic_admin'))throw new ApiException(403,'forbidden','Administrator access is required.');}

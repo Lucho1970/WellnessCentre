@@ -14,7 +14,14 @@ final class AvailabilityService
 {
     public function __construct(private readonly Database $database) {}
 
-    public function search(array $query,?int $excludeAppointmentId=null): array
+    public function publicSearch(array $query): array
+    {
+        $result = $this->search($query, null, true);
+        foreach ($result['availability'] as &$slot) unset($slot['available_room_ids']);
+        return $result;
+    }
+
+    public function search(array $query,?int $excludeAppointmentId=null,bool $publicOnly=false,bool $existingBookingTransfer=false): array
     {
         $mode=Delivery::mode($query);
         $serviceId=(int)($query['service_id']??0); $practitionerId=(int)($query['practitioner_id']??0); $locationId=(int)($query['location_id']??0);
@@ -24,13 +31,14 @@ final class AvailabilityService
         if($to<$from||$to>$from->modify('+31 days')) throw new ApiException(422,'invalid_date_range','The availability range must be between 1 and 31 days.');
 
         $sql="SELECT ps.offers_mobile,ps.offers_clinic,ps.travel_buffer_minutes,ps.mobile_fee_cents,COALESCE(ps.price_override_cents,d.price_cents,s.price_cents) base_price_cents,s.lead_time_minutes,s.booking_horizon_days,s.buffer_before_minutes,s.buffer_after_minutes,s.requires_room,d.id duration_option_id,d.duration_minutes,l.timezone
-                FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.active=1 JOIN locations l ON l.id=:location JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=l.id AND sl.active=1
+                FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.active=1 JOIN locations l ON l.id=:location AND l.clinic_id=s.clinic_id JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=l.id AND sl.active=1
                 JOIN practitioner_services ps ON ps.service_id=s.id AND ps.practitioner_id=:practitioner AND ps.active=1
                 JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1
                 JOIN users u ON u.id=p.user_id AND u.status='active' AND u.clinic_id=s.clinic_id
                 JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=l.id AND pl.active=1
-               WHERE s.id=:service AND s.active=1 AND l.is_bookable=1 AND l.clinic_id=s.clinic_id
-               ORDER BY d.duration_minutes,d.id";
+               WHERE s.id=:service AND s.active=1 AND l.is_bookable=1 AND l.clinic_id=s.clinic_id";
+        if ($publicOnly) $sql .= " AND s.published=1 AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1) AND EXISTS(SELECT 1 FROM public_team_profiles t WHERE t.user_id=p.user_id AND t.clinic_id=s.clinic_id AND t.published=1 AND t.section='practitioner' AND t.show_booking_action=1)";
+        $sql .= ' ORDER BY d.duration_minutes,d.id';
         $statement=$this->database->connection()->prepare($sql);$statement->execute(['location'=>$locationId,'practitioner'=>$practitionerId,'service'=>$serviceId]);$options=$statement->fetchAll();
         if(!$options) throw new ApiException(404,'service_not_available','That practitioner does not offer this service at the selected location.');
         $timezone=new DateTimeZone($options[0]['timezone']); $slots=[];
@@ -47,7 +55,7 @@ final class AvailabilityService
                     $slotEnd=$cursor->setTimestamp($cursor->getTimestamp()+(int)$option['duration_minutes']*60);
                     $utcStart=$cursor->setTimezone(new DateTimeZone('UTC'));$utcEnd=$slotEnd->setTimezone(new DateTimeZone('UTC'));
                     $bufferStart=$utcStart->modify('-'.((int)$option['buffer_before_minutes']+$terms['travel']).' minutes');$bufferEnd=$utcEnd->modify('+'.((int)$option['buffer_after_minutes']+$terms['travel']).' minutes');
-                    if($utcStart>=$now->modify('+'.$option['lead_time_minutes'].' minutes')&&$utcStart<=$now->modify('+'.$option['booking_horizon_days'].' days')&&$bufferStart>=(new DateTimeImmutable($day->format('Y-m-d').' '.$rule['start_time'],$timezone))&&$bufferEnd<=$end&&!$this->blocked($practitionerId,$locationId,$bufferStart,$bufferEnd,$excludeAppointmentId)){
+                    if(($existingBookingTransfer || ($utcStart>=$now->modify('+'.$option['lead_time_minutes'].' minutes')&&$utcStart<=$now->modify('+'.$option['booking_horizon_days'].' days')))&&$utcStart>$now&&$bufferStart>=(new DateTimeImmutable($day->format('Y-m-d').' '.$rule['start_time'],$timezone))&&$bufferEnd<=$end&&!$this->blocked($practitionerId,$locationId,$bufferStart,$bufferEnd,$excludeAppointmentId)){
                         $rooms=$terms['requires_room']?$this->rooms($serviceId,$practitionerId,$locationId,$bufferStart,$bufferEnd,$excludeAppointmentId):[];
                         if(!$terms['requires_room']||$rooms)$slots[$option['duration_option_id'].':'.$utcStart->getTimestamp()]=['duration_option_id'=>(int)$option['duration_option_id'],'starts_at'=>$cursor->format(DATE_ATOM),'ends_at'=>$slotEnd->format(DATE_ATOM),'available_room_ids'=>$rooms];
                     }

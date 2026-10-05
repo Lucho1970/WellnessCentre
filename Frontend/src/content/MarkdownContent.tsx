@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
-import { Box, Container, Link as MuiLink, Paper, Typography } from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Box, Container, Grid, Link as MuiLink, Paper, Stack, Typography } from '@mui/material';
+import { ChevronDown } from 'lucide-react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Link as RouterLink } from 'react-router-dom';
@@ -40,8 +41,15 @@ const components: Components = {
   hr: () => <Box component="hr" sx={{ border: 0, borderTop: 1, borderColor: 'divider', my: 4 }} />,
 };
 
-function Body({ children }: { children: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={safeUrl}>{children}</ReactMarkdown>;
+const embeddedPageComponents: Components = {
+  ...components,
+  h1: ({ children }) => <Typography component="h2" variant="h3" mb={3}>{children}</Typography>,
+  h2: ({ children }) => <Typography component="h3" variant="h5" mt={4} mb={1.5}>{children}</Typography>,
+  h3: ({ children }) => <Typography component="h4" variant="h6" mt={3} mb={1}>{children}</Typography>,
+};
+
+function Body({ children, embeddedPage = false }: { children: string; embeddedPage?: boolean }) {
+  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={embeddedPage ? embeddedPageComponents : components} urlTransform={safeUrl}>{children}</ReactMarkdown>;
 }
 
 function MissingContent({ children }: { children: ReactNode }) {
@@ -75,9 +83,30 @@ export function ContentPage({ contentKey }: { contentKey: string }) {
   return <Container maxWidth="md" sx={{ py: { xs: 5, md: 8 } }}><Body>{document.body}</Body></Container>;
 }
 
-export function ContentSection({ contentKey }: { contentKey: string }) {
+export function ContentSection({ contentKey, presentation }: { contentKey: string; presentation?: 'split' | 'faq' }) {
   const { i18n } = useTranslation();
   const document = localizedContent(i18n.resolvedLanguage, contentKey);
   if (!document) return null;
-  return <Box component="section" py={{ xs: 5, md: 7 }}><Container maxWidth="lg"><Body>{document.body}</Body></Container></Box>;
+  const embeddedPage = contentKey.startsWith('pages/');
+  const [intro, ...blocks] = document.body.split(/\r?\n(?=## )/);
+  if (presentation === 'split') {
+    return <Box py={{ xs: 7, md: 12 }}><Container maxWidth="lg"><Grid container spacing={{ xs: 4, md: 9 }} alignItems="start">
+      <Grid size={{ xs: 12, md: 5 }}><Box className="editorial-intro"><Body embeddedPage={embeddedPage}>{intro}</Body></Box></Grid>
+      <Grid size={{ xs: 12, md: 7 }}><Paper className="editorial-detail" variant="outlined" sx={{ p: { xs: 3, md: 5 } }}><Body embeddedPage={embeddedPage}>{blocks.join('\n')}</Body></Paper></Grid>
+    </Grid></Container></Box>;
+  }
+  if (presentation === 'faq') {
+    const questions = blocks.map(block => {
+      const newline = block.indexOf('\n');
+      return { question: block.slice(3, newline < 0 ? undefined : newline).trim(), answer: newline < 0 ? '' : block.slice(newline + 1).trim() };
+    });
+    return <Box py={{ xs: 7, md: 12 }}><Container maxWidth="lg"><Grid container spacing={{ xs: 3, md: 8 }} alignItems="start">
+      <Grid size={{ xs: 12, md: 4 }}><Body embeddedPage={embeddedPage}>{intro}</Body></Grid>
+      <Grid size={{ xs: 12, md: 8 }}><Stack spacing={1.5}>{questions.map((item, index) => <Accordion key={`${index}-${item.question}`} disableGutters elevation={0} defaultExpanded={index === 0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px !important', '&:before': { display: 'none' } }}>
+        <AccordionSummary expandIcon={<ChevronDown size={20} />} aria-controls={`faq-answer-${index}`} id={`faq-question-${index}`} sx={{ px: { xs: 2.5, md: 3 }, py: 0.5 }}><Typography component="span" variant="h6">{item.question}</Typography></AccordionSummary>
+        <AccordionDetails id={`faq-answer-${index}`} sx={{ px: { xs: 2.5, md: 3 }, pb: 2.5 }}><Body>{item.answer}</Body></AccordionDetails>
+      </Accordion>)}</Stack></Grid>
+    </Grid></Container></Box>;
+  }
+  return <Box py={{ xs: 7, md: 10 }}><Container maxWidth="lg"><Body embeddedPage={embeddedPage}>{document.body}</Body></Container></Box>;
 }

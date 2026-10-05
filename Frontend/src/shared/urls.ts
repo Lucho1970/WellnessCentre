@@ -1,3 +1,5 @@
+import { runtimePublicWebsiteUrl } from './runtimeConfig';
+
 function appUrl(configured: string | undefined, fallback: string) {
   const url = new URL(configured || fallback, window.location.origin);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
@@ -6,7 +8,7 @@ function appUrl(configured: string | undefined, fallback: string) {
   url.pathname = url.pathname.replace(/\/?$/, '/');
   return url;
 }
-export const publicUrl = appUrl(import.meta.env.VITE_PUBLIC_URL, import.meta.env.DEV ? 'http://localhost:5173/' : '/');
+export const publicUrl = appUrl(runtimePublicWebsiteUrl() ?? import.meta.env.VITE_PUBLIC_URL, import.meta.env.DEV ? 'http://localhost:5173/' : '/');
 export const portalUrl = appUrl(import.meta.env.VITE_PORTAL_URL, import.meta.env.DEV ? 'http://localhost:5174/' : '/portal/');
 
 function localizedLink(path: string, base: URL) {

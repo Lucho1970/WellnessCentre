@@ -6,6 +6,12 @@ Start with these two authoritative documents:
 
 - [Master Requirements](MASTER_REQUIREMENTS.md): product scope, retained features, role permissions, implementation baseline, delivery stages and acceptance criteria.
 - [System Design](SYSTEM_DESIGN.md): public/portal architecture, identity and account linking, API/data boundaries, transactions, deployment, migrations and testing.
+- [MT0 architecture and inventory](MT0_IDENTITY_AND_PRACTICE_ARCHITECTURE.md): source findings, additive data model, practitioner invitation journey and migration sequencing.
+- [Multi tenant development path](MULTI_TENANT_DEVELOPMENT_PATH.md): provider-neutral login, application-owned clinic membership, isolation gates and sequencing before a second clinic.
+- [Portal host cutover](PORTAL_HOST_CUTOVER.md): move Willow to `willowwellness.copihue.ca` and deploy a neutral landing page at `portal.copihue.ca`.
+- [Runtime website configuration](RUNTIME_WEBSITE_CONFIGURATION.md): live public website destination, temporary .com cutover, deployment order and checks.
+- [Practitioner external link plan](PRACTITIONER_EXTERNAL_LINK_PLAN.md): optional website/social-page links for independent practitioners and portal-only virtual clinics; local implementation and pending hosted acceptance.
+- [Practitioner person card](PRACTITIONER_PERSON_CARD.md): preferred public name, biography, optional public contacts, and hover previews.
 - [Public website content](PUBLIC_CONTENT.md): bilingual Markdown locations, validation rules, editing workflow and the boundary between editorial content and API-backed catalogue data.
 - [Public practitioner directory](PUBLIC_PRACTITIONER_DIRECTORY.md): published practitioner projections, directory/profile behavior, preferred names and practitioner-first booking acceptance.
 - [Configurable branding](CONFIGURABLE_BRANDING.md): business logo/favicon roles, secure image constraints, migration and deployment acceptance.
@@ -15,7 +21,8 @@ Start with these two authoritative documents:
 
 ## Supporting records and historical sources
 
-- [Public/portal separation checkpoint](PORTAL_SEPARATION.md): build outputs, routes, preserved permissions, subdomain deployment steps and acceptance checks. No SQL upgrade for this change.
+- [Public/portal separation checkpoint](PORTAL_SEPARATION.md): build outputs, routes, preserved permissions, subdomain deployment steps and acceptance checks.
+- [Portal treatment catalogue](PORTAL_CATALOGUE.md): configurable bilingual welcome text, category navigation, public practitioner previews, booking entry points and migration 028.
 
 - [Staff booking checkpoint](STAFF_BOOKING.md), [Client management](CLIENT_MANAGEMENT.md) and [Booking validation tests](BOOKING_VALIDATION_TESTS.md) describe specific implementation/test checkpoints; they do not establish production readiness.
 - [Practitioner appointment management](PRACTITIONER_APPOINTMENTS.md) records the scoped practitioner booking, rescheduling, cancellation, authorization and deployment checkpoint.

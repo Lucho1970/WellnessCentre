@@ -52,7 +52,10 @@ export async function customerSignIn() {
   try {
     await customerInstance.loginRedirect({
       scopes: customerScopes,
-      prompt: 'select_account',
+      // select_account opens Microsoft's remembered-account picker before the
+      // External ID user flow. A remembered Gmail address can be selected as
+      // the wrong kind of Microsoft account, bypassing the provider choices.
+      prompt: 'login',
       ...(nonce ? freshCustomerLoginParameters(nonce) : {}),
     });
   } catch (error) {

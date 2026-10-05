@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from 'react';
-import { InteractionRequiredAuthError, PublicClientApplication, type AccountInfo } from '@azure/msal-browser';
+import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from 'react';
+import { PublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { MsalProvider, useMsal } from '@azure/msal-react';
 import { useTranslation } from 'react-i18next';
 import { selectAccount } from './accountSelection';
 import i18n from '../i18n';
+import { claimStaffSessionRecovery, clearStaffSessionRecovery, needsInteractiveStaffAuth } from './staffSessionRecovery';
 
 const tenantId = import.meta.env.VITE_ENTRA_TENANT_ID ?? '';
 const spaClientId = import.meta.env.VITE_ENTRA_SPA_CLIENT_ID ?? '';
@@ -26,18 +27,44 @@ export function selectStaffAccount(preferred = msalInstance.getActiveAccount()) 
   return selectAccount(msalInstance.getAllAccounts(), preferred, tenantId, ['login.windows.net', 'login.microsoftonline.com', 'login.microsoft.com', 'sts.windows.net']);
 }
 
-type StaffAuthValue = { account: AccountInfo | null; configured: boolean; isAuthenticated: boolean; signIn: () => Promise<void>; signOut: () => Promise<void>; getAccessToken: () => Promise<string> };
+type StaffAuthValue = { account: AccountInfo | null; configured: boolean; isAuthenticated: boolean; sessionExpired: boolean; signIn: () => Promise<void>; signOut: () => Promise<void>; getAccessToken: () => Promise<string> };
 const StaffAuthContext = createContext<StaffAuthValue | null>(null);
+let sessionRecoveryRedirect: Promise<void> | null = null;
 
 function StaffAuthBridge({ children }: PropsWithChildren) {
   const { t } = useTranslation();
   const { instance, accounts } = useMsal();
   const account = useMemo(() => selectStaffAccount(instance.getActiveAccount()), [instance, accounts]);
   const isAuthenticated = Boolean(account);
-  const signIn = useCallback(async () => { if (!configured) throw new Error(t('Microsoft Entra staff sign-in is not configured.')); await instance.loginRedirect({ scopes: apiScopes, prompt: 'select_account' }); }, [instance, t]);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const signIn = useCallback(async () => {
+    if (!configured) throw new Error(t('Microsoft Entra staff sign-in is not configured.'));
+    if (sessionRecoveryRedirect) return sessionRecoveryRedirect;
+    clearStaffSessionRecovery();
+    await instance.loginRedirect({ scopes: apiScopes, prompt: 'select_account' });
+  }, [instance, t]);
   const signOut = useCallback(async () => { await instance.logoutRedirect({ account: account ?? undefined, postLogoutRedirectUri: portalRoot }); }, [account, instance]);
-  const getAccessToken = useCallback(async () => { if (!account) throw new Error(t('Staff sign-in is required.')); try { return (await instance.acquireTokenSilent({ account, scopes: apiScopes })).accessToken; } catch (error) { if (error instanceof InteractionRequiredAuthError) { await instance.acquireTokenRedirect({ account, scopes: apiScopes }); throw new Error(t('Redirecting to Microsoft Entra for authorization.')); } throw error; } }, [account, instance, t]);
-  const value = useMemo(() => ({ account, configured, isAuthenticated, signIn, signOut, getAccessToken }), [account, getAccessToken, isAuthenticated, signIn, signOut]);
+  const getAccessToken = useCallback(async () => {
+    if (!account) throw new Error(t('Staff sign-in is required.'));
+    try {
+      const token = (await instance.acquireTokenSilent({ account, scopes: apiScopes })).accessToken;
+      if (!sessionRecoveryRedirect) {
+        clearStaffSessionRecovery();
+        setSessionExpired(false);
+      }
+      return token;
+    } catch (error) {
+      if (!needsInteractiveStaffAuth(error)) throw error;
+      setSessionExpired(true);
+      if (!sessionRecoveryRedirect && claimStaffSessionRecovery()) {
+        sessionRecoveryRedirect = instance.loginRedirect({ scopes: apiScopes, prompt: 'select_account' });
+      }
+      try { await sessionRecoveryRedirect; } catch { /* The sign-in button remains available. */ }
+      finally { sessionRecoveryRedirect = null; }
+      throw new Error(t('Your staff session has expired. Sign in with Microsoft to continue.'));
+    }
+  }, [account, instance, t]);
+  const value = useMemo(() => ({ account, configured, isAuthenticated, sessionExpired, signIn, signOut, getAccessToken }), [account, getAccessToken, isAuthenticated, sessionExpired, signIn, signOut]);
   return <StaffAuthContext.Provider value={value}>{children}</StaffAuthContext.Provider>;
 }
 

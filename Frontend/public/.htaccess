@@ -1,5 +1,12 @@
 RewriteEngine On
 
+# Temporary canonical host while the .ca certificate is being repaired.
+# Use 302 so browsers do not permanently cache this temporary cutover.
+RewriteCond %{HTTP_HOST} ^(www\.)?livinlively\.ca$ [NC,OR]
+RewriteCond %{HTTP_HOST} ^www\.livinlively\.com$ [NC,OR]
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://livinlively.com/$1 [R=302,L]
+
 # The SPA shell selects the current hashed JS/CSS files. Apply to index.html
 # after directory-index resolution and SPA rewrites, not API or asset responses.
 <Files "index.html">

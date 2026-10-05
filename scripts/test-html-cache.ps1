@@ -1,13 +1,15 @@
 param(
     [string]$PublicUrl = 'https://wellness.copihue.ca/',
-    [string]$PortalUrl = 'https://portal.copihue.ca/'
+    [string]$PortalUrl = 'https://willowwellness.copihue.ca/',
+    [string]$LandingUrl = 'https://portal.copihue.ca/'
 )
 $ErrorActionPreference = 'Stop'
 $failed = $false
 $targets = @(
     $PublicUrl, ($PublicUrl.TrimEnd('/') + '/book'),
     $PortalUrl, ($PortalUrl.TrimEnd('/') + '/client'),
-    ($PortalUrl.TrimEnd('/') + '/staff/login')
+    ($PortalUrl.TrimEnd('/') + '/staff/login'),
+    $LandingUrl
 )
 foreach ($url in $targets) {
     $response = Invoke-WebRequest -Uri $url -TimeoutSec 20

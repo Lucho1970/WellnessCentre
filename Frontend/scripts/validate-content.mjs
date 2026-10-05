@@ -6,6 +6,10 @@ const root = resolve('content');
 const publicAssets = resolve('public/content-assets');
 const languages = ['en', 'fr'];
 const allowedStatus = new Set(['draft', 'published']);
+const allowedKinds = new Set(['markdown', 'services', 'practitioners', 'team', 'contact']);
+const allowedSurfaces = new Set(['plain', 'soft']);
+const allowedNavigationLabels = new Set(['Services', 'Practitioners', 'New clients', 'About', 'FAQs', 'Contact']);
+const allowedPresentations = new Set(['split', 'faq']);
 
 async function markdownFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -64,5 +68,60 @@ for (const name of english) if (!french.has(name)) throw new Error(`fr/${name}: 
 for (const name of french) if (!english.has(name)) throw new Error(`en/${name}: translated counterpart is missing`);
 for (const name of english) {
   if (statusesByLanguage.get('en').get(name) !== statusesByLanguage.get('fr').get(name)) throw new Error(`${name}: English and French publication status must match`);
+}
+const layout = JSON.parse(await readFile(resolve(root, 'site-layout.json'), 'utf8'));
+if (layout.version !== 1 || !Array.isArray(layout.sections) || layout.sections.length === 0) {
+  throw new Error('site-layout.json: expected version 1 and a non-empty sections array');
+}
+const sectionIds = new Set();
+const navigationLabels = new Set();
+for (const section of layout.sections) {
+  if (!section || typeof section.id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(section.id) || sectionIds.has(section.id)) {
+    throw new Error('site-layout.json: section IDs must be unique, stable URL-safe names');
+  }
+  sectionIds.add(section.id);
+  for (const field of Object.keys(section)) {
+    if (!['id', 'kind', 'contentKey', 'presentation', 'navLabel', 'surface'].includes(field)) {
+      throw new Error(`site-layout.json: unsupported field ${field} on ${section.id}`);
+    }
+  }
+  if (!allowedKinds.has(section.kind) || !allowedSurfaces.has(section.surface)) {
+    throw new Error(`site-layout.json: invalid kind or surface for ${section.id}`);
+  }
+  if (section.navLabel !== undefined && !allowedNavigationLabels.has(section.navLabel)) {
+    throw new Error(`site-layout.json: unsupported navigation label for ${section.id}`);
+  }
+  if (section.navLabel && navigationLabels.has(section.navLabel)) throw new Error(`site-layout.json: duplicate navigation label ${section.navLabel}`);
+  if (section.navLabel) navigationLabels.add(section.navLabel);
+  if (section.kind === 'markdown') {
+    if (typeof section.contentKey !== 'string' || !/^(pages|sections)\/[a-z0-9/-]+$/.test(section.contentKey)) {
+      throw new Error(`site-layout.json: invalid content key for ${section.id}`);
+    }
+    const file = `${section.contentKey}.md`;
+    if (!english.has(file) || statusesByLanguage.get('en').get(file) !== 'published') {
+      throw new Error(`site-layout.json: ${section.id} must reference published bilingual Markdown`);
+    }
+    if (section.presentation !== undefined && !allowedPresentations.has(section.presentation)) {
+      throw new Error(`site-layout.json: unsupported presentation for ${section.id}`);
+    }
+    if (section.presentation) {
+      const headingCounts = [];
+      for (const language of languages) {
+        const { body } = documentParts(await readFile(resolve(root, language, file), 'utf8'), `${language}/${file}`);
+        const blocks = body.split(/\r?\n(?=## )/).slice(1);
+        if (blocks.length === 0) throw new Error(`site-layout.json: ${section.id} needs subheadings in ${language}`);
+        if (section.presentation === 'faq' && blocks.some(block => !/^##\s+[^\r\n]+\r?\n\s*\S/.test(block))) {
+          throw new Error(`site-layout.json: every FAQ question needs an answer in ${language}`);
+        }
+        headingCounts.push(blocks.length);
+      }
+      if (section.presentation === 'faq' && headingCounts[0] !== headingCounts[1]) throw new Error(`site-layout.json: ${section.id} needs matching English and French question counts`);
+    }
+  } else if (section.contentKey !== undefined || section.presentation !== undefined) {
+    throw new Error(`site-layout.json: ${section.id} must not have a content key or presentation`);
+  }
+}
+for (const required of ['services', 'practitioners', 'contact']) {
+  if (!sectionIds.has(required)) throw new Error(`site-layout.json: required section ${required} is missing`);
 }
 console.log(`Validated ${english.size} bilingual content entries.`);

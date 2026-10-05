@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
+import { pagePath } from '../portal/access';
+import { Link as RouterLink } from 'react-router-dom';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -16,7 +18,8 @@ type PanelMode = 'details' | 'new' | 'edit' | null;
 type Practitioner = { practitioner_id: number; display_name: string; preferred_name?: string | null; discipline?: string; location_id?: number | null; active?: number | boolean };
 type Location = { id: number; name: string; timezone: string };
 type Rule = { id: number; practitioner_id: number; location_id: number; practitioner_name: string; location_name: string; weekday: number; start_time: string; end_time: string; valid_from: string; valid_until: string | null; recurrence_interval_weeks: number; active?: number | boolean };
-type Exception = { id: number; kind: 'override' | 'time_off'; practitioner_id: number; location_id: number | null; practitioner_name: string; location_name: string | null; starts_at: string; ends_at: string; type: string; reason: string | null };
+type Exception = { id: number; kind: 'override' | 'time_off'; practitioner_id: number; location_id: number | null; practitioner_name: string; location_name: string | null; starts_at: string; ends_at: string; type: string; reason: string | null; affected_appointment_count?: number };
+type AffectedAppointment = { id: number; starts_at: string; ends_at: string; status: string; client_name: string; service_name: string; location_name: string; timezone: string };
 type SelectedItem = { kind: ItemKind; id: number; rule?: Rule; exception?: Exception };
 type Form = { location_id: string; weekday: string; start_time: string; end_time: string; valid_from: string; valid_until: string; starts_at: string; ends_at: string; type: string; reason: string };
 
@@ -52,6 +55,7 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
   const [loadError, setLoadError] = useState('');
   const [panelError, setPanelError] = useState('');
   const [saved, setSaved] = useState('');
+  const [impactReview, setImpactReview] = useState<AffectedAppointment[] | null>(null);
   const [canManage, setCanManage] = useState(true);
   const formGuard = useUnsavedForm();
 
@@ -104,7 +108,7 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
   const selectItem = (item: SelectedItem) => { setSelected(current => current?.kind === item.kind && current.id === item.id ? null : item); };
   const startNew = (kind: ItemKind) => {
     if (!selectedPractitioner || !canManage) return;
-    formGuard.markClean(); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); setPanelError(''); setPanelMode('new');
+    formGuard.markClean(); setImpactReview(null); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); setPanelError(''); setPanelMode('new');
   };
   const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelKind(selected.kind); setPanelError(''); setPanelMode('details'); };
   const startEdit = () => {
@@ -113,7 +117,7 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
     const next = blankForm(selected.kind, location?.id ?? null);
     if (selected.rule) Object.assign(next, { location_id: String(selected.rule.location_id), weekday: String(selected.rule.weekday), start_time: selected.rule.start_time.slice(0, 5), end_time: selected.rule.end_time.slice(0, 5), valid_from: selected.rule.valid_from, valid_until: selected.rule.valid_until ?? '' });
     if (selected.exception) Object.assign(next, { location_id: String(location?.id ?? ''), starts_at: utcToLocalInput(selected.exception.starts_at, location?.timezone ?? 'America/Toronto'), ends_at: utcToLocalInput(selected.exception.ends_at, location?.timezone ?? 'America/Toronto'), type: selected.exception.type, reason: selected.exception.reason ?? '' });
-    formGuard.markClean(); setPanelKind(selected.kind); setForm(next); setPanelError(''); setPanelMode('edit');
+    formGuard.markClean(); setImpactReview(null); setPanelKind(selected.kind); setForm(next); setPanelError(''); setPanelMode('edit');
   };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
@@ -130,12 +134,21 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
       const payload = panelKind === 'rule'
         ? { practitioner_id: selectedPractitioner.practitioner_id, location_id: Number(form.location_id), weekday: Number(form.weekday), start_time: form.start_time, end_time: form.end_time, valid_from: form.valid_from, valid_until: form.valid_until || null, recurrence_interval_weeks: 1 }
         : { practitioner_id: selectedPractitioner.practitioner_id, location_id: Number(form.location_id), starts_at: form.starts_at, ends_at: form.ends_at, ...(panelKind === 'override' ? { override_type: form.type, reason: form.reason } : { reason_type: form.type, notes: form.reason }) };
-      const response = await fetch(`${api}/admin/${resource}${editingId ? `/${editingId}` : ''}`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (panelKind === 'time_off' && impactReview === null) {
+        const review = await fetch(`${api}/admin/time-off/impact`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const reviewBody = await review.json();
+        if (!review.ok) throw new Error(apiErrorMessage(reviewBody, review.status, t('Unable to review affected appointments.')));
+        setImpactReview(normalizeNumericIds<AffectedAppointment[]>(reviewBody.data.appointments));
+        return;
+      }
+      const savePayload = panelKind === 'time_off' ? { ...payload, expected_affected_appointment_ids: impactReview?.map(item => item.id) ?? [] } : payload;
+      const response = await fetch(`${api}/admin/${resource}${editingId ? `/${editingId}` : ''}`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(savePayload) });
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save availability.')));
-      formGuard.markClean(); setPanelMode(null); setSelected(null); await load();
-      setSaved(t(editingId ? 'Schedule item updated.' : panelKind === 'rule' ? 'Working hours added.' : panelKind === 'override' ? 'Schedule change added.' : 'Time off added.'));
-    } catch (cause) { setPanelError(cause instanceof Error ? cause.message : t('Unable to save availability.')); }
+      formGuard.markClean(); setImpactReview(null); setPanelMode(null); setSelected(null); await load();
+      const affected = Number(body.data?.affected_appointment_count ?? 0);
+      setSaved(t(editingId ? 'Schedule item updated.' : panelKind === 'rule' ? 'Working hours added.' : panelKind === 'override' ? 'Schedule change added.' : 'Time off added.') + (affected ? ` ${t('{{count}} appointments need follow-up. Select this time off for the list.', { count: affected })}` : ''));
+    } catch (cause) { if (panelKind === 'time_off') setImpactReview(null); setPanelError(cause instanceof Error ? cause.message : t('Unable to save availability.')); }
     finally { setBusy(false); }
   };
 
@@ -151,10 +164,11 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
     finally { setBusy(false); }
   };
 
-  const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
+  const field = <K extends keyof Form>(key: K, value: Form[K]) => { setImpactReview(null); setForm(current => ({ ...current, [key]: value })); };
   const selectedLocation = locations.find(location => String(location.id) === form.location_id);
   const practitionerName = (person: Practitioner) => person.preferred_name || person.display_name;
   return <Stack spacing={2}>
+    <Box><Button component={RouterLink} to={pagePath(practitionerMode ? 'practitioner' : 'admin', 'appointments')} state={{ startBooking: true }} variant="contained">{t('Book appointment')}</Button></Box>
     {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}
     {loadError && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>{t('Retry')}</Button>}>{loadError}</Alert>}
     {practitionerMode && !canManage && <Alert severity="info">{t('Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.')}</Alert>}
@@ -185,7 +199,7 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
 
     <Drawer anchor="right" open={panelMode !== null} onClose={closePanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 640 }, maxWidth: '100%' } } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'details' ? 'Schedule details' : panelMode === 'edit' ? 'Edit schedule item' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Typography><Typography variant="h5">{selectedPractitioner ? practitionerName(selectedPractitioner) : ''}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={closePanel}><X/></IconButton></Stack>
-      {panelMode === 'details' && selected && <ItemDetails item={selected} locations={locations} language={i18n.resolvedLanguage} edit={startEdit} canEdit={canManage}/>}
+      {panelMode === 'details' && selected && <><ItemDetails item={selected} locations={locations} language={i18n.resolvedLanguage} edit={startEdit} canEdit={canManage}/>{selected.kind === 'time_off' && <SavedTimeOffImpact id={selected.id} getAccessToken={getAccessToken} appointmentsPath={pagePath(practitionerMode ? 'practitioner' : 'admin', 'appointments')} language={i18n.resolvedLanguage}/>}</>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={submit} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Typography color="text.secondary" mb={2}>{panelKind === 'rule' ? t('Define recurring working hours for this practitioner.') : t('Enter times in {{timezone}}.', { timezone: selectedLocation?.timezone ?? t("the selected location's timezone") })}</Typography><Grid container spacing={2}>
           <Grid size={12}><TextField required select fullWidth label={t(panelKind === 'rule' ? 'Location' : 'Timezone location')} value={form.location_id} onChange={event => field('location_id', event.target.value)}>{locations.map(location => <MenuItem key={location.id} value={String(location.id)}>{location.name} ({location.timezone})</MenuItem>)}</TextField></Grid>
@@ -198,8 +212,8 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
             <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth label={t(panelKind === 'override' ? 'Availability' : 'Reason type')} value={form.type} onChange={event => field('type', event.target.value)}>{(panelKind === 'override' ? [['blocked', 'Blocked'], ['available', 'Available']] : [['vacation', 'Vacation'], ['sick', 'Sick'], ['personal', 'Personal'], ['other', 'Other']]).map(([value, label]) => <MenuItem key={value} value={value}>{t(label)}</MenuItem>)}</TextField></Grid>
             <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth label={t('Notes (optional)')} value={form.reason} inputProps={{ maxLength: 500 }} onChange={event => field('reason', event.target.value)}/></Grid>
           </>}
-        </Grid>{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box>
-        <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}><Button onClick={closePanel} disabled={busy}>{t('Cancel')}</Button><Button type="submit" variant="contained" disabled={busy || !form.location_id} startIcon={<Save size={17}/>}>{t(busy ? 'Saving…' : panelMode === 'edit' ? 'Save changes' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Button></Stack>
+        </Grid>{impactReview !== null && panelKind === 'time_off' && <Box sx={{ mt: 2 }}><Alert severity={impactReview.length ? 'warning' : 'success'}>{impactReview.length ? t('{{count}} booked appointments overlap this time off. Saving will not cancel or move them.', { count: impactReview.length }) : t('No booked appointments overlap this time off.')}</Alert>{impactReview.length > 0 && <AffectedAppointmentList appointments={impactReview} language={i18n.resolvedLanguage}/>}</Box>}{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box>
+        <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}><Button onClick={closePanel} disabled={busy}>{t('Cancel')}</Button><Button type="submit" variant="contained" disabled={busy || !form.location_id} startIcon={<Save size={17}/>}>{t(busy ? 'Saving…' : panelKind === 'time_off' && impactReview === null ? 'Review affected appointments' : panelMode === 'edit' ? 'Save changes' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Button></Stack>
       </Box>}
     </Drawer>
   </Stack>;
@@ -213,7 +227,7 @@ function exceptionRow(item: Exception, selected: SelectedItem | null, locations:
   const labels: Record<string, string> = { blocked: 'Blocked', available: 'Available', vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
   const location = locations.find(value => value.id === item.location_id);
   const interval = `${formatInZone(item.starts_at, location?.timezone, language)} – ${formatInZone(item.ends_at, location?.timezone, language)}`;
-  return { key: `${item.kind}-${item.id}`, selected: selected?.kind === item.kind && selected.id === item.id, primary: t(labels[item.type] ?? item.type), secondary: `${interval}${item.location_name ? ` · ${item.location_name}` : ''}${item.reason ? ` · ${item.reason}` : ''}`, onClick: () => select({ kind: item.kind, id: item.id, exception: item }) };
+  return { key: `${item.kind}-${item.id}`, selected: selected?.kind === item.kind && selected.id === item.id, primary: t(labels[item.type] ?? item.type), secondary: `${interval}${item.location_name ? ` · ${item.location_name}` : ''}${item.reason ? ` · ${item.reason}` : ''}${Number(item.affected_appointment_count) > 0 ? ` · ${t('{{count}} need follow-up', { count: item.affected_appointment_count })}` : ''}`, onClick: () => select({ kind: item.kind, id: item.id, exception: item }) };
 }
 function formatInZone(value: string, timezone: string | undefined, language: string | undefined) { return new Intl.DateTimeFormat(language, { timeZone: timezone ?? 'UTC', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(`${value.replace(' ', 'T')}Z`)); }
 function ItemDetails({ item, locations, language, edit, canEdit }: { item: SelectedItem; locations: Location[]; language: string | undefined; edit: () => void; canEdit: boolean }) {
@@ -221,4 +235,40 @@ function ItemDetails({ item, locations, language, edit, canEdit }: { item: Selec
   const typeLabels: Record<string, string> = { blocked: 'Blocked', available: 'Available', vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' };
   const rows = item.rule ? [[t('Type'), t('Regular hours')], [t('Day'), t(days[item.rule.weekday - 1])], [t('Time'), `${item.rule.start_time.slice(0, 5)}–${item.rule.end_time.slice(0, 5)}`], [t('Location'), item.rule.location_name], [t('Valid from'), item.rule.valid_from], [t('Valid until'), item.rule.valid_until || t('No end date')]] : item.exception ? [[t('Type'), t(item.kind === 'override' ? 'Schedule change' : 'Time off')], [t(item.kind === 'override' ? 'Availability' : 'Reason type'), t(typeLabels[item.exception.type] ?? item.exception.type)], [t('Starts'), formatInZone(item.exception.starts_at, location?.timezone, language)], [t('Ends'), formatInZone(item.exception.ends_at, location?.timezone, language)], [t('Location'), item.exception.location_name || t('Not set')], [t('Notes'), item.exception.reason || t('Not set')]] : [];
   return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack>{canEdit && <Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button>}</Stack>;
+}
+
+function AffectedAppointmentList({ appointments, language }: { appointments: AffectedAppointment[]; language: string | undefined }) {
+  const { t } = useTranslation();
+  return <List dense aria-label={t('Affected appointments')} sx={{ mt: 1 }}>
+    {appointments.map(item => <Box component="li" key={item.id} sx={{ listStyle: 'none', py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Typography fontWeight={650}>{t('Appointment #{{id}}', { id: item.id })} · {item.client_name} · {item.service_name}</Typography>
+      <Typography variant="body2" color="text.secondary">{formatInZone(item.starts_at, item.timezone, language)} · {item.location_name} · {t(item.status.replaceAll('_', ' '))}</Typography>
+    </Box>)}
+  </List>;
+}
+
+function SavedTimeOffImpact({ id, getAccessToken, appointmentsPath, language }: { id: number; getAccessToken: () => Promise<string>; appointmentsPath: string; language: string | undefined }) {
+  const { t } = useTranslation();
+  const [appointments, setAppointments] = useState<AffectedAppointment[] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const token = await getAccessToken();
+        if (controller.signal.aborted) return;
+        const response = await fetch(`${api}/admin/time-off/${id}/impact`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+        const body = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load affected appointments.')));
+        if (!controller.signal.aborted) setAppointments(normalizeNumericIds<AffectedAppointment[]>(body.data.appointments));
+      } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load affected appointments.')); }
+    })();
+    return () => controller.abort();
+  }, [getAccessToken, id, t]);
+  return <Box sx={{ px: 3, pb: 3 }}><Divider sx={{ mb: 2 }}/><Typography variant="h6">{t('Affected appointments')}</Typography>
+    {error && <Alert severity="error">{error}</Alert>}
+    {appointments === null && !error && <Typography color="text.secondary">{t('Loading affected appointments…')}</Typography>}
+    {appointments?.length === 0 && <Typography color="text.secondary">{t('No booked appointments overlap this time off.')}</Typography>}
+    {appointments && appointments.length > 0 && <><Alert severity="warning" sx={{ mt: 1 }}>{t('{{count}} booked appointments still need staff follow-up. They have not been canceled or moved.', { count: appointments.length })}</Alert><AffectedAppointmentList appointments={appointments} language={language}/>{appointments.map(item => <Button key={item.id} href={`${appointmentsPath}?appointment_id=${item.id}`} variant="outlined" sx={{ mr: 1, mb: 1 }}>{t('Review appointment #{{id}}', { id: item.id })}</Button>)}</>}
+  </Box>;
 }

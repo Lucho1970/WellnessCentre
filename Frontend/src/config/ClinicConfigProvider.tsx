@@ -8,9 +8,16 @@ export type ClinicConfig = {
   phone: string | null;
   logo_version: string | null;
   favicon_version: string | null;
+  theme_primary_color: string;
+  theme_secondary_color: string;
+  theme_font_family: 'Inter' | 'Arial' | 'Georgia';
+  welcome_title_en: string | null;
+  welcome_title_fr: string | null;
+  welcome_body_en: string | null;
+  welcome_body_fr: string | null;
 };
 
-const fallbackConfig: ClinicConfig = { name: 'Wellness Centre', legal_name: null, email: null, phone: null, logo_version: null, favicon_version: null };
+const fallbackConfig: ClinicConfig = { name: 'Wellness Centre', legal_name: null, email: null, phone: null, logo_version: null, favicon_version: null, theme_primary_color: '#176b62', theme_secondary_color: '#d8754c', theme_font_family: 'Inter', welcome_title_en: null, welcome_title_fr: null, welcome_body_en: null, welcome_body_fr: null };
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
 type ClinicConfigValue = {

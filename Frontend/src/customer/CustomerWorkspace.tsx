@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, Grid, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { customerFetch } from './session';
 import { useTranslation } from 'react-i18next';
@@ -20,8 +20,10 @@ const appointmentInstant = (value: string) => new Date(`${value.replace(' ', 'T'
 export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatus; onRefresh: () => void }) {
   const { t, i18n } = useTranslation();
   const canBook=status.capabilities?.includes('book_own_appointments')??false;
+  const previousOnboarding = useRef(status.onboarding_status);
   const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking' | 'manage'>(status.onboarding_status === 'linked' ? (canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
   const [appointmentView, setAppointmentView] = useState<AppointmentView>('upcoming');
+  const [showCanceled, setShowCanceled] = useState(() => { try { return localStorage.getItem('wellness.client.showCanceledAppointments') === 'true'; } catch { return false; } });
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [managing, setManaging] = useState<Appointment | null>(null);
@@ -35,24 +37,29 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
     if (status.onboarding_status === 'linked' && (mode === 'choose' || mode === 'invite')) setMode(canBook&&customerBookingIntent() ? 'booking' : 'appointments');
   }, [canBook, mode, status.onboarding_status]);
   useEffect(() => {
+    const wasLinked = previousOnboarding.current === 'linked';
+    previousOnboarding.current = status.onboarding_status;
+    if (!wasLinked && status.onboarding_status === 'linked' && canBook && customerBookingIntent()) setMode('booking');
+  }, [canBook, status.onboarding_status]);
+  useEffect(() => {
     if (status.onboarding_status !== 'linked' || !['profile','appointments'].includes(mode)) return;
     const controller = new AbortController(); setLoading(true); setError('');
-    void customerFetch(mode === 'profile' ? '/profile' : '/appointments', { signal: controller.signal }).then(data => {
+    void customerFetch(mode === 'profile' ? '/profile' : `/appointments?show_canceled=${showCanceled ? '1' : '0'}`, { signal: controller.signal }).then(data => {
       if (controller.signal.aborted) return;
       if (mode === 'profile') setProfile({ ...emptyProfile, ...data, address: data.address ?? { ...emptyAddress } });
       else setAppointments(data.items);
     }).catch(cause => { if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [mode, status.onboarding_status, reload]);
+  }, [mode, status.onboarding_status, reload, showCanceled]);
   const visibleAppointments = useMemo(() => {
     const now = Date.now();
-    const rows = appointments.filter(appointment => appointmentView === 'all' || (appointmentView === 'upcoming'
+    const rows = appointments.filter(appointment => (showCanceled || !appointment.status.startsWith('canceled')) && (appointmentView === 'all' || (appointmentView === 'upcoming'
       ? appointmentInstant(appointment.ends_at) >= now
-      : appointmentInstant(appointment.ends_at) < now));
+      : appointmentInstant(appointment.ends_at) < now)));
     return [...rows].sort((left, right) => appointmentView === 'upcoming'
       ? appointmentInstant(left.starts_at) - appointmentInstant(right.starts_at)
       : appointmentInstant(right.starts_at) - appointmentInstant(left.starts_at));
-  }, [appointmentView, appointments]);
+  }, [appointmentView, appointments, showCanceled]);
   const save = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError('');
     try {
@@ -102,6 +109,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
           <Button startIcon={<RefreshCw size={16} />} disabled={loading} onClick={() => setReload(value => value + 1)}>{t('Refresh')}</Button>
         </Stack>
       </Stack>
+      <FormControlLabel control={<Checkbox checked={showCanceled} onChange={event => { const checked = event.target.checked; setShowCanceled(checked); try { localStorage.setItem('wellness.client.showCanceledAppointments', String(checked)); } catch { /* Browsers may disable storage. */ } }} />} label={t('Show canceled appointments')} />
       {visibleAppointments.length === 0 ? <Typography color="text.secondary">{t('No appointments in this view.')}</Typography> : <Stack spacing={2}>
         {visibleAppointments.map(appointment => <Box key={appointment.id} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
           <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={700}>{appointment.service}</Typography><Chip size="small" variant="outlined" label={t(appointment.status.replaceAll('_', ' '))} /></Stack>

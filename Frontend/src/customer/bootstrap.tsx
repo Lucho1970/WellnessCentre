@@ -4,10 +4,19 @@ import { AppProviders } from '../shared/AppProviders';
 import { ClientApp } from './ClientApp';
 import { customerConfigured, customerHome, customerInstance, selectCustomerAccount } from './auth';
 import { finishCustomerLogin } from './session';
-import { captureCustomerBookingIntent } from './bookingIntent';
+import { bookingSignInKey, captureCustomerBookingIntent, customerBookingIntent } from './bookingIntent';
 
 export async function bootstrap() {
-  captureCustomerBookingIntent();
+  if (window.location.pathname === `${import.meta.env.BASE_URL}client` && new URLSearchParams(window.location.search).get('return') === 'browse') {
+    sessionStorage.setItem('wellness.customer.return-to-browse.v1', 'pending');
+    window.history.replaceState(null, '', customerHome);
+  }
+  const capturedBooking = captureCustomerBookingIntent();
+  if (window.location.pathname === `${import.meta.env.BASE_URL}book`) {
+    if (!capturedBooking || !customerBookingIntent()) { window.location.replace(import.meta.env.BASE_URL); return; }
+    sessionStorage.setItem(bookingSignInKey, 'pending');
+    window.history.replaceState(null, '', customerHome);
+  }
   if (window.location.pathname.endsWith('/client/invite')) {
     const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
     if (token && /^[a-f0-9]{64}$/.test(token)) sessionStorage.setItem('wellness.customer.invitation', token);

@@ -12,6 +12,16 @@ is still pending; this checkpoint does not enable client booking or clinical acc
 
 ## Client-first login and refresh correction
 
+Booking sign-in requests `prompt=login` so External ID presents the configured
+Google, personal Microsoft, and email-code choices instead of Microsoft's
+remembered-account picker. The latter can offer a Gmail address as a Microsoft
+account and fail unless the client discovers “Use another account.” The portal
+does not send a `login_hint` or `domain_hint` for this fresh booking request;
+the selected appointment remains saved locally through the redirect. Verify
+the hosted provider page and a successful return with a real test account after
+deployment, since automated tests can validate the authorization request but
+cannot simulate the hosted identity-provider UI.
+
 Public **Login** now targets `/client`; generic portal `/login` redirects there too.
 Employees use `/staff/login` via a secondary Staff login link. The portal root remains
 compatible with the existing workforce callback, so no Entra redirect changes are needed.
@@ -21,17 +31,11 @@ on every new MSAL account object. Verification times out after 20 seconds with e
 retry/sign-in recovery. Both personas filter restored accounts by tenant and trusted
 environment before acquiring tokens; API validation is unchanged.
 
-When an application session expires but the cached customer identity remains, a returning
-Google user is routed back through Google using External ID's `domain_hint=google`. The
-hint is selected only from an allowlisted value of the signed cached `idp` claim. The
-fresh nonce, `prompt=login`, `max_age=0`, and `auth_time` proof remain mandatory, so this
-changes provider routing without weakening the onboarding/session freshness check. A
-first-time user, a missing claim, or an unsupported provider still sees the normal chooser.
-The portal supplies this through MSAL's supported `domainHint` request property and
-temporarily clears the active-account hint while the redirect starts. This prevents an
-External ID opaque `login_hint` or generated username from being combined with
-`domain_hint`, a combination rejected with `AADSTS1002014`. The cached account itself is
-not deleted and a failed redirect restores it as active.
+When an application session expires but the cached customer identity remains, sign-in
+still starts at the configured External ID user flow. A fresh nonce, `prompt=login`,
+`max_age=0`, and `auth_time` proof remain mandatory. The portal temporarily clears the
+active account before redirect so MSAL does not send a stale account hint; it keeps the
+cached account locally and restores it if redirect initiation fails.
 
 Public initials use a hidden portal `/client/session` page with exact-origin/source and
 nonce-checked postMessage replies. Only initials from an unexpired cached customer ID
@@ -50,7 +54,7 @@ refresh, browse availability, public refresh and account-link return, then staff
 
 Owner reports registration created: `Wellness Client Portal Dev`, single-tenant SPA
 in the customer tenant. Application (client) ID: `7a522317-d74f-4ccb-9805-8e4b912c02ab`.
-Planned customer-only callback: `https://portal.copihue.ca/client/auth/callback`.
+Customer-only callback: `https://willowwellness.copihue.ca/client/auth/callback`.
 This callback is implemented in this release; deploy before end-to-end testing.
 Do not create a SPA client secret or enable implicit grants.
 
@@ -123,8 +127,8 @@ private API packages; no data migration reversal is needed.
 
 1. Verify the customer SPA and API really reside in the new external tenant; compare their
    Directory tenant IDs if registration fails. Keep all workforce registrations unchanged.
-2. Customer SPA redirect must be exactly `https://portal.copihue.ca/client/auth/callback`.
-   Register `https://portal.copihue.ca/client` as an additional SPA redirect for the logout
+2. Customer SPA redirect must be exactly `https://willowwellness.copihue.ca/client/auth/callback`.
+   Register `https://willowwellness.copihue.ca/client` as an additional SPA redirect for the logout
    return, if not already registered. Do not enable implicit grants. For local testing add
    matching localhost callbacks separately; local Vite still needs a running/reachable PHP API.
 3. In the separate personal-Microsoft federation registration's Web platform, retain the
@@ -133,7 +137,7 @@ private API packages; no data migration reversal is needed.
    Keep its credential only in the customer tenant's custom identity provider.
 4. Keep Google OAuth in Testing; add intended test Google accounts under Audience/Test users
    if required. Do not publish or request Gmail/Calendar permissions for sign-in.
-5. Open `https://portal.copihue.ca/client` in a private browser window. Test Google, personal
+5. Open `https://willowwellness.copihue.ca/client` in a private browser window. Test Google, personal
    Microsoft and email-code sign-up/sign-in separately. Each must return to the portal and
    show **Customer sign-in verified** and **not linked**. The hosted provider screen alone
    is not success. No booking, profile or clinical data should be accessible.

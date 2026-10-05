@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { legacyPage, pageAt, pagePath, pagesFor, workspacesFor, type PortalPage, type Workspace } from './access';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { BetaFeedbackLink } from '../shared/BetaFeedbackLink';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -47,10 +48,12 @@ const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ de
 const TeamAdmin = lazy(() => import('../admin/TeamAdmin').then(module => ({ default: module.TeamAdmin })));
 const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
+const PractitionerClients = lazy(() => import('./PractitionerClients').then(module => ({ default: module.PractitionerClients })));
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
 const NotificationStatusAdmin = lazy(() => import('../admin/NotificationStatusAdmin').then(module => ({ default: module.NotificationStatusAdmin })));
+const PractitionerNotifications = lazy(() => import('./PractitionerNotifications').then(module => ({ default: module.PractitionerNotifications })));
 const PractitionerCalendar = lazy(() => import('../scheduling/PractitionerCalendar').then(module => ({ default: module.PractitionerCalendar })));
 
 type NavigationItem = {
@@ -63,7 +66,7 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
   { id: "appointments", label: "Appointments", description: "Bookings and scheduled visits", icon: <CalendarDays size={20} /> },
-  { id: "schedule_calendar", label: "My calendar", description: "Your appointments by day, week, or month", icon: <CalendarDays size={20} /> },
+  { id: "schedule_calendar", label: "My calendar", description: "Your appointments and time off by day, week, or month", icon: <CalendarDays size={20} /> },
   { id: "clients", label: "Clients", description: "Contact details and client records", icon: <Users size={20} /> },
   { id: "calendar", label: "Availability", description: "Working hours and schedules", icon: <CalendarRange size={20} /> },
   {
@@ -78,6 +81,7 @@ const navigation: NavigationItem[] = [
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
   { id: "notifications", label: "Notification status", description: "Review appointment notification delivery", icon: <MailCheck size={20} /> },
+  { id: "my_notifications", label: "My notifications", description: "Booking notices sent to you", icon: <MailCheck size={20} /> },
   {
     id: "profile",
     label: "My profile",
@@ -107,6 +111,9 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
   const { account } = useStaffAuth();
   const workspaces = workspacesFor(roles);
   const preferenceKey = `wellness.workspace.${account?.homeAccountId ?? 'staff'}`;
+  const rememberWorkspace = (choice: Workspace) => {
+    try { sessionStorage.setItem(preferenceKey, choice); } catch { /* Preference only, never authority. */ }
+  };
   let remembered: string | null = null;
   try { remembered = sessionStorage.getItem(preferenceKey); } catch { /* Storage may be disabled. */ }
   const defaultWorkspace = workspaces.find(item => item === remembered) ?? workspaces[0];
@@ -137,12 +144,12 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {!desktop && <IconButton aria-label={t('Close portal menu')} onClick={() => setDrawerOpen(false)}><X size={20} /></IconButton>}
       </Stack>
       <Divider sx={{ mb: 1.5 }} />
-      {workspaces.length > 1 && <Stack spacing={1} mb={2} aria-label={t('Switch workspace')}>{workspaces.map(item => <Button key={item} component={Link} to={pagePath(item, 'dashboard')} variant={workspace === item ? 'contained' : 'outlined'}>{t(item === 'admin' ? 'Operations' : 'Practitioner')}</Button>)}</Stack>}
+      {workspaces.length > 1 && <Stack spacing={1} mb={2} aria-label={t('Switch workspace')}>{workspaces.map(item => <Button key={item} component={Link} to={pagePath(item, 'dashboard')} onClick={() => rememberWorkspace(item)} variant={workspace === item ? 'contained' : 'outlined'}>{t(item === 'admin' ? 'Operations' : 'Practitioner')}</Button>)}</Stack>}
       <List aria-label={t('Staff portal navigation')}>
         {allowedNavigation.map((item) => (
           <ListItemButton component={Link} to={pagePath(workspace, item.id)} aria-current={page === item.id ? 'page' : undefined} key={item.id} selected={page === item.id} sx={{ borderRadius: 2, mb: 0.75, alignItems: "flex-start" }}>
             <ListItemIcon sx={{ minWidth: 40, mt: 0.4, color: page === item.id ? "primary.main" : "text.secondary" }}>{item.icon}</ListItemIcon>
-            <ListItemText primary={t(item.label)} secondary={t(item.description)} primaryTypographyProps={{ fontWeight: page === item.id ? 750 : 600 }} />
+            <ListItemText primary={t(workspace === 'practitioner' && item.id === 'clients' ? 'My clients' : item.label)} secondary={t(workspace === 'practitioner' && item.id === 'clients' ? 'Clients linked to your appointments' : item.description)} primaryTypographyProps={{ fontWeight: page === item.id ? 750 : 600 }} />
           </ListItemButton>
         ))}
       </List>
@@ -158,13 +165,13 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         <Stack direction="row" spacing={1.5} alignItems="center" mb={3}>
           {!desktop && <IconButton aria-label={t('Open portal menu')} onClick={() => setDrawerOpen(true)} sx={{ border: "1px solid", borderColor: "divider" }}><Menu /></IconButton>}
           <Box>
-            <Typography variant="h4" component="h1">{t(current.label)}</Typography>
-            <Typography color="text.secondary">{t(current.description)}</Typography>
+            <Typography variant="h4" component="h1">{t(workspace === 'practitioner' && page === 'clients' ? 'My clients' : current.label)}</Typography>
+            <Typography color="text.secondary">{t(workspace === 'practitioner' && page === 'clients' ? 'Clients linked to your appointments' : current.description)}</Typography>
           </Box>
         </Stack>
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
         {page === "dashboard" && <Dashboard workspace={workspace} />}
-        {page === "clients" && <ClientManagement canMerge={roles.includes('super_admin')} />}
+        {page === "clients" && (workspace === 'practitioner' ? <PractitionerClients /> : <ClientManagement canMerge={roles.includes('super_admin')} />)}
         {page === "appointments" && <StaffAppointments canManageFees={roles.some(role => ['super_admin', 'clinic_admin'].includes(role))} practitionerMode={workspace === 'practitioner'} canScheduleOthers={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('schedule_for_other_practitioners')} canAddClients={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || (roles.includes('practitioner') && permissions.includes('add_clients'))} canApproveOnsiteArea={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('approve_onsite_service_area')} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
         {page === "schedule_calendar" && <PractitionerCalendar />}
         {page === "practitioners" && <PractitionerAdmin />}
@@ -177,9 +184,11 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "team" && <TeamAdmin />}
         {page === "widgets" && <DashboardWidgetAdmin />}
         {page === "notifications" && <NotificationStatusAdmin />}
+        {page === "my_notifications" && <PractitionerNotifications />}
         {page === "calendar" && <AvailabilityAdmin practitionerMode={workspace === 'practitioner'} />}
-        {page === "profile" && <ProfileSettings />}
+        {page === "profile" && <ProfileSettings practitioner={roles.includes('practitioner')} />}
         </Suspense>
+        <Box sx={{ mt: 4, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}><BetaFeedbackLink /></Box>
       </Box>
     </Box>
   );

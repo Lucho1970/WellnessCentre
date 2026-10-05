@@ -53,6 +53,28 @@ test("customer route offers sign-in without running staff authentication", async
   await expect(
     page.getByRole("button", { name: "Create appointment", exact: true }),
   ).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Report a problem" })).toHaveAttribute("href", /localhost:5183\/contact/);
+});
+test("portal Book handoff preserves a guest selection and starts client sign-in", async ({ page }) => {
+  await fixture(page);
+  await page.goto("http://localhost:5184/book?delivery_mode=clinic&location_id=2&service_id=4&practitioner_id=7&duration_option_id=8&starts_at=2099-10-01T14%3A00%3A00-04%3A00");
+  await expect(page).toHaveURL("http://localhost:5184/client");
+  await expect.poll(() => page.evaluate(() => Boolean((window as Window & { customerSignInCalled?: boolean }).customerSignInCalled))).toBe(true);
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('wellness.customer.booking-intent.v1') ?? 'null'))).toMatchObject({ service_id: '4', practitioner_id: '7', duration_option_id: '8' });
+});
+test("portal Book without a valid selection returns to guest browsing", async ({ page }) => {
+  await fixture(page);
+  await page.goto("http://localhost:5184/book?service_id=4");
+  await expect(page).toHaveURL("http://localhost:5184/");
+  await expect(page.getByRole('heading', { name: 'Welcome to Test Wellness' })).toBeVisible();
+});
+
+test("client login from the catalogue returns linked clients to browsing",async({page})=>{
+  await fixture(page,true);
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments','book_own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.goto('http://localhost:5184/client?return=browse');
+  await expect(page).toHaveURL('http://localhost:5184/');
+  await expect(page.getByRole('heading',{name:/Welcome to/})).toBeVisible();
 });
 test("verified identity remains unlinked with no client records or staff roles", async ({
   page,
@@ -349,9 +371,12 @@ test("real customer MSAL starts code flow with PKCE and customer-only scope", as
   );
   expect(url.searchParams.has("client_secret")).toBe(false);
   expect(url.searchParams.get("nonce")).toBe("a".repeat(64));
-  expect(url.searchParams.get("prompt")).toBe("select_account");
+  // Start at the External ID provider chooser, not Microsoft's remembered-
+  // account picker (where selecting a Gmail address may fail).
+  expect(url.searchParams.get("prompt")).toBe("login");
   expect(url.searchParams.get("max_age")).toBe("0");
   expect(url.searchParams.has("domain_hint")).toBe(false);
+  expect(url.searchParams.has("login_hint")).toBe(false);
   expect(
     JSON.parse(url.searchParams.get("claims") ?? "{}").id_token.auth_time
       .essential,
@@ -458,7 +483,7 @@ test("linked client sees only their appointments and idle expiry removes private
       },
     }),
   );
-  await page.route("**/api/v1/customer/appointments", (route) => {
+  await page.route("**/api/v1/customer/appointments*", (route) => {
     appointmentReads++;
     expect(route.request().url()).not.toContain("client_id");
     return route.fulfill({
@@ -487,6 +512,17 @@ test("linked client sees only their appointments and idle expiry removes private
               timezone: "America/Toronto",
               delivery_mode: "clinic",
             },
+            {
+              id: 13,
+              starts_at: "2099-09-21 16:00:00",
+              ends_at: "2099-09-21 17:00:00",
+              status: "canceled_by_client",
+              service: "Canceled Massage",
+              practitioner: "Esther Vanderpoel",
+              location: "Holland Landing Clinic",
+              timezone: "America/Toronto",
+              delivery_mode: "clinic",
+            },
           ],
         },
       },
@@ -508,8 +544,15 @@ test("linked client sees only their appointments and idle expiry removes private
   await page.getByRole("button", { name: "Add to calendar" }).click();
   expect((await download).suggestedFilename()).toBe("appointment-41.ics");
   expect(calendarReads).toBe(1);
+  await expect(page.getByRole("checkbox", { name: "Show canceled appointments" })).not.toBeChecked();
+  await expect(page.getByText("Canceled Massage", { exact: true })).toHaveCount(0);
+  await page.getByRole("checkbox", { name: "Show canceled appointments" }).check();
+  await expect(page.getByText("Canceled Massage", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('wellness.client.showCanceledAppointments'))).toBe('true');
+  await page.getByRole("checkbox", { name: "Show canceled appointments" }).uncheck();
+  await expect(page.getByText("Canceled Massage", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Massage", { exact: true })).toHaveCount(0);
-  await page.getByLabel("Show").click();
+  await page.getByRole("combobox").click();
   await page.getByRole("option", { name: "Past", exact: true }).click();
   await expect(page.getByText("Massage", { exact: true })).toBeVisible();
   await expect(
@@ -530,7 +573,7 @@ test("linked client sees only their appointments and idle expiry removes private
     page.getByRole("button", { name: "Sign in again", exact: true }),
   ).toBeVisible();
   expect(checks).toBeLessThanOrEqual(2);
-  expect(appointmentReads).toBe(1);
+  expect(appointmentReads).toBe(3);
 });
 
 test("invitation fragment is removed and acceptance remains pending until manual refresh", async ({
@@ -604,7 +647,7 @@ test("linked client books only for the signed-in client through the customer API
   );
   let appointmentReads = 0,
     confirmations = 0;
-  await page.route("**/api/v1/customer/appointments", (route) => {
+  await page.route("**/api/v1/customer/appointments*", (route) => {
     if (route.request().method() === "POST") {
       confirmations++;
       const body = route.request().postDataJSON();
@@ -732,6 +775,89 @@ test("linked client books only for the signed-in client through the customer API
   expect(appointmentReads).toBeGreaterThanOrEqual(2);
 });
 
+test("selected public On-Site time survives sign-in and address validation", async ({ page }) => {
+  await fixture(page);
+  await page.route("**/api/v1/customer/auth/me", route => route.fulfill({ json: { data: {
+    authenticated: true, authentication_context: "customer", onboarding_status: "linked",
+    capabilities: ["book_own_appointments"],
+    session: { idle_expires_at: Date.now()/1000+1800, absolute_expires_at: Date.now()/1000+28800 },
+  } } }));
+  await page.route("**/api/v1/customer/booking-options", route => route.fulfill({ json: { data: {
+    default_location_id: 2, rooms: [], combinations: [{
+      location_id: 2, location_name: "Holland Landing", timezone: "America/Toronto",
+      service_id: 4, service_name: "Massage", requires_room: 0, offers_mobile: 1, offers_clinic: 0,
+      travel_buffer_minutes: 20, mobile_fee_cents: 1500, base_price_cents: 12000,
+      practitioner_id: 7, practitioner_name: "Esther", duration_option_id: 8, duration_minutes: 60,
+    }],
+  } } }));
+  await page.route("**/api/v1/customer/profile", route => route.fulfill({ json: { data: { address: {
+    address_line1: "10 Client Street", address_line2: "", city: "Newmarket", province: "ON",
+    postal_code: "L3Y 1A1", country: "Canada", instructions: "",
+  } } } }));
+  await page.route("**/api/v1/customer/address-coverage/approval", route => route.fulfill({ json: { data: { approved: false } } }));
+  await page.route("**/api/v1/customer/address-coverage/validate", route => route.fulfill({ json: { data: {
+    destination: route.request().postDataJSON().destination, distance_km: 7.2, radius_km: 25, token: "coverage-proof",
+  } } }));
+  let availabilityChecks = 0;
+  await page.route("**/api/v1/customer/availability?**", route => {
+    availabilityChecks++;
+    return route.fulfill({ json: { data: { availability: [{
+      duration_option_id: 8, starts_at: "2099-10-01T14:00:00-04:00", ends_at: "2099-10-01T15:00:00-04:00", available_room_ids: [],
+    }] } } });
+  });
+  await page.goto("http://localhost:5184/client/book?delivery_mode=mobile&location_id=2&service_id=4&practitioner_id=7&duration_option_id=8&starts_at=2099-10-01T14%3A00%3A00-04%3A00");
+  await expect(page.getByRole("button", { name: "Sign in or create client account" })).toBeVisible();
+  await expect(page.getByText("We saved your selected service and time for this sign-in. We will check availability again before you confirm.")).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("wellness.customer.booking-intent.v1") ?? "null"))).toMatchObject({
+    delivery_mode: "mobile", location_id: "2", service_id: "4", practitioner_id: "7", duration_option_id: "8",
+  });
+  await page.unroute("**/src/customer/auth.ts");
+  await fixture(page, true);
+  await page.goto("http://localhost:5184/client");
+  await expect(page.getByText(/Your selected Massage appointment.*still available/)).toBeVisible();
+  await expect(page.getByText("Confirm the visit address to continue with this time.", { exact: false })).toBeVisible();
+  expect(availabilityChecks).toBe(1);
+  await page.getByRole("button", { name: "Validate address and coverage" }).click();
+  await expect(page.getByRole("button", { name: "Review appointment" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: /Oct.*1.*2099/i })).toHaveAttribute("class", /MuiButton-contained/);
+  await expect(page.getByLabel("Appointment date")).toHaveValue("2099-10-01");
+  expect(availabilityChecks).toBe(1);
+});
+
+test("stale public time returns to the selected date without silently choosing another slot", async ({ page }) => {
+  await fixture(page, true);
+  await page.route("**/api/v1/customer/auth/me", route => route.fulfill({ json: { data: {
+    authenticated: true, authentication_context: "customer", onboarding_status: "linked",
+    capabilities: ["book_own_appointments"],
+    session: { idle_expires_at: Date.now()/1000+1800, absolute_expires_at: Date.now()/1000+28800 },
+  } } }));
+  await page.route("**/api/v1/customer/booking-options", route => route.fulfill({ json: { data: {
+    default_location_id: 2, rooms: [], combinations: [{
+      location_id: 2, location_name: "Holland Landing", timezone: "America/Toronto",
+      service_id: 4, service_name: "Massage", requires_room: 0, offers_mobile: 0, offers_clinic: 1,
+      travel_buffer_minutes: 0, mobile_fee_cents: 0, base_price_cents: 12000,
+      practitioner_id: 7, practitioner_name: "Esther", duration_option_id: 8, duration_minutes: 60,
+    }],
+  } } }));
+  await page.route("**/api/v1/customer/profile", route => route.fulfill({ json: { data: { address: null } } }));
+  await page.route("**/api/v1/customer/appointments?**", route => route.fulfill({ json: { data: { items: [] } } }));
+  await page.route("**/api/v1/customer/availability?**", route => route.fulfill({ json: { data: { availability: [{
+    duration_option_id: 8, starts_at: "2099-10-01T15:00:00-04:00", ends_at: "2099-10-01T16:00:00-04:00", available_room_ids: [],
+  }] } } }));
+  await page.goto("http://localhost:5184/client/book?delivery_mode=clinic&location_id=2&service_id=4&practitioner_id=7&duration_option_id=8&starts_at=2099-10-01T14%3A00%3A00-04%3A00");
+  await expect(page.getByText("The time you selected before sign-in is no longer available. Please choose another time.")).toBeVisible();
+  await expect(page.getByLabel("Appointment date")).toHaveValue("2099-10-01");
+  await expect(page.getByRole("button", { name: "Review appointment" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Oct.*1.*2099/i })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("combobox", { name: /^Service\b/ })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  expect(await page.evaluate(() => sessionStorage.getItem("wellness.customer.booking-intent.v1"))).toBeNull();
+  await expect(page).toHaveURL("http://localhost:5184/client/book");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "New appointment" })).toHaveCount(0);
+});
+
 test("linked client reschedules and cancels only their own upcoming appointment", async ({ page }) => {
   await fixture(page, true);
   await page.route("**/api/v1/customer/auth/me", route => route.fulfill({ json: { data: {
@@ -748,7 +874,7 @@ test("linked client reschedules and cancels only their own upcoming appointment"
     timezone: "America/Toronto", delivery_mode: "mobile",
   };
   const changes: Record<string, unknown>[] = [];
-  await page.route("**/api/v1/customer/appointments", route => route.fulfill({ json: { data: { items: [appointment], limit: 100 } } }));
+  await page.route("**/api/v1/customer/appointments?**", route => route.fulfill({ json: { data: { items: [appointment], limit: 100 } } }));
   await page.route("**/api/v1/customer/appointments/41/availability?**", route => route.fulfill({ json: { data: { availability: [
     { duration_option_id: 8, starts_at: "2099-09-20T10:00:00-04:00", ends_at: "2099-09-20T11:00:00-04:00", available_room_ids: [] },
     { duration_option_id: 8, starts_at: "2099-09-21T11:00:00-04:00", ends_at: "2099-09-21T12:00:00-04:00", available_room_ids: [] },
