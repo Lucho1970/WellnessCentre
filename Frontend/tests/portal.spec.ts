@@ -125,6 +125,7 @@ async function fixtures(
       };
     if (path === "/auth/me") data = { roles: roles ?? [], permissions };
     if (path === "/profile/avatar") data = { image_base64: null };
+    if (path === "/profile/public-card") data = { public_name: "Test Practitioner", booking_name: "Test", summary: "", summary_fr: "", public_website_url: "", public_contact_email: "", public_contact_phone: "", public_contact_sms: false, slug: "test-practitioner", published: true };
     if (path === "/profile/notifications") data = { work_email: "staff@example.test", email_enabled: false, email_destination: "work", personal_email: null, personal_email_verified: false, mobile_phone: null, sms_requested: false, sms_delivery_active: false };
     if (path === "/dashboard") {
       const workspace = url.searchParams.get("workspace") === "practitioner" ? "practitioner" : "admin";
@@ -2133,8 +2134,8 @@ test("public practitioner directory filters services and links profiles to booki
   await expect(page.getByRole("heading", { name: "Meet your care team." })).toBeVisible();
   await page.getByRole("combobox", { name: "Service" }).click();
   await page.getByRole("option", { name: "Massage Therapy" }).click();
-  await expect(page.getByRole("heading", { name: "Esther Vanderpoel" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Nutrition Practitioner" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Esther Vanderpoel", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Nutrition Practitioner", exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "View profile" }).click();
   await expect(page).toHaveURL(`${publicHost}/practitioners/esther-vanderpoel`);
   await expect(page.getByRole("heading", { name: "Services offered" })).toBeVisible();
