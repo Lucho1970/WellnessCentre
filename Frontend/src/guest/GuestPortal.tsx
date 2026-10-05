@@ -44,6 +44,7 @@ export function GuestPortal() {
         <Button href={import.meta.env.BASE_URL} size="small">{t('Treatments')}</Button>
         <Button href={`${import.meta.env.BASE_URL}client`} size="small">{t('My appointments')}</Button>
         <Button href={`${import.meta.env.BASE_URL}client${hasClientSession ? '' : '?return=browse'}`} variant="contained" size="small">{t(hasClientSession ? 'My account' : 'Log in')}</Button>
+        <Button href={`${import.meta.env.BASE_URL}staff/login`} variant="outlined" size="small">{t('Staff sign in')}</Button>
         <LanguageSwitcher/>
       </Stack>
     </Toolbar></Container></AppBar>
