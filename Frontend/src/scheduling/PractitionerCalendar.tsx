@@ -17,24 +17,37 @@ import { formatDateTime } from '../i18n/format';
 import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { pagePath } from '../portal/access';
 
-type Appointment = { id: number; starts_at: string; ends_at: string; status: string; delivery_mode: 'clinic' | 'mobile'; service_name: string; client_name: string; location_name: string; timezone: string };
+type Appointment = { kind?: 'appointment'; id: number; starts_at: string; ends_at: string; status: string; delivery_mode: 'clinic' | 'mobile'; service_name: string; client_name: string; location_name: string; timezone: string };
+type TimeOff = { kind: 'time_off'; id: number; starts_at: string; ends_at: string; reason_type: 'vacation' | 'sick' | 'personal' | 'other'; location_name: string | null };
+type CalendarItem = Appointment | TimeOff;
 type View = 'timeGridDay' | 'timeGridWeek' | 'dayGridMonth';
 const plugins = [themePlugin, dayGridPlugin, timeGridPlugin];
 const utc = (value: string) => `${value.replace(' ', 'T')}Z`;
 const boundary = (value: Date) => value.toISOString().slice(0, 19) + 'Z';
+const viewKey = (accountId: string | undefined) => accountId ? `wellness:practitioner-calendar:view:v1:${accountId}` : null;
+const storedView = (key: string | null): View | null => {
+  if (!key) return null;
+  try {
+    const value = window.localStorage.getItem(key);
+    return value === 'timeGridDay' || value === 'timeGridWeek' || value === 'dayGridMonth' ? value : null;
+  } catch { return null; }
+};
 
 export function PractitionerCalendar() {
   const { t, i18n } = useTranslation();
-  const { getAccessToken } = useStaffAuth();
+  const { account, getAccessToken } = useStaffAuth();
   const theme = useTheme();
   const narrow = useMediaQuery(theme.breakpoints.down('sm'));
+  const defaultView = useRef<View>(narrow ? 'timeGridDay' : 'timeGridWeek').current;
+  const storageKey = viewKey(account?.homeAccountId);
+  const initialView = storedView(storageKey) ?? defaultView;
   const calendar = useRef<CalendarRef | null>(null);
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
-  const [rows, setRows] = useState<Appointment[]>([]);
+  const [rows, setRows] = useState<CalendarItem[]>([]);
   const [title, setTitle] = useState('');
-  const [view, setView] = useState<View>('timeGridWeek');
+  const [view, setView] = useState<View>(initialView);
   const [privateMode, setPrivateMode] = useState(false);
-  const [selected, setSelected] = useState<Appointment | null>(null);
+  const [selected, setSelected] = useState<CalendarItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
@@ -45,6 +58,11 @@ export function PractitionerCalendar() {
     setView(info.view.type as View);
     setSelected(null);
   }, []);
+  useEffect(() => {
+    const api = calendar.current?.getApi();
+    const next = storedView(storageKey) ?? defaultView;
+    if (api && api.view.type !== next) api.changeView(next);
+  }, [storageKey, defaultView]);
   useEffect(() => {
     if (!range) return;
     const controller = new AbortController();
@@ -65,6 +83,10 @@ export function PractitionerCalendar() {
     return () => controller.abort();
   }, [range, revision, getAccessToken, t]);
   const events = useMemo<EventInput[]>(() => rows.map(item => {
+    if (item.kind === 'time_off') return {
+      id: `time_off:${item.id}`, title: t('Time off'), start: utc(item.starts_at), end: utc(item.ends_at),
+      backgroundColor: theme.palette.grey[700], borderColor: theme.palette.grey[700], textColor: theme.palette.common.white,
+    };
     const canceled = item.status.startsWith('canceled');
     const pending = item.status === 'requested';
     const title = privateMode ? t('Private appointment') : `${item.client_name} · ${item.service_name}`;
@@ -75,11 +97,15 @@ export function PractitionerCalendar() {
       textColor: canceled || pending ? theme.palette.getContrastText(canceled ? theme.palette.grey[500] : theme.palette.warning.main) : theme.palette.primary.contrastText,
     };
   }), [rows, privateMode, t, theme]);
-  const selectEvent = (info: EventClickInfo) => setSelected(rows.find(item => String(item.id) === info.event.id) ?? null);
-  const changeView = (next: View) => calendar.current?.getApi().changeView(next);
+  const selectEvent = (info: EventClickInfo) => setSelected(rows.find(item => (item.kind === 'time_off' ? `time_off:${item.id}` : String(item.id)) === info.event.id) ?? null);
+  const changeView = (next: View) => {
+    calendar.current?.getApi().changeView(next);
+    if (storageKey) try { window.localStorage.setItem(storageKey, next); } catch { /* The choice remains active for this visit. */ }
+  };
   const details = selected;
   return <Stack spacing={2}>
-    <Alert severity="info">{t('This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.', { zone: Intl.DateTimeFormat().resolvedOptions().timeZone })}</Alert>
+    <Alert severity="info">{t('This calendar shows your appointments and time off. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.', { zone: Intl.DateTimeFormat().resolvedOptions().timeZone })}</Alert>
+    <Box><Button component={Link} to={pagePath('practitioner', 'appointments')} state={{ startBooking: true }} variant="contained">{t('Book appointment')}</Button></Box>
     <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 } }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} justifyContent="space-between" alignItems={{ md: 'center' }}>
@@ -90,14 +116,17 @@ export function PractitionerCalendar() {
         {error && <Alert severity="error">{error}</Alert>}
         <Box sx={{ position: 'relative', minWidth: 0, '& .fc': { fontFamily: 'inherit', fontSize: { xs: 12, sm: 14 } }, '& .fc-event': { cursor: 'pointer' }, '& .fc-daygrid-day-number, & .fc-col-header-cell-cushion': { color: 'text.primary' } }}>
           {loading && <CircularProgress size={22} aria-label={t('Loading calendar')} sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} />}
-          <FullCalendar ref={calendar} plugins={plugins} initialView={narrow ? 'timeGridDay' : 'timeGridWeek'} headerToolbar={false} datesSet={datesChanged} events={events} eventClick={selectEvent} locale={i18n.resolvedLanguage?.startsWith('fr') ? frCaLocale : 'en'} timeZone="local" nowIndicator allDaySlot={false} height="auto" dayMaxEvents={2} expandRows={false} eventTimeFormat={{ hour: 'numeric', minute: '2-digit' }} />
+          <FullCalendar ref={calendar} plugins={plugins} initialView={initialView} headerToolbar={false} datesSet={datesChanged} events={events} eventClick={selectEvent} locale={i18n.resolvedLanguage?.startsWith('fr') ? frCaLocale : 'en'} timeZone="local" nowIndicator allDaySlot={false} height="auto" dayMaxEvents={2} expandRows={false} eventTimeFormat={{ hour: 'numeric', minute: '2-digit' }} />
         </Box>
-        {!loading && !error && rows.length === 0 && <Typography color="text.secondary">{t('No appointments in this period.')}</Typography>}
+        {!loading && !error && rows.length === 0 && <Typography color="text.secondary">{t('No appointments or time off in this period.')}</Typography>}
       </Stack>
     </Paper>
     <Drawer anchor="right" open={details !== null} onClose={() => setSelected(null)}><Box sx={{ width: { xs: '100vw', sm: 420 }, p: 3 }}><Stack spacing={2}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h5">{t('Appointment #{{id}}', { id: details?.id })}</Typography><Button onClick={() => setSelected(null)}>{t('Close')}</Button></Stack><Divider />
-      {details && <><Chip sx={{ alignSelf: 'flex-start' }} label={t(details.status.replaceAll('_', ' '))} /><Typography fontWeight={700}>{privateMode ? t('Private appointment') : `${details.client_name} · ${details.service_name}`}</Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h5">{details?.kind === 'time_off' ? t('Time off') : t('Appointment #{{id}}', { id: details?.id })}</Typography><Button onClick={() => setSelected(null)}>{t('Close')}</Button></Stack><Divider />
+      {details?.kind === 'time_off' ? <><Chip sx={{ alignSelf: 'flex-start' }} label={t(details.reason_type.charAt(0).toUpperCase() + details.reason_type.slice(1))} />
+        <Typography>{formatDateTime(utc(details.starts_at), i18n.resolvedLanguage, { dateStyle: 'full', timeStyle: 'short' })} – {formatDateTime(utc(details.ends_at), i18n.resolvedLanguage, { dateStyle: 'full', timeStyle: 'short' })}</Typography>
+        {details.location_name && <Typography>{details.location_name}</Typography>}
+      </> : details && <><Chip sx={{ alignSelf: 'flex-start' }} label={t(details.status.replaceAll('_', ' '))} /><Typography fontWeight={700}>{privateMode ? t('Private appointment') : `${details.client_name} · ${details.service_name}`}</Typography>
         <Typography>{formatDateTime(utc(details.starts_at), i18n.resolvedLanguage, { dateStyle: 'full', timeStyle: 'short' })} – {formatDateTime(utc(details.ends_at), i18n.resolvedLanguage, { timeStyle: 'short' })}</Typography>
         <Typography>{details.location_name} · {t(details.delivery_mode === 'mobile' ? 'On-Site (client location)' : 'Clinic visit')}</Typography>
         {!privateMode && <Button component={Link} to={pagePath('practitioner', 'appointments')}>{t('Open appointments')}</Button>}

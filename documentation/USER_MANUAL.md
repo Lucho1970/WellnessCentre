@@ -14,11 +14,15 @@ time is not reserved until confirmation succeeds. Keep the appointment number fo
 Use the same confirmation button to retry an uncertain
 network result; do not start a second booking until the appointment list has been checked.
 
+If a client selects a time on the public website before signing in, the portal keeps that service, practitioner, duration, and time in the same browser tab. After sign-in, it checks the time again and selects it if still available. For an On-Site visit, the client must first confirm the visit address and service-area coverage. No time is reserved until the client confirms the appointment.
+
 For a current or past appointment, choose **Add to calendar** in **My appointments** to download its `.ics` file. Open the file with your preferred calendar and confirm the addition if prompted. Booking and change calendar files request reminders 24 hours and one hour before the appointment; check them after import because your calendar may override them. Booking, change, and cancellation emails also include a calendar update. Whether an email automatically appears in Google, Outlook, or another calendar depends on that provider and the recipient's settings. Canceled appointments cannot be added from the portal.
 
 The client portal derives the client record from the signed-in account; a client cannot choose or request another client's record. Linked clients can book, review, reschedule, and cancel their own eligible upcoming appointments. The portal rechecks availability before a reschedule. Before cancellation, the portal shows the server-calculated fee, if any, from the policy accepted when the appointment was booked. Confirming records the assessed fee but does not itself collect payment.
 
 After a duplicate client is merged, only the surviving client appears in client lists and booking searches. The merged record remains in protected history for audit purposes and is not deleted.
+
+When staff book an appointment, they may select the service or the practitioner first after choosing the base location. Each choice narrows the other menu to compatible assignments; use **Clear service** or **Clear practitioner** to switch paths. For an On-Site visit, an earlier Google distance check by itself does not create a reusable approval. Authorized clinic staff must click **Approve this address for future On-Site bookings** after a successful check. Future bookings with the same client address, base location, service, practitioner, and service-area settings can reuse that approval without another Google distance request. Changing any of those details requires a new check and approval.
 
 ## Common administration pattern
 
@@ -47,7 +51,7 @@ Open **Administration → Services** to manage the treatments or other services 
 
 Changes to a service affect future booking choices. Existing appointments retain their saved appointment details, price snapshots, and cancellation policy. A service cancellation policy can have no fee, a fixed fee, or a percentage fee inside its configured window.
 
-Duration choices use one system-wide display rule: shortest to longest (for example, 60, 90, then 120 minutes). Set each duration and its price when editing the service; there is no separate duration display-order field. This order applies to the public catalogue, available-time choices, and staff and client booking selectors.
+Duration choices use one system-wide display rule: shortest to longest (for example, 60, 90, then 120 minutes). Set each duration and its price when editing the service; there is no separate duration display-order field. This order applies to the public catalogue and the staff and client booking selectors. On the public booking page, clients choose a duration before seeing times; services with multiple durations require an explicit choice.
 
 ### Create a service
 
@@ -93,13 +97,43 @@ Create the Microsoft Entra account and assign the required practitioner applicat
 
 Open **My profile → Appointment notifications** to opt into email notices when an appointment is booked, changed, or canceled on your schedule. Choose the work sign-in email, a verified personal email, or both. To use a personal email, save it, request a verification code, enter the eight-digit code from that inbox, then select it as a destination and save again. Changing the personal address requires re-verification and never changes your Microsoft sign-in.
 
+Practitioners can open **My notifications** in the Practitioner workspace to see booking notices addressed to them. Filter by status, Email/SMS, or activity date, and select a notice for its destination and provider-acceptance time. The page is read-only. “Accepted by provider” is not a delivery receipt; if a notice says **Needs review**, a clinic administrator must check it. The appointment link opens the practitioner-scoped appointment view, which may deny access if the appointment is no longer assigned to you.
+
+For a client follow-up, open the assigned booking in **Appointments → More details**. The single-appointment details panel loads the client's contact email, phone, and preferred contact method. Click the email address to compose an email, the phone number to call, or **Text client** to compose an SMS in the device's default app. These links do not send through the clinic's notification queue or VoIP.ms account. This information is not included in the broader appointment-list response, and opening it is audited. A practitioner does not gain access to the clinic's general client directory by viewing an assigned booking.
+
+**My clients** in the Practitioner workspace lists clients with an appointment assigned to you, plus clients you added for booking. Search the list, open a client for contact details and the latest appointment, or select **Book appointment** to start with that client already selected. The list is not a clinic-wide client directory. Booking is also available from the dashboard and calendar. In Operations, a selected client or service has a **Book appointment** action that carries that selection into the booking form.
+
 You can save a Canadian mobile number and request SMS notices. The profile shows whether SMS delivery is active for the clinic; when active, opted-in practitioners receive appointment texts. Appointment emails include the time and a portal link, not client or visit details. Disabling email or changing an address before a queued notice is delivered cancels that pending staff notice.
 
 ### My calendar
 
-Practitioners can open **My calendar** in their workspace to see their own clinic appointments by day, week, or month. Use the arrows or **Today** to move between periods; **Refresh** reloads current booking data. Select an event for its status, time, service, and base location. On-Site visits are labelled, but their destination address is not shown on the calendar. Use **Appointments** for the full booking workflow and authorized details.
+Practitioners can open **My calendar** in their workspace to see their own appointments and time off by day, week, or month. Time off appears as a distinct **Time off** block; select it to see the reason, dates, and location. Use the arrows or **Today** to move between periods; **Refresh** reloads current schedule data. Select an appointment for its status, time, service, and base location. On-Site visits are labelled, but their destination address is not shown on the calendar. Use **Appointments** for the full booking workflow and authorized details.
+
+The calendar remembers your last **Day**, **Week**, or **Month** choice for your signed-in account on this browser, including after closing and reopening it. It still opens at today's date. A different browser or device starts with the default view until you choose one there.
 
 The calendar displays times in the device's timezone, which is shown above the grid. Turn on **Privacy mode** before sharing your screen to hide client names from calendar events and the detail panel. This is a display safeguard, not a change to account permissions. Google/Outlook connections for practitioners remain future features; this page does not put events into an external calendar.
+
+When adding or editing **Time off** in Availability, choose **Review affected appointments** before saving. Review any overlapping bookings, then save the block if it is correct. Saving does not cancel, reschedule, or notify those clients. A follow-up count appears in the Time off list; select the item and open **Details** to see the current affected appointments. Choose **Review appointment #…** to open that exact booking, even when it is not on the first appointment-list page, then reschedule or cancel it using the permitted actions. The impact list updates as appointments are rescheduled or canceled.
+
+The Practitioner dashboard also shows a warning while any upcoming, active appointments overlap your time off. It counts each appointment once, even if multiple time-off blocks overlap it, and links directly to the first five bookings. Use **Refresh** after resolving one; the warning disappears when no future overlaps remain. This is a follow-up aid, not an automatic cancellation or client notification.
+
+### Travel to the next On-Site visit
+
+The Practitioner dashboard shows the next confirmed or rescheduled On-Site appointment starting within 24 hours. Choose **Check from my location** to ask your device for location permission and calculate a driving estimate using current traffic, or **Check from clinic** if the clinic has a complete address. The check is manual; opening the dashboard does not request location or call Google Routes. The device coordinates are sent to the private API and Google only for that estimate, and are not saved in the clinic database or audit metadata. The clinic-origin option does not use device location. The card shows distance, approximate driving time, a suggested leave time with a 10-minute arrival margin, the time checked, and a Google Maps directions link. Traffic can change, so check again before leaving. The estimate does not alter the appointment or travel buffer reserved for scheduling. Only the signed-in practitioner can request this appointment's estimate. Google Maps Platform billing and Routes display requirements apply.
+
+### Today's visits
+
+The Practitioner dashboard lists your own appointments for the current day, in local clinic time. Each card has **Call client** when a usable phone number is on file, **View appointment**, and **Book next visit** with that client and service carried into the booking form. A phone link opens your device's dialer; it does not place a call through the clinic's VoIP.ms account.
+
+The optional visit steps are **En route**, **Arrived**, **Started [service]**, **Finished [service]**, and **Left residence**. Travel/residence steps appear only on On-Site appointments; in-clinic visits have start and finish. Steps can be skipped, but cannot be recorded after a later active step. **Undo last step** records a correction without deleting the history. Each action is timestamped in UTC, scoped to the assigned practitioner, and auditable. These are manually entered workflow events, not proof of physical location or treatment. They do not automatically notify the client or change the booking status.
+
+To review steps after the day-of card is gone, open the appointment in **Appointments → More details**. The practitioner-only **Visit step history** lists recorded and undone steps, newest first. It shows the latest 100 entries if an appointment has more; the complete event record remains in the database. This is an activity history, not clinical documentation or a safety-monitoring system.
+
+Once the scheduled start has passed, use **Mark completed** or **Mark no-show** to close a confirmed appointment. Both require confirmation and update its booking status; a session already started cannot be marked no-show. A completed On-Site visit can still record **Left residence**. The booking continues to reserve its original time and buffers; closing it does not open the slot for a new booking. Pending reminders are canceled on closure. The dashboard shows today's visits, with milestone buttons enabled from four hours before each appointment. **Undo outcome** restores the prior confirmed/rescheduled status within two days after the scheduled end; it does not recreate reminders. All status corrections remain in appointment history. Do not use visit steps to store clinical notes.
+
+If you missed the day-of outcome, open the visit from the **Past** appointments list and use **More details → Visit outcome**. The same completion, no-show, and eligible undo checks apply. This lets a practitioner close their own past visit without changing its original booking time or reserved buffers.
+
+The Practitioner dashboard also has **Visit activity · last 7 days**. It counts the practitioner's own visits by scheduled date and current booking status: completed, no-show, or past visits still awaiting an outcome. It separately counts appointments with active optional steps and On-Site arrival/departure steps. Undone steps do not count as active. Use **Review visits awaiting outcome** to open the **Needs visit outcome** appointment filter; a visit leaves that list after you close it. These are operational counts, not a clinical or performance measure; a missing optional step does not prove that care was missed.
 
 ## Quick verification after changing a service
 
@@ -107,3 +141,7 @@ The calendar displays times in the device's timezone, which is shown above the g
 - Start a test booking and confirm the service appears only for the expected practitioner, location, and delivery mode.
 - Check each configured duration shows the correct price.
 - Confirm an inactive service or a service without assignments cannot be booked.
+
+## Practitioner website or social page
+
+In the practitioner workspace, open Profile → Public practitioner card. Enter the full address in Website or social page URL, for example `https://www.facebook.com/yourbusiness`, and click Save public card. This is an optional public link: visitors can open it from your published card or profile. Clear it and save to remove the link. Administrators can maintain the same field under Team profiles. Your existing publication status is unchanged.

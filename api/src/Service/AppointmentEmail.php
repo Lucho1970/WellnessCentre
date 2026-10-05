@@ -17,6 +17,7 @@ final class AppointmentEmail
             'booking_confirmation' => ['Appointment confirmed', 'Rendez-vous confirmé', 'Your appointment is confirmed.', 'Votre rendez-vous est confirmé.'],
             'booking_change' => ['Appointment changed', 'Rendez-vous modifié', 'Your appointment has changed.', 'Votre rendez-vous a été modifié.'],
             'booking_cancellation' => ['Appointment canceled', 'Rendez-vous annulé', 'Your appointment has been canceled.', 'Votre rendez-vous a été annulé.'],
+            'appointment_reminder' => ['Appointment reminder', 'Rappel de rendez-vous', 'Your appointment is coming up.', 'Votre rendez-vous approche.'],
             default => throw new InvalidArgumentException('Unsupported notification event.'),
         };
         $clinic = trim((string)($event['clinic_name'] ?? ''));
@@ -26,11 +27,19 @@ final class AppointmentEmail
         $local = $start->setTimezone($timezone)->format('Y-m-d H:i T');
         $url = rtrim($clientPortalUrl, '/');
         if (!filter_var($url, FILTER_VALIDATE_URL) || !str_starts_with($url, 'https://')) throw new InvalidArgumentException('Client portal URL must be HTTPS.');
-        $body = $words[2] . "\n" . 'Appointment: ' . $local . "\n"
-            . 'A calendar file is attached. Your calendar may ask you to add or accept it.' . "\n"
+        $calendarNote = $code === 'appointment_reminder' ? '' : 'A calendar file is attached. Your calendar may ask you to add or accept it.' . "\n";
+        $calendarNoteFr = $code === 'appointment_reminder' ? '' : 'Un fichier de calendrier est joint. Votre calendrier pourrait vous demander de l’ajouter ou de l’accepter.' . "\n";
+        $payload = json_decode((string)($event['payload'] ?? ''), true);
+        $reassigned = $code === 'booking_change' && is_array($payload) && ($payload['change_type'] ?? '') === 'practitioner_reassignment';
+        $practitioner = $reassigned ? trim((string)($payload['practitioner_name'] ?? '')) : '';
+        $practitioner = trim((string)preg_replace('/[\x00-\x1F\x7F]/u', ' ', $practitioner));
+        $practitionerLine = $reassigned && $practitioner !== '' ? 'Your appointment is now with ' . $practitioner . ".\n" : '';
+        $practitionerLineFr = $reassigned && $practitioner !== '' ? 'Votre rendez-vous est maintenant avec ' . $practitioner . ".\n" : '';
+        $body = $words[2] . "\n" . $practitionerLine . 'Appointment: ' . $local . "\n"
+            . $calendarNote
             . 'Sign in to review your appointment: ' . $url . "\n\n"
-            . $words[3] . "\n" . 'Rendez-vous : ' . $local . "\n"
-            . 'Un fichier de calendrier est joint. Votre calendrier pourrait vous demander de l’ajouter ou de l’accepter.' . "\n"
+            . $words[3] . "\n" . $practitionerLineFr . 'Rendez-vous : ' . $local . "\n"
+            . $calendarNoteFr
             . 'Ouvrez une session pour voir votre rendez-vous : ' . $url . "\n\n"
             . $clinic;
         return ['subject' => $clinic . ' — ' . $words[0] . ' / ' . $words[1], 'body' => $body];

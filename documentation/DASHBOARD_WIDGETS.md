@@ -65,6 +65,7 @@ Only widgets backed by released modules and real projections appear.
 ### Operations
 
 - Appointments today → filtered appointment list
+- Email and SMS activity → Notification status (Super Admin and Clinic Admin only). The card shows today and a rolling last seven days, split by channel and current state: accepted by provider (including delivered), queued, failed, and needs review. For accepted notifications the period uses `sent_at` (provider acceptance); other states use `scheduled_at` because there is no separate failure/queue-state timestamp. Future-scheduled rows are not counted yet. It excludes sending, canceled, and closed-after-review events. A provider acceptance is not proof of recipient delivery.
 - Awaiting confirmation → filtered appointment list
 - Recent cancellations → filtered appointment list
 - New clients → client list when authorized
@@ -104,6 +105,10 @@ Only widgets backed by released modules and real projections appear.
 Steps 1–5 are implemented for the initial Operations and Practitioner appointment widgets. Pointer drag-and-drop, client widgets, module-specific cards beyond appointments, and richer filtered destination views remain planned. Keyboard/touch move controls are the current accessible ordering mechanism.
 
 Super Admin runtime management is implemented as a guarded, versioned catalogue. A JSON upload may compose an approved renderer, appointment projection, capability, filters, destination and icon. The server rejects executable code, SQL, arbitrary URLs and unknown values. A duplicate ID requires explicit confirmation and creates a new immutable version; it never destructively overwrites history. Super Admin can disable a widget, restore an earlier uploaded version, or restore the packaged definition of a built-in widget. All publish, toggle and restore operations are audited.
+
+The notification summary is a built-in, code-owned projection and renderer. Uploaded JSON can select it only with the `notifications.view.clinic` capability, Operations workspace, empty parameters, and the Notification status destination; JSON cannot supply its own query. Existing saved dashboard layouts gain the new card automatically unless the widget is disabled by a Super Admin; individual users can hide or reorder it.
+
+The card also shows an all-time count of notifications still in `needs_review`, independent of its today/last-seven-days activity counts. Its **Review items** link opens Notification status with that status filter selected. Notification status supports allowlisted channel (`email`/`sms`) and activity-period (`today`/`last7`) filters using the same status-dependent timestamp rules as the card. A separate calendar-week filter remains available for older bookmarks. Today uses clinic-local midnight and honors DST; the rolling seven-day boundary is an exact 168-hour interval. Status counts reflect the chosen channel/period scope. Filters are reflected in the URL so refresh and navigation preserve triage context. Only Super Admin and Clinic Admin may access these projections or the destination; practitioners do not receive a clinic-wide notification queue.
 
 A ready-to-upload example is available at `documentation/examples/confirmed-appointments-today.widget.json`. It creates a new Operations metric from the approved appointment-count projection, so it is also the deployment acceptance fixture for confirming that a new JSON ID appears without rebuilding the frontend.
 

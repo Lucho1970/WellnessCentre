@@ -36,7 +36,7 @@ final class NotificationWorker
                 $message = $superseded ? null : ($event['channel'] === 'sms'
                     ? StaffAppointmentSms::compose($details, $this->clientPortalUrl)
                     : ($staffNotice ? StaffAppointmentEmail::compose($details, $this->clientPortalUrl) : AppointmentEmail::compose($details, $this->clientPortalUrl)));
-                $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' ? null : AppointmentCalendar::compose($details, $this->clientPortalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
+                $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $this->clientPortalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
             } catch (Throwable $e) {
                 $this->finish($event, 'needs_review', 'Notification could not be prepared (' . get_class($e) . ').');
                 $summary['review']++;
@@ -86,7 +86,7 @@ final class NotificationWorker
     {
         $this->pdo->beginTransaction();
         try {
-            $channels = $this->sms === null ? "channel='email'" : "(channel='email' OR (channel='sms' AND event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation')))";
+            $channels = $this->sms === null ? "channel='email'" : "(channel='email' OR (channel='sms' AND event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation','staff_booking_reassigned_away')))";
             $query = $this->pdo->prepare("SELECT id,channel,recipient_address,attempt_count FROM notification_events WHERE {$channels} AND status IN ('queued','failed') AND scheduled_at<=UTC_TIMESTAMP() AND (next_attempt_at IS NULL OR next_attempt_at<=UTC_TIMESTAMP()) AND attempt_count<5" . ($appointmentId === null ? '' : ' AND appointment_id=:appointment') . ($appointmentId === null ? ' ORDER BY scheduled_at,id' : " ORDER BY CASE WHEN channel='sms' THEN 0 ELSE 1 END,scheduled_at,id") . ' LIMIT 1 FOR UPDATE');
             $query->execute($appointmentId === null ? [] : ['appointment' => $appointmentId]);
             $event = $query->fetch(PDO::FETCH_ASSOC);
@@ -106,7 +106,7 @@ final class NotificationWorker
 
     private function details(int $eventId): ?array
     {
-        $query = $this->pdo->prepare('SELECT n.id,n.clinic_id,n.appointment_id,n.recipient_user_id,n.recipient_address,n.event_code,n.channel,n.scheduled_at,a.status appointment_status,a.version,a.starts_at,a.ends_at,l.timezone,c.name clinic_name FROM notification_events n JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id JOIN locations l ON l.id=a.location_id JOIN clinics c ON c.id=n.clinic_id WHERE n.id=:id');
+        $query = $this->pdo->prepare('SELECT n.id,n.clinic_id,n.appointment_id,n.recipient_user_id,n.recipient_address,n.event_code,n.channel,n.scheduled_at,n.payload,a.status appointment_status,a.version,a.starts_at,a.ends_at,l.timezone,c.name clinic_name FROM notification_events n JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id JOIN locations l ON l.id=a.location_id JOIN clinics c ON c.id=n.clinic_id WHERE n.id=:id');
         $query->execute(['id' => $eventId]);
         $row = $query->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
@@ -116,12 +116,26 @@ final class NotificationWorker
     {
         $code = (string)$event['event_code'];
         $status = (string)$event['appointment_status'];
-        if (!in_array($code, ['booking_confirmation','booking_change','booking_cancellation','staff_booking_confirmation','staff_booking_change','staff_booking_cancellation'], true)) return true;
+        if ($code === 'appointment_reminder') {
+            $payload = json_decode((string)($event['payload'] ?? ''), true);
+            if (!is_array($payload)
+                || (int)($payload['appointment_version'] ?? 0) !== (int)$event['version']
+                || !in_array($status, ['requested','confirmed','rescheduled'], true)
+                || strtotime((string)$event['starts_at'] . ' UTC') <= time()
+                || strtotime((string)$event['scheduled_at'] . ' UTC') < time() - 3600) return true;
+            $schedule = $this->pdo->prepare("SELECT 1 FROM reminder_schedules WHERE clinic_id=:clinic AND event_code='appointment_reminder' AND channel='email' AND minutes_before=:minutes AND active=1");
+            $schedule->execute(['clinic' => $event['clinic_id'], 'minutes' => (int)($payload['minutes_before'] ?? 0)]);
+            if ($schedule->fetchColumn() === false) return true;
+            $recipient = $this->pdo->prepare("SELECT 1 FROM users WHERE id=:user AND clinic_id=:clinic AND user_type='client' AND status='active' AND email=:address");
+            $recipient->execute(['user' => $event['recipient_user_id'], 'clinic' => $event['clinic_id'], 'address' => $event['recipient_address']]);
+            return $recipient->fetchColumn() === false;
+        }
+        if (!in_array($code, ['booking_confirmation','booking_change','booking_cancellation','staff_booking_confirmation','staff_booking_change','staff_booking_cancellation','staff_booking_reassigned_away'], true)) return true;
         $cancellation = str_ends_with($code, 'cancellation');
         if ($cancellation && !in_array($status, ['canceled_by_client','canceled_by_clinic'], true)) return true;
         if (!$cancellation && in_array($status, ['canceled_by_client','canceled_by_clinic'], true)) return true;
         $staff = str_starts_with($code, 'staff_');
-        $query = $this->pdo->prepare("SELECT 1 FROM notification_events WHERE appointment_id=:appointment AND id>:event AND recipient_user_id=:recipient AND recipient_address=:address AND channel=:channel AND event_code IN (" . ($staff ? "'staff_booking_confirmation','staff_booking_change','staff_booking_cancellation'" : "'booking_confirmation','booking_change','booking_cancellation'") . ") LIMIT 1");
+        $query = $this->pdo->prepare("SELECT 1 FROM notification_events WHERE appointment_id=:appointment AND id>:event AND recipient_user_id=:recipient AND recipient_address=:address AND channel=:channel AND event_code IN (" . ($staff ? "'staff_booking_confirmation','staff_booking_change','staff_booking_cancellation','staff_booking_reassigned_away'" : "'booking_confirmation','booking_change','booking_cancellation'") . ") LIMIT 1");
         $query->execute(['appointment' => $event['appointment_id'], 'event' => $event['id'], 'recipient' => $event['recipient_user_id'], 'address' => $event['recipient_address'], 'channel' => $event['channel']]);
         return $query->fetchColumn() !== false;
     }
@@ -129,8 +143,16 @@ final class NotificationWorker
     private function staffRecipientStillAllowed(array $event): bool
     {
         // Preferences or contact details may change between booking and worker delivery.
-        $query = $this->pdo->prepare("SELECT u.email,p.email_enabled,p.email_destination,p.personal_email,p.personal_email_verified_at,p.mobile_phone,p.sms_requested FROM users u JOIN staff_notification_preferences p ON p.user_id=u.id JOIN practitioners practitioner ON practitioner.user_id=u.id AND practitioner.active=1 JOIN appointments a ON a.practitioner_id=practitioner.id AND a.id=:appointment AND a.clinic_id=u.clinic_id WHERE u.id=:recipient AND u.clinic_id=:clinic AND u.user_type='staff' AND u.status='active'");
-        $query->execute(['appointment' => $event['appointment_id'], 'recipient' => $event['recipient_user_id'], 'clinic' => $event['clinic_id']]);
+        $away=(string)$event['event_code']==='staff_booking_reassigned_away';
+        $payload=$away?json_decode((string)($event['payload']??''),true):null;
+        if($away&&(!is_array($payload)||(int)($payload['reassignment_id']??0)<1))return false;
+        $assignmentJoin=$away
+            ? 'JOIN appointment_reassignments ar ON ar.old_practitioner_id=practitioner.id AND ar.id=:reassignment AND ar.appointment_id=:appointment AND ar.clinic_id=u.clinic_id'
+            : 'JOIN appointments a ON a.practitioner_id=practitioner.id AND a.id=:appointment AND a.clinic_id=u.clinic_id';
+        $query = $this->pdo->prepare("SELECT u.email,p.email_enabled,p.email_destination,p.personal_email,p.personal_email_verified_at,p.mobile_phone,p.sms_requested FROM users u JOIN staff_notification_preferences p ON p.user_id=u.id JOIN practitioners practitioner ON practitioner.user_id=u.id AND practitioner.active=1 {$assignmentJoin} WHERE u.id=:recipient AND u.clinic_id=:clinic AND u.user_type='staff' AND u.status='active'");
+        $params=['appointment' => $event['appointment_id'], 'recipient' => $event['recipient_user_id'], 'clinic' => $event['clinic_id']];
+        if($away)$params['reassignment']=(int)$payload['reassignment_id'];
+        $query->execute($params);
         $row = $query->fetch(PDO::FETCH_ASSOC);
         if (!$row) return false;
         $address = (string)$event['recipient_address'];

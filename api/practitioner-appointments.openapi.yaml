@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Wellness Centre Practitioner Appointments
   version: 1.0.0
-  description: Practitioner-scoped booking, rescheduling, and cancellation contract.
+  description: Practitioner-scoped booking plus clinic appointment changes, including administrator reassignment.
 servers:
   - url: /api/v1
 security:
@@ -28,7 +28,7 @@ paths:
         '422': { description: Validation failure, including a reschedule request that keeps the existing start time }
   /appointments/{id}:
     patch:
-      summary: Reschedule or cancel an appointment
+      summary: Reschedule, cancel, or reassign an appointment
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
       requestBody:
@@ -39,6 +39,7 @@ paths:
               oneOf:
                 - $ref: '#/components/schemas/RescheduleRequest'
                 - $ref: '#/components/schemas/CancelRequest'
+                - $ref: '#/components/schemas/ReassignRequest'
       responses:
         '200': { description: Updated appointment; exact retries return the existing result }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -56,6 +57,47 @@ paths:
         '200': { description: Replacement availability calculated while excluding this appointment from conflict checks and omitting its unchanged current start time }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Appointment not found }
+  /appointments/{id}/reassignment-options:
+    get:
+      summary: List eligible practitioners for a same-time, same-price in-clinic reassignment
+      description: Clinic administrator only. On-Site appointments are excluded. Qualifications are not yet part of service eligibility.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Array of practitioner_id and practitioner_name candidates }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Appointment not found }
+        '409': { description: Appointment is no longer editable }
+        '422': { description: Reassignment is unsupported for this appointment }
+  /appointments/{id}/logistics-notes:
+    get:
+      summary: List appointment-specific logistics notes
+      description: Clinic administrators and reception can view clinic appointments. Practitioners can view only appointments assigned to them. Clients and other roles are denied. Returns the newest 100 notes with author and creation time. Notes are not included in client communications or clinical treatment records.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Appointment logistics note history }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Appointment not found or not assigned to this practitioner }
+    post:
+      summary: Append an appointment logistics note
+      description: Notes cannot be edited or deleted through this API. Intended for arrival, access, and equipment instructions; not treatment or health information.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '201': { description: Note appended with author and creation time }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Appointment not found or not assigned to this practitioner }
+        '422': { description: Invalid note }
   /booking-options:
     get:
       summary: Get active booking combinations
@@ -96,3 +138,11 @@ components:
         action: { type: string, enum: [cancel] }
         version: { type: integer, minimum: 1 }
         reason: { type: string, maxLength: 1000 }
+    ReassignRequest:
+      type: object
+      required: [action, version, practitioner_id, reason]
+      properties:
+        action: { type: string, enum: [reassign] }
+        version: { type: integer, minimum: 1 }
+        practitioner_id: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }

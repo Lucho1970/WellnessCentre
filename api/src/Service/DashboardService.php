@@ -13,9 +13,9 @@ use Wellness\Http\ApiException;
 final class DashboardService
 {
     private const SIZES=['small','medium','wide'];
-    private const ICONS=['calendar-check','clock','map-pin'];
-    private const PROJECTIONS=['appointment_count','next_appointment'];
-    private const CAPABILITIES=['appointments.view.clinic','appointments.view.own'];
+    private const ICONS=['calendar-check','clock','map-pin','mail-check'];
+    private const PROJECTIONS=['appointment_count','next_appointment','notification_summary'];
+    private const CAPABILITIES=['appointments.view.clinic','appointments.view.own','notifications.view.clinic'];
     private const STATUSES=['draft','requested','confirmed','rescheduled','no_show','completed','invoiced','paid'];
 
     public function __construct(private readonly Database $database,private readonly AuditLogger $audit) {}
@@ -24,7 +24,8 @@ final class DashboardService
     {
         $definitions=$this->catalogue($actor,$workspace);$timezone=$this->timezone($actor,$workspace);$now=new DateTimeImmutable('now',new DateTimeZone('UTC'));$values=[];
         foreach($definitions as $definition)$values[$definition['id']]=$this->project($actor,$workspace,$timezone,$definition);
-        return ['workspace'=>$workspace,'timezone'=>$timezone,'as_of'=>$now->format(DATE_ATOM),'definitions'=>$definitions,'values'=>$values];
+        return ['workspace'=>$workspace,'timezone'=>$timezone,'as_of'=>$now->format(DATE_ATOM),'definitions'=>$definitions,'values'=>$values]
+            + ($workspace==='practitioner'?['time_off_follow_ups'=>$this->timeOffFollowUps($actor)]:[]);
     }
 
     public function preferences(AuthContext $actor,string $workspace): array
@@ -90,11 +91,52 @@ final class DashboardService
 
     private function project(AuthContext $actor,string $workspace,string $timezone,array $definition): mixed
     {
+        if($definition['dataProjection']==='notification_summary')return $this->notificationSummary($actor,$timezone);
         $params=['clinic'=>$actor->clinicId];$where='a.clinic_id=:clinic';if($workspace==='practitioner'){$where.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user AND active=1 LIMIT 1)';$params['user']=$actor->userId;}$configuration=$definition['parameters']??[];
         if(($configuration['date']??null)==='today'){$local=new DateTimeImmutable('now',new DateTimeZone($timezone));$from=$local->setTime(0,0)->setTimezone(new DateTimeZone('UTC'));$to=$local->modify('+1 day')->setTime(0,0)->setTimezone(new DateTimeZone('UTC'));$where.=' AND a.starts_at>=:from_time AND a.starts_at<:to_time';$params['from_time']=$from->format('Y-m-d H:i:s');$params['to_time']=$to->format('Y-m-d H:i:s');}
         $statuses=$configuration['statuses']??self::STATUSES;if($statuses){$marks=[];foreach($statuses as $index=>$status){$key='status_'.$index;$marks[]=':'.$key;$params[$key]=$status;}$where.=' AND a.status IN ('.implode(',',$marks).')';}if(isset($configuration['delivery_mode'])){$where.=' AND a.delivery_mode=:delivery_mode';$params['delivery_mode']=$configuration['delivery_mode'];}
         if($definition['dataProjection']==='appointment_count'){$statement=$this->database->connection()->prepare("SELECT COUNT(*) FROM appointments a WHERE {$where}");$statement->execute($params);return (int)$statement->fetchColumn();}
         $where.=' AND a.ends_at>=UTC_TIMESTAMP()';$statement=$this->database->connection()->prepare("SELECT a.id,a.starts_at,a.delivery_mode,s.name service_name,u.display_name client_name,l.timezone FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN locations l ON l.id=a.location_id WHERE {$where} ORDER BY a.starts_at,a.id LIMIT 1");$statement->execute($params);return $statement->fetch()?:null;
+    }
+
+    private function notificationSummary(AuthContext $actor,string $timezone): array
+    {
+        $now=new DateTimeImmutable('now',new DateTimeZone('UTC'));
+        [$today]=NotificationActivityWindow::bounds('today',$timezone,$now);
+        [$last7,$end]=NotificationActivityWindow::bounds('last7',$timezone,$now);
+        $counts=[];
+        foreach(['today','last7'] as $period)foreach(['email','sms'] as $channel)$counts[$period][$channel]=['sent'=>0,'queued'=>0,'failed'=>0,'needs_review'=>0];
+        $statement=$this->database->connection()->prepare("SELECT n.channel,n.status,
+            SUM(CASE WHEN n.activity_at>=:today_start THEN 1 ELSE 0 END) today_count,
+            COUNT(*) last7_count
+            FROM (SELECT channel,status,CASE WHEN status IN ('sent','delivered') THEN sent_at ELSE scheduled_at END activity_at
+                  FROM notification_events WHERE clinic_id=:clinic AND channel IN ('email','sms')
+                  AND status IN ('sent','delivered','queued','failed','needs_review')) n
+            WHERE n.activity_at>=:last7_start AND n.activity_at<:end_time
+            GROUP BY n.channel,n.status");
+        $statement->execute(['today_start'=>$today,'last7_start'=>$last7,'end_time'=>$end,'clinic'=>$actor->clinicId]);
+        foreach($statement->fetchAll() as $row){$status=in_array($row['status'],['sent','delivered'],true)?'sent':$row['status'];$counts['today'][$row['channel']][$status]+=(int)$row['today_count'];$counts['last7'][$row['channel']][$status]+=(int)$row['last7_count'];}
+        $unresolved=$this->database->connection()->prepare("SELECT COUNT(*) FROM notification_events WHERE clinic_id=:clinic AND status='needs_review'");
+        $unresolved->execute(['clinic'=>$actor->clinicId]);
+        $counts['needs_review_total']=(int)$unresolved->fetchColumn();
+        $counts['health']=(new NotificationSchedulerHealth($this->database))->summary($actor);
+        return $counts;
+    }
+
+    private function timeOffFollowUps(AuthContext $actor): array
+    {
+        // One appointment can overlap multiple time-off blocks. Count and show it once.
+        $from="FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id
+            JOIN time_off t ON t.practitioner_id=p.id AND a.starts_at<t.ends_at AND a.ends_at>t.starts_at
+            WHERE a.clinic_id=:clinic AND p.user_id=:user AND p.active=1
+            AND a.ends_at>UTC_TIMESTAMP() AND a.status IN ('requested','confirmed','rescheduled')";
+        $params=['clinic'=>$actor->clinicId,'user'=>$actor->userId];
+        $pdo=$this->database->connection();
+        $count=$pdo->prepare("SELECT COUNT(DISTINCT a.id) {$from}");
+        $count->execute($params);
+        $items=$pdo->prepare("SELECT DISTINCT a.id,a.starts_at,a.status {$from} ORDER BY a.starts_at,a.id LIMIT 5");
+        $items->execute($params);
+        return ['count'=>(int)$count->fetchColumn(),'appointments'=>$items->fetchAll()];
     }
 
     private function storedDefinitions(int $clinicId,bool $includeDisabled=false): array
@@ -104,12 +146,12 @@ final class DashboardService
 
     private function validateDefinition(array $input): array
     {
-        $id=(string)($input['id']??'');if(!preg_match('/^[a-z][a-z0-9_]{2,99}$/',$id))throw new ApiException(422,'validation_error','Widget ID must use lowercase letters, numbers, and underscores.');$renderer=(string)($input['renderer']??'');if(!in_array($renderer,['metric','next_appointment'],true))throw new ApiException(422,'validation_error','Unknown widget renderer.');$projection=(string)($input['dataProjection']??'');if(!in_array($projection,self::PROJECTIONS,true))throw new ApiException(422,'validation_error','Unknown widget data projection.');if(($renderer==='next_appointment')!==($projection==='next_appointment'))throw new ApiException(422,'validation_error','The renderer does not match the data projection.');$capability=(string)($input['requiredCapability']??'');if(!in_array($capability,self::CAPABILITIES,true))throw new ApiException(422,'validation_error','Unknown widget capability.');
-        $requestedWorkspaces=$input['workspaces']??[];$workspaces=is_array($requestedWorkspaces)?array_values(array_unique(array_filter($requestedWorkspaces,fn($value)=>is_string($value)&&in_array($value,['admin','practitioner'],true)))):[];if(!$workspaces||count($workspaces)!==count($requestedWorkspaces))throw new ApiException(422,'validation_error','Choose one or more supported workspaces.');if($capability==='appointments.view.clinic'&&$workspaces!==['admin'])throw new ApiException(422,'validation_error','Clinic appointment widgets are limited to the Operations workspace.');if($capability==='appointments.view.own'&&$workspaces!==['practitioner'])throw new ApiException(422,'validation_error','Own-appointment widgets are limited to the Practitioner workspace.');
+        $id=(string)($input['id']??'');if(!preg_match('/^[a-z][a-z0-9_]{2,99}$/',$id))throw new ApiException(422,'validation_error','Widget ID must use lowercase letters, numbers, and underscores.');$renderer=(string)($input['renderer']??'');if(!in_array($renderer,['metric','next_appointment','notification_summary'],true))throw new ApiException(422,'validation_error','Unknown widget renderer.');$projection=(string)($input['dataProjection']??'');if(!in_array($projection,self::PROJECTIONS,true))throw new ApiException(422,'validation_error','Unknown widget data projection.');if(($renderer==='next_appointment')!==($projection==='next_appointment')||($renderer==='notification_summary')!==($projection==='notification_summary'))throw new ApiException(422,'validation_error','The renderer does not match the data projection.');$capability=(string)($input['requiredCapability']??'');if(!in_array($capability,self::CAPABILITIES,true))throw new ApiException(422,'validation_error','Unknown widget capability.');
+        $requestedWorkspaces=$input['workspaces']??[];$workspaces=is_array($requestedWorkspaces)?array_values(array_unique(array_filter($requestedWorkspaces,fn($value)=>is_string($value)&&in_array($value,['admin','practitioner'],true)))):[];if(!$workspaces||count($workspaces)!==count($requestedWorkspaces))throw new ApiException(422,'validation_error','Choose one or more supported workspaces.');if($capability==='appointments.view.clinic'&&$workspaces!==['admin'])throw new ApiException(422,'validation_error','Clinic appointment widgets are limited to the Operations workspace.');if($capability==='appointments.view.own'&&$workspaces!==['practitioner'])throw new ApiException(422,'validation_error','Own-appointment widgets are limited to the Practitioner workspace.');if(($capability==='notifications.view.clinic')!==($projection==='notification_summary')||($capability==='notifications.view.clinic'&&$workspaces!==['admin']))throw new ApiException(422,'validation_error','Notification summaries require the Operations notification capability.');
         foreach(['title','description'] as $field){if(!is_array($input[$field]??null))throw new ApiException(422,'validation_error',"{$field} must contain English and French text.");foreach(['en','fr'] as $language){$value=trim((string)($input[$field][$language]??''));$length=function_exists('mb_strlen')?mb_strlen($value):strlen($value);if($value===''||$length>300)throw new ApiException(422,'validation_error',"{$field}.{$language} is required and must be at most 300 characters.");$input[$field][$language]=$value;}}
-        $icon=(string)($input['icon']??'');if(!in_array($icon,self::ICONS,true))throw new ApiException(422,'validation_error','Unknown widget icon.');$requestedSizes=$input['sizes']??[];$sizes=is_array($requestedSizes)?array_values(array_unique(array_filter($requestedSizes,fn($value)=>is_string($value)&&in_array($value,self::SIZES,true)))):[];if(!$sizes||count($sizes)!==count($requestedSizes))throw new ApiException(422,'validation_error','Choose one or more supported widget sizes.');$default=(string)($input['defaultSize']??'');if(!in_array($default,$sizes,true))throw new ApiException(422,'validation_error','Default size must be one of the supported sizes.');$destination=$input['destination']??null;if(!is_array($destination)||($destination['page']??null)!=='appointments')throw new ApiException(422,'validation_error','Widget destination must be the appointments page.');
-        $parameters=$input['parameters']??[];if(!is_array($parameters)||array_diff(array_keys($parameters),['date','statuses','delivery_mode']))throw new ApiException(422,'validation_error','Widget parameters contain unsupported fields.');if(isset($parameters['date'])&&$parameters['date']!=='today')throw new ApiException(422,'validation_error','Only the today date filter is currently supported.');if(isset($parameters['delivery_mode'])&&!in_array($parameters['delivery_mode'],['clinic','mobile'],true))throw new ApiException(422,'validation_error','Unknown delivery mode.');if(isset($parameters['statuses'])){$statuses=$parameters['statuses'];if(!is_array($statuses)||!$statuses||count(array_filter($statuses,fn($value)=>is_string($value)&&in_array($value,self::STATUSES,true)))!==count($statuses))throw new ApiException(422,'validation_error','Widget statuses contain unsupported values.');}
-        return ['id'=>$id,'schemaVersion'=>1,'workspaces'=>$workspaces,'renderer'=>$renderer,'dataProjection'=>$projection,'parameters'=>$parameters,'requiredCapability'=>$capability,'title'=>$input['title'],'description'=>$input['description'],'icon'=>$icon,'destination'=>['page'=>'appointments'],'sizes'=>$sizes,'defaultSize'=>$default,'defaultEnabled'=>boolval($input['defaultEnabled']??true),'defaultOrder'=>max(0,min(10000,(int)($input['defaultOrder']??100)))];
+        $icon=(string)($input['icon']??'');if(!in_array($icon,self::ICONS,true))throw new ApiException(422,'validation_error','Unknown widget icon.');$requestedSizes=$input['sizes']??[];$sizes=is_array($requestedSizes)?array_values(array_unique(array_filter($requestedSizes,fn($value)=>is_string($value)&&in_array($value,self::SIZES,true)))):[];if(!$sizes||count($sizes)!==count($requestedSizes))throw new ApiException(422,'validation_error','Choose one or more supported widget sizes.');$default=(string)($input['defaultSize']??'');if(!in_array($default,$sizes,true))throw new ApiException(422,'validation_error','Default size must be one of the supported sizes.');$destination=$input['destination']??null;$expectedDestination=$projection==='notification_summary'?'notifications':'appointments';if(!is_array($destination)||($destination['page']??null)!==$expectedDestination)throw new ApiException(422,'validation_error','Widget destination does not match its data projection.');
+        $parameters=$input['parameters']??[];if(!is_array($parameters)||($projection==='notification_summary'&&$parameters!==[])||array_diff(array_keys($parameters),['date','statuses','delivery_mode']))throw new ApiException(422,'validation_error','Widget parameters contain unsupported fields.');if(isset($parameters['date'])&&$parameters['date']!=='today')throw new ApiException(422,'validation_error','Only the today date filter is currently supported.');if(isset($parameters['delivery_mode'])&&!in_array($parameters['delivery_mode'],['clinic','mobile'],true))throw new ApiException(422,'validation_error','Unknown delivery mode.');if(isset($parameters['statuses'])){$statuses=$parameters['statuses'];if(!is_array($statuses)||!$statuses||count(array_filter($statuses,fn($value)=>is_string($value)&&in_array($value,self::STATUSES,true)))!==count($statuses))throw new ApiException(422,'validation_error','Widget statuses contain unsupported values.');}
+        return ['id'=>$id,'schemaVersion'=>1,'workspaces'=>$workspaces,'renderer'=>$renderer,'dataProjection'=>$projection,'parameters'=>$parameters,'requiredCapability'=>$capability,'title'=>$input['title'],'description'=>$input['description'],'icon'=>$icon,'destination'=>['page'=>$expectedDestination],'sizes'=>$sizes,'defaultSize'=>$default,'defaultEnabled'=>boolval($input['defaultEnabled']??true),'defaultOrder'=>max(0,min(10000,(int)($input['defaultOrder']??100)))];
     }
 
     private function builtIns(): array
@@ -118,6 +160,7 @@ final class DashboardService
             ['id'=>'appointments_today','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>"Today's appointments",'fr'=>'Rendez-vous d’aujourd’hui'],'description'=>['en'=>'All active appointments scheduled today.','fr'=>'Tous les rendez-vous actifs prévus aujourd’hui.'],'parameters'=>['date'=>'today'],'defaultOrder'=>10],
             ['id'=>'awaiting_confirmation','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>'Awaiting confirmation','fr'=>'En attente de confirmation'],'description'=>['en'=>'Requested appointments that still need confirmation.','fr'=>'Rendez-vous demandés qui doivent encore être confirmés.'],'parameters'=>['date'=>'today','statuses'=>['requested']],'icon'=>'clock','defaultOrder'=>20],
             ['id'=>'onsite_today','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>"Today's On-Site visits",'fr'=>'Visites sur place aujourd’hui'],'description'=>['en'=>'Appointments taking place at a client location.','fr'=>'Rendez-vous ayant lieu chez un client.'],'parameters'=>['date'=>'today','delivery_mode'=>'mobile'],'icon'=>'map-pin','defaultOrder'=>30],
+            ['id'=>'notification_delivery_summary','workspaces'=>['admin'],'requiredCapability'=>'notifications.view.clinic','title'=>['en'=>'Email and SMS activity','fr'=>'Activité des courriels et SMS'],'description'=>['en'=>'Provider acceptance today and over the last 7 days; other statuses use scheduled time.','fr'=>'Acceptation du fournisseur aujourd’hui et au cours des 7 derniers jours; les autres états utilisent l’heure prévue.'],'parameters'=>[],'renderer'=>'notification_summary','dataProjection'=>'notification_summary','icon'=>'mail-check','destination'=>['page'=>'notifications'],'sizes'=>['wide'],'defaultSize'=>'wide','defaultOrder'=>40],
             ['id'=>'my_appointments_today','workspaces'=>['practitioner'],'requiredCapability'=>'appointments.view.own','title'=>['en'=>'My appointments today','fr'=>'Mes rendez-vous aujourd’hui'],'description'=>['en'=>'Your active appointments scheduled today.','fr'=>'Vos rendez-vous actifs prévus aujourd’hui.'],'parameters'=>['date'=>'today'],'defaultOrder'=>10],
             ['id'=>'my_next_appointment','workspaces'=>['practitioner'],'requiredCapability'=>'appointments.view.own','title'=>['en'=>'My next appointment','fr'=>'Mon prochain rendez-vous'],'description'=>['en'=>'Your next active appointment.','fr'=>'Votre prochain rendez-vous actif.'],'parameters'=>[],'renderer'=>'next_appointment','dataProjection'=>'next_appointment','icon'=>'clock','defaultSize'=>'medium','defaultOrder'=>20],
             ['id'=>'my_onsite_today','workspaces'=>['practitioner'],'requiredCapability'=>'appointments.view.own','title'=>['en'=>'My On-Site visits today','fr'=>'Mes visites sur place aujourd’hui'],'description'=>['en'=>'Your visits taking place at a client location.','fr'=>'Vos visites ayant lieu chez un client.'],'parameters'=>['date'=>'today','delivery_mode'=>'mobile'],'icon'=>'map-pin','defaultOrder'=>30],
@@ -125,7 +168,7 @@ final class DashboardService
     }
 
     private function assertWorkspace(AuthContext $actor,string $workspace): void{if($actor->userType!=='staff')throw new ApiException(403,'forbidden','Dashboard access requires a staff account.');if($workspace==='practitioner'&&$actor->hasAnyRole('practitioner'))return;if($workspace==='admin'&&$actor->hasAnyRole('super_admin','clinic_admin','reception','accountant'))return;throw new ApiException(403,'forbidden','This dashboard workspace is not available to this account.');}
-    private function can(AuthContext $actor,string $capability): bool{return $capability==='appointments.view.clinic'?$actor->hasAnyRole('super_admin','clinic_admin','reception'):$actor->hasAnyRole('practitioner');}
+    private function can(AuthContext $actor,string $capability): bool{return match($capability){'appointments.view.clinic'=>$actor->hasAnyRole('super_admin','clinic_admin','reception'),'appointments.view.own'=>$actor->hasAnyRole('practitioner'),'notifications.view.clinic'=>$actor->hasAnyRole('super_admin','clinic_admin'),default=>false};}
     private function superAdmin(AuthContext $actor): void{if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin'))throw new ApiException(403,'forbidden','Only a Super Admin can manage dashboard widgets.');}
     private function timezone(AuthContext $actor,string $workspace): string{$sql=$workspace==='practitioner'?'SELECT l.timezone FROM practitioners p JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 JOIN locations l ON l.id=pl.location_id AND l.is_bookable=1 WHERE p.user_id=:user AND l.clinic_id=:clinic ORDER BY l.id LIMIT 1':'SELECT timezone FROM locations WHERE clinic_id=:clinic AND is_bookable=1 ORDER BY id LIMIT 1';$statement=$this->database->connection()->prepare($sql);$params=['clinic'=>$actor->clinicId];if($workspace==='practitioner')$params['user']=$actor->userId;$statement->execute($params);$timezone=(string)($statement->fetchColumn()?:'America/Toronto');try{new DateTimeZone($timezone);}catch(Throwable){$timezone='America/Toronto';}return $timezone;}
     private function normalize(array $items,array $eligible,array $defaults,bool $strict=false): array{$result=[];$seen=[];foreach($items as $item){if(!is_array($item)||!is_string($item['id']??null)||!in_array($item['id'],$eligible,true)||isset($seen[$item['id']])){if($strict)throw new ApiException(422,'validation_error','Dashboard preferences contain an invalid or duplicate widget.');continue;}$size=(string)($item['size']??'small');if(!in_array($size,$defaults[$item['id']]['sizes']??self::SIZES,true)){if($strict)throw new ApiException(422,'validation_error','Dashboard preferences contain an invalid widget size.');$size=$defaults[$item['id']]['size']??'small';}$seen[$item['id']]=true;$result[]=['id'=>$item['id'],'enabled'=>(bool)($item['enabled']??true),'order'=>count($result),'size'=>$size];}foreach($eligible as $id)if(!isset($seen[$id]))$result[]=['id'=>$id,'enabled'=>$defaults[$id]['enabled']??true,'order'=>count($result),'size'=>$defaults[$id]['size']??'small'];return $result;}

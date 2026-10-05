@@ -4,6 +4,9 @@ require dirname(__DIR__).'/vendor/autoload.php';
 use Wellness\Service\ClientService;
 use Wellness\Auth\AuthContext;
 use Wellness\Http\ApiException;
+use Wellness\Config;
+use Wellness\Database;
+use Wellness\Service\AuditLogger;
 
 $count=0;
 $valid=['given_name'=>' Esther ','family_name'=>' Vanderpoel ','email'=>'ESTHER@example.com'];
@@ -39,5 +42,15 @@ try{ClientService::authorizeMerge(new AuthContext(1,1,'','test@example.com','Tes
 foreach([['staff',['practitioner']],['staff',['accounting']],['client',['super_admin']],['staff',[]]] as [$type,$roles]){
     try{ClientService::authorize(new AuthContext(1,1,'','test@example.com','Test',$type,$roles));throw new RuntimeException('Unauthorized client access accepted');}
     catch(ApiException $e){if($e->status!==403)throw $e;$count++;}
+}
+$config=new Config('test',true,'test',[],'localhost',3306,'none','none','','','','',3600);
+$directory=new ClientService(new Database($config),new AuditLogger(new Database($config)));
+foreach([new AuthContext(1,1,'','','','staff',['super_admin']),new AuthContext(1,1,'','','','client',['practitioner']),new AuthContext(1,1,'','','','staff',[])] as $denied){
+    try{$directory->practitionerList($denied,[]);throw new RuntimeException('Unauthorized practitioner client directory accepted');}
+    catch(ApiException $e){if($e->status!==403)throw $e;$count++;}
+}
+foreach([['page'=>0],['page'=>-1],['q'=>str_repeat('x',191)]] as $invalid){
+    try{$directory->practitionerList(new AuthContext(1,1,'','','','staff',['practitioner']),$invalid);throw new RuntimeException('Invalid practitioner client query accepted');}
+    catch(ApiException $e){if($e->status!==422)throw $e;$count++;}
 }
 echo "{$count} client validation and authorization tests passed.\n";

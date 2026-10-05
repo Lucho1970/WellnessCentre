@@ -41,3 +41,12 @@ api/php-version.php
 
 # Local Azure onboarding session data
 .copilot-azure/
+
+# Generated deployment packages and local review attachments
+deployments/
+.codex-remote-attachments/
+test-results/
+
+# Local database backups and duplicate design scratch files
+/wellness_centre.sql
+/branding/* - Copy.*

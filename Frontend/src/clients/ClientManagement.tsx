@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
+import { Link as RouterLink } from 'react-router-dom';
+import { pagePath } from '../portal/access';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Summary = { id: number; display_name: string; email: string; phone: string | null; status: string };
@@ -114,14 +116,16 @@ export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
   />;
 
   return <Stack spacing={2}>
-    <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Client actions')} direction={{ xs: 'column', md: 'row' }} gap={1} alignItems={{ md: 'center' }}>
-      <Button variant="contained" startIcon={<Plus size={17}/>} onClick={newClient} disabled={opening}>{t('New client')}</Button>
-      <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
-      <Button startIcon={<Eye size={17}/>} disabled={!selected || opening} onClick={() => selected && void openClient(selected.id, 'details')}>{t('Details')}</Button>
-      <Button startIcon={<Pencil size={17}/>} disabled={!selected || opening} onClick={() => selected && void openClient(selected.id, 'edit')}>{t('Edit')}</Button>
-      {canMerge && <Button color="warning" startIcon={<Merge size={17}/>} disabled={!selected || selected.status === 'inactive'} onClick={() => beginMerge()}>{t('Merge')}</Button>}
-      <Stack component="form" direction="row" gap={1} sx={{ ml: { md: 'auto' }, width: { xs: '100%', md: 'auto' } }} onSubmit={(event: FormEvent) => { event.preventDefault(); setSearch(query.trim()); setPage(1); setRefresh(value => value + 1); }}>
-        <TextField size="small" label={t('Filter clients')} value={query} inputProps={{ maxLength: 190 }} onChange={event => setQuery(event.target.value)} sx={{ flex: 1, minWidth: { md: 280 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
+    <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Client actions')} spacing={1.5}>
+      <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} sx={{ '& .MuiButton-root': { flexShrink: 0, whiteSpace: 'nowrap' } }}>
+        <Button variant="contained" startIcon={<Plus size={17}/>} onClick={newClient} disabled={opening}>{t('New client')}</Button>
+        <Button startIcon={<Eye size={17}/>} disabled={!selected || opening} onClick={() => selected && void openClient(selected.id, 'details')}>{t('Details')}</Button>
+        <Button startIcon={<Pencil size={17}/>} disabled={!selected || opening} onClick={() => selected && void openClient(selected.id, 'edit')}>{t('Edit')}</Button>
+        <Button component={RouterLink} to={pagePath('admin', 'appointments')} state={selected ? { startBooking: true, bookingClient: selected } : undefined} disabled={!selected || selected.status !== 'active'}>{t('Book appointment')}</Button>
+        {canMerge && <Button color="warning" startIcon={<Merge size={17}/>} disabled={!selected || selected.status === 'inactive'} onClick={() => beginMerge()}>{t('Merge')}</Button>}
+      </Stack>
+      <Stack component="form" direction="row" gap={1} onSubmit={(event: FormEvent) => { event.preventDefault(); setSearch(query.trim()); setPage(1); setRefresh(value => value + 1); }}>
+        <TextField size="small" label={t('Filter clients')} value={query} inputProps={{ maxLength: 190 }} onChange={event => setQuery(event.target.value)} sx={{ flex: '1 1 220px' }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
         <Button type="submit" variant="outlined">{t('Search')}</Button>
       </Stack>
     </Stack></Paper>
@@ -137,7 +141,7 @@ export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
     </>}
     <Drawer anchor="right" open={panelMode !== null} onClose={close} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 760 }, maxWidth: '100%' } } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'details' ? 'Client details' : panelMode === 'edit' ? 'Edit client' : 'New client')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Add a client') : selected?.display_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={close}><X/></IconButton></Stack>
-      {panelMode === 'details' && id !== null && <ClientDetails form={form} edit={() => void openClient(id, 'edit')}><ClientInvitations key={id} clientId={id} request={request}/></ClientDetails>}
+      {panelMode === 'details' && id !== null && <ClientDetails form={form} edit={() => void openClient(id, 'edit')}><Stack spacing={2}>{form.status === 'active' && <Button component={RouterLink} to={pagePath('admin', 'appointments')} state={{ startBooking: true, bookingClient: { id, display_name: `${form.given_name} ${form.family_name}`, email: form.email, phone: form.phone } }} variant="contained">{t('Book appointment')}</Button>}<ClientInvitations key={id} clientId={id} request={request}/></Stack></ClientDetails>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={save} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}>
           <Typography color="text.secondary" mb={3}>{t('Saving a client record does not create a sign-in account or send an email.')}</Typography>

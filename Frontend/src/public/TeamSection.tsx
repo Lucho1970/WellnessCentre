@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Alert, Avatar, Box, Button, Card, CardActions, CardContent, CircularProgress, Container, Grid, Stack, Typography } from '@mui/material';
 import { CalendarDays } from 'lucide-react';
+import { portalLink } from '../shared/urls';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { apiBaseUrl, apiRequest } from '../shared/api';
+import { PractitionerNameHover } from '../shared/PractitionerPersonCard';
 
 type TeamMember = {
   slug: string;
@@ -20,6 +22,9 @@ type TeamMember = {
   practitioner_id: number | null;
   discipline: string | null;
   credentials: string | null;
+  public_website_url?: string | null; public_contact_email?: string | null;
+  public_contact_phone?: string | null;
+  public_contact_sms?: boolean;
 };
 
 function initials(name: string) {
@@ -42,16 +47,16 @@ function TeamMemberTile({ member }: { member: TeamMember }) {
           <Avatar src={image || undefined} alt="" sx={{ width: 112, height: 112, bgcolor: 'primary.light', color: 'primary.dark', fontSize: '2rem' }}>
             {initials(member.public_name)}
           </Avatar>
-          <Box><Typography variant="h6" component="h4">{member.public_name}</Typography><Typography color="primary.main" fontWeight={650}>{title}</Typography></Box>
+          <Box>{member.section === 'practitioner' ? <PractitionerNameHover person={member}><Typography variant="h6" component={Link} to={`/practitioners/${member.slug}`} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>{member.public_name}</Typography></PractitionerNameHover> : <Typography variant="h6" component="h4">{member.public_name}</Typography>}<Typography color="primary.main" fontWeight={650}>{title}</Typography></Box>
           {professionalDetails && <Typography variant="body2" color="text.secondary">{professionalDetails}</Typography>}
           {summary && <Typography sx={{ whiteSpace: 'pre-line' }}>{summary}</Typography>}
         </Stack>
       </CardContent>
-      {member.section === 'practitioner' && <CardActions sx={{ px: 3, pb: 3, pt: 0, flexWrap: 'wrap' }}><Button component={Link} to={`/practitioners/${member.slug}`} sx={{ flexGrow: 1 }}>{t('View profile')}</Button>{member.practitioner_id && <Button component={Link} to={`/book?practitioner_id=${member.practitioner_id}`} variant="contained" startIcon={<CalendarDays size={18} />} aria-label={t('Book with {{name}}',{name:member.public_name})}>{t('Book with {{name}}',{name:member.booking_name||member.public_name})}</Button>}</CardActions>}
+      {member.section === 'practitioner' && <CardActions sx={{ px: 3, pb: 3, pt: 0, flexWrap: 'wrap' }}><Button component={Link} to={`/practitioners/${member.slug}`} sx={{ flexGrow: 1 }}>{t('View profile')}</Button>{member.practitioner_id && <Button href={portalLink(`?practitioner_id=${member.practitioner_id}`)} variant="contained" startIcon={<CalendarDays size={18} />} aria-label={t('Book with {{name}}',{name:member.public_name})}>{t('Find a time')}</Button>}</CardActions>}
     </Card>;
 }
 
-export function TeamSection() {
+export function TeamSection({ administrationOnly = false }: { administrationOnly?: boolean }) {
   const { t } = useTranslation();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,11 +71,12 @@ export function TeamSection() {
     return () => controller.abort();
   }, [retry, t]);
   const sections = [
-    { key: 'practitioner' as const, title: t('Practitioners') },
+    ...(!administrationOnly ? [{ key: 'practitioner' as const, title: t('Practitioners') }] : []),
     { key: 'administration' as const, title: t('Administration') },
   ];
+  if (administrationOnly && !loading && !error && !members.some(member => member.section === 'administration')) return null;
 
-  return <Box component="section" aria-labelledby="our-team-heading" sx={{ bgcolor: 'background.default', py: { xs: 6, md: 8 } }}>
+  return <Box aria-labelledby="our-team-heading" sx={{ py: { xs: 6, md: 8 } }}>
     <Container maxWidth="lg">
       <Typography variant="overline" color="primary">{t('People who care')}</Typography>
       <Typography id="our-team-heading" variant="h3" component="h2">{t('Our Team')}</Typography>

@@ -12,6 +12,7 @@ const env = {
   VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID: '55555555-5555-5555-5555-555555555555',
   VITE_CUSTOMER_ENTRA_API_CLIENT_ID: '66666666-6666-6666-6666-666666666666',
   VITE_GOOGLE_MAPS_BROWSER_API_KEY: '',
+  VITE_RELEASE_NAME: 'test-release',
 };
 export default defineConfig({
   testDir: './tests', testMatch: ['**/portal.spec.ts', '**/customer.spec.ts'], fullyParallel: true, workers: 2,

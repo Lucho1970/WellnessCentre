@@ -8,9 +8,9 @@ export const surfaceConfig = (portal: boolean) => defineConfig(({ mode, command,
     plugins: [react()], base,
     define: {
       __APP_SURFACE__: JSON.stringify(portal ? 'portal' : 'public'),
-      // Deployed portal uses its own thin PHP entry point, not the public host.
+      // Each deployed surface uses its own thin PHP entry point on the current host.
       // Keep development's configured backend unchanged (Vite does not run PHP).
-      ...(portal && command === 'build' ? { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/api/v1') } : {}),
+      ...(command === 'build' ? { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/api/v1') } : {}),
     },
     build: { outDir: `dist/${portal ? 'portal' : 'public'}`, emptyOutDir: true },
     server: { port: portal ? 5174 : 5173, strictPort: true },

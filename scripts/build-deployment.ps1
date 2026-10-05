@@ -1,4 +1,7 @@
-param([Parameter(Mandatory=$true)][string]$ReleaseName)
+param(
+    [Parameter(Mandatory=$true)][string]$ReleaseName,
+    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
+)
 $ErrorActionPreference = 'Stop'
 if ($ReleaseName -notmatch '^[a-zA-Z0-9_-]+$') { throw 'Use letters, digits, underscores, and hyphens for ReleaseName.' }
 $repo = Split-Path $PSScriptRoot -Parent
@@ -30,8 +33,13 @@ foreach ($name in $requiredFrontendSettings) {
     if ([string]::IsNullOrWhiteSpace($value)) { throw "Missing required production frontend setting: $name" }
     $resolvedFrontendSettings[$name] = $value
 }
+$previousReleaseName = [Environment]::GetEnvironmentVariable('VITE_RELEASE_NAME', 'Process')
+[Environment]::SetEnvironmentVariable('VITE_RELEASE_NAME', $ReleaseName, 'Process')
 Push-Location (Join-Path $repo 'Frontend')
-try { npm run build; if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed' } } finally { Pop-Location }
+try { npm run build; if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed' } } finally {
+    Pop-Location
+    [Environment]::SetEnvironmentVariable('VITE_RELEASE_NAME', $previousReleaseName, 'Process')
+}
 $portalScripts = Get-ChildItem -LiteralPath (Join-Path $repo 'Frontend/dist/portal/assets') -Filter '*.js' -File
 foreach ($name in $requiredFrontendSettings) {
     $expected = $resolvedFrontendSettings[$name]
@@ -62,17 +70,21 @@ function Write-DeploymentZip([string]$Source,[string]$Target) {
 Write-DeploymentZip (Join-Path $repo 'Frontend/dist/public') (Join-Path $destination 'wellness-public.zip')
 $portalStage = Join-Path $stage 'portal'
 Copy-Item -LiteralPath (Join-Path $repo 'Frontend/dist/portal') -Destination $portalStage -Recurse
+Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal/.htaccess'),(Join-Path $repo 'hosting/netfirms/portal/share-preview.php'),(Join-Path $repo 'hosting/netfirms/portal/share-preview-lib.php') -Destination $portalStage -Force
 # Both public entry points resolve to the same private application; no backend copy.
 Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $portalStage 'api') -Recurse
 Write-DeploymentZip $portalStage (Join-Path $destination 'wellness-portal.zip')
+Write-DeploymentZip (Join-Path $repo 'hosting/netfirms/portal-landing') (Join-Path $destination 'copihue-portal-landing.zip')
 Write-DeploymentZip $private (Join-Path $destination 'wellness-api-private.zip')
 Write-DeploymentZip (Join-Path $repo 'api/deploy/netfirms/public') (Join-Path $destination 'wellness-api-public.zip')
 Write-DeploymentZip (Join-Path $repo 'hosting/netfirms/main-domain') (Join-Path $destination 'tuff-tar-mail-bridge.zip')
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/migrations') -Destination (Join-Path $destination 'sql-updates') -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/maintenance') -Destination (Join-Path $destination 'sql-maintenance') -Recurse
+Copy-Item -LiteralPath (Join-Path $repo 'documentation/PORTAL_HOST_CUTOVER.md') -Destination $destination
+Copy-Item -LiteralPath (Join-Path $repo 'documentation/PRACTITIONER_PERSON_CARD.md') -Destination $destination
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
-$manifest = [ordered]@{ source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-and-portal'; deployment_guide='documentation/PORTAL_SEPARATION.md'; archives=@() }
+$manifest = [ordered]@{ release_name=$ReleaseName; source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-clinic-portal-and-neutral-landing'; deployment_guide=$DeploymentGuide; archives=@() }
 foreach ($file in Get-ChildItem -LiteralPath $destination -Filter '*.zip') {
     $archive = [System.IO.Compression.ZipFile]::OpenRead($file.FullName)
     try {

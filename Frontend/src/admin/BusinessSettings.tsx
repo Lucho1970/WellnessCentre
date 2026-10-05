@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { ImagePlus, Save, Trash2 } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useClinicConfig, type ClinicConfig } from '../config/ClinicConfigProvider';
@@ -38,9 +38,21 @@ export function BusinessSettings() {
   const [saved, setSaved] = useState(false);
   const [assetBusy, setAssetBusy] = useState<BrandAssetType | null>(null);
   const [assetMessage, setAssetMessage] = useState('');
+  const [themePrimary, setThemePrimary] = useState(config.theme_primary_color || '#176b62');
+  const [themeSecondary, setThemeSecondary] = useState(config.theme_secondary_color || '#d8754c');
+  const [themeFont, setThemeFont] = useState<ClinicConfig['theme_font_family']>(config.theme_font_family || 'Inter');
+  const [themeBusy, setThemeBusy] = useState(false);
+  const [themeMessage, setThemeMessage] = useState('');
+  const [welcome, setWelcome] = useState({ welcome_title_en: config.welcome_title_en ?? '', welcome_title_fr: config.welcome_title_fr ?? '', welcome_body_en: config.welcome_body_en ?? '', welcome_body_fr: config.welcome_body_fr ?? '' });
+  const [welcomeBusy, setWelcomeBusy] = useState(false);
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [welcomeError, setWelcomeError] = useState('');
   const { markDirty, markClean } = useUnsavedForm();
+  const welcomeGuard = useUnsavedForm();
 
   useEffect(() => { setForm(config); }, [config]);
+  useEffect(() => { setThemePrimary(config.theme_primary_color || '#176b62'); setThemeSecondary(config.theme_secondary_color || '#d8754c'); setThemeFont(config.theme_font_family || 'Inter'); }, [config]);
+  useEffect(() => { setWelcome({ welcome_title_en: config.welcome_title_en ?? '', welcome_title_fr: config.welcome_title_fr ?? '', welcome_body_en: config.welcome_body_en ?? '', welcome_body_fr: config.welcome_body_fr ?? '' }); }, [config]);
 
   const setField = (field: keyof ClinicConfig, value: string) => setForm(current => ({ ...current, [field]: value }));
   const submit = async (event: FormEvent) => {
@@ -60,6 +72,13 @@ export function BusinessSettings() {
     try{const payload=await normalizeBrandImage(file,type,t('Choose an image file.'),t('Choose an image smaller than 5 MB.'),t('Image processing is unavailable.')),token=await getAccessToken();const response=await fetch(`${apiBaseUrl}/admin/clinic/branding/${type}`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)}),body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to upload brand image.')));await refresh();setAssetMessage(t(type==='logo'?'Business logo updated.':'Favicon updated.'));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to upload brand image.'));}finally{setAssetBusy(null);event.target.value='';}
   };
   const removeAsset = async (type: BrandAssetType) => {setAssetBusy(type);setError('');setAssetMessage('');try{const token=await getAccessToken(),response=await fetch(`${apiBaseUrl}/admin/clinic/branding/${type}`,{method:'DELETE',headers:{Authorization:`Bearer ${token}`}}),body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to remove brand image.')));await refresh();setAssetMessage(t(type==='logo'?'Business logo removed.':'Favicon removed.'));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to remove brand image.'));}finally{setAssetBusy(null);}};
+  const saveTheme = async (event: FormEvent) => {event.preventDefault();setThemeBusy(true);setError('');setThemeMessage('');try{const token=await getAccessToken(),response=await fetch(`${apiBaseUrl}/admin/clinic/portal-theme`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({primary_color:themePrimary,secondary_color:themeSecondary,font_family:themeFont})}),body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to save portal theme.')));markClean();await refresh();setThemeMessage(t('Portal theme saved.'));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to save portal theme.'));}finally{setThemeBusy(false);}};
+  const saveWelcome = async (event: FormEvent) => {
+    event.preventDefault();setWelcomeBusy(true);setWelcomeError('');setWelcomeMessage('');
+    try { const token=await getAccessToken();const response=await fetch(`${apiBaseUrl}/admin/clinic/portal-welcome`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(welcome)});const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to save portal welcome message.')));welcomeGuard.markClean();await refresh();setWelcomeMessage(t('Portal welcome message saved.')); }
+    catch(cause){setWelcomeError(cause instanceof Error?cause.message:t('Unable to save portal welcome message.'));}
+    finally{setWelcomeBusy(false);}
+  };
 
   return <Stack spacing={3}><Paper component="form" onSubmit={submit} onChange={markDirty} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
     <Typography variant="h5">{t('Clinic identity')}</Typography>
@@ -80,7 +99,14 @@ export function BusinessSettings() {
       <BrandAssetEditor type="favicon" title={t('Browser favicon')} description={t('Use a simple square image that remains recognizable at small sizes. It will be cropped to a square.')} version={config.favicon_version} busy={assetBusy==='favicon'} upload={uploadAsset} remove={removeAsset}/>
       {assetMessage&&<Alert severity="success">{assetMessage}</Alert>}
     </Stack>
-  </Paper></Stack>;
+  </Paper><Paper component="form" onSubmit={saveWelcome} onChange={welcomeGuard.markDirty} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}><Typography variant="h5">{t('Portal welcome message')}</Typography><Typography color="text.secondary" mb={2}>{t('Introduce your clinic to visitors before they explore treatments. Provide both languages so the portal can switch cleanly.')}</Typography><Stack spacing={2} maxWidth={760}>
+    <TextField required label={t('Welcome title (English)')} value={welcome.welcome_title_en} onChange={event=>setWelcome(current=>({...current,welcome_title_en:event.target.value}))} inputProps={{maxLength:160}}/>
+    <TextField required label={t('Welcome message (English)')} multiline minRows={3} value={welcome.welcome_body_en} onChange={event=>setWelcome(current=>({...current,welcome_body_en:event.target.value}))} inputProps={{maxLength:3000}}/>
+    <TextField required label={t('Welcome title (French)')} value={welcome.welcome_title_fr} onChange={event=>setWelcome(current=>({...current,welcome_title_fr:event.target.value}))} inputProps={{maxLength:160}}/>
+    <TextField required label={t('Welcome message (French)')} multiline minRows={3} value={welcome.welcome_body_fr} onChange={event=>setWelcome(current=>({...current,welcome_body_fr:event.target.value}))} inputProps={{maxLength:3000}}/>
+    {welcomeError&&<Alert severity="error">{welcomeError}</Alert>}{welcomeMessage&&<Alert severity="success">{welcomeMessage}</Alert>}
+    <Button type="submit" variant="contained" disabled={welcomeBusy} sx={{alignSelf:'flex-start'}}>{t('Save welcome message')}</Button>
+  </Stack></Paper><Paper component="form" onSubmit={saveTheme} onChange={markDirty} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}><Typography variant="h5">{t('Portal appearance')}</Typography><Typography color="text.secondary" mb={2}>{t('Match the booking portal to the clinic website. Changes apply to guest, client, and staff portal pages.')}</Typography><Stack spacing={2} maxWidth={500}><TextField type="color" label={t('Primary colour')} value={themePrimary} onChange={event=>setThemePrimary(event.target.value)} slotProps={{ inputLabel: { shrink: true } }}/><TextField type="color" label={t('Accent colour')} value={themeSecondary} onChange={event=>setThemeSecondary(event.target.value)} slotProps={{ inputLabel: { shrink: true } }}/><TextField select label={t('Portal font')} value={themeFont} onChange={event=>setThemeFont(event.target.value as ClinicConfig['theme_font_family'])}><MenuItem value="Inter">Inter</MenuItem><MenuItem value="Arial">Arial</MenuItem><MenuItem value="Georgia">Georgia</MenuItem></TextField>{themeMessage&&<Alert severity="success">{themeMessage}</Alert>}<Button type="submit" disabled={themeBusy} variant="contained" sx={{ alignSelf: 'flex-start' }}>{t('Save portal appearance')}</Button></Stack></Paper></Stack>;
 }
 
 function BrandAssetEditor({type,title,description,version,busy,upload,remove}:{type:BrandAssetType;title:string;description:string;version:string|null;busy:boolean;upload:(type:BrandAssetType,event:ChangeEvent<HTMLInputElement>)=>void;remove:(type:BrandAssetType)=>void}){

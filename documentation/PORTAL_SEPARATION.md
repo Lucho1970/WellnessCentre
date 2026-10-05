@@ -1,19 +1,19 @@
 # Public website / portal separation checkpoint
 
-16 September 2026 · Feature branch: `codex/public-portal-separation`
+Updated 30 September 2026 for guest portal booking.
 
-This is an implementation/deployment runbook for R1 in [Master Requirements](MASTER_REQUIREMENTS.md), not a replacement master plan. No database migration is required for this update. No tenant, DNS or live hosting changes have been made by this code change.
+This is an implementation/deployment runbook for R1 in [Master Requirements](MASTER_REQUIREMENTS.md), not a replacement master plan. The portal appearance update requires migration 027; it does not change DNS or live hosting configuration.
 
 ## What changed
 
-- Two independently deployable builds: `Frontend/dist/public` and `Frontend/dist/portal`. Both share branding/configuration, MUI theme and the existing PHP API.
-- Public home, `/book` availability browsing and `/contact`. The public build no longer initializes or includes workforce MSAL authentication. Unbuilt marketing/content sections are not presented as working modules.
+- Two independently deployable builds: `Frontend/dist/public` and `Frontend/dist/portal`. They share branding/configuration and the existing PHP API; portal colours and font can be configured separately.
+- Public home, CMS-led service/practitioner information and `/contact`. Booking links lead to guest browsing on the portal; the old public `/book` address redirects there. The public build does not initialize workforce MSAL authentication.
 - A separate staff login and operational layout, without the public hero, booking section or marketing footer. The round application avatar/initials menu retains profile upload and sign-out access.
 - Real guarded routes, browser history/refresh support, desktop navigation and a mobile drawer. Existing feature components are retained and loaded on demand.
 - Current API-derived permissions are preserved, not broadened. SuperAdmin still owns the existing restricted configuration screens; reception retains clients/bookings; practitioners retain appointment viewing; accountants get dashboard/profile until finance is built.
 - Multi-role staff can switch between their eligible operations/practitioner workspaces. A remembered workspace is a preference, never an authorization grant. Switching does not replace the API's resource/role rules; it does not create a narrower server-side impersonation session.
-- Legacy public `#portal` and `?portal=...` bookmarks redirect to the new portal and still pass authorization. `#booking` continues to open public browsing.
-- Removed unsupported public claims that a time was held or an appointment was requested. The client route explains that customer sign-in/confirmation is not built. Handoff retains only non-sensitive booking preferences, with no tokens or client data in the URL.
+- Legacy public `#portal` and `?portal=...` bookmarks still reach the staff portal and pass authorization. `#booking` now redirects to guest browsing on the portal.
+- No time is held before confirmation. Handoff retains only non-sensitive booking preferences, with no tokens or client data in the URL.
 - Shared public/auth response handling gives a readable error for empty/HTML API responses, with retry where applicable. Public requests are cancelled when selection changes or the page unmounts.
 
 ## Routes
@@ -22,7 +22,8 @@ Paths below are relative to the portal base: at a subdomain they start at `/`; f
 
 | Portal route | Released behavior |
 | --- | --- |
-| `/`, `/staff/login` | Staff sign-in, then eligible default workspace; root retained for workforce callback compatibility |
+| `/` | Guest service, practitioner and free-slot browsing without authentication |
+| `/staff/login` | Staff sign-in, then eligible default workspace |
 | `/login` | Redirect to client sign-in at `/client` |
 | `/profile` | Redirect to eligible workspace's profile |
 | `/admin` | Operations dashboard with truthful guidance, not invented metrics |
@@ -32,7 +33,8 @@ Paths below are relative to the portal base: at a subdomain they start at `/`; f
 | `/admin/practitioners`, `/admin/users`, `/admin/settings` | Existing SuperAdmin practitioner/staff/business settings |
 | `/admin/profile` | Application-owned avatar/profile |
 | `/practitioner`, `/practitioner/schedule`, `/practitioner/profile` | Current practitioner workspace, appointment list and profile |
-| `/client`, `/client/book` | Isolated customer sign-in verification; record linking and booking not yet enabled |
+| `/book` | Selected-slot handoff to client authentication and booking |
+| `/client`, `/client/book` | Customer sign-in, registration, appointment management and legacy booking handoff |
 | `/client/session` | Read-only, origin-checked initials display bridge for the public website; no tokens or account access shared |
 
 Unknown paths and unauthorized module paths show safe errors without mounting the feature. API authorization remains mandatory and unchanged.
@@ -69,7 +71,7 @@ must also include the entry-point files. Vite preview itself does not execute PH
 This avoids cross-origin preflight for deployed portal requests; it does not fix
 Netfirms OPTIONS handling for cross-origin local development.
 
-The owner confirmed `https://portal.copihue.ca/` mapped to `/public_html/wellness-portal`, and `https://wellness.copihue.ca/` mapped to `/public_html/wellness`. The hostnames are configured in `Frontend/.env.production`. These are owner-provided mappings; live DNS/routing and HTTPS readiness still require verification. Do not upload a `/portal/`-based fallback build unchanged to a subdomain root.
+This section records the original Willow deployment on `portal.copihue.ca`. The October 2026 host cutover supersedes it: Willow moves to `willowwellness.copihue.ca`, while `portal.copihue.ca` becomes a neutral landing page. Use [Portal Host Cutover](PORTAL_HOST_CUTOVER.md) for current deployment order, callbacks, and URLs. The prior confirmed mapping was `portal.copihue.ca` → `/public_html/wellness-portal`; the new Willow document root must be confirmed before upload.
 
 1. Verify that `portal.copihue.ca` serves `/public_html/wellness-portal` and has a valid HTTPS certificate. This is a sibling of `/public_html/wellness`, not a directory inside it. Do not point the subdomain at the private PHP application directory.
 2. The current **frontend build** values are:

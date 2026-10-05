@@ -16,6 +16,7 @@ final class StaffAppointmentEmail
             'staff_booking_confirmation' => ['New appointment', 'Nouveau rendez-vous', 'An appointment has been booked for you.', 'Un rendez-vous a été réservé pour vous.'],
             'staff_booking_change' => ['Appointment changed', 'Rendez-vous modifié', 'An appointment on your schedule has changed.', 'Un rendez-vous dans votre horaire a été modifié.'],
             'staff_booking_cancellation' => ['Appointment canceled', 'Rendez-vous annulé', 'An appointment on your schedule has been canceled.', 'Un rendez-vous dans votre horaire a été annulé.'],
+            'staff_booking_reassigned_away' => ['Appointment reassigned', 'Rendez-vous réattribué', 'An appointment has been moved off your schedule to another practitioner.', 'Un rendez-vous a été retiré de votre horaire et attribué à un autre praticien.'],
             default => throw new InvalidArgumentException('Unsupported staff notification event.'),
         };
         $clinic = trim((string)($event['clinic_name'] ?? ''));
@@ -25,9 +26,10 @@ final class StaffAppointmentEmail
         $start = new DateTimeImmutable((string)$event['starts_at'], new DateTimeZone('UTC'));
         $local = $start->setTimezone($timezone)->format('Y-m-d H:i T');
         $portal = 'https://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '') . '/practitioner/schedule';
+        $away = ($event['event_code'] ?? '') === 'staff_booking_reassigned_away';
         return [
             'subject' => $clinic . ' — ' . $words[0] . ' / ' . $words[1],
-            'body' => $words[2] . "\n" . 'Time: ' . $local . "\n" . 'Sign in to review the details: ' . $portal . "\n\n" . $words[3] . "\n" . 'Heure : ' . $local . "\n" . 'Ouvrez une session pour voir les détails : ' . $portal . "\n\n" . $clinic,
+            'body' => $words[2] . "\n" . 'Time: ' . $local . "\n" . ($away ? 'Your calendar no longer includes this appointment: ' : 'Sign in to review the details: ') . $portal . "\n\n" . $words[3] . "\n" . 'Heure : ' . $local . "\n" . ($away ? 'Ce rendez-vous ne figure plus dans votre calendrier : ' : 'Ouvrez une session pour voir les détails : ') . $portal . "\n\n" . $clinic,
         ];
     }
 }

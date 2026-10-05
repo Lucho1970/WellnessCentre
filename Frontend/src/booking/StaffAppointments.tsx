@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, Drawer, FormControlLabel, Grid, IconButton, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
-import { CalendarClock, CalendarPlus, CalendarX, Eye, RefreshCw, X } from 'lucide-react';
+import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, Drawer, FormControlLabel, Grid, IconButton, Link, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
+import { CalendarClock, CalendarPlus, CalendarX, Eye, RefreshCw, UserRoundCheck, X } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
@@ -8,6 +8,10 @@ import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import { portalLink } from '../shared/urls';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { PractitionerVisitHistory } from './PractitionerVisitHistory';
+import { PractitionerVisitOutcome } from './PractitionerVisitOutcome';
+import { AppointmentLogisticsNotes } from './AppointmentLogisticsNotes';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
@@ -19,7 +23,15 @@ type Destination = AddressValue & { instructions: string };
 type CoverageValidation = { destination: Destination; distance_km: number; radius_km: number; token: string; expires_at: string };
 const emptyDestination = (): Destination => ({address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',country:'Canada',instructions:''});
 function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
-type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
+function emailHref(value?: string | null) {
+  const email = value?.trim() ?? '';
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? `mailto:${encodeURIComponent(email)}` : null;
+}
+function phoneHrefs(value?: string | null) {
+  const phone = (value ?? '').replace(/[^\d+]/g, '');
+  return /^\+?\d{7,15}$/.test(phone) ? { call: `tel:${phone}`, text: `sms:${phone}` } : null;
+}
+type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string, readonly fields: Record<string, unknown> = {}) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
@@ -33,19 +45,34 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
 export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false, canAddClients = false, canApproveOnsiteArea = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean; canAddClients?: boolean; canApproveOnsiteArea?: boolean }) {
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
+  const [searchParams] = useSearchParams();
+  const route = useLocation();
+  const bookingIntent = route.state as { startBooking?: boolean; bookingClient?: Client; bookingServiceId?: number } | null;
+  const requestedId = Number(searchParams.get('appointment_id'));
+  const linkedId = Number.isSafeInteger(requestedId) && requestedId > 0 ? requestedId : null;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [view, setView] = useState('upcoming');
+  const [view, setView] = useState(() => searchParams.get('view') === 'needs_outcome' ? 'needs_outcome' : searchParams.get('view') === 'past' ? 'past' : 'upcoming');
+  const [showCanceled, setShowCanceled] = useState(() => { try { return localStorage.getItem('wellness.staff.showCanceledAppointments') === 'true'; } catch { return false; } });
   const [page, setPage] = useState(1);
   const [refresh, setRefresh] = useState(0);
   const [listBusy, setListBusy] = useState(true);
   const [listError, setListError] = useState('');
+  const [linkedError, setLinkedError] = useState('');
   const [notice, setNotice] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(() => Boolean(canBook && (bookingIntent?.startBooking || bookingIntent?.bookingClient || bookingIntent?.bookingServiceId)));
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [focusedAppointment, setFocusedAppointment] = useState<Appointment | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsRecord, setDetailsRecord] = useState<Appointment | null>(null);
+  const [detailsBusy, setDetailsBusy] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
   const [managing, setManaging] = useState<{ appointment: Appointment; action: 'reschedule' | 'cancel' } | null>(null);
-  const selected = appointments.find(item => item.id === selectedId) ?? null;
+  const [reassigning, setReassigning] = useState<Appointment | null>(null);
+  const selected = selectedId === linkedId && focusedAppointment?.id === selectedId ? focusedAppointment : appointments.find(item => item.id === selectedId) ?? null;
+  const clientEmailHref = emailHref(detailsRecord?.client_email);
+  const clientPhoneHrefs = phoneHrefs(detailsRecord?.client_phone);
   const canChangeSelected = Boolean(!creating && canBook && selected && ['requested','confirmed','rescheduled'].includes(selected.status) && new Date(`${selected.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now());
+  const canReassignSelected = Boolean(!practitionerMode && canManageFees && selected?.delivery_mode === 'clinic' && selected.base_price_cents !== null && ['requested','confirmed','rescheduled'].includes(selected.status) && new Date(`${selected.starts_at.replace(' ', 'T')}Z`).getTime() > Date.now());
   useEffect(() => { if (detailsOpen && !selected) setDetailsOpen(false); }, [detailsOpen, selected]);
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
@@ -57,26 +84,53 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
     return normalizeNumericIds(body.data);
   }, [getAccessToken, t]);
   useEffect(() => {
+    if (linkedId === null) return;
+    let active = true;
+    setSelectedId(linkedId); setLinkedError('');
+    void request(`/appointments/${linkedId}${practitionerMode ? '?scope=practitioner' : ''}`)
+      .then(data => { if (active) { setFocusedAppointment(data); setSelectedId(linkedId); setDetailsOpen(true); } })
+      .catch(error => { if (active) setLinkedError(error instanceof Error ? error.message : t('Unable to load appointment.')); });
+    return () => { active = false; };
+  }, [linkedId, practitionerMode, refresh, request, t]);
+  useEffect(() => {
+    if (!detailsOpen || selectedId === null) { setDetailsRecord(null); setDetailsBusy(false); setDetailsError(''); return; }
+    if (focusedAppointment?.id === selectedId) { setDetailsRecord(focusedAppointment); setDetailsBusy(false); setDetailsError(''); return; }
+    const controller = new AbortController();
+    setDetailsRecord(null); setDetailsBusy(true); setDetailsError('');
+    void request(`/appointments/${selectedId}${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal })
+      .then(data => { if (!controller.signal.aborted) setDetailsRecord(data); })
+      .catch(error => { if (!controller.signal.aborted) setDetailsError(error instanceof Error ? error.message : t('Unable to load appointment.')); })
+      .finally(() => { if (!controller.signal.aborted) setDetailsBusy(false); });
+    return () => controller.abort();
+  }, [detailsOpen, selectedId, focusedAppointment, practitionerMode, request, t]);
+  useEffect(() => {
     const controller = new AbortController(); setListBusy(true); setListError('');
-    void request(`/appointments?view=${view}&page=${page}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
-      .then(data => { if (!controller.signal.aborted) { setAppointments(data); setSelectedId(current => data.some((item: Appointment) => item.id === current) ? current : null); } })
+    void request(`/appointments?view=${view}&page=${page}&show_canceled=${showCanceled ? '1' : '0'}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
+      .then(data => { if (!controller.signal.aborted) { setAppointments(data); setSelectedId(current => data.some((item: Appointment) => item.id === current) || current === linkedId ? current : null); } })
       .catch(error => { if (!controller.signal.aborted) setListError(error.message); })
       .finally(() => { if (!controller.signal.aborted) setListBusy(false); });
     return () => controller.abort();
-  }, [request, view, page, refresh, practitionerMode]);
+  }, [request, view, page, showCanceled, refresh, practitionerMode, linkedId]);
   const startChange = (action: 'reschedule' | 'cancel') => { if (!selected || !canChangeSelected) return; setCreating(false); setDetailsOpen(false); setManaging({ appointment: selected, action }); };
   return <Stack spacing={2}>
-    <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Appointment actions')} direction={{ xs: 'column', md: 'row' }} gap={1} alignItems={{ md: 'center' }}>
-      {canBook && <Button variant="contained" startIcon={<CalendarPlus size={17}/>} disabled={creating} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
-      <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
-      <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={() => setDetailsOpen(true)}>{t('More details')}</Button>
-      {canBook && <><Button startIcon={<CalendarClock size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" startIcon={<CalendarX size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button></>}
-      <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); setSelectedId(null); setDetailsOpen(false); }} sx={{ ml: { md: 'auto' }, minWidth: { md: 170 } }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
-      <Button startIcon={<RefreshCw size={16}/>} disabled={listBusy} onClick={() => setRefresh(value => value + 1)}>{t('Refresh')}</Button>
+    <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Appointment actions')} spacing={1.5}>
+      <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} sx={{ '& .MuiButton-root': { flexShrink: 0, whiteSpace: 'nowrap' } }}>
+        {canBook && <Button variant="contained" startIcon={<CalendarPlus size={17}/>} disabled={creating} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
+        <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={() => setDetailsOpen(true)}>{t('More details')}</Button>
+        {canBook && <><Button startIcon={<CalendarClock size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" startIcon={<CalendarX size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button></>}
+        {!practitionerMode && canManageFees && <Button startIcon={<UserRoundCheck size={17}/>} disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}
+      </Stack>
+      <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} alignItems="center">
+        <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); setSelectedId(null); setDetailsOpen(false); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="needs_outcome">{t('Needs visit outcome')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
+        <FormControlLabel sx={{ ml: 0, mr: 1 }} control={<Checkbox checked={showCanceled} onChange={event => { const checked = event.target.checked; setShowCanceled(checked); try { localStorage.setItem('wellness.staff.showCanceledAppointments', String(checked)); } catch { /* Browsers may disable storage. */ } setPage(1); setSelectedId(null); setDetailsOpen(false); }} />} label={t('Show canceled appointments')} />
+        <Button startIcon={<RefreshCw size={16}/>} disabled={listBusy} onClick={() => setRefresh(value => value + 1)} sx={{ flexShrink: 0 }}>{t('Refresh')}</Button>
+      </Stack>
     </Stack></Paper>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
-    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} canApproveOnsiteArea={canApproveOnsiteArea} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {linkedError && <Alert severity="error">{linkedError}</Alert>}
+    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} canApproveOnsiteArea={canApproveOnsiteArea} initialClient={bookingIntent?.bookingClient} initialServiceId={bookingIntent?.bookingServiceId} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     {managing && <ManageAppointment key={`${managing.appointment.id}-${managing.action}`} appointment={managing.appointment} initialAction={managing.action} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
+    {reassigning && <ReassignAppointment key={reassigning.id} appointment={reassigning} request={request} close={() => setReassigning(null)} complete={() => { setReassigning(null); setSelectedId(null); setFocusedAppointment(null); setNotice(t('Appointment #{{id}} was assigned to a new practitioner.', { id: reassigning.id })); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.')}</Typography></Box>
       {listError && <Alert severity="error">{listError}</Alert>}
@@ -93,12 +147,66 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
     <Drawer anchor="right" open={detailsOpen && Boolean(selected)} onClose={() => setDetailsOpen(false)} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
       {selected && <><Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t('Appointment details')}</Typography><Typography variant="h5">{selected.client_name} · {selected.service_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={() => setDetailsOpen(false)}><X/></IconButton></Stack><Stack spacing={2} sx={{ p: 3, overflowY: 'auto' }}>
         {[[t('Status'), t(selected.status.replaceAll('_', ' '))], [t('Starts'), displayTime(selected.starts_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Ends'), displayTime(selected.ends_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Practitioner'), selected.practitioner_name], [t('Location'), selected.location_name], [t('Room'), selected.room_name || t('Not set')], [t('Visit type'), t(selected.delivery_mode === 'mobile' ? 'On-Site (client location)' : 'In clinic')], [t('Appointment ID'), String(selected.id)]].map(([label, value]) => <Box key={label}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}
+        <Divider />
+        <Typography variant="h6">{t('Client contact')}</Typography>
+        {detailsBusy && <CircularProgress size={20} aria-label={t('Loading appointment details')} />}
+        {detailsError && <Alert severity="error">{detailsError}</Alert>}
+        {detailsRecord && <>
+          <Box><Typography variant="caption" color="text.secondary">{t('Email')}</Typography><Typography fontWeight={600}>{clientEmailHref ? <Link href={clientEmailHref}>{detailsRecord.client_email}</Link> : detailsRecord.client_email || t('Not set')}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">{t('Phone')}</Typography><Stack direction="row" spacing={2} alignItems="center"><Typography fontWeight={600}>{clientPhoneHrefs ? <Link href={clientPhoneHrefs.call} aria-label={t('Call client')}>{detailsRecord.client_phone}</Link> : detailsRecord.client_phone || t('Not set')}</Typography>{clientPhoneHrefs && <Link href={clientPhoneHrefs.text}>{t('Text client')}</Link>}</Stack></Box>
+          <Box><Typography variant="caption" color="text.secondary">{t('Preferred contact')}</Typography><Typography fontWeight={600}>{detailsRecord.client_preferred_contact ? t(detailsRecord.client_preferred_contact) : t('Not set')}</Typography></Box>
+        </>}
         {selected.delivery_mode === 'mobile' && <><Box><Typography variant="caption" color="text.secondary">{t('Visit address')}</Typography><Typography fontWeight={600}>{addressText(selected.destination_snapshot, t('Address unavailable')) || t('Address unavailable')}</Typography></Box><Typography variant="body2">{t('Travel reserved: {{minutes}} minutes before and after', { minutes: selected.travel_buffer_minutes })}</Typography></>}
         {selected.base_price_cents !== null && selected.base_price_cents !== undefined && <Typography variant="body2">{t('Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)', { treatment: formatCad(Number(selected.base_price_cents), i18n.resolvedLanguage), mobile: formatCad(Number(selected.mobile_fee_cents), i18n.resolvedLanguage) })}</Typography>}
-        {canBook && <Stack direction="row" gap={1}><Button disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button></Stack>}
+        {detailsRecord && <AppointmentLogisticsNotes key={selected.id} appointmentId={selected.id} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
+        {practitionerMode && <PractitionerVisitHistory appointmentId={selected.id} serviceName={selected.service_name} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
+        {practitionerMode && detailsRecord && <PractitionerVisitOutcome appointment={detailsRecord} request={request} onChanged={message => { setNotice(message); setDetailsOpen(false); setRefresh(value => value + 1); }} />}
+        {canBook && <Stack direction="row" gap={1}><Button disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button>{!practitionerMode && canManageFees && <Button disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}</Stack>}
       </Stack></>}
     </Drawer>
   </Stack>;
+}
+
+type ReassignmentCandidate = { practitioner_id: number; practitioner_name: string };
+function ReassignAppointment({ appointment, request, close, complete }: { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; close: () => void; complete: () => void }) {
+  const { t, i18n } = useTranslation();
+  const [candidates, setCandidates] = useState<ReassignmentCandidate[]>([]);
+  const [practitionerId, setPractitionerId] = useState('');
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useUnsavedChanges(Boolean(practitionerId || reason.trim()));
+  useEffect(() => {
+    let active = true;
+    void request(`/appointments/${appointment.id}/reassignment-options`)
+      .then(data => { if (active) setCandidates(data as ReassignmentCandidate[]); })
+      .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : t('Unable to load practitioners.')); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [appointment.id, request, t]);
+  const closeSafely = () => { if (!saving && (!(practitionerId || reason.trim()) || window.confirm(t('Discard your unsaved changes?')))) close(); };
+  const submit = async () => {
+    if (!practitionerId || !reason.trim()) return;
+    setSaving(true); setError('');
+    try {
+      await request(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reassign', version: Number(appointment.version), practitioner_id: Number(practitionerId), reason: reason.trim() }) });
+      complete();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to change the practitioner.')); }
+    finally { setSaving(false); }
+  };
+  return <Drawer anchor="right" open onClose={closeSafely} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 560 }, maxWidth: '100%' } } }}>
+    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t('Change practitioner')}</Typography><Typography variant="h5">{t('Appointment #{{id}}', { id: appointment.id })}</Typography></Box><IconButton aria-label={t('Close panel')} disabled={saving} onClick={closeSafely}><X/></IconButton></Stack>
+    <Stack spacing={2} sx={{ p: 3 }}>
+      <Typography>{appointment.client_name} · {appointment.service_name}</Typography>
+      <Typography>{displayTime(appointment.starts_at, appointment.timezone, i18n.resolvedLanguage, true)} · {appointment.location_name}</Typography>
+      <Alert severity="info">{t('Only practitioners available for this in-clinic appointment at the same time, room, and price are shown. The client and both practitioners will be notified.')}</Alert>
+      {error && <Alert severity="error">{error}</Alert>}
+      {loading ? <CircularProgress aria-label={t('Loading practitioners')} /> : candidates.length === 0 ? <Alert severity="warning">{t('No other practitioner can take this appointment without changing its time or price.')}</Alert> : <TextField select required label={t('New practitioner')} value={practitionerId} disabled={saving} onChange={event => setPractitionerId(event.target.value)}>{candidates.map(candidate => <MenuItem key={candidate.practitioner_id} value={String(candidate.practitioner_id)}>{candidate.practitioner_name}</MenuItem>)}</TextField>}
+      <TextField required label={t('Reason for reassignment')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} disabled={saving} onChange={event => setReason(event.target.value)} />
+      <Stack direction="row" gap={2}><Button disabled={saving} onClick={closeSafely}>{t('Cancel')}</Button><Button variant="contained" disabled={loading || saving || !practitionerId || !reason.trim()} onClick={() => void submit()}>{t(saving ? 'Saving…' : 'Confirm practitioner change')}</Button></Stack>
+    </Stack>
+  </Drawer>;
 }
 
 type ManageProps = { appointment: Appointment; initialAction: 'reschedule' | 'cancel'; request: (path: string, init?: RequestInit) => Promise<any>; canAssessFees: boolean; canManageFees: boolean; close: () => void; complete: (message: string) => void };
@@ -178,8 +286,8 @@ function ManageAppointment({ appointment, initialAction, request, canAssessFees,
   </Drawer>;
 }
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; cancel: () => void; complete: (id: number) => void };
-function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClients, canApproveOnsiteArea, cancel, complete }: FormProps) {
+type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; initialClient?: Client; initialServiceId?: number; cancel: () => void; complete: (id: number) => void };
+function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClients, canApproveOnsiteArea, initialClient, initialServiceId, cancel, complete }: FormProps) {
   const { t, i18n } = useTranslation();
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
@@ -190,7 +298,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
   const [clientQuery, setClientQuery] = useState('');
   const [clientBirthdate, setClientBirthdate] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
-  const [client, setClient] = useState<Client | null>(null);
+  const [client, setClient] = useState<Client | null>(initialClient ?? null);
   const [clientBusy, setClientBusy] = useState(false);
   const [clientMore, setClientMore] = useState(false);
   const [clientError, setClientError] = useState('');
@@ -210,6 +318,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
   const [coverage,setCoverage]=useState<CoverageValidation|null>(null);
   const [coverageBusy,setCoverageBusy]=useState(false);
   const [areaApproved,setAreaApproved]=useState(false);
+  const [approvalLoading,setApprovalLoading]=useState(false);
   const [approvalBusy,setApprovalBusy]=useState(false);
   const approvalLookup=useRef<AbortController|null>(null);
   const addressComplete=(['address_line1','city','province','postal_code','country'] as const).every(key=>destination[key].trim());
@@ -234,12 +343,13 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
   const needsRoom=mode==='clinic'&&Boolean(Number(selected?.requires_room));
   const mobileFee=mode==='mobile'?Number(selected?.mobile_fee_cents??0):0;
   const locationRows = eligibleOptions.filter(row => String(row.location_id) === location);
-  const serviceRows = locationRows.filter(row => String(row.service_id) === service);
-  const practitionerRows = serviceRows.filter(row => String(row.practitioner_id) === practitioner);
+  const serviceRows = locationRows.filter(row => !practitioner || String(row.practitioner_id) === practitioner);
+  const practitionerRows = locationRows.filter(row => !service || String(row.service_id) === service);
+  const durationRows = locationRows.filter(row => String(row.service_id) === service && String(row.practitioner_id) === practitioner);
   const practitionerLocked=practitionerMode&&!canScheduleOthers;
   const assignedPractitioner=practitionerLocked?unique(options,'practitioner_id')[0]:undefined;
   useUnsavedChanges(Boolean(
-    clientQuery.trim() || clientBirthdate || client || location || service || duration || date || slot || room || pending ||
+    clientQuery.trim() || clientBirthdate || client || location || service || (!practitionerLocked && practitioner) || duration || date || slot || room || pending ||
     (addingClient && Object.values(newClient).some(value => value.trim())) ||
     destination.address_line1 || destination.address_line2 || destination.city || destination.postal_code || destination.instructions
   ));
@@ -260,6 +370,14 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
     if(preferredLocation&&availableLocations.some(row=>String(row.location_id)===preferredLocation))setLocation(preferredLocation);
     else if(availableLocations.length===1)setLocation(String(availableLocations[0].location_id));
   },[location,mode,options,preferredLocation]);
+  useEffect(() => {
+    if (!initialServiceId || service || options.length === 0) return;
+    const match = options.find(row => Number(row.service_id) === Number(initialServiceId) && Number(row.offers_mobile)) ?? options.find(row => Number(row.service_id) === Number(initialServiceId) && Number(row.offers_clinic));
+    if (!match) return;
+    setMode(Number(match.offers_mobile) ? 'mobile' : 'clinic');
+    setLocation(String(match.location_id));
+    setService(String(match.service_id));
+  }, [initialServiceId, options, service]);
   useEffect(() => {
     const term = clientQuery.trim();
     setClients([]); setClientMore(false); setClientError(''); setClientSearched(false);
@@ -285,13 +403,15 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
   },[client?.id,mode,request]);
   useEffect(() => {
     setAreaApproved(false);
-    if (!client || mode !== 'mobile' || !selected || !addressComplete) return;
+    if (!client || mode !== 'mobile' || !addressComplete || !eligibleOptions.some(row => String(row.location_id) === location && String(row.service_id) === service && String(row.practitioner_id) === practitioner)) { setApprovalLoading(false); return; }
     const controller = new AbortController();
     approvalLookup.current = controller;
+    setApprovalLoading(true);
     void request('/address-coverage/approval', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }), signal:controller.signal })
-      .then(result => { if (!controller.signal.aborted) setAreaApproved(Boolean(result.approved)); }).catch(() => {});
+      .then(result => { if (!controller.signal.aborted) setAreaApproved(Boolean(result.approved)); }).catch(() => {})
+      .finally(() => { if (!controller.signal.aborted) setApprovalLoading(false); });
     return () => controller.abort();
-  }, [request,client?.id,mode,location,service,practitioner,selected?.duration_option_id,destination.address_line1,destination.address_line2,destination.city,destination.province,destination.postal_code,destination.country,addressComplete]);
+  }, [request,client?.id,mode,location,service,practitioner,destination.address_line1,destination.address_line2,destination.city,destination.province,destination.postal_code,destination.country,addressComplete,options]);
   const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); setError(''); };
   const createClient = async (event: FormEvent) => {
     event.preventDefault(); setNewClientBusy(true); setNewClientError(''); setDuplicateClients([]);
@@ -364,7 +484,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
       setError(cause instanceof Error ? cause.message : t('Unable to confirm appointment.'));
     } finally { sending.current = false; setBusy(false); }
   };
-  const comboSelect = (label: string, value: string, rows: Combination[], key: 'location_id' | 'service_id' | 'practitioner_id' | 'duration_option_id', name: (row: Combination) => string, change: (value: string) => void) => <TextField required fullWidth select label={label} value={value} onChange={event => change(event.target.value)}>{unique(rows, key).map(row => <MenuItem key={row[key]} value={String(row[key])}>{name(row)}</MenuItem>)}</TextField>;
+  const comboSelect = (label: string, value: string, rows: Combination[], key: 'location_id' | 'service_id' | 'practitioner_id' | 'duration_option_id', name: (row: Combination) => string, change: (value: string) => void, clearLabel?: string) => <TextField required fullWidth select label={label} value={value} onChange={event => change(event.target.value)}>{clearLabel && <MenuItem value="">{clearLabel}</MenuItem>}{unique(rows, key).map(row => <MenuItem key={row[key]} value={String(row[key])}>{name(row)}</MenuItem>)}</TextField>;
   return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
     <Typography variant="h5" mb={2}>{t('New appointment')}</Typography>
     <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>{['Client and care', 'Available time', 'Review and confirm'].map(label => <Step key={label}><StepLabel>{t(label)}</StepLabel></Step>)}</Stepper>
@@ -414,11 +534,11 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
         {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); setCoverage(null); setAreaApproved(false); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, locationRows, 'service_id', row => row.service_name, value => { setService(value); setPractitioner(''); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); })}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, serviceRows, 'service_id', row => row.service_name, value => { setService(value); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); }, t('Clear service'))}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{practitionerLocked
             ? <TextField fullWidth label={t('Practitioner')} value={assignedPractitioner?.practitioner_name ?? ''} InputProps={{ readOnly: true }} helperText={t('Appointments booked in your practitioner workspace are assigned to you.')} />
-            : comboSelect(t('Practitioner'), practitioner, serviceRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); })}</Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, practitionerRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
+            : comboSelect(t('Practitioner'), practitioner, practitionerRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); }, t('Clear practitioner'))}</Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, durationRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
         </Grid>
         {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography>
           {clientAddressState==='loading'&&<Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20}/><Typography>{t('Loading saved client address…')}</Typography></Stack>}
@@ -426,8 +546,9 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
           {clientAddressState==='custom'&&<Alert severity="info">{t('Visit address changes apply only to this appointment and do not update the client profile.')}</Alert>}
           {clientAddressState==='missing'&&<Alert severity="info">{t('This client has no saved service address. Find an address with Google or enter it manually.')}</Alert>}
           {clientAddressState==='error'&&<Alert severity="warning">{t('The saved client address could not be loaded. Find an address with Google or enter it manually.')}</Alert>}
-          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.')}</Alert>{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. No new distance check is needed.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}{coverage&&client&&canApproveOnsiteArea&&!areaApproved&&<Button variant="outlined" disabled={approvalBusy} onClick={()=>void approveCoverage()}>{t(approvalBusy?'Saving approval…':'Approve this address for future On-Site bookings')}</Button>}{areaApproved&&canApproveOnsiteArea&&<Button variant="text" color="warning" disabled={approvalBusy} onClick={()=>void revokeCoverage()}>{t(approvalBusy?'Removing approval…':'Remove On-Site approval')}</Button>}</Stack>}
-        <Button variant="contained" disabled={!client || !selected || !addressReady} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
+          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.')}</Alert>{approvalLoading&&<Alert severity="info">{t('Checking for a saved service-area approval…')}</Alert>}{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. No new distance check is needed.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||approvalLoading||areaApproved||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}{coverage&&client&&canApproveOnsiteArea&&!areaApproved&&<Button variant="outlined" disabled={approvalBusy} onClick={()=>void approveCoverage()}>{t(approvalBusy?'Saving approval…':'Approve this address for future On-Site bookings')}</Button>}{areaApproved&&canApproveOnsiteArea&&<Button variant="text" color="warning" disabled={approvalBusy} onClick={()=>void revokeCoverage()}>{t(approvalBusy?'Removing approval…':'Remove On-Site approval')}</Button>}</Stack>}
+        {mode==='mobile' && coverage && client && canApproveOnsiteArea && !areaApproved && <Typography variant="body2" color="text.secondary">{t('A distance check alone is not saved for future bookings. Approve this address once to reuse it.')}</Typography>}
+        <Button variant="contained" disabled={!client || !selected || !addressReady || approvalLoading} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
       </Stack>}
       {step === 1 && <Stack spacing={2}>
         <Typography>{t('Availability in {{timezone}}. Choose a day to see current openings.',{timezone})}</Typography>

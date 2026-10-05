@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
+import { PractitionerQualifications } from '../profile/PractitionerQualifications';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const tenantId = import.meta.env.VITE_ENTRA_TENANT_ID ?? '';
@@ -115,7 +116,7 @@ export function PractitionerAdmin() {
 function PractitionerDetails({ item, edit }: { item: Practitioner; edit: () => void }) {
   const { t } = useTranslation();
   const rows = [[t('First name'), item.given_name || t('Not set')], [t('Last name'), item.family_name || t('Not set')], [t('Preferred public name'), item.preferred_name || t('Not set')], [t('Internal display name'), item.display_name], [t('Account status'), t(item.status === 'active' ? 'Active' : 'Inactive')], [t('Practitioner availability'), t(Boolean(Number(item.active)) ? 'Available' : 'Unavailable')], [t('Discipline'), item.discipline], [t('Credentials'), item.credentials || t('Not set')], [t('Clinic location'), item.locations || t('No active location')], [t('Booking management'), t(item.booking_mode === 'practitioner_managed' ? 'Practitioner managed' : 'Clinic managed')], [t('Microsoft sign-in email'), item.email]];
-  return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button></Stack>;
+  return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><PractitionerQualifications key={item.practitioner_id} practitionerId={item.practitioner_id} admin /></Stack>;
 }
 
 function NewPractitionerFields({ form, locations, field }: { form: NewForm; locations: Location[]; field: <K extends keyof NewForm>(key: K, value: NewForm[K]) => void }) {

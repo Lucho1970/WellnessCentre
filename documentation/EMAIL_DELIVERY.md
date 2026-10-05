@@ -24,7 +24,7 @@ Graph uses the [client-credentials flow](https://learn.microsoft.com/en-us/graph
    MAIL_CLIENT_ID=<mail-app-client-guid>
    MAIL_CLIENT_SECRET=<secret-value>
    MAIL_FROM_ADDRESS=wellness@lucho1970.onmicrosoft.com
-   CLIENT_PORTAL_URL=https://portal.copihue.ca/client
+   CLIENT_PORTAL_URL=https://willowwellness.copihue.ca/client
    ```
 
 4. Verify the mailbox and permission scope, then set `MAIL_ENABLED=true`. Run a private command-line smoke test with a safe test client address. Only then schedule the worker.
@@ -66,7 +66,27 @@ The command prints only counts: `sent` (Graph accepted), `retry`, `review`, and 
 
 ## Monitoring and recovery
 
-Super Admin and Clinic Admin can inspect the read-only **Email status** page at `/admin/notifications`. It lists clinic-scoped appointment email events, status counts, retry timing, attempts, and the last error. The corresponding API is `GET /api/v1/admin/notifications?status=needs_review&page=1`; it does not expose message payloads or provide a resend action. The page is not a delivery receipt: `sent` means Graph accepted the mail, not that it reached an inbox.
+### Scheduled worker health
+
+Apply `api/database/migrations/023_notification_scheduler_health.sql` once after a database backup and **before** deploying the matching private API, public cron pointer, and portal build. The migration adds one global, non-patient scheduler state row. The authenticated Azure-triggered PHP cron pointer marks a run as started, succeeded, or failed; immediate booking dispatch does **not** update this state, so it cannot disguise a stopped scheduler. A 204 caused by the five-minute cooldown also does not count as a new worker pass.
+
+Super Admin and Clinic Admin see the latest scheduled-run state and last successful time on the Operations email/SMS activity widget and the Notification status page. The count of notices over 30 minutes past due is scoped to their clinic and includes `queued` and retryable `failed` rows whose effective due time has passed. The health state warns when the last scheduled run failed, ran for over five minutes without completion, or no scheduled run succeeded in 45 minutes. An unobserved state immediately after deployment is informational until the next recurrence. Health is an operational signal, not a delivery receipt; no recipient or message content is stored in the scheduler row.
+
+After deployment, wait for the next 15-minute Azure recurrence, then confirm the state becomes **Healthy** and the last successful time advances even when `sent=0`. A stale or failed state calls for checking the Azure run history and Netfirms PHP error log; a 204 HTTP response can also mean cooldown, so inspect the in-app state. If migration 023 is not applied, deploy it before enabling this version; do not leave the updated cron pointer running against the old schema. Do not intentionally interrupt a live send to test the failure state.
+
+### Client appointment reminders
+
+Apply `api/database/migrations/021_appointment_reminder.sql` after backing up the database and before deploying its matching API package. It adds one active, clinic-wide email reminder 24 hours before an appointment, without queuing reminders for existing bookings. Clinic Admin and Super Admin can then use **Email status → Reminder settings** to enable, disable, or add offered reminder times (up to three active). Only active `appointment_reminder` email rows are used. Do not enable SMS schedule rows until a separate consent and delivery design is approved.
+
+New bookings queue future reminders in the same database transaction as the booking. Rescheduling cancels unsent reminders and creates new ones for the new time; cancellation cancels them. The worker checks the appointment version, status, recipient address, start time, and reminder lateness again before sending. A booking made inside a reminder's lead time does not receive that reminder, and a reminder delayed by more than one hour is canceled instead of sent late. Reminder email has no calendar attachment; the booking confirmation/change email continues to provide the `.ics` file. The existing 15-minute scheduled worker sends due reminders, so delivery can be up to about 15 minutes after the configured time.
+
+Adding or re-enabling a reminder time affects future bookings only; it does not backfill existing appointments. Disabling a time cancels queued or retryable reminders at that lead time, and the worker checks the active schedule again before sending. An already in-flight email cannot be recalled. The schedule API and portal require clinic administrator access, and changes are audited.
+
+For a controlled test, book an appointment more than 24 hours ahead and inspect `notification_events` for one queued `appointment_reminder` with `scheduled_at` one day before `starts_at` (both UTC). Reschedule it and confirm the old reminder is canceled and a new one is queued; cancel it and confirm the new reminder is canceled. Use a test appointment near the reminder time to verify actual delivery, and keep the admin Email status page under review. Do not alter a live event's scheduled time just to force delivery.
+
+Super Admin and Clinic Admin can inspect **Notification status** at `/admin/notifications`. It lists clinic-scoped appointment notification events, status counts, retry timing, attempts, and the last error. The corresponding API is `GET /api/v1/admin/notifications?status=needs_review&page=1`; it does not expose message payloads. The page is not a delivery receipt: `sent` means a provider accepted the message, not that it reached an inbox or handset.
+
+After migration `022_notification_review.sql` and the matching portal/API release, the page is labeled **Notification status** and supports a limited, audited review action. An administrator must check provider history and recipient status before closing a `needs_review` row as provider-accepted, handled manually, or no longer needed. The decision is stored in `notification_reviews`; closed rows become `resolved`, distinct from `sent` or `canceled`. A retry is offered only for a staff SMS less than one hour old when both checks confirm it was **not** sent. The API rejects retries with too many attempts, a provider message ID, a changed appointment, or a newer notice. Email and old SMS remain manual follow-up only. The worker still performs its own checks before any retried send. Never requeue a row by SQL merely because it shows `needs_review`.
 
 The worker retries definite transient failures with backoff, including Graph throttling ([429 guidance](https://learn.microsoft.com/en-us/graph/throttling)). It does not automatically resend a request with an unknown outcome (e.g. a network break after submission or a worker crash mid-send); those rows become `needs_review` to avoid duplicate mail. Review provider traces and the recipient mailbox before deciding whether to resend. Do not change those rows to `queued` casually. Provider delivery receipts and a controlled, audited recovery action remain future work.
 

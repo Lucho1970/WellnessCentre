@@ -5,6 +5,8 @@ declare(strict_types=1);
 // live in this public directory; both public hosts point to wellness-api.
 ini_set('display_errors', '0');
 header('Cache-Control: no-store');
+$schedulerPdo = null;
+$schedulerStarted = false;
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     http_response_code(405);
@@ -60,18 +62,23 @@ try {
         $sms = filter_var($env('SMS_ENABLED'), FILTER_VALIDATE_BOOL)
             ? new \Wellness\Service\VoipMsSmsClient($env('VOIPMS_API_USERNAME'), $env('VOIPMS_API_PASSWORD'), $env('VOIPMS_FROM_DID'))
             : null;
+        $schedulerPdo = (new \Wellness\Database(\Wellness\Config::fromEnvironment()))->connection();
         $worker = new \Wellness\Service\NotificationWorker(
-            (new \Wellness\Database(\Wellness\Config::fromEnvironment()))->connection(),
+            $schedulerPdo,
             $mailer,
             $portalUrl,
             $sms
         );
         // Bound HTTP duration: each Graph operation has a 25-second timeout.
+        \Wellness\Service\NotificationSchedulerHealth::start($schedulerPdo);
+        $schedulerStarted = true;
         $result = $worker->run(3);
         rewind($lock);
         if (!ftruncate($lock, 0) || fwrite($lock, (string)time()) === false || !fflush($lock)) {
             throw new \RuntimeException('Mail trigger lock could not be updated.');
         }
+        \Wellness\Service\NotificationSchedulerHealth::succeed($schedulerPdo, $result);
+        $schedulerStarted = false;
         error_log(sprintf(
             'Wellness notification trigger: sent=%d retry=%d review=%d canceled=%d',
             $result['sent'], $result['retry'], $result['review'], $result['canceled']
@@ -82,6 +89,10 @@ try {
         fclose($lock);
     }
 } catch (\Throwable $e) {
+    if ($schedulerStarted && $schedulerPdo instanceof \PDO) {
+        try { \Wellness\Service\NotificationSchedulerHealth::fail($schedulerPdo, $e); }
+        catch (\Throwable $recordError) { error_log('Wellness scheduler health recording failed: ' . get_class($recordError)); }
+    }
     error_log('Wellness notification trigger failed: ' . get_class($e));
     http_response_code(503);
 }

@@ -9,13 +9,13 @@ type StaffAccess = { roles: string[]; permissions: string[] };
 
 export function StaffSignIn({ children }: { children: (access: StaffAccess) => ReactNode }) {
   const { t } = useTranslation();
-  const { account, configured, isAuthenticated, signIn, getAccessToken } = useStaffAuth();
+  const { account, configured, isAuthenticated, sessionExpired, signIn, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const [access, setAccess] = useState<(StaffAccess & { account: string }) | null>(null);
   useEffect(() => {
     const controller = new AbortController(); setAccess(null); setError('');
-    if (!isAuthenticated) return () => controller.abort();
+    if (!isAuthenticated || sessionExpired) return () => controller.abort();
     setBusy(true);
     void getAccessToken().then(token => apiRequest<{ roles: string[]; permissions?: string[] }>('/auth/me', { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }))
       .then(data => {
@@ -25,7 +25,7 @@ export function StaffSignIn({ children }: { children: (access: StaffAccess) => R
       }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Staff authorization failed.')); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
-  }, [getAccessToken, isAuthenticated, accountKey, retry, t]);
+  }, [getAccessToken, isAuthenticated, sessionExpired, accountKey, retry, t]);
   const login = async () => {
     setBusy(true); setError('');
     try { await signIn(); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); }
@@ -41,6 +41,7 @@ export function StaffSignIn({ children }: { children: (access: StaffAccess) => R
       <Button href={`${import.meta.env.BASE_URL}client`}>{t('Client sign in / booking')}</Button>
     </Stack>
   </Paper>;
+  if (sessionExpired) return <Alert severity="warning" action={<Button color="inherit" disabled={busy} onClick={() => void login()}>{t('Sign in again')}</Button>}>{t('Your staff session has expired. Sign in with Microsoft to continue.')}</Alert>;
   if (error) return <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>;
   if (busy || access?.account !== accountKey) return <Stack alignItems="center" py={4}><CircularProgress /><Typography mt={2}>{t('Verifying staff access…')}</Typography></Stack>;
   if (!access.roles.length) return <Alert severity="warning">{t('This account has no active staff permissions. Please contact the clinic administrator.')}</Alert>;

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sections": [
+    { "id": "services", "kind": "services", "navLabel": "Services", "surface": "soft" },
+    { "id": "practitioners", "kind": "practitioners", "navLabel": "Practitioners", "surface": "plain" },
+    { "id": "team", "kind": "team", "surface": "soft" },
+    { "id": "new-clients", "kind": "markdown", "contentKey": "pages/new-clients", "presentation": "split", "navLabel": "New clients", "surface": "plain" },
+    { "id": "about", "kind": "markdown", "contentKey": "pages/about", "presentation": "split", "navLabel": "About", "surface": "soft" },
+    { "id": "faq", "kind": "markdown", "contentKey": "pages/faq", "presentation": "faq", "navLabel": "FAQs", "surface": "plain" },
+    { "id": "contact", "kind": "contact", "navLabel": "Contact", "surface": "soft" }
+  ]
+}
