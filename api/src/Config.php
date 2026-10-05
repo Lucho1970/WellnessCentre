@@ -31,6 +31,7 @@ final readonly class Config
         public string $addressValidationSigningKey = '',
         public int $addressValidationTokenTtlSeconds = 900,
         public string $clientPortalUrl = '',
+        public array $clinicHostMap = [],
     ) {}
 
     public static function fromEnvironment(): self
@@ -66,7 +67,15 @@ final readonly class Config
             $value('ADDRESS_VALIDATION_SIGNING_KEY'),
             max(60, min(3600, (int)$value('ADDRESS_VALIDATION_TOKEN_TTL_SECONDS', '900'))),
             $value('CLIENT_PORTAL_URL'),
+            self::hostMap($value('CLINIC_HOST_MAP', '{}')),
         );
+    }
+
+    private static function hostMap(string $json): array
+    {
+        $map = json_decode($json, false, 512, JSON_THROW_ON_ERROR);
+        if (!$map instanceof \stdClass) throw new RuntimeException('CLINIC_HOST_MAP must be a JSON object.');
+        return (array)$map;
     }
 
     public static function loadEnvFile(string $path): void

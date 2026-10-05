@@ -36,6 +36,7 @@ use function FastRoute\simpleDispatcher;
 final class Api
 {
     private EntraAuthenticator $auth;
+    private ?ClinicContext $clinicContext = null;
     private CatalogService $catalog;
     private AvailabilityService $availability;
     private BookingService $bookings;
@@ -56,7 +57,7 @@ final class Api
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
+        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
     }
 
     public function handle(): never
@@ -65,6 +66,11 @@ final class Api
         try{
             $request=Request::capture();$this->cors($request);
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
+            if (!in_array($request->path, ['/api/v1/health', '/api/v1/health/database'], true)) {
+                $this->clinicContext = ClinicContext::forHost($this->config, (string)($request->headers['host'] ?? ''));
+                $this->catalog = new CatalogService($this->database, $this->clinicContext->clinicId);
+                $this->availability = new AvailabilityService($this->database, $this->clinicContext->clinicId);
+            }
             if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
                 Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
             }
@@ -207,6 +213,9 @@ final class Api
             $route=$dispatcher->dispatch($request->method,$request->path);
             if($route[0]===Dispatcher::NOT_FOUND)throw new ApiException(404,'not_found','Route not found.');
             if($route[0]===Dispatcher::METHOD_NOT_ALLOWED)throw new ApiException(405,'method_not_allowed','Method not allowed.');
+            if (in_array($route[1], ['siteConfig', 'brandAsset', 'locations', 'services', 'publicServices', 'publicService', 'publicPractitioners', 'publicPractitioner', 'practitioners', 'team', 'teamImage', 'availability'], true)) {
+                $this->clinicContext->assertActive($this->database);
+            }
             $data=match($route[1]){
                 'health'=>['status'=>'ok','time'=>gmdate(DATE_ATOM),'environment'=>$this->config->environment],
                 'databaseHealth'=>$this->databaseHealth(),
@@ -357,6 +366,7 @@ final class Api
     private function customerMe(Request $request): array
     {
         header('Cache-Control: no-store');
+        $this->clinicContext->assertActive($this->database);
         if ($this->config->customerOnboardingEnabled) {
             $service = $this->onboarding();
             $session = $service->session((new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
@@ -369,13 +379,14 @@ final class Api
     private function onboarding(): CustomerOnboarding
     {
         if (!$this->config->customerOnboardingEnabled) throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled.');
-        return new CustomerOnboarding($this->database->connection(), $this->config);
+        return new CustomerOnboarding($this->database->connection(), $this->config, $this->clinicContext?->clinicId);
     }
 
     private function customerRoute(Request $r): array
     {
+        $this->clinicContext->assertActive($this->database);
         $route = $r->method . ' ' . substr($r->path, strlen('/api/v1/customer/'));
-        if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled];
+        if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled && $this->clinicContext?->clinicId === $this->config->customerClinicId];
         $service = $this->onboarding();
         if ($route === 'POST auth/challenge') return $service->challenge($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         $token = $r->headers['x-customer-session'] ?? null;
@@ -433,7 +444,12 @@ final class Api
         Response::image((string)$asset['image_data'],(string)$asset['mime_type'],$hash,$request->correlationId);
     }
 
-    private function user(Request $request): AuthContext{return $this->auth->authenticate($request->bearerToken());}
+    private function user(Request $request): AuthContext
+    {
+        $actor = $this->clinicContext->assertActor($this->auth->authenticate($request->bearerToken()));
+        $this->clinicContext->assertActive($this->database);
+        return $actor;
+    }
     private function me(AuthContext $user): array{return ['id'=>$user->userId,'clinic_id'=>$user->clinicId,'email'=>$user->email,'display_name'=>$user->displayName,'user_type'=>$user->userType,'roles'=>$user->roles,'permissions'=>$user->permissions];}
 
     private function cors(Request $request): void

@@ -11,7 +11,14 @@ use Wellness\Http\ApiException;
 /** Customer-only domain. Browser-supplied user/clinic IDs are never ownership evidence. */
 final class CustomerOnboarding
 {
-    public function __construct(private readonly PDO $db, private readonly Config $config) {}
+    private readonly int $clinicId;
+    public function __construct(private readonly PDO $db, private readonly Config $config, ?int $clinicId = null)
+    {
+        $this->clinicId = $clinicId ?? $config->customerClinicId;
+        // The existing identity links and application sessions are single-clinic.
+        // Do not enable a second clinic's customer sessions before MT1 migration.
+        if ($this->clinicId !== $config->customerClinicId) throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled for this clinic.');
+    }
     private static function stamp(?int $time = null): string { return gmdate('Y-m-d H:i:s', $time ?? time()); }
     private function query(string $sql, array $params = []): \PDOStatement {
         $s = $this->db->prepare($sql); $s->execute($params); return $s;
@@ -26,14 +33,14 @@ final class CustomerOnboarding
         }
     }
     private function clinic(bool $lock = false): void {
-        if (!$this->config->customerOnboardingEnabled || $this->config->customerClinicId < 1)
+        if (!$this->config->customerOnboardingEnabled || $this->clinicId < 1)
             throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled.');
-        if (!$this->query("SELECT id FROM clinics WHERE id=? AND status='active'" . ($lock ? ' FOR UPDATE' : ''), [$this->config->customerClinicId])->fetchColumn())
+        if (!$this->query("SELECT id FROM clinics WHERE id=? AND status='active'" . ($lock ? ' FOR UPDATE' : ''), [$this->clinicId])->fetchColumn())
             throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled.');
     }
     private function audit(string $action, ?int $entity, string $cid, ?AuthContext $actor = null, array $metadata = []): void {
         $this->query('INSERT INTO audit_logs(clinic_id,actor_user_id,correlation_id,action,entity_type,entity_id,metadata) VALUES(?,?,?,?,?,?,?)',
-            [$this->config->customerClinicId, $actor?->userId, $cid, $action, 'customer_onboarding', $entity, $metadata ? json_encode($metadata, JSON_THROW_ON_ERROR) : null]);
+            [$this->clinicId, $actor?->userId, $cid, $action, 'customer_onboarding', $entity, $metadata ? json_encode($metadata, JSON_THROW_ON_ERROR) : null]);
     }
     public static function identityHash(array $claims): string {
         return hash('sha256', json_encode([$claims['iss'], $claims['sub']], JSON_THROW_ON_ERROR));
@@ -111,20 +118,20 @@ final class CustomerOnboarding
         return ['signed_out' => true];
     }
     private function link(int $identity, bool $lock = false): ?array {
-        $row = $this->query('SELECT l.client_id,u.status,u.user_type FROM customer_client_links l JOIN users u ON u.id=l.client_id AND u.clinic_id=l.clinic_id WHERE l.identity_id=? AND l.clinic_id=?' . ($lock ? ' FOR UPDATE' : ''), [$identity, $this->config->customerClinicId])->fetch();
+        $row = $this->query('SELECT l.client_id,u.status,u.user_type FROM customer_client_links l JOIN users u ON u.id=l.client_id AND u.clinic_id=l.clinic_id WHERE l.identity_id=? AND l.clinic_id=?' . ($lock ? ' FOR UPDATE' : ''), [$identity, $this->clinicId])->fetch();
         if ($row && ($row['status'] !== 'active' || $row['user_type'] !== 'client')) throw new ApiException(403, 'client_unavailable', 'Client access is unavailable. Contact the clinic.');
         return $row ?: null;
     }
     public function status(int $identity): array {
         $link = $this->link($identity);
-        $claim = $this->query("SELECT c.review_code FROM client_link_claims c JOIN client_link_invitations i ON i.id=c.invitation_id WHERE c.identity_id=? AND c.status='pending' AND i.clinic_id=? ORDER BY c.id DESC LIMIT 1", [$identity, $this->config->customerClinicId])->fetch();
+        $claim = $this->query("SELECT c.review_code FROM client_link_claims c JOIN client_link_invitations i ON i.id=c.invitation_id WHERE c.identity_id=? AND c.status='pending' AND i.clinic_id=? ORDER BY c.id DESC LIMIT 1", [$identity, $this->clinicId])->fetch();
         return ['authenticated' => true, 'authentication_context' => 'customer', 'onboarding_status' => $link ? 'linked' : ($claim ? 'pending_review' : 'not_linked'),
             'review_code' => $claim['review_code'] ?? null, 'capabilities' => $link ? ['own_profile', 'own_appointments', 'book_own_appointments'] : []];
     }
     public function bookingActor(int $identity): AuthContext {
         $link = $this->link($identity);
         if (!$link) throw new ApiException(403, 'client_not_linked', 'Your client record is not linked yet.');
-        $row = $this->query("SELECT id,clinic_id,email,display_name FROM users WHERE id=? AND clinic_id=? AND user_type='client' AND status='active'", [$link['client_id'], $this->config->customerClinicId])->fetch();
+        $row = $this->query("SELECT id,clinic_id,email,display_name FROM users WHERE id=? AND clinic_id=? AND user_type='client' AND status='active'", [$link['client_id'], $this->clinicId])->fetch();
         if (!$row) throw new ApiException(403, 'client_unavailable', 'Client access is unavailable. Contact the clinic.');
         return new AuthContext((int)$row['id'], (int)$row['clinic_id'], '', (string)$row['email'], (string)$row['display_name'], 'client', []);
     }
@@ -142,12 +149,12 @@ final class CustomerOnboarding
             $this->clinic(true); // Serializes onboarding ownership changes within this clinic.
             if ($this->link($identity)) return $this->status($identity);
             if ($this->status($identity)['onboarding_status'] === 'pending_review') throw new ApiException(409, 'claim_pending', 'Your invitation is awaiting staff review.');
-            $this->query("INSERT INTO users(clinic_id,given_name,family_name,display_name,email,status,user_type) VALUES(?,?,?,?,?,'active','client')", [$this->config->customerClinicId, $data['given_name'], $data['family_name'], $data['display_name'], $data['email']]);
+            $this->query("INSERT INTO users(clinic_id,given_name,family_name,display_name,email,status,user_type) VALUES(?,?,?,?,?,'active','client')", [$this->clinicId, $data['given_name'], $data['family_name'], $data['display_name'], $data['email']]);
             $client = (int)$this->db->lastInsertId();
-            $this->query("INSERT INTO client_email_addresses(clinic_id,client_id,email,is_primary,source) VALUES(?,?,?,1,'customer')", [$this->config->customerClinicId, $client, $data['email']]);
+            $this->query("INSERT INTO client_email_addresses(clinic_id,client_id,email,is_primary,source) VALUES(?,?,?,1,'customer')", [$this->clinicId, $client, $data['email']]);
             $this->query('INSERT INTO client_profiles(user_id,phone,preferred_contact) VALUES(?,?,?)', [$client, $data['phone'], $data['preferred_contact']]);
             $this->query('INSERT INTO client_contact_addresses(client_id,address_json) VALUES(?,?)', [$client, json_encode($data['address'], JSON_THROW_ON_ERROR)]);
-            $this->query('INSERT INTO customer_client_links(identity_id,client_id,clinic_id,created_at) VALUES(?,?,?,?)', [$identity, $client, $this->config->customerClinicId, self::stamp()]);
+            $this->query('INSERT INTO customer_client_links(identity_id,client_id,clinic_id,created_at) VALUES(?,?,?,?)', [$identity, $client, $this->clinicId, self::stamp()]);
             $this->audit('customer.register', $client, $cid, null, ['identity_id' => $identity]);
             return $this->status($identity);
         });
@@ -155,7 +162,7 @@ final class CustomerOnboarding
     private function ownProfile(int $identity, bool $lock = false): array {
         $link = $this->link($identity, $lock);
         if (!$link) throw new ApiException(403, 'client_not_linked', 'Your client record is not linked yet.');
-        $row = $this->query('SELECT u.given_name,u.family_name,u.email,p.phone,p.preferred_contact,a.address_json FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id LEFT JOIN client_contact_addresses a ON a.client_id=u.id WHERE u.id=? AND u.clinic_id=?' . ($lock ? ' FOR UPDATE' : ''), [$link['client_id'], $this->config->customerClinicId])->fetch();
+        $row = $this->query('SELECT u.given_name,u.family_name,u.email,p.phone,p.preferred_contact,a.address_json FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id LEFT JOIN client_contact_addresses a ON a.client_id=u.id WHERE u.id=? AND u.clinic_id=?' . ($lock ? ' FOR UPDATE' : ''), [$link['client_id'], $this->clinicId])->fetch();
         $row['address'] = $row['address_json'] ? json_decode($row['address_json'], true, 32, JSON_THROW_ON_ERROR) : null; unset($row['address_json']);
         $row['revision'] = hash('sha256', json_encode($row, JSON_THROW_ON_ERROR)); return $row;
     }
@@ -173,10 +180,10 @@ final class CustomerOnboarding
             $current = $this->ownProfile($identity, true);
             if (!is_string($body['revision'] ?? null) || !hash_equals($current['revision'], $body['revision'])) throw new ApiException(409, 'profile_changed', 'Your profile changed. Reload it before saving.');
             if (json_encode($current['address'] ?? null, JSON_THROW_ON_ERROR) !== json_encode($data['address'], JSON_THROW_ON_ERROR)) $this->query('DELETE FROM onsite_area_approvals WHERE client_id=?', [$client]);
-            if ($this->query('SELECT client_id FROM client_email_addresses WHERE clinic_id=? AND email=? AND client_id<>? FOR UPDATE', [$this->config->customerClinicId, $data['email'], $client])->fetchColumn()) throw new ApiException(409, 'email_in_use', 'This email is already used by another account in this clinic.');
+            if ($this->query('SELECT client_id FROM client_email_addresses WHERE clinic_id=? AND email=? AND client_id<>? FOR UPDATE', [$this->clinicId, $data['email'], $client])->fetchColumn()) throw new ApiException(409, 'email_in_use', 'This email is already used by another account in this clinic.');
             $this->query('UPDATE users SET given_name=?,family_name=?,display_name=?,email=? WHERE id=?', [$data['given_name'], $data['family_name'], $data['display_name'], $data['email'], $client]);
             $this->query('UPDATE client_email_addresses SET is_primary=0 WHERE client_id=?', [$client]);
-            $this->query("INSERT INTO client_email_addresses(clinic_id,client_id,email,is_primary,source) VALUES(?,?,?,1,'customer') ON DUPLICATE KEY UPDATE is_primary=1", [$this->config->customerClinicId, $client, $data['email']]);
+            $this->query("INSERT INTO client_email_addresses(clinic_id,client_id,email,is_primary,source) VALUES(?,?,?,1,'customer') ON DUPLICATE KEY UPDATE is_primary=1", [$this->clinicId, $client, $data['email']]);
             $this->query('INSERT INTO client_profiles(user_id,phone,preferred_contact) VALUES(?,?,?) ON DUPLICATE KEY UPDATE phone=VALUES(phone),preferred_contact=VALUES(preferred_contact)', [$client, $data['phone'], $data['preferred_contact']]);
             $this->query('INSERT INTO client_contact_addresses(client_id,address_json) VALUES(?,?) ON DUPLICATE KEY UPDATE address_json=VALUES(address_json)', [$client, json_encode($data['address'], JSON_THROW_ON_ERROR)]);
             $this->audit('customer.profile.update', $client, $cid, null, ['identity_id' => $identity]); return $this->ownProfile($identity, true);
@@ -185,7 +192,7 @@ final class CustomerOnboarding
     public function appointments(int $identity, string $cid, bool $showCanceled = true): array {
         $link = $this->link($identity);
         if (!$link) throw new ApiException(403, 'client_not_linked', 'Your client record is not linked yet.');
-        $rows = $this->query('SELECT a.id,a.starts_at,a.ends_at,a.status,a.version,a.room_id,a.duration_option_id,a.delivery_mode,a.cancellation_fee_cents,s.name AS service,p.display_name AS practitioner,l.name AS location,l.timezone,r.name AS room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN practitioners pr ON pr.id=a.practitioner_id JOIN users p ON p.id=pr.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.client_id=? AND a.clinic_id=?' . ($showCanceled ? '' : " AND a.status NOT IN ('canceled_by_client','canceled_by_clinic')") . ' ORDER BY a.starts_at DESC LIMIT 100', [$link['client_id'], $this->config->customerClinicId])->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $this->query('SELECT a.id,a.starts_at,a.ends_at,a.status,a.version,a.room_id,a.duration_option_id,a.delivery_mode,a.cancellation_fee_cents,s.name AS service,p.display_name AS practitioner,l.name AS location,l.timezone,r.name AS room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN practitioners pr ON pr.id=a.practitioner_id JOIN users p ON p.id=pr.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.client_id=? AND a.clinic_id=?' . ($showCanceled ? '' : " AND a.status NOT IN ('canceled_by_client','canceled_by_clinic')") . ' ORDER BY a.starts_at DESC LIMIT 100', [$link['client_id'], $this->clinicId])->fetchAll(PDO::FETCH_ASSOC);
         $this->audit('customer.appointments.view', (int)$link['client_id'], $cid, null, ['identity_id' => $identity]); return ['items' => $rows, 'limit' => 100];
     }
     private function staffClient(AuthContext $actor, int $client, bool $allowCreator = false): void {
@@ -194,7 +201,7 @@ final class CustomerOnboarding
                 throw new ApiException(403, 'forbidden', 'You can invite only clients you created.');
         } else ClientService::authorize($actor);
         $this->clinic();
-        if ($actor->clinicId !== $this->config->customerClinicId || !$this->query("SELECT id FROM users WHERE id=? AND clinic_id=? AND user_type='client'", [$client, $actor->clinicId])->fetchColumn()) throw new ApiException(404, 'client_not_found', 'Client not found.');
+        if ($actor->clinicId !== $this->clinicId || !$this->query("SELECT id FROM users WHERE id=? AND clinic_id=? AND user_type='client'", [$client, $actor->clinicId])->fetchColumn()) throw new ApiException(404, 'client_not_found', 'Client not found.');
     }
     public function invitations(AuthContext $actor, int $client): array {
         $this->staffClient($actor, $client, true);
@@ -245,7 +252,7 @@ final class CustomerOnboarding
         return $this->transaction(function () use ($identity, $token, $name, $cid) {
             $this->clinic(true);
             if ($this->link($identity)) throw new ApiException(409, 'already_linked', 'This sign-in is already linked to a client record.');
-            $invite = $this->query('SELECT * FROM client_link_invitations WHERE token_hash=? AND clinic_id=? FOR UPDATE', [hash('sha256', $token), $this->config->customerClinicId])->fetch();
+            $invite = $this->query('SELECT * FROM client_link_invitations WHERE token_hash=? AND clinic_id=? FOR UPDATE', [hash('sha256', $token), $this->clinicId])->fetch();
             if (!$invite || $invite['revoked_at'] !== null || strtotime($invite['expires_at'] . ' UTC') <= time()) throw new ApiException(409, 'invalid_invitation', 'This invitation is unavailable. Request a new invitation from the clinic.');
             if ($invite['consumed_at'] !== null) {
                 $owner = $this->query("SELECT identity_id FROM client_link_claims WHERE invitation_id=? AND status='pending'", [$invite['id']])->fetchColumn();

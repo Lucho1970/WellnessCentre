@@ -111,6 +111,6 @@ Rollbacks disable the new authentication/invitation gate and preserve additive t
 
 ## Next implementation slice
 
-Implement a trusted `ClinicContext` resolver and tests, retaining an explicit single-clinic compatibility configuration for Willow. Thread it through public catalogue, branding, availability and customer onboarding; stop relying on the first active clinic. Reject unknown hosts and test two synthetic host mappings. This is a prerequisite for memberships and can be built without selecting a new identity provider or changing live practitioner login.
+The trusted `ClinicContext` resolver is implemented on `feature/trusted-clinic-routing`, with an explicit single-clinic customer compatibility boundary for Willow. Public catalogue, branding and availability use mapped clinic IDs; unknown hosts and mismatched staff are rejected. See [Trusted clinic routing](TRUSTED_CLINIC_ROUTING.md) for configuration, deployment and remaining database acceptance checks. This source implementation is a prerequisite for memberships and does not change the live practitioner identity provider.
 
 Then implement the additive identity/membership schema and adapter interface, followed by provider proof-of-concept and portal invitations. Hosted source/schema reconciliation, identity/storage decisions and policy review remain MT0 exit items; this document does not mark the entire milestone accepted.

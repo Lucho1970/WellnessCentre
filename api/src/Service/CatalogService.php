@@ -8,14 +8,17 @@ use Wellness\Http\ApiException;
 
 final class CatalogService
 {
-    public function __construct(private readonly Database $database) {}
+    public function __construct(private readonly Database $database, private readonly int $clinicId)
+    {
+        if ($clinicId < 1) throw new ApiException(503, 'clinic_not_configured', 'The clinic has not been configured.');
+    }
 
     public function siteConfig(): array
     {
         $clinic = $this->database->connection()->query("SELECT c.name,c.legal_name,c.email,c.phone,COALESCE(pt.primary_color,'#176b62') theme_primary_color,COALESCE(pt.secondary_color,'#d8754c') theme_secondary_color,COALESCE(pt.font_family,'Inter') theme_font_family,pt.welcome_title_en,pt.welcome_title_fr,pt.welcome_body_en,pt.welcome_body_fr,
                    (SELECT content_hash FROM clinic_brand_assets WHERE clinic_id=c.id AND asset_type='logo') logo_version,
                    (SELECT content_hash FROM clinic_brand_assets WHERE clinic_id=c.id AND asset_type='favicon') favicon_version
-              FROM clinics c LEFT JOIN clinic_portal_themes pt ON pt.clinic_id=c.id WHERE c.status='active' ORDER BY c.id LIMIT 1")->fetch();
+              FROM clinics c LEFT JOIN clinic_portal_themes pt ON pt.clinic_id=c.id WHERE c.status='active' AND c.id={$this->clinicId}")->fetch();
         if (!$clinic) throw new ApiException(503, 'clinic_not_configured', 'The clinic has not been configured.');
         return $clinic;
     }
@@ -25,7 +28,7 @@ final class CatalogService
         if (!in_array($type, ['logo', 'favicon'], true)) throw new ApiException(404, 'brand_asset_not_found', 'Brand asset not found.');
         $statement = $this->database->connection()->prepare("SELECT a.mime_type,a.image_data,a.content_hash
               FROM clinic_brand_assets a JOIN clinics c ON c.id=a.clinic_id AND c.status='active'
-             WHERE a.asset_type=:type ORDER BY c.id LIMIT 1");
+             WHERE a.asset_type=:type AND c.id={$this->clinicId}");
         $statement->execute(['type' => $type]);
         $asset = $statement->fetch();
         if (!$asset) throw new ApiException(404, 'brand_asset_not_found', 'Brand asset not found.');
@@ -34,7 +37,7 @@ final class CatalogService
 
     public function locations(): array
     {
-        return $this->database->connection()->query("SELECT id,name,timezone,city,province FROM locations WHERE is_bookable=1 AND clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1) ORDER BY name")->fetchAll();
+        return $this->database->connection()->query("SELECT id,name,timezone,city,province FROM locations WHERE is_bookable=1 AND clinic_id={$this->clinicId} ORDER BY name")->fetchAll();
     }
 
     public function services(?int $practitionerId = null): array
@@ -45,7 +48,7 @@ final class CatalogService
         $params = [];
         if ($practitionerId) { $sql .= " JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1 JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1 JOIN users u ON u.id=p.user_id AND u.status='active' JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=s.clinic_id AND t.published=1 AND t.section='practitioner' AND t.show_booking_action=1 WHERE s.active=1 AND s.published=1 AND ps.practitioner_id=:practitioner"; $params['practitioner']=$practitionerId; }
         else $sql .= ' WHERE s.active=1 AND s.published=1';
-        $sql .= " AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)";
+        $sql .= " AND s.clinic_id={$this->clinicId}";
         $sql .= ' GROUP BY s.id,s.slug,s.name,s.description,s.preparation_instructions,s.price_cents,c.name ORDER BY c.name,s.display_order,s.name';
         $statement=$this->database->connection()->prepare($sql); $statement->execute($params);
         $rows=$statement->fetchAll(); foreach($rows as &$row) $row['durations']=self::sortedDurations($row['durations']); return $rows;
@@ -61,7 +64,7 @@ final class CatalogService
            LEFT JOIN service_categories c ON c.id=s.category_id AND c.clinic_id=s.clinic_id
                 JOIN service_duration_options d ON d.service_id=s.id AND d.active=1
                WHERE s.active=1 AND s.published=1
-                 AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                 AND s.clinic_id={$this->clinicId}
             GROUP BY s.id,s.slug,s.name,s.name_fr,s.public_summary,s.public_summary_fr,s.description,s.description_fr,s.preparation_instructions,s.preparation_instructions_fr,c.id,c.name,c.name_fr,c.description,c.description_fr,s.display_order
             ORDER BY c.name IS NULL,c.name,s.display_order,s.name";
         $rows=$this->database->connection()->query($sql)->fetchAll();
@@ -86,7 +89,7 @@ final class CatalogService
             $this->publicPractitioners(),
             static fn(array $person): bool => in_array($slug, array_column($person['services'], 'slug'), true)
         ));
-        $locations=$this->database->connection()->prepare("SELECT l.name,l.city,l.province FROM services s JOIN service_locations sl ON sl.service_id=s.id AND sl.active=1 JOIN locations l ON l.id=sl.location_id AND l.is_bookable=1 WHERE s.slug=:slug AND s.active=1 AND s.published=1 AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1) ORDER BY l.name");
+        $locations=$this->database->connection()->prepare("SELECT l.name,l.city,l.province FROM services s JOIN service_locations sl ON sl.service_id=s.id AND sl.active=1 JOIN locations l ON l.id=sl.location_id AND l.is_bookable=1 WHERE s.slug=:slug AND s.active=1 AND s.published=1 AND s.clinic_id={$this->clinicId} ORDER BY l.name");
         $locations->execute(['slug'=>$slug]);$service['locations']=$locations->fetchAll();
         return $service;
     }
@@ -103,7 +106,7 @@ final class CatalogService
                   JOIN practitioners p ON p.user_id=u.id AND p.active=1
              LEFT JOIN user_profile_images i ON i.user_id=u.id
                  WHERE t.published=1 AND t.section='practitioner'
-                   AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                   AND t.clinic_id={$this->clinicId}
               ORDER BY t.display_order,t.public_name";
         $practitioners = $this->database->connection()->query($sql)->fetchAll();
         if ($practitioners === []) return [];
@@ -115,7 +118,7 @@ final class CatalogService
                          JOIN services s ON s.id=ps.service_id AND s.active=1 AND s.published=1
                     LEFT JOIN service_categories c ON c.id=s.category_id AND c.clinic_id=s.clinic_id
                         WHERE t.published=1 AND t.section='practitioner'
-                          AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                          AND t.clinic_id={$this->clinicId}
                      ORDER BY c.name IS NULL,c.name,s.display_order,s.name";
         $servicesByPractitioner = [];
         foreach ($this->database->connection()->query($serviceSql)->fetchAll() as $service) {
@@ -155,7 +158,7 @@ final class CatalogService
         $sql = "SELECT p.id,COALESCE(t.booking_name,t.public_name) display_name,p.discipline,p.credentials FROM practitioners p JOIN users u ON u.id=p.user_id AND u.status='active' JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=u.clinic_id AND t.published=1 AND t.section='practitioner' AND t.show_booking_action=1";
         $params=[];
         if($serviceId){$sql.=" JOIN practitioner_services ps ON ps.practitioner_id=p.id JOIN services s ON s.id=ps.service_id AND s.clinic_id=u.clinic_id WHERE p.active=1 AND ps.active=1 AND s.active=1 AND s.published=1 AND ps.service_id=:service";$params['service']=$serviceId;}else{$sql.=' WHERE p.active=1';}
-        $sql.=" AND u.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)";
+        $sql.=" AND u.clinic_id={$this->clinicId}";
         $sql.=' ORDER BY u.display_name'; $statement=$this->database->connection()->prepare($sql);$statement->execute($params);return $statement->fetchAll();
     }
 
@@ -175,7 +178,7 @@ final class CatalogService
              LEFT JOIN practitioners p ON p.user_id=u.id
              LEFT JOIN user_profile_images i ON i.user_id=u.id
                  WHERE t.published=1
-                   AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                   AND t.clinic_id={$this->clinicId}
                    AND (t.section<>'practitioner' OR p.active=1)
               ORDER BY CASE t.section WHEN 'practitioner' THEN 0 ELSE 1 END,t.display_order,t.public_name";
         return $this->database->connection()->query($sql)->fetchAll();
@@ -193,7 +196,7 @@ final class CatalogService
                JOIN user_profile_images i ON i.user_id=u.id
           LEFT JOIN practitioners p ON p.user_id=u.id
               WHERE t.slug=:slug AND t.published=1
-                AND t.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1)
+                AND t.clinic_id={$this->clinicId}
                 AND (t.section<>'practitioner' OR p.active=1)
               LIMIT 1"
         );
