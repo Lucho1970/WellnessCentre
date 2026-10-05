@@ -837,4 +837,12 @@ These decisions should be made at or before the phase that depends on them:
 
 ## 19 Recommended next build piece
 
+### Planned: appointments from admin client details (5 October 2026)
+
+Add a **View appointments** button to the selected client's **More details** view in the admin/staff Clients workflow. Open a client-specific appointment list that clearly identifies the client and offers upcoming appointments and past history, including cancelled appointments with visible status. Each entry should show date/time in the location timezone, service, practitioner, location or delivery mode, and status; authorized users can open the existing appointment details/actions. Provide a clear return to client details and loading, empty, error and paginated states. The admin should not need to search the general schedule manually.
+
+Reuse existing appointment screens and API filtering where possible after verifying their authorization and query behavior. Every request must validate the selected clinic-local client and scope results to the actor's clinic. Apply the current Clients directory roles (Super Admin, Clinic Admin, reception); this action does not broaden practitioner/client access or grant new appointment-edit permissions. Test two clients in one clinic, a client in another clinic, denied roles, an empty history, upcoming/past/cancelled entries, pagination and mobile navigation. Include English and French labels.
+
+Status: planned only; not implemented or deployed. This addition does not replace the ongoing identity/membership pilot and protected hosted backfill runner work.
+
 Proceed with the remaining **Phase 5 Appointment management and recurrence** work: secure cancellation/rescheduling action links and recurrence design/implementation. Keep assessed cancellation fees separate from invoicing and payment collection until those finance milestones and a hosted/tokenized payment provider are ready. In parallel with deployment acceptance, complete the hosted MySQL concurrency test that remains from Phase 4.

@@ -13,6 +13,10 @@ The Clients page is available to Super Admin, Clinic Admin, and reception staff.
 
 Email is required and must be unique among accounts within the clinic, matching the existing database constraints. Shared family email addresses and client sign-in/invitations require further design. Addresses and mobile-visit destination handling remain in the Phase 4 plan; this checkpoint manages contact profiles.
 
+## Planned appointment navigation
+
+Requested 5 October 2026: add **View appointments** from a client's **More details** view for administrators and other staff already authorized to use Clients. Show upcoming appointments and past history, including cancelled status, with links to existing authorized appointment details/actions and a return to the client's details. Keep the selected client visible; handle empty history, loading, errors, pagination and mobile layout. Enforce clinic/client scope on the API and preserve current edit permissions. See the tracked acceptance criteria in [Solution build plan](SOLUTION_BUILD_PLAN.md#planned-appointments-from-admin-client-details-5-october-2026). This is planned scope, not an included feature.
+
 ## Deployment
 
 Deploy both ZIPs from `release/client-management-2026-09-15`:
