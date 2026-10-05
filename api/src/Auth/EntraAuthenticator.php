@@ -14,11 +14,17 @@ use Wellness\Config;
 use Wellness\Database;
 use Wellness\Http\ApiException;
 
-final class EntraAuthenticator
+final class EntraAuthenticator implements IdentityAdapter
 {
     public function __construct(private readonly Config $config, private readonly Database $database, private readonly ?\Closure $keyLoader = null) {}
 
     public function authenticate(?string $token): AuthContext
+    {
+        $identity = $this->verify($token);
+        return $this->loadUser($identity->tenantId, $identity->subject, $identity->directoryRoles);
+    }
+
+    public function verify(?string $token): VerifiedIdentity
     {
         if (!$token) throw new ApiException(401, 'unauthorized', 'A bearer access token is required.');
         if ($this->config->entraTenantId === '' || $this->config->entraApiClientId === '') {
@@ -59,7 +65,7 @@ final class EntraAuthenticator
         if ($objectId === '') throw new ApiException(401, 'invalid_token_claims', 'The token has no stable user identifier.');
         $roleMap=['Wellness.SuperAdmin'=>'super_admin','Wellness.ClinicAdmin'=>'clinic_admin','Wellness.Reception'=>'reception','Wellness.Practitioner'=>'practitioner','Wellness.Accountant'=>'accountant'];
         $directoryRoles=array_values(array_filter(array_map(static fn($role)=>$roleMap[(string)$role]??null,(array)($claims['roles']??[]))));
-        return $this->loadUser($tenant, $objectId, $directoryRoles);
+        return new VerifiedIdentity('entra-workforce', $expectedIssuer, $objectId, $tenant, $directoryRoles);
     }
 
     private function loadUser(string $tenantId, string $objectId, array $directoryRoles): AuthContext
