@@ -44,8 +44,10 @@ final class BackfillStatement extends PDOStatement {
 function verifyResult(bool $ok): void {if(!$ok)throw new RuntimeException('Backfill transaction check failed');}
 $pdo=new BackfillPDO();$pdo->source[7]=[$row];$backfill=new StaffMembershipBackfill($pdo,$tenant);
 verifyResult($backfill->run([7])[0]['action']==='would_import'&&$pdo->members===[]&&$pdo->identities===[]);
+$review=$backfill->run([7]);
+mustReject(fn()=>$backfill->run([7],true,[7=>str_repeat('0',64)]));verifyResult($pdo->members===[]&&$pdo->identities===[]);
 mustReject(fn()=>$backfill->run([7,8],true));verifyResult($pdo->members===[]&&$pdo->identities===[]&&!$pdo->inTransaction());
-verifyResult($backfill->run([7],true)[0]['action']==='imported'&&count($pdo->members)===1&&count($pdo->identities)===1);
+verifyResult($backfill->run([7],true,[7=>$review[0]['binding_hash']])[0]['action']==='imported'&&count($pdo->members)===1&&count($pdo->identities)===1);
 verifyResult($backfill->run([7],true)[0]['action']==='already_imported'&&count($pdo->members)===1);
 $pdo->members[0]['status']='revoked';mustReject(fn()=>$backfill->run([7],true));verifyResult($pdo->members[0]['status']==='revoked');
 $pdo->members[0]['status']='active';$pdo->identities[0]['status']='inactive';mustReject(fn()=>$backfill->run([7],true));verifyResult($pdo->identities[0]['status']==='inactive');

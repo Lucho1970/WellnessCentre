@@ -21,7 +21,7 @@ Replace the placeholder with a verified positive integer, not an Entra object ID
 
 The tool prints local IDs and actions, not identity subjects or emails. It intentionally requires a recognized Entra GUID mapping; ambiguous tenant/subject values need review. The expected count confirms the selected-account count, not the count of newly inserted rows.
 
-If Netfirms does not provide CLI/SSH execution, do not upload the CLI script under `public_html` or change it to a public runner. We can build a separate protected hosted runner once the pilot user ID and dry-run deployment method are confirmed.
+If Netfirms does not provide CLI/SSH execution, do not upload the CLI script under `public_html` or change it to a public runner. Use the separate [protected browser runner for Esther, local user 2](HOSTED_STAFF_BACKFILL.md); it defaults to dry-run and uses a private single-use review for apply.
 
 ## Deployment and activation
 
