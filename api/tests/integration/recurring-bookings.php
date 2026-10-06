@@ -78,4 +78,53 @@ $check((int)$pdo->query('SELECT cancellation_fee_cents FROM appointments WHERE i
 $check((int)$pdo->query('SELECT version FROM appointments WHERE id='.$ids[0])->fetchColumn()===2);$before=$counts();
 $check($series->change($client,(int)$saved['series_id'],$cancel,'test',true)==$changed&&$counts()===$before);
 $check(!$pdo->inTransaction());
+// Real concurrent confirmations through independent PHP processes/connections.
+$race=function(array $bodies)use($name):array{
+ if(!function_exists('proc_open'))throw new RuntimeException('Concurrent SQL acceptance requires proc_open.');
+ $workers=[];$logs=dirname(__DIR__,3).'/.tmp/recurrence-race-'.bin2hex(random_bytes(6));
+ if(!is_dir(dirname($logs)))mkdir(dirname($logs),0777,true);
+ mkdir($logs);
+ try{
+  foreach($bodies as $index=>$request){
+   $readyFile="$logs/$index.ready";$outputFile="$logs/$index.json";$errorFile="$logs/$index.error";
+   $pipes=[];$process=proc_open([PHP_BINARY,__DIR__.'/recurring-bookings-worker.php',$name,json_encode($request,JSON_THROW_ON_ERROR),$readyFile],[0=>['pipe','r'],1=>['file',$outputFile,'w'],2=>['file',$errorFile,'w']],$pipes);
+   if(!is_resource($process))throw new RuntimeException('Could not start recurrence worker.');
+   $workers[]=['process'=>$process,'pipes'=>$pipes,'ready'=>$readyFile,'output'=>$outputFile,'error'=>$errorFile];
+  }
+  $wait=function(bool $ready)use(&$workers):void{
+   $deadline=microtime(true)+30;
+   do{
+    $done=true;
+    foreach($workers as &$worker){
+     $status=proc_get_status($worker['process']);
+     if($ready){if(!is_file($worker['ready'])){if(!$status['running'])throw new RuntimeException('Worker failed before release: '.file_get_contents($worker['error']));$done=false;}}
+     elseif($status['running'])$done=false;
+    }unset($worker);
+    if($done)return;
+    usleep(10000);
+   }while(microtime(true)<$deadline);
+   throw new RuntimeException('Concurrent recurrence workers timed out.');
+  };
+  $wait(true);
+  foreach($workers as $worker){if(fwrite($worker['pipes'][0],"GO\n")!==3||!fflush($worker['pipes'][0]))throw new RuntimeException('Could not release recurrence worker.');}
+  $wait(false);$results=[];
+  foreach($workers as $worker){$error=file_get_contents($worker['error']);if($error!=='')throw new RuntimeException('Recurrence worker failed: '.$error);$results[]=json_decode(file_get_contents($worker['output']),true,32,JSON_THROW_ON_ERROR);}
+  return $results;
+ }finally{
+  foreach($workers as $worker){if(proc_get_status($worker['process'])['running'])proc_terminate($worker['process']);foreach($worker['pipes'] as $pipe)fclose($pipe);proc_close($worker['process']);}
+ }
+};
+$raceBody=array_replace($body,['starts_at'=>(new DateTimeImmutable($start))->modify('+42 days')->format('Y-m-d\TH:i:sP'),'idempotency_key'=>'concurrent-identical-series']);
+$preview=$series->create($client,$raceBody,'test',false);$check($preview['ready']);$raceBody['preview_token']=$preview['preview_token'];
+$before=$counts();$identical=$race([$raceBody,$raceBody]);$after=$counts();
+$check($identical[0]['applied']&&$identical[0]===$identical[1]);
+$check($after['appointments']===$before['appointments']+3&&$after['requests']===$before['requests']+1&&$after['notifications']===$before['notifications']+3);
+$raceBody=array_replace($body,['starts_at'=>(new DateTimeImmutable($start))->modify('+84 days')->format('Y-m-d\TH:i:sP'),'idempotency_key'=>'concurrent-competing-series-a']);
+$other=array_replace($raceBody,['idempotency_key'=>'concurrent-competing-series-b']);
+$raceBody['preview_token']=$series->create($client,$raceBody,'test',false)['preview_token'];$other['preview_token']=$series->create($client,$other,'test',false)['preview_token'];
+$before=$counts();$competing=$race([$raceBody,$other]);$after=$counts();
+$check(count(array_filter($competing,static fn($result)=>$result['applied']))===1);
+$loser=array_values(array_filter($competing,static fn($result)=>!$result['applied']))[0];
+$check(!$loser['ready']&&count(array_filter($loser['items'],static fn($item)=>!$item['ok']&&$item['code']==='schedule_conflict'))===3);
+$check($after['appointments']===$before['appointments']+3&&$after['requests']===$before['requests']+1&&$after['notifications']===$before['notifications']+3);
 echo "Real SQL recurring booking acceptance: $checks checks passed on ".$pdo->getAttribute(PDO::ATTR_SERVER_VERSION).".\n";

@@ -66,4 +66,20 @@ Local validation on 6 October 2026:
 
  `api/tests/integration/recurring-bookings.php` rehearses migration 035 with legacy data and exercises actual booking writers, preview/failed-apply rollback (including notification/audit rows), replay, eligibility/isolation, single versus series operations, a slot taken after preview and changed cancellation fees. It uses an explicitly authorized random localhost database, never the application `.env` or hosted client data. Run with `RECURRING_TEST_ALLOW_CREATE=true`; optional `RECURRING_TEST_PORT` defaults to 13317, `RECURRING_TEST_USER` to root, and `RECURRING_TEST_PASSWORD` to empty. The synthetic database is retained for inspection.
 
-**Outstanding:** no MySQL server was available at localhost:13317 during implementation, so that test has not passed and no scratch schema was created. Hosted migration, real concurrent races, notification delivery and owner acceptance remain required before rollout is considered complete. Passing PHP doubles and mocked browser tests do not establish these results.
+### Repeatable local SQL rehearsal
+
+The follow-up branch `feature/recurrence-sql-validation` adds a Windows portable MariaDB runner and independent PHP workers for simultaneous confirmations. It creates a fresh local data directory for every run, binds only to `127.0.0.1`, refuses an occupied port, does not install a Windows service, and stops its server in `finally`. The synthetic database and server logs remain in ignored `.tmp/recurring-sql-<random>/` for inspection. It never loads the application `.env` or connects to Netfirms.
+
+1. Extract a Windows x64 portable MariaDB ZIP to an ignored local directory. The validated runtime was [MariaDB 11.4.8 from the official archive](https://archive.mariadb.org/mariadb-11.4.8/winx64-packages/); its ZIP SHA-256 was `ed86e93157af46317bb49161451c2ec258498a6fa8e68ca821ef1d780d855e6b`, matching the archive checksum. Runtime binaries are not committed.
+2. With PHP CLI and the existing `api/vendor` dependencies available, run from the repository root:
+
+   ```powershell
+   ./scripts/test-recurring-sql.ps1 -MariaDbDirectory .tmp/recurrence-db-runtime/package/mariadb-11.4.8-winx64
+   ```
+
+   `-Port` selects an unused localhost port (default 13317); `-PhpExecutable` selects another PHP CLI. The script restores its temporary test environment variables after success or failure.
+3. Retain the final check count, database version, source revision and local log directory with the review evidence. The simultaneous-request checks require PHP `proc_open`: both workers open separate connections, signal readiness, and receive a common release before confirming. Identical requests must return the same series and create one set of appointments/notifications; competing keys for the same dates must produce one winner, a complete conflict report for the loser, and no partial extra appointments or ledger rows.
+
+Local follow-up evidence on 6 October 2026: **34 real SQL checks passed on MariaDB 11.4.8**, including migration 035, rollback/replay/fee checks and both simultaneous-confirmation scenarios. Synthetic database `wellness_recurring_test_20d3d1118490` remains in `.tmp/recurring-sql-9f81c2ca9b3d44baad139a0c09af677d/data`; the temporary server was stopped. All 46 top-level PHP tests and both integration-file syntax checks passed; the runner also refused an occupied port. The first concurrent harness attempt blocked on Windows pipe reads; the successful rerun used readiness/output files with bounded process polling. Frontend source was unchanged, so its previously recorded build/browser evidence was not rerun for this test-tooling change.
+
+**Outstanding:** local MariaDB rehearsal does not establish compatibility with the exact hosted MySQL version or its operational configuration. Hosted migration, broader booking concurrency/isolation acceptance, notification delivery and owner acceptance remain required before rollout is considered complete. No feature code or migration has been deployed during this follow-up.
