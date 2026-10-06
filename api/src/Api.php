@@ -151,6 +151,9 @@ final class Api
                 $routes->addRoute('POST','/api/v1/address-coverage/approve','approveAddressCoverage');
                 $routes->addRoute('POST','/api/v1/address-coverage/revoke','revokeAddressCoverage');
                 $routes->addRoute('GET','/api/v1/clients','clients');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments','clientAppointments');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments/{appointment:\\d+}/history','clientAppointmentChanges');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/practitioner-access','clientPractitionerAccess');
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
                 $routes->addRoute('PATCH','/api/v1/clients/{id:\\d+}','updateClient');
@@ -303,6 +306,9 @@ final class Api
                 'appointmentAvailability'=>$this->bookings->updateAvailability($this->user($request),(int)$route[2]['id'],$request->query),
                 'appointmentCancellationPreview'=>$this->bookings->cancellationPreview($this->user($request),(int)$route[2]['id']),
                 'clients'=>$this->clients->search($this->user($request),$request->query),
+                'clientAppointments'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointments($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'clientAppointmentChanges'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointmentChanges($this->user($request),(int)$route[2]['id'],(int)$route[2]['appointment'],$request->query,$request->correlationId),
+                'clientPractitionerAccess'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->practitionerAccess($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
                 'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId),
                 'updateClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),

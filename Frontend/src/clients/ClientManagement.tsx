@@ -9,6 +9,8 @@ import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import { Link as RouterLink } from 'react-router-dom';
 import { pagePath } from '../portal/access';
+import { useSearchParams } from 'react-router-dom';
+import { ClientOverview, type OverviewTab } from './ClientOverview';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Summary = { id: number; display_name: string; email: string; phone: string | null; status: string };
@@ -18,12 +20,17 @@ type Form = typeof empty;
 type Detail = Summary & Form;
 type Candidate = Summary & { date_of_birth?: string | null };
 type MergePreview = { survivor: Detail; duplicate: Detail; relationship_counts: Record<string, number>; blocked: boolean; blocked_reason: string | null };
-type PanelMode = 'details' | 'new' | 'edit' | null;
+type PanelMode = 'details' | 'new' | 'edit' | 'overview' | null;
 class ClientRequestError extends Error { constructor(message:string,public code='',public fields:Record<string,unknown>={}){super(message);} }
 
 export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
+  const [searchParams] = useSearchParams();
+  const requestedId = Number(searchParams.get('client_id'));
+  const linkedClientId = Number.isSafeInteger(requestedId) && requestedId > 0 ? requestedId : null;
+  const [overviewTab,setOverviewTab] = useState<OverviewTab>('appointments');
+  const [clientName,setClientName] = useState('');
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -80,15 +87,18 @@ export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
 
   const selected = items.find(item => item.id === selectedId) ?? null;
   const newClient = () => { const values={ ...empty, address:{...emptyAddress} }; setId(null); setForm(values); setOriginal(values); setFormError(''); setDuplicateCandidates([]); setPanelMode('new'); };
-  const openClient = async (clientId: number, mode: 'details' | 'edit') => {
+  const openClient = useCallback(async (clientId: number, mode: 'details' | 'edit' | 'overview') => {
     setOpening(true); setError('');
     try {
       const client: Detail = await request(`/${clientId}`);
       const values = { ...empty, ...Object.fromEntries(Object.keys(empty).filter(key=>key!=='address').map(key => [key, client[key as keyof Form] ?? ''])), address: client.address ? { ...emptyAddress, ...client.address } : { ...emptyAddress } } as Form;
-      setSelectedId(clientId); setId(clientId); setForm(values); setOriginal(values); setFormError(''); setDuplicateCandidates([]); setPanelMode(mode);
+      setClientName(client.display_name); setSelectedId(clientId); setId(clientId); setForm(values); setOriginal(values); setFormError(''); setDuplicateCandidates([]); setPanelMode(mode);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to open client.')); }
     finally { setOpening(false); }
-  };
+  }, [request, t]);
+  useEffect(() => {
+    if (linkedClientId !== null) { setOverviewTab('appointments'); void openClient(linkedClientId, 'overview'); }
+  }, [linkedClientId, openClient]);
   const close = () => {
     if (saving) return;
     if (JSON.stringify(form) !== JSON.stringify(original) && !window.confirm(t('Discard your unsaved client changes?'))) return;
@@ -140,8 +150,9 @@ export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
       <Stack direction="row" alignItems="center" justifyContent="space-between"><Button startIcon={<ArrowLeft size={16} />} disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography color="text.secondary">{t('Page {{page}}',{page})}</Typography><Button endIcon={<ArrowRight size={16} />} disabled={!more} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
     </>}
     <Drawer anchor="right" open={panelMode !== null} onClose={close} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 760 }, maxWidth: '100%' } } }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'details' ? 'Client details' : panelMode === 'edit' ? 'Edit client' : 'New client')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Add a client') : selected?.display_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={close}><X/></IconButton></Stack>
-      {panelMode === 'details' && id !== null && <ClientDetails form={form} edit={() => void openClient(id, 'edit')}><Stack spacing={2}>{form.status === 'active' && <Button component={RouterLink} to={pagePath('admin', 'appointments')} state={{ startBooking: true, bookingClient: { id, display_name: `${form.given_name} ${form.family_name}`, email: form.email, phone: form.phone } }} variant="contained">{t('Book appointment')}</Button>}<ClientInvitations key={id} clientId={id} request={request}/></Stack></ClientDetails>}
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'overview' ? 'Client overview' : panelMode === 'details' ? 'Client details' : panelMode === 'edit' ? 'Edit client' : 'New client')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Add a client') : clientName}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={close}><X/></IconButton></Stack>
+      {panelMode === 'details' && id !== null && <ClientDetails form={form} edit={() => void openClient(id, 'edit')} overview={tab => { setOverviewTab(tab); setPanelMode('overview'); }}><Stack spacing={2}>{form.status === 'active' && <Button component={RouterLink} to={pagePath('admin', 'appointments')} state={{ startBooking: true, bookingClient: { id, display_name: `${form.given_name} ${form.family_name}`, email: form.email, phone: form.phone } }} variant="contained">{t('Book appointment')}</Button>}<ClientInvitations key={id} clientId={id} request={request}/></Stack></ClientDetails>}
+      {panelMode === 'overview' && id !== null && <ClientOverview key={id} clientId={id} initialTab={overviewTab} request={request} back={() => setPanelMode('details')}/>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={save} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}>
           <Typography color="text.secondary" mb={3}>{t('Saving a client record does not create a sign-in account or send an email.')}</Typography>
@@ -178,7 +189,7 @@ export function ClientManagement({ canMerge = false }: { canMerge?: boolean }) {
   </Stack>;
 }
 
-function ClientDetails({ form, edit, children }: { form: Form; edit: () => void; children: ReactNode }) {
+function ClientDetails({ form, edit, overview, children }: { form: Form; edit: () => void; overview: (tab: OverviewTab) => void; children: ReactNode }) {
   const { t } = useTranslation();
   const address = [form.address.address_line1, form.address.address_line2, form.address.city, form.address.province, form.address.postal_code, form.address.country].filter(Boolean).join(', ');
   const rows = [
@@ -194,6 +205,7 @@ function ClientDetails({ form, edit, children }: { form: Form; edit: () => void;
     [t('Administrative notes'), form.administrative_notes || t('Not set')],
   ];
   return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}>
+    <Stack direction="row" gap={1} flexWrap="wrap"><Button variant="outlined" onClick={() => overview('appointments')}>{t('View appointments')}</Button><Button variant="outlined" onClick={() => overview('access')}>{t('Practitioner access')}</Button></Stack>
     <Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600} sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{value}</Typography></Box>)}</Stack>
     <Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button>
     <Divider/>

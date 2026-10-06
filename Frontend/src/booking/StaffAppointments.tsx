@@ -8,7 +8,8 @@ import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import { portalLink } from '../shared/urls';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useSearchParams } from 'react-router-dom';
+import { pagePath } from '../portal/access';
 import { PractitionerVisitHistory } from './PractitionerVisitHistory';
 import { PractitionerVisitOutcome } from './PractitionerVisitOutcome';
 import { AppointmentLogisticsNotes } from './AppointmentLogisticsNotes';
@@ -50,6 +51,8 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   const bookingIntent = route.state as { startBooking?: boolean; bookingClient?: Client; bookingServiceId?: number } | null;
   const requestedId = Number(searchParams.get('appointment_id'));
   const linkedId = Number.isSafeInteger(requestedId) && requestedId > 0 ? requestedId : null;
+  const requestedClient = Number(searchParams.get('return_client_id'));
+  const returnClientId = !practitionerMode && Number.isSafeInteger(requestedClient) && requestedClient > 0 ? requestedClient : null;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [view, setView] = useState(() => searchParams.get('view') === 'needs_outcome' ? 'needs_outcome' : searchParams.get('view') === 'past' ? 'past' : 'upcoming');
   const [showCanceled, setShowCanceled] = useState(() => { try { return localStorage.getItem('wellness.staff.showCanceledAppointments') === 'true'; } catch { return false; } });
@@ -113,6 +116,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   }, [request, view, page, showCanceled, refresh, practitionerMode, linkedId]);
   const startChange = (action: 'reschedule' | 'cancel') => { if (!selected || !canChangeSelected) return; setCreating(false); setDetailsOpen(false); setManaging({ appointment: selected, action }); };
   return <Stack spacing={2}>
+    {returnClientId !== null && <Button component={RouterLink} to={`${pagePath('admin', 'clients')}?client_id=${returnClientId}`} sx={{ alignSelf: 'flex-start' }}>{t('Back to client history')}</Button>}
     <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Appointment actions')} spacing={1.5}>
       <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} sx={{ '& .MuiButton-root': { flexShrink: 0, whiteSpace: 'nowrap' } }}>
         {canBook && <Button variant="contained" startIcon={<CalendarPlus size={17}/>} disabled={creating} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
