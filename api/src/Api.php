@@ -125,6 +125,11 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/admin/users/{id:\\d+}/avatar','adminSaveAvatar');
                 $routes->addRoute('GET','/api/v1/admin/users/{id:\\d+}/avatar','adminAvatar');
                 $routes->addRoute('DELETE','/api/v1/admin/users/{id:\\d+}/avatar','adminDeleteAvatar');
+                $routes->addRoute('POST','/api/v1/recurring-series/preview','recurringPreview');
+                $routes->addRoute('POST','/api/v1/recurring-series','recurringCreate');
+                $routes->addRoute('GET','/api/v1/recurring-series/{id:\d+}','recurringView');
+                $routes->addRoute('POST','/api/v1/recurring-series/{id:\d+}/preview','recurringChangePreview');
+                $routes->addRoute('POST','/api/v1/recurring-series/{id:\d+}','recurringChange');
                 $routes->addRoute('GET','/api/v1/appointments','appointments');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}','appointmentDetails');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/reassignment-options','appointmentReassignmentOptions');
@@ -281,6 +286,11 @@ final class Api
                 'adminSaveAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
                 'adminAvatar'=>$this->profiles->avatar($this->user($request),(int)$route[2]['id']),
                 'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
+                'recurringPreview'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($this->user($request),$request->body,$request->correlationId,false),
+                'recurringCreate'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($this->user($request),$request->body,$request->correlationId,true),
+                'recurringView'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->view($this->user($request),(int)$route[2]['id']),
+                'recurringChangePreview'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,false),
+                'recurringChange'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,true),
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
                 'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId) + ['action_links_enabled'=>$this->config->appointmentActionLinksEnabled],
                 'appointmentReassignmentOptions'=>$this->bookings->reassignmentOptions($this->user($request),(int)$route[2]['id']),
@@ -419,6 +429,12 @@ final class Api
         $identity = $session['identity_id'];
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        if ($route === 'POST recurring-series/preview' || $route === 'POST recurring-series') return (new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($bookingActor(),$r->body,$r->correlationId,$route === 'POST recurring-series');
+        if(preg_match('#^recurring-series/(\d+)(/preview)?$#',substr($r->path,strlen('/api/v1/customer/')),$matches)){
+            $recurring=new \Wellness\Service\RecurringBookingService($this->database,$this->bookings);
+            if($r->method==='GET'&&!isset($matches[2]))return $recurring->view($bookingActor(),(int)$matches[1]);
+            if($r->method==='POST')return $recurring->change($bookingActor(),(int)$matches[1],$r->body,$r->correlationId,!isset($matches[2]));
+        }
         if ($route === 'POST appointment-links/resolve') return (new \Wellness\Service\AppointmentActionLinks($this->database->connection(),$this->config->appointmentActionLinksEnabled,new AuditLogger($this->database)))->resolve($bookingActor(),$r->body,$r->correlationId);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/availability$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->updateAvailability($bookingActor(),(int)$matches[1],$r->query);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/calendar$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->customerCalendar($bookingActor(),(int)$matches[1],$this->config->clientPortalUrl);

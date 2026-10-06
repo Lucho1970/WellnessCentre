@@ -5,7 +5,7 @@ import { customerFetch } from './session';
 import { clearAppointmentLink, pendingAppointmentLink } from './appointmentLink';
 import { CustomerAppointmentManager, type CustomerAppointment } from './CustomerAppointmentManager';
 
-export function CustomerAppointmentLink({ close, complete }: { close: () => void; complete: (message: string) => void }) {
+export function CustomerAppointmentLink({ close, complete, onLockedChange }: { onLockedChange?: (locked: boolean) => void; close: () => void; complete: (message: string) => void }) {
   const { t } = useTranslation();
   const [token] = useState(pendingAppointmentLink);
   const [appointment, setAppointment] = useState<CustomerAppointment | null>(null);
@@ -28,7 +28,7 @@ export function CustomerAppointmentLink({ close, complete }: { close: () => void
     return () => controller.abort();
   }, [token, attempt, t]);
   const leave = () => { clearAppointmentLink(); close(); };
-  if (appointment) return <CustomerAppointmentManager appointment={appointment} close={leave} complete={message => { clearAppointmentLink(); complete(message); }}/>;
+  if (appointment) return <CustomerAppointmentManager onLockedChange={onLockedChange} appointment={appointment} close={leave} complete={message => { clearAppointmentLink(); complete(message); }}/>;
   return <Stack spacing={2}>
     <Alert severity="info">{t('Opening this link does not change your appointment. Review the booking before confirming cancellation or rescheduling.')}</Alert>
     {busy && <CircularProgress aria-label={t('Opening appointment link')}/>}

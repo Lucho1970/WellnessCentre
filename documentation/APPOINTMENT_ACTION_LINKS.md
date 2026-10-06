@@ -1,6 +1,6 @@
 # Secure appointment email links
 
-Implemented on `feature/appointment-action-links`; not deployed or enabled. This is the email navigation slice of Phase 5; recurrence is separate work.
+Implemented on `feature/appointment-action-links`. The owner reported the uploaded, enabled deployment working on 6 October 2026; broader real SQL isolation/concurrency and delivery acceptance remain outstanding. This is the email navigation slice of Phase 5; recurrence is separate work.
 
 ## Client experience
 

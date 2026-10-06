@@ -47,7 +47,7 @@ final class AppointmentActionLinks
         if ($actor->userType !== 'client') throw new ApiException(403, 'forbidden', 'Client sign-in is required.');
         $token = $body['token'] ?? null;
         if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/D', $token)) $this->unavailable();
-        $query = $this->pdo->prepare("SELECT a.id,a.starts_at,a.ends_at,a.status,a.version,a.room_id,a.duration_option_id,a.delivery_mode,
+        $query = $this->pdo->prepare("SELECT a.id,a.recurring_series_id,a.starts_at,a.ends_at,a.status,a.version,a.room_id,a.duration_option_id,a.delivery_mode,
             s.name service,pu.display_name practitioner,l.name location,l.timezone,r.name room_name
             FROM appointment_action_links link
             JOIN appointments a ON a.id=link.appointment_id AND a.clinic_id=link.clinic_id AND a.client_id=link.client_id AND a.version=link.appointment_version

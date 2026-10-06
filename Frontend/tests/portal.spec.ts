@@ -3255,6 +3255,8 @@ test("availability is practitioner-first with selectable hours, changes, and tim
 });
 
 test("time off previews booked appointments before save and retains a follow-up list", async ({ page }) => {
+  // Keep this fixture's appointment in the future without freezing network/UI timers.
+  await page.clock.setFixedTime(new Date('2026-10-01T12:00:00Z'));
   await fixtures(page, ["super_admin"]);
   const affected = { id: "71", starts_at: "2026-10-06 14:00:00", ends_at: "2026-10-06 15:00:00", status: "confirmed", client_name: "Test Client", service_name: "Massage", location_name: "Holland Landing", timezone: "America/Toronto" };
   const existing = { id: "42", practitioner_id: "8", location_id: "1", practitioner_name: "Esther Vanderpoel", location_name: "Holland Landing", starts_at: "2026-10-05 13:00:00", ends_at: "2026-10-09 21:00:00", type: "vacation", reason: null, kind: "time_off", affected_appointment_count: "1" };

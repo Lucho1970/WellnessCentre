@@ -1,3 +1,5 @@
+import { RecurringBooking } from './RecurringBooking';
+import { ManageRecurringSeries } from './ManageRecurringSeries';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, Drawer, FormControlLabel, Grid, IconButton, Link, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
 import { CalendarClock, CalendarPlus, CalendarX, Eye, RefreshCw, UserRoundCheck, X } from 'lucide-react';
@@ -17,7 +19,7 @@ import { AppointmentLogisticsNotes } from './AppointmentLogisticsNotes';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
-type Combination = { location_id: number; location_name: string; timezone: string; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
+type Combination = { recurrence_allowed?: number; location_id: number; location_name: string; timezone: string; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type CancellationPreview = { window_minutes: number; deadline: string; inside_fee_window: boolean; fee_cents: number; appointment_total_cents: number; currency: string };
@@ -33,7 +35,7 @@ function phoneHrefs(value?: string | null) {
   const phone = (value ?? '').replace(/[^\d+]/g, '');
   return /^\+?\d{7,15}$/.test(phone) ? { call: `tel:${phone}`, text: `sms:${phone}` } : null;
 }
-type Appointment = { action_links_enabled?: boolean; delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
+type Appointment = { recurring_series_id?: number | null; action_links_enabled?: boolean; delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string, readonly fields: Record<string, unknown> = {}) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
@@ -71,6 +73,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   const [detailsBusy, setDetailsBusy] = useState(false);
   const [detailsError, setDetailsError] = useState('');
   const [managing, setManaging] = useState<{ appointment: Appointment; action: 'reschedule' | 'cancel' } | null>(null);
+  const [seriesManaging, setSeriesManaging] = useState<number | null>(null);
   const [reassigning, setReassigning] = useState<Appointment | null>(null);
   const selected = selectedId === linkedId && focusedAppointment?.id === selectedId ? focusedAppointment : appointments.find(item => item.id === selectedId) ?? null;
   const clientEmailHref = emailHref(detailsRecord?.client_email);
@@ -123,6 +126,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
         {canBook && <Button variant="contained" startIcon={<CalendarPlus size={17}/>} disabled={creating} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={() => setDetailsOpen(true)}>{t('More details')}</Button>
         {canBook && <><Button startIcon={<CalendarClock size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" startIcon={<CalendarX size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button></>}
+        {canBook && selected?.recurring_series_id && <Button disabled={!canChangeSelected} onClick={() => { setManaging(null); setDetailsOpen(false); setSeriesManaging(Number(selected.recurring_series_id)); }}>{t('Manage future series')}</Button>}
         {!practitionerMode && canManageFees && <Button startIcon={<UserRoundCheck size={17}/>} disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}
       </Stack>
       <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} alignItems="center">
@@ -131,10 +135,12 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
         <Button startIcon={<RefreshCw size={16}/>} disabled={listBusy} onClick={() => setRefresh(value => value + 1)} sx={{ flexShrink: 0 }}>{t('Refresh')}</Button>
       </Stack>
     </Stack></Paper>
+    {selected?.recurring_series_id && <Alert severity="info">{t('This appointment belongs to a recurring series. Ordinary reschedule and cancel actions change only this appointment.')}</Alert>}
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
     {linkedError && <Alert severity="error">{linkedError}</Alert>}
-    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} canApproveOnsiteArea={canApproveOnsiteArea} initialClient={bookingIntent?.bookingClient} initialServiceId={bookingIntent?.bookingServiceId} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} canApproveOnsiteArea={canApproveOnsiteArea} initialClient={bookingIntent?.bookingClient} initialServiceId={bookingIntent?.bookingServiceId} cancel={() => setCreating(false)} complete={(id, message) => { setCreating(false); setNotice(message ?? t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     {managing && <ManageAppointment key={`${managing.appointment.id}-${managing.action}`} appointment={managing.appointment} initialAction={managing.action} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
+    {seriesManaging !== null && <ManageRecurringSeries id={seriesManaging} request={request} close={() => setSeriesManaging(null)} complete={message => { setSeriesManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
     {reassigning && <ReassignAppointment key={reassigning.id} appointment={reassigning} request={request} close={() => setReassigning(null)} complete={() => { setReassigning(null); setSelectedId(null); setFocusedAppointment(null); setNotice(t('Appointment #{{id}} was assigned to a new practitioner.', { id: reassigning.id })); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.')}</Typography></Box>
@@ -142,7 +148,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
       {listBusy ? <Box sx={{ p: 3 }}><CircularProgress aria-label={t('Loading appointments')} /></Box> : !listError && <Stack>
         <List disablePadding aria-label={t('Appointments')}>
           {appointments.map(item => <ListItemButton key={item.id} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} divider sx={{ py: 1.75, px: 2.5 }}>
-            <ListItemText primary={<Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={750}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>} secondary={<Stack><Typography variant="body2" color="text.secondary">{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography><Typography variant="body2" color="text.secondary">{item.practitioner_name} · {item.location_name} · #{item.id}</Typography></Stack>} />
+            <ListItemText primary={<Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={750}>{item.client_name} · {item.service_name}</Typography>{item.recurring_series_id && <Chip size="small" label={t('Recurring series #{{id}}', { id: item.recurring_series_id })} />}<Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>} secondary={<Stack><Typography variant="body2" color="text.secondary">{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography><Typography variant="body2" color="text.secondary">{item.practitioner_name} · {item.location_name} · #{item.id}</Typography></Stack>} />
           </ListItemButton>)}
           {appointments.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography color="text.secondary">{t('No appointments in this view.')}</Typography></Box>}
         </List>
@@ -292,7 +298,7 @@ function ManageAppointment({ appointment, initialAction, request, canAssessFees,
   </Drawer>;
 }
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; initialClient?: Client; initialServiceId?: number; cancel: () => void; complete: (id: number) => void };
+type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; initialClient?: Client; initialServiceId?: number; cancel: () => void; complete: (id: number, message?: string) => void };
 function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClients, canApproveOnsiteArea, initialClient, initialServiceId, cancel, complete }: FormProps) {
   const { t, i18n } = useTranslation();
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
@@ -571,7 +577,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
         <Typography>{t('Treatment: {{treatment}} · On-Site surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD',{treatment:money(Number(selected.base_price_cents)),mobile:money(mobileFee),subtotal:money(Number(selected.base_price_cents)+mobileFee)})}</Typography><Alert severity="info">{t('Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.')}</Alert>
         <Divider /><Typography color="text.secondary">{t('Availability is checked again when you confirm. A confirmation email will be sent to the client.')}</Typography>
         {pending && !busy && <Alert severity="warning">{t('Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.')}</Alert>}
-        <Button variant="contained" disabled={busy} onClick={() => void confirm()}>{t(busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment')}</Button>
+        {Number(selected.recurrence_allowed) && !pending ? <RecurringBooking payload={{ delivery_mode:mode, ...(mode==='mobile'?{destination,...(!areaApproved&&coverage?{address_validation_token:coverage.token}:{})}:{}), quoted_base_price_cents:Number(selected.base_price_cents), quoted_mobile_fee_cents:mobileFee, client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), duration_option_id:Number(duration), starts_at:slot.starts_at, ...(needsRoom?{room_id:Number(room)}:{}) }} request={request} setBusy={setBusy} complete={complete} single={<Button variant="contained" disabled={busy} onClick={() => void confirm()}>{t(busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment')}</Button>} /> : <Button variant="contained" disabled={busy} onClick={() => void confirm()}>{t(busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment')}</Button>}
       </Stack>}
     </>}
     <Stack direction="row" justifyContent="space-between" mt={3}><Button disabled={busy || Boolean(pending)} onClick={cancel}>{t('Cancel')}</Button>{step > 0 && <Button disabled={busy || Boolean(pending)} onClick={() => setStep(value => value - 1)}>{t('Back')}</Button>}</Stack>
