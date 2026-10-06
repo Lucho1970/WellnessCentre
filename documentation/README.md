@@ -21,6 +21,7 @@ Start with these two authoritative documents:
 - [Dashboard widgets](DASHBOARD_WIDGETS.md): governed widget registry, authorized data projections, per-workspace personalization, delivery sequence and acceptance criteria.
 - [Limited testing readiness](PILOT_TEST_READINESS.md): hosted acceptance gates, safe pilot journeys, feedback capture and current scope limits.
 - [Temporary hosted test suite](HOSTED_TEST_SUITE.md): Netfirms upload layout, private PHP checks, one protected results page and required cleanup.
+- [Client intake and consent forms](CLIENT_INTAKE_FORMS.md): versioned questionnaires, client assignments/submissions, restricted practitioner answers and migration 036 pilot acceptance.
 
 ## Supporting records and historical sources
 

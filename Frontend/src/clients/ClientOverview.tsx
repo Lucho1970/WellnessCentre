@@ -5,8 +5,9 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime, appLocale } from '../i18n/format';
 import { pagePath } from '../portal/access';
+import { ClientForms } from '../forms/ClientForms';
 
-export type OverviewTab = 'appointments' | 'access';
+export type OverviewTab = 'appointments' | 'access' | 'forms';
 type Client = { id: number; display_name: string; status: string };
 type Appointment = { id: number; starts_at: string; ends_at: string; created_at: string; status: string; delivery_mode: string; service_name: string; service_name_fr: string | null; practitioner_name: string; location_name: string; timezone: string; room_name: string | null; base_price_cents: number | null; mobile_fee_cents: number; cancellation_fee_cents: number | null; currency: string; source: string };
 type History = { client: Client; items: Appointment[]; page: number; has_more: boolean; counts: { total: number; upcoming: number; past: number; canceled: number } };
@@ -14,13 +15,17 @@ type Access = { practitioner_id: number; user_id: number; display_name: string; 
 type AccessList = { client: Client; items: Access[]; page: number; has_more: boolean };
 type Request = (path: string, init?: RequestInit) => Promise<unknown>;
 
-export function ClientOverview({ clientId, initialTab, request, back }: { clientId: number; initialTab: OverviewTab; request: Request; back: () => void }) {
+export function ClientOverview({ clientId, initialTab, request, back, onLockedChange }: { clientId: number; initialTab: OverviewTab; request: Request; back: () => void; onLockedChange?: (locked: boolean) => void }) {
   const { t, i18n } = useTranslation();
   const [tab, setTab] = useState<OverviewTab>(initialTab), [view, setView] = useState('all');
+  const [formsLocked, setFormsLocked] = useState(false);
+  useEffect(() => { onLockedChange?.(formsLocked); }, [formsLocked, onLockedChange]);
+  useEffect(() => () => onLockedChange?.(false), [onLockedChange]);
   const [historyPage, setHistoryPage] = useState(1), [accessPage, setAccessPage] = useState(1);
   const [history, setHistory] = useState<History | null>(null), [access, setAccess] = useState<AccessList | null>(null);
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   useEffect(() => {
+    if(tab==='forms'){setBusy(false);setError('');return;}
     const controller = new AbortController(); setBusy(true); setError('');
     const path = tab === 'appointments' ? `/${clientId}/appointments?view=${view}&page=${historyPage}` : `/${clientId}/practitioner-access?page=${accessPage}`;
     void request(path, { signal: controller.signal }).then(result => {
@@ -39,10 +44,11 @@ export function ClientOverview({ clientId, initialTab, request, back }: { client
   const page = tab === 'appointments' ? historyPage : accessPage;
   const setPage = tab === 'appointments' ? setHistoryPage : setAccessPage;
   return <Stack spacing={2} sx={{ p: { xs: 2, sm: 3 }, overflowY: 'auto' }}>
-    <Button onClick={back} startIcon={<ArrowLeft size={17}/>} sx={{ alignSelf: 'flex-start' }}>{t('Back to client details')}</Button>
+    <Button disabled={formsLocked} onClick={back} startIcon={<ArrowLeft size={17}/>} sx={{ alignSelf: 'flex-start' }}>{t('Back to client details')}</Button>
     <Tabs value={tab} onChange={(_, value: OverviewTab) => setTab(value)} variant="scrollable" allowScrollButtonsMobile aria-label={t('Client overview sections')}>
-      <Tab value="appointments" label={t('Appointment history')}/><Tab value="access" label={t('Practitioner access')}/>
+      <Tab disabled={formsLocked} value="appointments" label={t('Appointment history')}/><Tab disabled={formsLocked} value="access" label={t('Practitioner access')}/><Tab disabled={formsLocked} value="forms" label={t('Client forms')}/>
     </Tabs>
+    {tab === 'forms' && <ClientForms key={clientId} clientId={clientId} onLockedChange={setFormsLocked}/>}
     {tab === 'appointments' && <>
       <TextField select label={t('Appointment history filter')} value={view} onChange={event => { setView(event.target.value); setHistoryPage(1); }}>
         <MenuItem value="all">{t('All appointments')}</MenuItem><MenuItem value="upcoming">{t('Upcoming appointments')}</MenuItem><MenuItem value="past">{t('Past appointments')}</MenuItem><MenuItem value="canceled">{t('Cancelled appointments')}</MenuItem>
@@ -94,7 +100,7 @@ export function ClientOverview({ clientId, initialTab, request, back }: { client
         {!!practitioner.permissions.length && <Typography variant="body2" color="text.secondary">{t('Additional permissions')}: {practitioner.permissions.map(permission => t(permission)).join(', ')}</Typography>}
       </Stack></Paper>)}
     </>}
-    {!busy && !error && current && <Box><Stack direction="row" justifyContent="space-between" alignItems="center"><Button startIcon={<ArrowLeft size={16}/>} disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}', { page })}</Typography><Button endIcon={<ArrowRight size={16}/>} disabled={!current.has_more} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack></Box>}
+    {tab !== 'forms' && !busy && !error && current && <Box><Stack direction="row" justifyContent="space-between" alignItems="center"><Button startIcon={<ArrowLeft size={16}/>} disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}', { page })}</Typography><Button endIcon={<ArrowRight size={16}/>} disabled={!current.has_more} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack></Box>}
   </Stack>;
 }
 

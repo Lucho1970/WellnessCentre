@@ -49,6 +49,7 @@ const TeamAdmin = lazy(() => import('../admin/TeamAdmin').then(module => ({ defa
 const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
 const PractitionerClients = lazy(() => import('./PractitionerClients').then(module => ({ default: module.PractitionerClients })));
+const FormTemplates = lazy(() => import('../forms/FormTemplates').then(module => ({ default: module.FormTemplates })));
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
@@ -82,6 +83,7 @@ const navigation: NavigationItem[] = [
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
   { id: "notifications", label: "Notification status", description: "Review appointment notification delivery", icon: <MailCheck size={20} /> },
   { id: "my_notifications", label: "My notifications", description: "Booking notices sent to you", icon: <MailCheck size={20} /> },
+  { id: "forms", label: "Intake and consent forms", description: "Questionnaires, consent and template versions", icon: <PanelsTopLeft size={20} /> },
   {
     id: "profile",
     label: "My profile",
@@ -172,6 +174,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
         {page === "dashboard" && <Dashboard workspace={workspace} />}
         {page === "clients" && (workspace === 'practitioner' ? <PractitionerClients /> : <ClientManagement canMerge={roles.includes('super_admin')} />)}
+        {page === "forms" && <FormTemplates />}
         {page === "appointments" && <StaffAppointments canManageFees={roles.some(role => ['super_admin', 'clinic_admin'].includes(role))} practitionerMode={workspace === 'practitioner'} canScheduleOthers={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('schedule_for_other_practitioners')} canAddClients={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || (roles.includes('practitioner') && permissions.includes('add_clients'))} canApproveOnsiteArea={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('approve_onsite_service_area')} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
         {page === "schedule_calendar" && <PractitionerCalendar />}
         {page === "practitioners" && <PractitionerAdmin />}

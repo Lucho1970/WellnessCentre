@@ -65,6 +65,7 @@ final class ClientService
         $page=filter_var($query['page']??1,FILTER_VALIDATE_INT,['options'=>['min_range'=>1,'max_range'=>100000]]);
         if($page===false)throw new ApiException(422,'validation_error','Invalid page.');
         $offset=($page-1)*25;
+        $formRelated=ClientFormsService::enabled()?" OR EXISTS(SELECT 1 FROM client_form_tasks ft WHERE ft.clinic_id=u.clinic_id AND ft.client_id=u.id AND ft.practitioner_id=p.id AND ft.status<>'revoked')":'';
         $sql="SELECT u.id,u.display_name,u.email,u.status,cp.phone,cp.preferred_contact,
             (SELECT COUNT(*) FROM appointments counted WHERE counted.clinic_id=u.clinic_id AND counted.practitioner_id=p.id AND counted.client_id=u.id) appointment_count,
             (SELECT recent.id FROM appointments recent WHERE recent.clinic_id=u.clinic_id AND recent.practitioner_id=p.id AND recent.client_id=u.id ORDER BY recent.starts_at DESC,recent.id DESC LIMIT 1) recent_appointment_id
@@ -72,7 +73,7 @@ final class ClientService
             LEFT JOIN client_profiles cp ON cp.user_id=u.id
             WHERE p.user_id=:actor AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id)
             AND (EXISTS(SELECT 1 FROM appointments own WHERE own.clinic_id=u.clinic_id AND own.practitioner_id=p.id AND own.client_id=u.id)
-              OR EXISTS(SELECT 1 FROM audit_logs created WHERE created.clinic_id=u.clinic_id AND created.actor_user_id=:creator AND created.action='client.create' AND created.entity_type='client' AND created.entity_id=u.id AND created.outcome='success'))";
+              OR EXISTS(SELECT 1 FROM audit_logs created WHERE created.clinic_id=u.clinic_id AND created.actor_user_id=:creator AND created.action='client.create' AND created.entity_type='client' AND created.entity_id=u.id AND created.outcome='success'){$formRelated})";
         $params=['clinic'=>$actor->clinicId,'actor'=>$actor->userId,'creator'=>$actor->userId];
         if($term!==''){
             $like='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';
@@ -243,9 +244,17 @@ final class ClientService
 
     private function relationshipCounts(int $clientId): array
     {
-        $tables=['appointments','recurring_series','waitlist_entries','form_submissions','practitioner_client_notes','invoices','consent_records','data_export_requests','client_link_invitations'];$counts=[];
+        $tables=$this->relationshipTables();$counts=[];
         foreach($tables as $table){$s=$this->database->connection()->prepare("SELECT COUNT(*) FROM {$table} WHERE client_id=:id");$s->execute(['id'=>$clientId]);$counts[$table]=(int)$s->fetchColumn();}
         return $counts;
+    }
+
+    private function relationshipTables(): array
+    {
+        $tables=['appointments','recurring_series','waitlist_entries','form_submissions','practitioner_client_notes','invoices','consent_records','data_export_requests','client_link_invitations'];
+        // Preserve form ownership even if the pilot was disabled after collecting submissions.
+        if($this->database->connection()->query("SHOW TABLES LIKE 'client_form_tasks'")->fetchColumn())$tables[]='client_form_tasks';
+        return $tables;
     }
 
     private function copyProfile(int $from,int $to): void
@@ -264,7 +273,7 @@ final class ClientService
     private function moveClientRelationships(int $from,int $to): void
     {
         $pdo=$this->database->connection();
-        foreach(['appointments','recurring_series','waitlist_entries','form_submissions','practitioner_client_notes','invoices','consent_records','data_export_requests','client_link_invitations'] as $table)$pdo->prepare("UPDATE {$table} SET client_id=:to WHERE client_id=:from")->execute(['to'=>$to,'from'=>$from]);
+        foreach($this->relationshipTables() as $table)$pdo->prepare("UPDATE {$table} SET client_id=:to WHERE client_id=:from")->execute(['to'=>$to,'from'=>$from]);
         $pdo->prepare('INSERT IGNORE INTO appointment_attendees(appointment_id,user_id,attendee_type) SELECT appointment_id,:to,attendee_type FROM appointment_attendees WHERE user_id=:from')->execute(['to'=>$to,'from'=>$from]);
         $pdo->prepare('DELETE FROM appointment_attendees WHERE user_id=:from')->execute(['from'=>$from]);
         $survivorLink=$pdo->prepare('SELECT identity_id FROM customer_client_links WHERE client_id=:to');$survivorLink->execute(['to'=>$to]);

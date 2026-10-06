@@ -228,3 +228,43 @@ CREATE TABLE recurring_booking_requests (
     FOREIGN KEY (clinic_id) REFERENCES clinics(id),
     FOREIGN KEY (actor_user_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
+
+-- Apply once before enabling CLIENT_FORMS_ENABLED. Existing foundation rows remain unchanged.
+ALTER TABLE form_templates CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE form_templates ADD COLUMN family_key CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN publication_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN publication_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN created_by BIGINT UNSIGNED NULL,
+    ADD UNIQUE KEY uq_form_family_version (clinic_id,family_key,version),
+    ADD UNIQUE KEY uq_form_publication (clinic_id,publication_key),
+    ADD CONSTRAINT fk_form_author FOREIGN KEY(created_by) REFERENCES users(id);
+CREATE TABLE client_form_tasks (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    clinic_id BIGINT UNSIGNED NOT NULL,
+    client_id BIGINT UNSIGNED NOT NULL,
+    practitioner_id BIGINT UNSIGNED NOT NULL,
+    form_template_id BIGINT UNSIGNED NOT NULL,
+    appointment_id BIGINT UNSIGNED NULL,
+    assigned_by BIGINT UNSIGNED NOT NULL,
+    assignment_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    required BOOLEAN NOT NULL DEFAULT TRUE,
+    status ENUM('pending','submitted','reviewed','revoked') NOT NULL DEFAULT 'pending',
+    version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+    submission_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    submitted_at DATETIME NULL,
+    reviewed_at DATETIME NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    UNIQUE KEY uq_appointment_form (appointment_id,form_template_id),
+    UNIQUE KEY uq_task_submission (submission_id),
+    UNIQUE KEY uq_form_assignment_request (clinic_id,assignment_key),
+    KEY ix_client_forms (clinic_id,client_id,id),
+    FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+    FOREIGN KEY(client_id) REFERENCES users(id),
+    FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),
+    FOREIGN KEY(form_template_id) REFERENCES form_templates(id),
+    FOREIGN KEY(appointment_id) REFERENCES appointments(id),
+    FOREIGN KEY(assigned_by) REFERENCES users(id),
+    FOREIGN KEY(reviewed_by) REFERENCES users(id),
+    FOREIGN KEY(submission_id) REFERENCES form_submissions(id)
+) ENGINE=InnoDB;

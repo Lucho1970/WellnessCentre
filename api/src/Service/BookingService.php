@@ -90,6 +90,8 @@ final class BookingService
             $notify=$pdo->prepare("INSERT INTO notification_events(clinic_id,appointment_id,recipient_user_id,recipient_address,event_code,channel,status,scheduled_at,payload) SELECT :clinic,:appointment_id,u.id,u.email,'booking_confirmation','email','queued',UTC_TIMESTAMP(),JSON_OBJECT('appointment_id',:payload_appointment_id) FROM users u WHERE u.id=:client");$notify->execute(['clinic'=>$actor->clinicId,'appointment_id'=>$id,'payload_appointment_id'=>$id,'client'=>$clientId]);
             AppointmentReminderQueue::replace($pdo,$actor->clinicId,$id,$clientId,$startsUtc->format('Y-m-d H:i:s'),1);
             StaffNotificationQueue::enqueue($pdo,$actor->clinicId,$id,(int)$body['practitioner_id'],'booking_confirmation');
+            $formCount=ClientFormsService::assignForAppointment($pdo,$actor->clinicId,$clientId,(int)$body['practitioner_id'],(int)$body['service_id'],$id,$actor->userId);
+            if($formCount>0)$this->audit->write($actor->clinicId,$actor,$correlationId,'form.service_assign','appointment',$id,'success',['count'=>$formCount]);
             $this->audit->write($actor->clinicId,$actor,$correlationId,'appointment.create','appointment',$id);
             if(!$participate)$pdo->commit();
             if(!$participate)ImmediateNotificationDispatch::schedule($this->database, $id);
@@ -255,6 +257,7 @@ final class BookingService
             }
             if($action==='cancel')AppointmentReminderQueue::cancel($pdo,$actor->clinicId,$id);
             else AppointmentReminderQueue::replace($pdo,$actor->clinicId,$id,(int)$appointment['client_id'],$requested->format('Y-m-d H:i:s'),$version+1);
+            if($action==='cancel'&&ClientFormsService::enabled())$pdo->prepare("UPDATE client_form_tasks SET status='revoked',version=version+1 WHERE clinic_id=? AND appointment_id=? AND status='pending'")->execute([$actor->clinicId,$id]);
             $notify=$pdo->prepare("INSERT INTO notification_events(clinic_id,appointment_id,recipient_user_id,recipient_address,event_code,channel,status,scheduled_at,payload) SELECT :clinic,:appointment,u.id,u.email,:event,'email','queued',UTC_TIMESTAMP(),JSON_OBJECT('appointment_id',:payload_id) FROM users u WHERE u.id=:client");$notify->execute(['clinic'=>$actor->clinicId,'appointment'=>$id,'event'=>$event,'payload_id'=>$id,'client'=>$appointment['client_id']]);
             StaffNotificationQueue::enqueue($pdo,$actor->clinicId,$id,(int)$appointment['practitioner_id'],$event);
             $this->audit->write($actor->clinicId,$actor,$correlationId,$audit,'appointment',$id,'success',$reason===''?[]:['reason'=>$reason]);$result=$this->appointment($actor,$id,false);if(!$participate)$pdo->commit();

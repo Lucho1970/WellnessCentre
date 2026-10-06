@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)][string]$MariaDbDirectory,
     [string]$PhpExecutable = 'php',
-    [ValidateRange(1024, 65535)][int]$Port = 13317
+    [ValidateRange(1024, 65535)][int]$Port = 13317,
+    [ValidateSet('recurring-bookings.php','client-forms.php')][string]$IntegrationTest = 'recurring-bookings.php'
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -41,8 +42,8 @@ try {
     [Environment]::SetEnvironmentVariable('RECURRING_TEST_PORT', [string]$Port, 'Process')
     [Environment]::SetEnvironmentVariable('RECURRING_TEST_USER', 'root', 'Process')
     [Environment]::SetEnvironmentVariable('RECURRING_TEST_PASSWORD', '', 'Process')
-    & $php (Join-Path $repo 'api/tests/integration/recurring-bookings.php')
-    if ($LASTEXITCODE -ne 0) { throw 'Real SQL recurrence acceptance failed.' }
+    & $php (Join-Path $repo "api/tests/integration/$IntegrationTest")
+    if ($LASTEXITCODE -ne 0) { throw "Real SQL acceptance failed: $IntegrationTest" }
 } finally {
     if ($null -ne $process -and -not $process.HasExited) { Stop-Process -Id $process.Id; $process.WaitForExit(10000) | Out-Null }
     foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process') }

@@ -76,6 +76,14 @@ final class Api
             }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
+                $routes->addRoute('GET','/api/v1/forms/templates','formTemplates');
+                $routes->addRoute('POST','/api/v1/forms/templates','publishForm');
+                $routes->addRoute('POST','/api/v1/forms/templates/{id:\d+}/versions','publishFormVersion');
+                $routes->addRoute('GET','/api/v1/forms/templates/{id:\d+}/history','formHistory');
+                $routes->addRoute('GET','/api/v1/forms/tasks/{id:\d+}','formDetail');
+                $routes->addRoute('PATCH','/api/v1/forms/tasks/{id:\d+}','formTransition');
+                $routes->addRoute('GET','/api/v1/clients/{id:\d+}/forms','clientForms');
+                $routes->addRoute('POST','/api/v1/clients/{id:\d+}/forms','assignClientForm');
                 $routes->addRoute('GET','/api/v1/health/database','databaseHealth');
                 $routes->addRoute('GET','/api/v1/site-config','siteConfig');
                 $routes->addRoute('GET','/api/v1/brand/{type:logo|favicon}','brandAsset');
@@ -307,6 +315,14 @@ final class Api
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
                 'practitionerClients'=>$this->clients->practitionerList($this->user($request),$request->query),
+                'formTemplates'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->templates($this->user($request),$request->query),
+                'publishForm'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId),
+                'publishFormVersion'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'formHistory'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->history($this->user($request),(int)$route[2]['id']),
+                'formDetail'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->detail($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'formTransition'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->transition($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'clientForms'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->list($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'assignClientForm'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->assign($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'bookingClientAddress'=>$this->bookings->bookingClientAddress($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'validateAddressCoverage'=>$this->addressCoverage->validate($this->user($request),$request->body),
                 'addressCoverageApproval'=>$this->addressCoverage->approvalStatus($this->user($request),$request->body),
@@ -429,6 +445,12 @@ final class Api
         $identity = $session['identity_id'];
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        $forms=new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database));
+        if($route==='GET forms'){$actor=$bookingActor();return $forms->list($actor,$actor->userId,$r->query,$r->correlationId);}
+        if(preg_match('#^(GET|POST) forms/(\d+)(/submit)?$#',$route,$matches)){
+            if($matches[1]==='GET'&&!isset($matches[3]))return $forms->detail($bookingActor(),(int)$matches[2],$r->correlationId);
+            if($matches[1]==='POST'&&isset($matches[3]))return $forms->submit($bookingActor(),(int)$matches[2],$r->body,$r->correlationId);
+        }
         if ($route === 'POST recurring-series/preview' || $route === 'POST recurring-series') return (new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($bookingActor(),$r->body,$r->correlationId,$route === 'POST recurring-series');
         if(preg_match('#^recurring-series/(\d+)(/preview)?$#',substr($r->path,strlen('/api/v1/customer/')),$matches)){
             $recurring=new \Wellness\Service\RecurringBookingService($this->database,$this->bookings);
