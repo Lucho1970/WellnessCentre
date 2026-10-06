@@ -76,3 +76,48 @@ test('client form questions and controls remain usable in French on mobile', asy
   await fixture(page); await page.setViewportSize({ width: 390, height: 844 }); await page.goto(`${host}/client`); await page.getByRole('button', { name: 'Language and region', exact: true }).click(); await page.getByRole('button', { name: /Français \(Canada\)/ }).click(); await page.getByRole('button', { name: 'Mes formulaires', exact: true }).click(); await page.getByRole('button', { name: 'Remplir le formulaire', exact: true }).click(); await expect(page.getByLabel('Réponse fictive')).toBeVisible();
   await expect(page.getByText('Questions fictives uniquement')).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); await page.screenshot({ path: 'test-results/client-form-mobile-fr.png', fullPage: true });
 });
+
+const typedDefinition = { instructions: '', instructions_fr: '', questions: [
+  { id: 'birth', label: 'Birth date', label_fr: 'Date de naissance', type: 'date', required: true, no_future: true },
+  { id: 'phone', label: 'Contact telephone', label_fr: 'Téléphone', type: 'phone', required: true },
+  { id: 'email', label: 'Contact email', label_fr: 'Courriel', type: 'email', required: true }
+] };
+async function openTyped(page: Page) {
+  await fixture(page);
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition: typedDefinition, answers: null } } }));
+  await page.goto(`${host}/client`); await page.getByRole('button', { name: 'My forms', exact: true }).click(); await page.getByRole('button', { name: 'Complete form', exact: true }).click();
+}
+test('date, international phone and email fields submit canonical answers', async ({ page }) => {
+  await openTyped(page); let body: any;
+  await page.route('**/api/v1/customer/forms/19/submit', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
+  await page.getByLabel('Birth date').fill('2000-02-29');
+  await expect(page.getByLabel('Birth date')).toHaveAttribute('type', 'date');
+  await expect(page.getByLabel('Birth date')).toHaveAttribute('max', /\d{4}-\d{2}-\d{2}/);
+  await page.getByRole('combobox', { name: 'Country for Contact telephone' }).click(); await page.getByRole('option', { name: 'United Kingdom (+44)', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Contact telephone', exact: true }).fill('020 7946 0018'); await page.getByLabel('Contact email').fill('test@example.test');
+  await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check(); await page.getByRole('button', { name: 'Submit form', exact: true }).click();
+  await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(body.answers).toEqual({ birth: '2000-02-29', phone: '+442079460018', email: 'test@example.test' });
+});
+test('invalid typed answers remain editable and do not send a submission', async ({ page }) => {
+  await openTyped(page); let sent = 0;
+  await page.route('**/api/v1/customer/forms/19/submit', route => { sent++; return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
+  await page.getByLabel('Birth date').fill('9999-01-01'); await page.getByRole('textbox', { name: 'Contact telephone', exact: true }).fill('123'); await page.getByLabel('Contact email').fill('invalid'); await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check();
+  await page.getByRole('button', { name: 'Submit form', exact: true }).click(); expect(sent).toBe(0);
+  await page.getByLabel('Birth date').fill('2000-01-01'); await page.getByLabel('Contact email').fill('test@example.test'); await page.getByRole('button', { name: 'Submit form', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Enter a valid phone number for the selected country.' })).toBeVisible(); expect(sent).toBe(0); await expect(page.getByRole('textbox', { name: 'Contact telephone', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Contact telephone', exact: true }).fill('(416) 555-1234'); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(sent).toBe(1);
+});
+test('a new version changes text to date while the existing version remains text', async ({ page }) => {
+  await fixture(page, 'practitioner'); let body: any;
+  await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
+  await page.getByRole('combobox', { name: /Answer type/ }).first().click(); await page.getByRole('option', { name: 'Date', exact: true }).click(); await page.getByRole('checkbox', { name: 'No future dates (for example, birth date)' }).check();
+  await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible(); expect(body.definition.questions[0].type).toBe('date'); expect(body.definition.questions[0].no_future).toBe(true); expect(template.definition.questions[0].type).toBe('text');
+});
+test('saved typed answers are read-only on a French mobile screen', async ({ page }) => {
+  await fixture(page); await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, status: 'submitted', definition: typedDefinition, answers: { birth: '2000-02-29', phone: '+14165551234', email: 'test@example.test' } } } }));
+  await page.goto(`${host}/client`); await page.getByRole('button', { name: 'Language and region', exact: true }).click(); await page.getByRole('button', { name: /Français \(Canada\)/ }).click(); await page.getByRole('button', { name: 'Mes formulaires', exact: true }).click(); await page.getByRole('button', { name: 'Remplir le formulaire', exact: true }).click();
+  await expect(page.getByLabel('Date de naissance')).toBeDisabled(); await expect(page.getByLabel('Téléphone')).toHaveValue('+14165551234'); await expect(page.getByLabel('Courriel')).toBeDisabled(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/typed-form-mobile-fr.png', fullPage: true });
+});

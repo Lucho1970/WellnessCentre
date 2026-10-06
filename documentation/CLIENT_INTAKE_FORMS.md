@@ -4,7 +4,7 @@ First workflow implemented on `feature/client-intake-forms`. Not merged or deplo
 
 ## Where to find it
 
-- Practitioners and clinic administrators: **Intake and consent forms** in their portal sidebar. Create a named template with an assigned practitioner, English/French instructions and up to 30 text, yes/no or required consent-checkbox questions. Publish immediately or create a new version of a current template; published definitions cannot be edited in place. Version history shows the latest 100 stored versions.
+- Practitioners and clinic administrators: **Intake and consent forms** in their portal sidebar. Create a named template with an assigned practitioner, English/French instructions and up to 30 text, yes/no, date, phone number, email or required consent-checkbox questions. Publish immediately or create a new version of a current template; published definitions cannot be edited in place. Version history shows the latest 100 stored versions.
 - Administration/reception: **Clients → Details → Client forms**, or the Forms tab beside appointment history and practitioner access. Assign a current template, inspect pending/submitted/reviewed/revoked status, or revoke a pending assignment. This view contains metadata, not answer content.
 - Practitioners: select a client in **My clients → Client forms**. Eligible clients are those with their appointment history, those they created, or those with an explicit current assignment approved for that practitioner. A form assignment is an explicit grant to its assigned practitioner; broad scheduling permission does not grant access to another practitioner's answers.
 - Linked clients: **My forms** in their client account. Read instructions, answer the assigned questions, acknowledge each consent checkbox where present, then review and explicitly submit. Answers remain visible afterward with the original version. No answer data is stored in browser local/session storage.
@@ -12,6 +12,16 @@ First workflow implemented on `feature/client-intake-forms`. Not merged or deplo
 Administrators may publish practitioner-owned templates and assign them to a clinic client. Reception may assign existing templates but cannot author them. Answers can be read only by the owning client or the currently active assigned practitioner with the practitioner role. Clinic administration, reception, accounting and scheduling delegation alone do not grant answer access. An administrator who separately has the practitioner role may read their own assigned answers.
 
 ## Versioning and transactions
+
+### Date, phone number and email fields
+
+The `feature/form-date-phone-fields` follow-up adds three answer types without another SQL migration. A published Text question can become one of these types in a new version; previous assignments and answers retain their original types. Revoke a pending old assignment and assign the new version if the client should receive the updated fields.
+
+- **Date** uses a native date picker and stores a calendar date as `YYYY-MM-DD`, without a timezone conversion. The optional **No future dates** setting is intended for birth dates; its cutoff uses the Toronto calendar day consistently in browser and API. Other date questions may accept future dates. Invalid calendar dates and year zero are rejected.
+- **Phone number** provides a country selector, defaulting to Canada. It accepts national formatting or an explicit international `+` number, validates numbering patterns and stores international E.164 format. Extensions are not supported. Number validation uses bundled metadata locally, without sending answers to an external provider; it does not verify ownership or reachability.
+- **Email address** uses email input and server validation, trims surrounding spaces and preserves the entered address. ASCII email addresses are supported; mailbox ownership or delivery is not verified.
+
+Blank optional typed fields are omitted. Client-side feedback supplements authoritative API checks. Answers remain private form responses; birth date, phone and email answers do not automatically update the client profile or public contact card. Both matching API dependencies (`vendor` and Composer files) and portal code must be deployed before authors publish these types. Older API code rejects the new types, and older portal code does not render their controls correctly. The existing `CLIENT_FORMS_ENABLED` setting and migration 036 are reused.
 
 New publications append a `form_templates` row in the same clinic-local family and retire the previous row from new assignments. Existing tasks/submissions keep their original template ID and definition. Publication, direct assignment and submission retries do not create duplicate rows. Publishing/assigning with a reused key for a different request fails; completed assignment retries still work after a new template version is published.
 
@@ -70,6 +80,8 @@ Validation completed on 6 October 2026:
 - The French mobile forms screenshot at 390 pixels was inspected, and Git whitespace checks passed.
 
 These are local results. Matching hosted deployment, migration 036, runtime enablement and synthetic acceptance have not been performed.
+
+The Date/Phone/Email follow-up passed both frontend builds, TypeScript/content/translation checks (1,632 keys), all 47 PHP fixture files (including 51 definition checks), PHP syntax and Composer validation, 48 forms SQL checks plus 34 recurrence checks on disposable MariaDB 11.4.8, 11 focused forms browser scenarios and 13 production smoke tests. The French mobile typed-field screenshot was inspected at 390 pixels. Existing bundle-size warnings remain. Dependency audit reported an existing development-only `source-map-js` advisory; the new phone dependencies introduced no reported advisory. No hosted database or deployment was changed by this follow-up.
 
 ## Subsequent forms work
 

@@ -58,6 +58,23 @@ $created=$series->create($client,$create+['preview_token'=>$preview['preview_tok
 $ids=array_column($created['items'],'appointment_id');$bookings->update($client,$ids[0],['action'=>'cancel','version'=>1,'expected_cancellation_fee_cents'=>0],'forms-test');
 $assert($pdo->query('SELECT status FROM client_form_tasks WHERE appointment_id='.$ids[0])->fetchColumn()==='revoked','Cancellation revokes pending automatic form');
 $assert((int)$pdo->query("SELECT COUNT(*) FROM client_form_tasks WHERE status='pending' AND appointment_id IN(".implode(',',$ids).')')->fetchColumn()===2,'Other occurrences untouched');
+// New answer types append a version; existing text responses stay pinned.
+$typedPublish=array_replace($next,['expected_version'=>2,'idempotency_key'=>'typed-form-publish-three','service_ids'=>[]]);
+$typedPublish['definition']['questions'][0]['type']='date';$typedPublish['definition']['questions'][0]['no_future']=true;
+$typedPublish['definition']['questions'][]=['id'=>'phone','label'=>'Synthetic phone','type'=>'phone','required'=>true];
+$typedPublish['definition']['questions'][]=['id'=>'email','label'=>'Synthetic email','type'=>'email','required'=>true];
+$third=$forms->publish($clinician,$typedPublish,'forms-test',$second['id']);
+$typedTask=$forms->assign($clinician,8,['template_id'=>$third['id'],'idempotency_key'=>'typed-form-assignment'],'forms-test');
+$typedAnswers=['text'=>'2000-02-29','yes'=>false,'consent'=>true,'phone'=>'+14165551234','email'=>'test@example.test'];
+$typedBody=['version'=>1,'confirmed'=>true,'answers'=>$typedAnswers];
+$denies(fn()=>$forms->submit($client,$typedTask['id'],array_replace($typedBody,['answers'=>array_replace($typedAnswers,['text'=>'2001-02-29'])]),'forms-test'),'invalid_form');
+$denies(fn()=>$forms->submit($client,$typedTask['id'],array_replace($typedBody,['answers'=>array_replace($typedAnswers,['phone'=>'4165551234'])]),'forms-test'),'invalid_form');
+$denies(fn()=>$forms->submit($client,$typedTask['id'],array_replace($typedBody,['answers'=>array_replace($typedAnswers,['email'=>'bad@'])]),'forms-test'),'invalid_form');
+$typedSubmitted=$forms->submit($client,$typedTask['id'],$typedBody,'forms-test');
+$assert($forms->submit($client,$typedTask['id'],$typedBody,'forms-test')===$typedSubmitted,'Typed submission replay');
+$assert($forms->detail($clinician,$typedTask['id'],'forms-test')['answers']['phone']==='+14165551234','Canonical phone stored');
+$assert($forms->detail($client,$task['id'],'forms-test')['definition']['questions'][0]['type']==='text','Old assignment retains text type');
+$assert($forms->detail($client,$task['id'],'forms-test')['answers']['text']==='Synthetic only','Old text response survives new date type');
 // Existing supervised client merge must move both tasks and immutable responses.
 $otherTemplate=$forms->publish($other,array_replace($publish,['owner_practitioner_id'=>12,'service_ids'=>[],'idempotency_key'=>'other-clinician-owned-form']),'forms-test');
 $denies(fn()=>$forms->assign($other,8,['template_id'=>$otherTemplate['id'],'idempotency_key'=>'unrelated-client-assignment'],'forms-test'),'client_not_found');

@@ -3,15 +3,16 @@ import { Alert, Button, Checkbox, Chip, CircularProgress, FormControlLabel, Menu
 import { useTranslation } from 'react-i18next';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import type { FormRequest } from './api';
+import { TypedFormField, typedAnswer, type FormAnswer } from './TypedFormField';
 import { customerFetch } from '../customer/session';
 
-export type Question = { id: string; label: string; label_fr: string; type: 'text' | 'yes_no' | 'consent'; required: boolean };
+export type Question = { id: string; label: string; label_fr: string; type: 'text' | 'yes_no' | 'consent' | 'date' | 'phone' | 'email'; required: boolean; no_future?: boolean };
 export type Definition = { instructions: string; instructions_fr: string; questions: Question[] };
 type Task = { id: number; name: string; status: string; version: number; template_version: number; practitioner_name: string; can_read_answers: boolean; required: boolean | number; appointment_id: number | null };
-type Detail = Task & { definition: Definition; answers: Record<string, string | boolean> | null };
+type Detail = Task & { definition: Definition; answers: Record<string, FormAnswer> | null };
 export function FormTasks({ request, clientId, customer = false, onLockedChange }: { request: FormRequest; clientId?: number; customer?: boolean; onLockedChange?: (locked: boolean) => void }) {
   const { t, i18n } = useTranslation();
-  const [items, setItems] = useState<Task[]>([]), [detail, setDetail] = useState<Detail | null>(null), [answers, setAnswers] = useState<Record<string, string | boolean>>({});
+  const [items, setItems] = useState<Task[]>([]), [detail, setDetail] = useState<Detail | null>(null), [answers, setAnswers] = useState<Record<string, FormAnswer>>({});
   const [page, setPage] = useState(1), [more, setMore] = useState(false), [reload, setReload] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false), [confirmed, setConfirmed] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [templates, setTemplates] = useState<{ id: number; name: string; version: number; practitioner_name: string }[] | null>(null), [templateId, setTemplateId] = useState(''), [templatePage, setTemplatePage] = useState(1), [templateMore, setTemplateMore] = useState(false), [assignmentKey, setAssignmentKey] = useState(() => crypto.randomUUID());
   const dirty = Boolean(customer && detail?.status === 'pending' && (Object.keys(answers).length || confirmed));
@@ -28,9 +29,11 @@ export function FormTasks({ request, clientId, customer = false, onLockedChange 
   const open = async (id: number) => { setBusy(true); setError(''); setNotice(''); setDetail(null); try { const data = await request(taskPath(id)); if (Number(data.id) !== id || !Array.isArray(data.definition?.questions)) throw new Error(t('Invalid form response.')); setDetail(data); setAnswers(data.answers ?? {}); setConfirmed(false); } catch (cause) { setError((cause as Error).message); } finally { setBusy(false); } };
   const leave = () => { if (dirty && !window.confirm(t('Discard these unsaved answers?'))) return; setDetail(null); setAnswers({}); setConfirmed(false); setError(''); };
   const submit = async () => {
-    if (!detail) return; setBusy(true); setError('');
+    if (!detail) return;
+    try { detail.definition.questions.forEach(q => typedAnswer(q, answers[q.id])); } catch (cause) { setError(t((cause as Error).message)); return; }
+    setBusy(true); setError('');
     try {
-      const data = await request(`${taskPath(detail.id)}/submit`, { method: 'POST', body: JSON.stringify({ version: Number(detail.version), answers, confirmed: true }) });
+      const data = await request(`${taskPath(detail.id)}/submit`, { method: 'POST', body: JSON.stringify({ version: Number(detail.version), answers: Object.fromEntries(detail.definition.questions.map(q => [q.id, typedAnswer(q, answers[q.id])]).filter(([, value]) => value !== undefined)), confirmed: true }) });
       if (Number(data.id) !== detail.id || !['submitted', 'reviewed'].includes(data.status)) throw new Error(t('Invalid form response.'));
       setUncertain(false); setDetail(null); setAnswers({}); setConfirmed(false); setNotice(t('Form submitted. Your answers have been saved.')); setReload(v => v + 1);
     } catch (cause) { const status = Number((cause as { status?: number }).status); setUncertain(!status || status >= 500); setError((cause as Error).message); }
@@ -49,7 +52,7 @@ export function FormTasks({ request, clientId, customer = false, onLockedChange 
       <Stack component="form" spacing={2} onSubmit={event => { event.preventDefault(); void submit(); }}>
         {detail.definition.questions.map(q => {
           const label = i18n.language.startsWith('fr') && q.label_fr ? q.label_fr : q.label; const disabled = busy || uncertain || !customer || detail.status !== 'pending';
-          return q.type === 'text' ? <TextField key={q.id} multiline fullWidth minRows={2} required={q.required} label={label} disabled={disabled} value={answers[q.id] ?? ''} inputProps={{ maxLength: 2000 }} onChange={event => setAnswers(a => ({ ...a, [q.id]: event.target.value }))}/>
+          return ['date', 'phone', 'email'].includes(q.type) ? <TypedFormField key={q.id} question={q} label={label} value={answers[q.id]} disabled={disabled} onChange={value => setAnswers(a => ({ ...a, [q.id]: value }))}/> : q.type === 'text' ? <TextField key={q.id} multiline fullWidth minRows={2} required={q.required} label={label} disabled={disabled} value={typeof answers[q.id] === 'string' ? answers[q.id] : ''} inputProps={{ maxLength: 2000 }} onChange={event => setAnswers(a => ({ ...a, [q.id]: event.target.value }))}/>
             : q.type === 'yes_no' ? <TextField key={q.id} select fullWidth label={label} required={q.required} disabled={disabled} value={answers[q.id] === true ? 'yes' : answers[q.id] === false ? 'no' : ''} onChange={event => setAnswers(a => { const next = { ...a }; if (!event.target.value) delete next[q.id]; else next[q.id] = event.target.value === 'yes'; return next; })}><MenuItem value="">{t('Not answered')}</MenuItem><MenuItem value="yes">{t('Yes')}</MenuItem><MenuItem value="no">{t('No')}</MenuItem></TextField>
               : <FormControlLabel key={q.id} label={label} control={<Checkbox required={q.required && !disabled} disabled={disabled} checked={answers[q.id] === true} onChange={event => setAnswers(a => ({ ...a, [q.id]: event.target.checked }))}/>}/>;
         })}
