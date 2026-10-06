@@ -9,6 +9,8 @@ import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { CustomerBooking } from './CustomerBooking';
 import { clearCustomerBookingIntent, customerBookingIntent } from './bookingIntent';
 import { CustomerAppointmentManager, type CustomerAppointment } from './CustomerAppointmentManager';
+import { pendingAppointmentLink, clearAppointmentLink } from './appointmentLink';
+import { CustomerAppointmentLink } from './CustomerAppointmentLink';
 
 export type CustomerStatus = { onboarding_status: 'not_linked' | 'pending_review' | 'linked'; review_code?: string; capabilities?: string[] };
 const emptyAddress = { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' };
@@ -21,7 +23,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
   const { t, i18n } = useTranslation();
   const canBook=status.capabilities?.includes('book_own_appointments')??false;
   const previousOnboarding = useRef(status.onboarding_status);
-  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking' | 'manage'>(status.onboarding_status === 'linked' ? (canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
+  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking' | 'manage' | 'link'>(status.onboarding_status === 'linked' ? (pendingAppointmentLink() ? 'link' : canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
   const [appointmentView, setAppointmentView] = useState<AppointmentView>('upcoming');
   const [showCanceled, setShowCanceled] = useState(() => { try { return localStorage.getItem('wellness.client.showCanceledAppointments') === 'true'; } catch { return false; } });
   const [profile, setProfile] = useState<Profile>(emptyProfile);
@@ -34,12 +36,14 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
   const [calendarDownloading, setCalendarDownloading] = useState<number | null>(null);
   const { markDirty, markClean } = useUnsavedForm();
   useEffect(() => {
-    if (status.onboarding_status === 'linked' && (mode === 'choose' || mode === 'invite')) setMode(canBook&&customerBookingIntent() ? 'booking' : 'appointments');
+    if (status.onboarding_status === 'linked' && (mode === 'choose' || mode === 'invite')) setMode(pendingAppointmentLink() ? 'link' : canBook&&customerBookingIntent() ? 'booking' : 'appointments');
   }, [canBook, mode, status.onboarding_status]);
   useEffect(() => {
     const wasLinked = previousOnboarding.current === 'linked';
     previousOnboarding.current = status.onboarding_status;
-    if (!wasLinked && status.onboarding_status === 'linked' && canBook && customerBookingIntent()) setMode('booking');
+    if (!wasLinked && status.onboarding_status === 'linked') {
+      if (pendingAppointmentLink()) setMode('link'); else if (canBook && customerBookingIntent()) setMode('booking');
+    }
   }, [canBook, status.onboarding_status]);
   useEffect(() => {
     if (status.onboarding_status !== 'linked' || !['profile','appointments'].includes(mode)) return;
@@ -99,7 +103,7 @@ export function CustomerWorkspace({ status, onRefresh }: { status: CustomerStatu
     {status.onboarding_status === 'linked' ? <Stack direction="row" spacing={1} flexWrap="wrap"><Button variant={mode === 'appointments' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('appointments')}>{t('My appointments')}</Button>{canBook&&<Button variant={mode === 'booking' ? 'contained' : 'text'} disabled={saving} onClick={() => { setNotice(''); setMode('booking'); }}>{t('Book appointment')}</Button>}<Button variant={mode === 'profile' ? 'contained' : 'text'} disabled={saving} onClick={() => setMode('profile')}>{t('My profile')}</Button></Stack>
       : <><Typography>{t('If the clinic has booked you before, request an invitation instead of creating another record. Email matching does not link accounts.')}</Typography><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}><Button onClick={() => setMode('profile')}>{t('I am a new client')}</Button><Button onClick={() => setMode('invite')}>{t('I have an invitation')}</Button></Stack></>}
     {error && <Alert severity="error">{error}{status.onboarding_status === 'linked' && <Button disabled={saving || loading} onClick={() => setReload(v => v + 1)}>{t('Reload saved information')}</Button>}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
-    {mode === 'booking' ? <CustomerBooking cancel={() => { clearCustomerBookingIntent(); setMode('appointments'); }} complete={id => { clearCustomerBookingIntent(); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : mode === 'manage' && managing ? <CustomerAppointmentManager appointment={managing} close={() => { setManaging(null); setMode('appointments'); }} complete={message => { setManaging(null); setNotice(message); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : loading ? <CircularProgress aria-label={t(mode === 'appointments' ? 'Loading appointments' : 'Loading your information…')} /> : mode === 'appointments' ? <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+    {mode === 'link' ? <CustomerAppointmentLink close={() => { clearAppointmentLink(); setMode('appointments'); }} complete={message => { setNotice(message); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }}/> : mode === 'booking' ? <CustomerBooking cancel={() => { clearCustomerBookingIntent(); setMode('appointments'); }} complete={id => { clearCustomerBookingIntent(); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : mode === 'manage' && managing ? <CustomerAppointmentManager appointment={managing} close={() => { setManaging(null); setMode('appointments'); }} complete={message => { setManaging(null); setNotice(message); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : loading ? <CircularProgress aria-label={t(mode === 'appointments' ? 'Loading appointments' : 'Loading your information…')} /> : mode === 'appointments' ? <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between" mb={2}>
         <Box><Typography variant="h6">{t('My appointments')}</Typography><Typography color="text.secondary">{t('Book a new appointment or manage an upcoming appointment here.')}</Typography></Box>
         <Stack direction="row" spacing={1} alignItems="center">

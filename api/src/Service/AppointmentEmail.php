@@ -35,11 +35,19 @@ final class AppointmentEmail
         $practitioner = trim((string)preg_replace('/[\x00-\x1F\x7F]/u', ' ', $practitioner));
         $practitionerLine = $reassigned && $practitioner !== '' ? 'Your appointment is now with ' . $practitioner . ".\n" : '';
         $practitionerLineFr = $reassigned && $practitioner !== '' ? 'Votre rendez-vous est maintenant avec ' . $practitioner . ".\n" : '';
+        $actionUrl = $event['appointment_action_url'] ?? null;
+        if ($actionUrl !== null && (!is_string($actionUrl) || !preg_match('#^' . preg_quote($url . '/appointment#token=', '#') . '[a-f0-9]{64}$#D', $actionUrl))) {
+            throw new InvalidArgumentException('Invalid appointment action URL.');
+        }
+        $actionLine = $actionUrl !== null && $code !== 'booking_cancellation' ? 'Review, reschedule or cancel (client sign-in required): ' . $actionUrl . "\n" : '';
+        $actionLineFr = $actionUrl !== null && $code !== 'booking_cancellation' ? 'Voir, reporter ou annuler (connexion client requise) : ' . $actionUrl . "\n" : '';
         $body = $words[2] . "\n" . $practitionerLine . 'Appointment: ' . $local . "\n"
             . $calendarNote
+            . $actionLine
             . 'Sign in to review your appointment: ' . $url . "\n\n"
             . $words[3] . "\n" . $practitionerLineFr . 'Rendez-vous : ' . $local . "\n"
             . $calendarNoteFr
+            . $actionLineFr
             . 'Ouvrez une session pour voir votre rendez-vous : ' . $url . "\n\n"
             . $clinic;
         return ['subject' => $clinic . ' — ' . $words[0] . ' / ' . $words[1], 'body' => $body];

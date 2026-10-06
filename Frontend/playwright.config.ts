@@ -15,7 +15,7 @@ const env = {
   VITE_RELEASE_NAME: 'test-release',
 };
 export default defineConfig({
-  testDir: './tests', testMatch: ['**/portal.spec.ts', '**/customer.spec.ts', '**/client-overview.spec.ts'], fullyParallel: true, workers: 2,
+  testDir: './tests', testMatch: ['**/portal.spec.ts', '**/customer.spec.ts', '**/client-overview.spec.ts', '**/appointment-action-links.spec.ts'], fullyParallel: true, workers: 2,
   outputDir: './test-results/browser',
   use: { browserName: 'chromium', channel: process.env.PLAYWRIGHT_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined), trace: 'retain-on-failure' },
   webServer: [

@@ -13,6 +13,7 @@ final class NotificationWorker
         private readonly GraphMailClient $mailer,
         private readonly string $clientPortalUrl,
         private readonly ?VoipMsSmsClient $sms = null,
+        private readonly bool $appointmentActionLinksEnabled = false,
     ) {}
 
     /** @return array{sent:int,retry:int,review:int,canceled:int} */
@@ -33,6 +34,9 @@ final class NotificationWorker
                     || ($event['channel'] === 'sms' && strtotime((string)$details['scheduled_at'] . ' UTC') < time() - 3600)
                     || (str_starts_with((string)$details['event_code'], 'staff_') && !$this->staffRecipientStillAllowed($details));
                 $staffNotice = !$superseded && str_starts_with((string)$details['event_code'], 'staff_');
+                if (!$superseded && !$staffNotice && $event['channel'] === 'email') {
+                    $details['appointment_action_url'] = (new AppointmentActionLinks($this->pdo, $this->appointmentActionLinksEnabled))->issue($details, $this->clientPortalUrl);
+                }
                 $message = $superseded ? null : ($event['channel'] === 'sms'
                     ? StaffAppointmentSms::compose($details, $this->clientPortalUrl)
                     : ($staffNotice ? StaffAppointmentEmail::compose($details, $this->clientPortalUrl) : AppointmentEmail::compose($details, $this->clientPortalUrl)));

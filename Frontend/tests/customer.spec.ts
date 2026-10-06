@@ -905,6 +905,6 @@ test("linked client reschedules and cancels only their own upcoming appointment"
   await expect(page.getByText(/will apply a \$60.00 cancellation fee/)).toBeVisible();
   await page.getByRole("button", { name: "Confirm cancellation" }).click();
   await expect(page.getByText("Appointment #41 was canceled.")).toBeVisible();
-  expect(changes[1]).toMatchObject({ action: "cancel", version: 3 });
+  expect(changes[1]).toMatchObject({ action: "cancel", version: 3, expected_cancellation_fee_cents: 6000 });
   expect(changes[1]).not.toHaveProperty("client_id");
 });

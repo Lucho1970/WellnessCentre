@@ -28,7 +28,8 @@ try {
     $sms = filter_var($env('SMS_ENABLED'), FILTER_VALIDATE_BOOL)
         ? new VoipMsSmsClient($env('VOIPMS_API_USERNAME'), $env('VOIPMS_API_PASSWORD'), $env('VOIPMS_FROM_DID'))
         : null;
-    $worker = new NotificationWorker((new Database(Config::fromEnvironment()))->connection(), $mailer, $portalUrl, $sms);
+    $config = Config::fromEnvironment();
+    $worker = new NotificationWorker((new Database($config))->connection(), $mailer, $portalUrl, $sms, $config->appointmentActionLinksEnabled);
     $result = $worker->run($limit);
     fwrite(STDOUT, json_encode($result, JSON_THROW_ON_ERROR) . "\n");
 } catch (Throwable $e) {

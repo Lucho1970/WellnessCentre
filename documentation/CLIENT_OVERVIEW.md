@@ -45,7 +45,7 @@ Views audit `client.appointments.view`, `client.appointment_changes.view` and `c
 
 ## Deployment and acceptance
 
-This feature has not been deployed. It introduces **no new SQL migration or environment settings**. The shared private API must already have the current appointment schema (including cancellation snapshot fields and migration 029 reassignment history), client-merge tables (006), and identity/membership foundation (032). These are prerequisites, not instructions to rerun existing migrations. Migration 033's invitation tables are not required for this read-only feature while invitations remain disabled.
+The owner reported the uploaded deployment working on 6 October 2026; broader database/isolation acceptance remains separate. This feature introduces **no new SQL migration or environment settings**. The shared private API must already have the current appointment schema (including cancellation snapshot fields and migration 029 reassignment history), client-merge tables (006), and identity/membership foundation (032). These are prerequisites, not instructions to rerun existing migrations. Migration 033's invitation tables are not required for this read-only feature while invitations remain disabled.
 
 Deploy the matching private `src/Api.php` and new `src/Service/ClientOverviewService.php` with the current source prerequisites, and rebuild/upload the portal frontend. Keep `.env` and private runtime files intact. Do not upload PHP service classes into the public `api/` folder. The old client-management release packages documented elsewhere do not contain this feature. No deployment package was generated or uploaded during this implementation.
 

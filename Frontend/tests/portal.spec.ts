@@ -9,6 +9,18 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+test('administrator revokes existing appointment links only after confirmation',async({page})=>{
+  await fixtures(page,['super_admin']);
+  const appointment={id:41,client_name:'Test Client',service_name:'Massage',practitioner_name:'Practitioner',location_name:'Main',timezone:'America/Toronto',room_id:null,room_name:null,duration_option_id:1,starts_at:'2099-10-01 14:00:00',ends_at:'2099-10-01 15:00:00',status:'confirmed',version:1,delivery_mode:'clinic',destination_snapshot:null,travel_buffer_minutes:0,base_price_cents:10000,mobile_fee_cents:0,action_links_enabled:true};
+  let revocations=0;
+  await page.route('**/api/v1/appointments?**',route=>route.fulfill({json:{data:[appointment]}}));
+  await page.route('**/api/v1/appointments/41',route=>route.fulfill({json:{data:appointment}}));
+  await page.route('**/api/v1/appointments/41/logistics-notes',route=>route.fulfill({json:{data:{notes:[],truncated:false}}}));
+  await page.route('**/api/v1/appointments/41/action-links/revoke',route=>{revocations++;expect(route.request().method()).toBe('POST');return route.fulfill({json:{data:{revoked:true}}});});
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await page.getByRole('button',{name:'Revoke existing email links'}).click();expect(revocations).toBe(0);
+  await page.getByRole('button',{name:'Confirm link revocation'}).click();await expect(page.getByText('Existing appointment email links were revoked.')).toBeVisible();expect(revocations).toBe(1);
+});
 test.beforeEach(({ page }) => {
   const list: string[] = [];
   errors.set(page, list);

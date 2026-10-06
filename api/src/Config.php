@@ -39,6 +39,7 @@ final readonly class Config
         public string $staffExternalSubdomain = '',
         public string $staffExternalApiClientId = '',
         public string $staffExternalSpaClientId = '',
+        public bool $appointmentActionLinksEnabled = false,
     ) {}
 
     public static function fromEnvironment(): self
@@ -82,6 +83,7 @@ final readonly class Config
             $value('STAFF_EXTERNAL_SUBDOMAIN'),
             $value('STAFF_EXTERNAL_API_CLIENT_ID'),
             $value('STAFF_EXTERNAL_SPA_CLIENT_ID'),
+            filter_var($value('APPOINTMENT_ACTION_LINKS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
         );
     }
 

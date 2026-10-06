@@ -220,6 +220,7 @@ final class BookingService
                 $preview=CancellationPolicy::preview($appointment);$fee=0;
                 if($actor->userType==='client'){
                     if(array_key_exists('apply_cancellation_fee',$body)||array_key_exists('adjusted_fee_cents',$body))throw new ApiException(422,'validation_error','Clients cannot alter the cancellation fee.');
+                    CancellationPolicy::acknowledge($body, $preview);
                     $fee=(int)$preview['fee_cents'];
                 }elseif((bool)($body['apply_cancellation_fee']??false)){
                     if(!$actor->hasAnyRole('super_admin','clinic_admin','reception'))throw new ApiException(403,'forbidden','Your role cannot assess a client cancellation fee.');

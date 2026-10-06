@@ -151,6 +151,7 @@ final class Api
                 $routes->addRoute('POST','/api/v1/address-coverage/approve','approveAddressCoverage');
                 $routes->addRoute('POST','/api/v1/address-coverage/revoke','revokeAddressCoverage');
                 $routes->addRoute('GET','/api/v1/clients','clients');
+                $routes->addRoute('POST','/api/v1/appointments/{id:\\d+}/action-links/revoke','revokeAppointmentActionLinks');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments','clientAppointments');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments/{appointment:\\d+}/history','clientAppointmentChanges');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/practitioner-access','clientPractitionerAccess');
@@ -281,7 +282,7 @@ final class Api
                 'adminAvatar'=>$this->profiles->avatar($this->user($request),(int)$route[2]['id']),
                 'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
-                'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId) + ['action_links_enabled'=>$this->config->appointmentActionLinksEnabled],
                 'appointmentReassignmentOptions'=>$this->bookings->reassignmentOptions($this->user($request),(int)$route[2]['id']),
                 'appointmentLogisticsNotes'=>$this->appointmentLogisticsNotes->list($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createAppointmentLogisticsNote'=>$this->appointmentLogisticsNotes->create($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
@@ -306,6 +307,7 @@ final class Api
                 'appointmentAvailability'=>$this->bookings->updateAvailability($this->user($request),(int)$route[2]['id'],$request->query),
                 'appointmentCancellationPreview'=>$this->bookings->cancellationPreview($this->user($request),(int)$route[2]['id']),
                 'clients'=>$this->clients->search($this->user($request),$request->query),
+                'revokeAppointmentActionLinks'=>(new \Wellness\Service\AppointmentActionLinks($this->database->connection(),$this->config->appointmentActionLinksEnabled,new AuditLogger($this->database)))->revoke($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'clientAppointments'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointments($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
                 'clientAppointmentChanges'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointmentChanges($this->user($request),(int)$route[2]['id'],(int)$route[2]['appointment'],$request->query,$request->correlationId),
                 'clientPractitionerAccess'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->practitionerAccess($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
@@ -417,6 +419,7 @@ final class Api
         $identity = $session['identity_id'];
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        if ($route === 'POST appointment-links/resolve') return (new \Wellness\Service\AppointmentActionLinks($this->database->connection(),$this->config->appointmentActionLinksEnabled,new AuditLogger($this->database)))->resolve($bookingActor(),$r->body,$r->correlationId);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/availability$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->updateAvailability($bookingActor(),(int)$matches[1],$r->query);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/calendar$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->customerCalendar($bookingActor(),(int)$matches[1],$this->config->clientPortalUrl);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/cancellation-preview$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->cancellationPreview($bookingActor(),(int)$matches[1]);

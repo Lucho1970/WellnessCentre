@@ -3,7 +3,7 @@ import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } fro
 import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
-import { customerFetch } from './session';
+import { customerFetch, CustomerRequestError } from './session';
 
 export type CustomerAppointment = {
   id: number; starts_at: string; ends_at: string; status: string; version: number;
@@ -59,11 +59,21 @@ export function CustomerAppointmentManager({ appointment, close, complete }: Pro
     setBusy(true); setError('');
     try {
       const body = action === 'cancel'
-        ? { action, version: appointment.version, reason }
+        ? { action, version: appointment.version, reason, expected_cancellation_fee_cents: Number(cancellation?.fee_cents) }
         : { action, version: appointment.version, starts_at: slot!.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), reason };
       await customerFetch(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify(body) });
       complete(t(action === 'cancel' ? 'Appointment #{{id}} was canceled.' : 'Appointment #{{id}} was rescheduled.', { id: appointment.id }));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to change the appointment.')); }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t('Unable to change the appointment.'));
+      if (cause instanceof CustomerRequestError && ['schedule_conflict','room_conflict'].includes(cause.code)) {
+        setSlots([]); setSlot(null); setSearched(false); setRoom('');
+      }
+      if (cause instanceof CustomerRequestError && cause.code === 'cancellation_fee_changed') {
+        setCancellation(null);
+        try { setCancellation(await customerFetch(`/appointments/${appointment.id}/cancellation-preview`)); }
+        catch { setError(t('Unable to load the cancellation policy.')); }
+      }
+    }
     finally { setBusy(false); }
   };
 
@@ -91,7 +101,7 @@ export function CustomerAppointmentManager({ appointment, close, complete }: Pro
       <Alert severity="warning">{t('Canceling releases the appointment time. The canceled appointment remains in your history.')}</Alert>
       {cancellation && <Alert severity={cancellation.fee_cents > 0 ? 'warning' : 'info'}>{cancellation.fee_cents > 0 ? t('Canceling now will apply a {{fee}} cancellation fee under the policy accepted when this appointment was booked.', { fee: formatCad(cancellation.fee_cents, i18n.resolvedLanguage) }) : t('No cancellation fee applies if you cancel now.')}</Alert>}
       <TextField label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
-      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('details')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
+      <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('details')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy || !cancellation} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
     </Stack>}
   </Paper>;
 }

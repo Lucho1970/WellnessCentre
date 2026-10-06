@@ -3,6 +3,7 @@ import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divid
 import { CalendarClock, CalendarPlus, CalendarX, Eye, RefreshCw, UserRoundCheck, X } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
+import { AppointmentLinkRevocation } from './AppointmentLinkRevocation';
 import { formatCad, formatDateTime } from '../i18n/format';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
@@ -32,7 +33,7 @@ function phoneHrefs(value?: string | null) {
   const phone = (value ?? '').replace(/[^\d+]/g, '');
   return /^\+?\d{7,15}$/.test(phone) ? { call: `tel:${phone}`, text: `sms:${phone}` } : null;
 }
-type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
+type Appointment = { action_links_enabled?: boolean; delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string, readonly fields: Record<string, unknown> = {}) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
@@ -165,6 +166,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
         {detailsRecord && <AppointmentLogisticsNotes key={selected.id} appointmentId={selected.id} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && <PractitionerVisitHistory appointmentId={selected.id} serviceName={selected.service_name} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && detailsRecord && <PractitionerVisitOutcome appointment={detailsRecord} request={request} onChanged={message => { setNotice(message); setDetailsOpen(false); setRefresh(value => value + 1); }} />}
+        {!practitionerMode && canManageFees && detailsRecord?.action_links_enabled && <AppointmentLinkRevocation key={detailsRecord.id} appointmentId={detailsRecord.id} request={request}/>}
         {canBook && <Stack direction="row" gap={1}><Button disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button>{!practitionerMode && canManageFees && <Button disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}</Stack>}
       </Stack></>}
     </Drawer>
