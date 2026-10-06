@@ -12,7 +12,7 @@ This release adds client appointment history, saved operational appointment chan
 
 No new SQL migration or environment setting is needed for the client overview itself. Existing prerequisites are client merge tables (006), appointment cancellation snapshot fields (015), reassignment history (029), and identity/membership foundation (032). Do not import the entire `sql-updates` directory or rerun migrations already applied.
 
-The source also contains the previously developed practitioner invitation pilot. Keep **`PRACTITIONER_INVITATIONS_ENABLED=false`** (or absent, its disabled default) until that pilot's separate identity-provider, migration 033 and acceptance prerequisites are complete. Preserve the existing staff membership pilot settings that were already tested with Esther; deploying this release does not migrate her identity or enable invitations.
+The source also contains the previously developed practitioner invitation pilot. Keep the private API setting **`STAFF_INVITATIONS_ENABLED=false`** (or absent, its disabled default) and frontend build setting **`VITE_STAFF_INVITATIONS_ENABLED=false`** until that pilot's separate identity-provider, migration 033 and acceptance prerequisites are complete. Preserve the existing staff membership pilot settings that were already tested with Esther; deploying this release does not migrate her identity or enable invitations.
 
 ## Acceptance after upload
 
