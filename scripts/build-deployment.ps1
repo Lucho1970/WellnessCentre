@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$ReleaseName,
-    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
+    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md','RECURRING_APPOINTMENTS_RELEASE.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
 )
 $ErrorActionPreference = 'Stop'
 if ($ReleaseName -notmatch '^[a-zA-Z0-9_-]+$') { throw 'Use letters, digits, underscores, and hyphens for ReleaseName.' }
@@ -83,6 +83,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'api/database/maintenance') -Destination
 Copy-Item -LiteralPath (Join-Path $repo 'documentation/PORTAL_HOST_CUTOVER.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'documentation/PRACTITIONER_PERSON_CARD.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo "documentation/$DeploymentGuide") -Destination $destination -Force
+if ($DeploymentGuide -eq 'RECURRING_APPOINTMENTS_RELEASE.md') {
+    Copy-Item -LiteralPath (Join-Path $repo 'documentation/RECURRING_APPOINTMENTS.md') -Destination $destination
+}
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
 $manifest = [ordered]@{ release_name=$ReleaseName; source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-clinic-portal-and-neutral-landing'; deployment_guide=$DeploymentGuide; archives=@() }
