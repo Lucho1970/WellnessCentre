@@ -278,3 +278,20 @@ test('source viewing remains available with draft storage disabled', async ({ pa
   await page.goto(`${host}/practitioner/forms`); await expect(page.getByRole('button', { name: 'Import form JSON', exact: true })).toHaveCount(0); await page.getByRole('button', { name: 'View source', exact: true }).click(); const panel = page.getByRole('dialog'); await expect(panel.getByRole('textbox', { name: 'Form JSON source' })).toBeVisible();
   await panel.getByRole('button', { name: 'Close', exact: true }).click(); await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: 'Publish new version', exact: true })).toBeEnabled(); expect(draftRequests).toBe(0);
 });
+test('configured question limit permits more than 30 questions and stops at the API limit', async ({ page }) => {
+  await fixture(page, 'practitioner');
+  const expanded = { ...template, form_type: 'intake', definition: { ...definition, sections: [{ id: 'info', title: 'Information' }], questions: Array.from({ length: 30 }, (_, index) => ({ ...definition.questions[0], id: `q${index}`, section_id: 'info' })) } };
+  await page.route('**/api/v1/forms/templates?*', route => route.fulfill({ json: { data: { items: [expanded], practitioners: [{ id: 7, display_name: 'Esther' }], services: [], can_author: true, drafts_enabled: true, max_questions: 32, has_more: false } } }));
+  let saved: any;
+  await page.route('**/api/v1/forms/drafts', route => route.request().method() === 'POST' ? (saved = route.request().postDataJSON(), route.fulfill({ json: { data: { id: 91, version: 1, status: 'draft' } } })) : route.fulfill({ json: { data: { items: [], has_more: false } } }));
+  await page.goto(`${host}/practitioner/forms`);
+  await page.getByRole('button', { name: 'Create new version', exact: true }).click();
+  const sectionAdd = page.getByRole('button', { name: 'Add question to Information', exact: true });
+  const add = page.getByRole('button', { name: 'Add question', exact: true });
+  await expect(add).toBeEnabled(); await expect(sectionAdd).toBeEnabled();
+  await sectionAdd.click(); await add.click();
+  await expect(add).toBeDisabled(); await expect(sectionAdd).toBeDisabled();
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('Draft saved. You can return after signing in again.')).toBeVisible();
+  expect(saved.definition.questions).toHaveLength(32);
+});

@@ -47,3 +47,7 @@ To disable only the new storage workflow, set `FORM_TEMPLATE_DRAFTS_ENABLED=fals
 Use the fuller acceptance checklist in `CLIENT_INTAKE_FORMS.md`, including merged clients, retry behavior and French/mobile navigation. Exact hosted database/provider behavior and clinical/privacy review remain outstanding.
 
 If acceptance fails, set `CLIENT_FORMS_ENABLED=false` and restore the previously matching API/portal files together. Preserve the migration and form/template/submission/consent history; do not drop tables to roll back application files.
+
+### Question capacity setting
+
+The private API now defaults to 100 questions per form. Optional `/wellness-api/.env` setting `FORM_TEMPLATE_MAX_QUESTIONS=100` accepts integers 1-200; invalid/unset values use 100. Deploy both the rebuilt wellness portal and private API for the editor to use the reported limit. No SQL migration is required. Back up unsaved JSON before reloading. Other section/option/definition-size limits still apply.

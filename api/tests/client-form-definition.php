@@ -66,4 +66,16 @@ $denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($sin
 $denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($single,['options'=>[$options[0],$options[0]]])]],'intake',true));
 $denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($q,['answers'=>['private']])]],'intake',true));
 $denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($q,['label'=>str_repeat('a',501)])]],'intake',true));
+$priorLimit=$_ENV['FORM_TEMPLATE_MAX_QUESTIONS']??null;
+try {
+    $_ENV['FORM_TEMPLATE_MAX_QUESTIONS']='100';
+    $many=['questions'=>array_map(fn($n)=>array_replace($q,['id'=>'q'.$n]),range(1,100))];
+    $assert(count(ClientFormDefinition::definition($many,'intake')['questions'])===100);
+    $assert(count(ClientFormDefinition::definition($many,'intake',true)['questions'])===100);
+    $denies(fn()=>ClientFormDefinition::definition(['questions'=>array_merge($many['questions'],[array_replace($q,['id'=>'q101'])])],'intake',true));
+    $_ENV['FORM_TEMPLATE_MAX_QUESTIONS']='35';
+    $assert(ClientFormDefinition::maxQuestions()===35);
+    $denies(fn()=>ClientFormDefinition::definition($many,'intake',true));
+    foreach(['bad','0','201','1.5'] as $limit){$_ENV['FORM_TEMPLATE_MAX_QUESTIONS']=$limit;$assert(ClientFormDefinition::maxQuestions()===100);}
+} finally { if($priorLimit===null)unset($_ENV['FORM_TEMPLATE_MAX_QUESTIONS']);else $_ENV['FORM_TEMPLATE_MAX_QUESTIONS']=$priorLimit; }
 echo "Client form definition: $checks checks passed.\n";

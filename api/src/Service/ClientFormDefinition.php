@@ -8,6 +8,11 @@ use libphonenumber\PhoneNumberUtil;
 
 final class ClientFormDefinition
 {
+    public static function maxQuestions(): int {
+        $raw=$_ENV['FORM_TEMPLATE_MAX_QUESTIONS']??getenv('FORM_TEMPLATE_MAX_QUESTIONS');
+        $limit=filter_var($raw,FILTER_VALIDATE_INT,['options'=>['min_range'=>1,'max_range'=>200]]);
+        return $limit===false?100:$limit;
+    }
     private static function invalid(): never { throw new ApiException(422,'invalid_form','Check the form questions and required answers.'); }
     private static function text(mixed $value,int $limit,bool $required=false): string {
         if(!is_string($value)||strlen($value)>$limit||($required&&trim($value)===''))self::invalid();
@@ -16,7 +21,7 @@ final class ClientFormDefinition
     public static function definition(mixed $value,string $type,bool $draft=false): array {
         if(!is_array($value)||array_diff(array_keys($value),['instructions','instructions_fr','questions','sections']))self::invalid();
         $questions=$value['questions']??null;
-        if(!is_array($questions)||!array_is_list($questions)||count($questions)<1||count($questions)>30)self::invalid();
+        if(!is_array($questions)||!array_is_list($questions)||count($questions)<1||count($questions)>self::maxQuestions())self::invalid();
         $result=['instructions'=>self::text($value['instructions']??'',5000),'instructions_fr'=>self::text($value['instructions_fr']??'',5000),'questions'=>[]];$ids=[];$consent=false;
         $sections=array_key_exists('sections',$value)?$value['sections']:[];$sectionIds=[];
         if(!is_array($sections)||!array_is_list($sections)||count($sections)>15)self::invalid();
