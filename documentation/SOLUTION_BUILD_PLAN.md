@@ -878,4 +878,6 @@ Follow-up on `feature/form-drafts-json-import`: explicit private form-author Sav
 
 ### Supervised Esther identity migration
 
+**Superseded pilot decision, 7 October 2026:** the owner chose a fresh Esther account because existing clients are test data. Continue with [Google practitioner rollout](GOOGLE_PRACTITIONER_ROLLOUT.md), dedicated External ID staff apps and normal verified invitation approval. Do not run migration SQL, delete client records or deactivate the old account before the new login passes acceptance.
+
 Separate maintenance SQL now prepares a reviewed migration of Esther's existing user 2 / clinic 1 workforce membership to the dedicated external staff identity. See [Esther SQL migration](ESTHER_IDENTITY_MIGRATION.md). It uses a verified pending invitation claim, preserves practitioner and related records, and includes guarded rollback. No normal app approval flow or public maintenance endpoint is added. Provider/Google/MFA setup, enabled staff external build, hosted database rehearsal and final login acceptance remain outstanding; no hosted account has been migrated.

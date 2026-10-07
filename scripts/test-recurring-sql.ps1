@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$MariaDbDirectory,
     [string]$PhpExecutable = 'php',
     [ValidateRange(1024, 65535)][int]$Port = 13317,
-    [ValidateSet('recurring-bookings.php','client-forms.php','staff-identity-migration.php')][string]$IntegrationTest = 'recurring-bookings.php'
+    [ValidateSet('recurring-bookings.php','client-forms.php','staff-identity-migration.php','staff-invitations.php')][string]$IntegrationTest = 'recurring-bookings.php'
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -19,7 +19,8 @@ try { $probe.Start() } finally { $probe.Stop() }
 $run = Join-Path $repo ('.tmp/recurring-sql-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $run | Out-Null
 $data = Join-Path $run 'data'
-$names = @('RECURRING_TEST_ALLOW_CREATE', 'RECURRING_TEST_PORT', 'RECURRING_TEST_USER', 'RECURRING_TEST_PASSWORD')
+$prefix = if ($IntegrationTest -eq 'staff-invitations.php') { 'STAFF_INVITATION_TEST' } else { 'RECURRING_TEST' }
+$names = @("${prefix}_ALLOW_CREATE", "${prefix}_PORT", "${prefix}_USER", "${prefix}_PASSWORD")
 $previous = @{}
 foreach ($name in $names) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 $process = $null
@@ -38,10 +39,10 @@ try {
         Start-Sleep -Milliseconds 500
     }
     if (-not $ready) { throw "MariaDB readiness timed out. Inspect $run" }
-    [Environment]::SetEnvironmentVariable('RECURRING_TEST_ALLOW_CREATE', 'true', 'Process')
-    [Environment]::SetEnvironmentVariable('RECURRING_TEST_PORT', [string]$Port, 'Process')
-    [Environment]::SetEnvironmentVariable('RECURRING_TEST_USER', 'root', 'Process')
-    [Environment]::SetEnvironmentVariable('RECURRING_TEST_PASSWORD', '', 'Process')
+    [Environment]::SetEnvironmentVariable("${prefix}_ALLOW_CREATE", 'true', 'Process')
+    [Environment]::SetEnvironmentVariable("${prefix}_PORT", [string]$Port, 'Process')
+    [Environment]::SetEnvironmentVariable("${prefix}_USER", 'root', 'Process')
+    [Environment]::SetEnvironmentVariable("${prefix}_PASSWORD", '', 'Process')
     & $php (Join-Path $repo "api/tests/integration/$IntegrationTest")
     if ($LASTEXITCODE -ne 0) { throw "Real SQL acceptance failed: $IntegrationTest" }
 } finally {

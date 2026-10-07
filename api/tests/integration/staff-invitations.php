@@ -23,9 +23,8 @@ $schema=file_get_contents(dirname(__DIR__,2).'/database/schema.sql');
 $pdo->exec(preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m','',$schema));
 $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Synthetic Clinic A'),(2,'Synthetic Clinic B');
  INSERT INTO locations(id,clinic_id,name) VALUES(1,1,'Main A'),(2,2,'Main B');
- INSERT INTO roles(id,code,name) VALUES(1,'super_admin','Super admin'),(2,'practitioner','Practitioner');
  INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(1,1,'admin@example.test','Admin','staff','active'),(2,1,'legacy@example.test','Legacy','staff','active');
- INSERT INTO user_roles(user_id,role_id,assigned_by) VALUES(1,1,1);
+ INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT 1,id,1 FROM roles WHERE code='super_admin';
  INSERT INTO practitioners(user_id,discipline) VALUES(2,'Massage');");
 $config=new Config('test',false,'test',[],'127.0.0.1',$port,$name,'','','workforce','workforce-api','scope',300,
  clinicHostMap:['a.test'=>1,'b.test'=>2],staffInvitationsEnabled:true);
