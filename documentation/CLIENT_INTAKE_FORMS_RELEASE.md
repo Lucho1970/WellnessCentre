@@ -4,6 +4,8 @@ This package contains the matching intake forms API and portal implementation. P
 
 The sections release also contains Date, Phone number and Email answer types, optional no-future-date restrictions, and ordered sections with bilingual titles/descriptions. No additional SQL is required after migration 036. Upload both required archives, including the private API's updated `vendor` dependencies, before publishing these field types or sections. Earlier packages do not contain these additions.
 
+The choices release adds Single choice radio buttons and Multiple choice checkboxes with editable English/French options. It includes the preceding sections and typed-field changes. There is no new SQL migration. Upload its two matching archives before publishing choice questions; previous packages do not render or validate them.
+
 ## Required uploads
 
 1. Back up the existing private API and Willow portal files. Keep `CLIENT_FORMS_ENABLED=false` in private `/wellness-api/.env` during upload. Preserve that file and existing authentication, clinic routing and other rollout settings.
@@ -21,6 +23,7 @@ Only these two archives are required for this feature. The public website, neutr
 - Test Date, Phone number and Email questions, including the no-future-date option for birth dates. Phone entry should support a country selection and save an international number; invalid entries must not submit. Existing assignments must retain their original types and sections after a new version is published.
 - Client details: **Client forms**. Assign directly and inspect status; admin/reception must not see answers.
 - Client account: **My forms**. Submit explicitly, including a required No answer and consent acknowledgment where applicable.
+- Publish an Average stress level radio question with Low/Moderate/High and a checkbox question allowing several answers. Verify required questions reject empty selections, only one radio answer can be chosen, multiple checkboxes can be selected, and saved selections are read-only. Publish changed options in a new version and confirm old assignments retain their original labels.
 - Assigned practitioner: open the submitted form and mark it reviewed. Another practitioner/client must not read it.
 - Book a matching service with the template owner and confirm an automatic assignment; canceled pending assignments are revoked. Verify recurring previews/conflicts leave no tasks.
 

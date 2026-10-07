@@ -23,7 +23,15 @@ Section IDs are stable within a versioned form, unique, and referenced by each q
 
 Published title, description, order or membership changes require **Create new version**. Existing assignments and submissions retain their original section structure, including descriptions, and version history displays it. No SQL migration or new runtime flag is required. Matching API/portal code must be uploaded; previously generated ZIPs do not contain this follow-up.
 
-### Typed answer fields
+### Radio buttons and checkboxes
+
+`feature/form-choice-fields` adds **Single choice (radio buttons)** and **Multiple choice (checkboxes)**. Enter the question label, then 2–20 options with English labels and optional French labels. Options may be added or removed while editing an unpublished version. For example, **Average stress level** can offer Low, Moderate and High as a single-choice question. Use multiple choice when several answers are allowed.
+
+Required single-choice questions need one selected option; required multiple-choice questions need at least one. Optional selections may be left blank, optional radio selections can be cleared, and unknown or duplicate option IDs are rejected. Answers store stable option IDs (one string or an array), while the assigned definition retains the original labels. Checkbox answers are sorted before storage/retry comparison so selection order cannot create a second submission. Saved selections are read-only and display labels from the assigned version, including French fallback behavior.
+
+Changing a question type or its options requires a new published version. Older assignments retain their original choices and answers. Choice options appear in version history. Answer-access permissions, audit exclusions and private response storage are unchanged. No additional SQL or runtime flag is required; matching private API and portal files must be deployed together. Earlier sections-only packages do not contain these types.
+
+### Date, phone number and email fields
 
 The `feature/form-date-phone-fields` follow-up adds three answer types without another SQL migration. A published Text question can become one of these types in a new version; previous assignments and answers retain their original types. Revoke a pending old assignment and assign the new version if the client should receive the updated fields.
 
@@ -96,5 +104,7 @@ The Date/Phone/Email follow-up passed both frontend builds, TypeScript/content/t
 The sections follow-up passed both frontend builds, TypeScript/content/translation checks (1,646 keys), all 47 PHP fixture files (including 71 definition checks), changed-file PHP syntax, 53 forms SQL checks plus 34 recurrence checks on disposable MariaDB 11.4.8, all 15 focused forms browser scenarios, and 13 production-build smoke tests. The French section-title/description layout was inspected at 390 pixels. Existing bundle-size warnings remain; exact hosted acceptance and deployment are still outstanding.
 
 ## Subsequent forms work
+
+Choice-field validation on 6 October 2026: both frontend builds, TypeScript/content/translation checks (1,657 keys), all 47 PHP fixture files (including 94 definition checks), changed-file PHP syntax, 59 forms SQL checks plus 34 recurrence checks on disposable MariaDB 11.4.8, and 19 forms browser scenarios passed. The read-only French radio/checkbox mobile layout was inspected at 390 pixels. Existing bundle-size warnings remain. Hosted acceptance is separate; the existing local English translation edit is excluded from the feature commit and package.
 
 Draft saving, append-only amendments, configurable due dates/reminders, historical assignment backfills, template archival, consent withdrawal, uploads/private storage/malware scanning, practitioner notes, exports and retention/deletion policies remain separate development steps. Intake completion does not yet block appointment booking or invoice a client.

@@ -4,20 +4,28 @@ import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type C
 import type { Question } from './FormTasks';
 
 export type PhoneAnswer = { number: string; country: CountryCode };
-export type FormAnswer = string | boolean | PhoneAnswer;
+export type FormAnswer = string | boolean | string[] | PhoneAnswer;
 export function formToday() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type)?.value).join('-');
 }
-export function typedAnswer(question: Question, value: FormAnswer | undefined): string | boolean | undefined {
-  if (value === undefined || value === '' || (typeof value === 'object' && value.number.trim() === '')) {
+export function typedAnswer(question: Question, value: FormAnswer | undefined): string | boolean | string[] | undefined {
+  if (value === undefined || value === '' || (typeof value === 'object' && !Array.isArray(value) && value.number.trim() === '')) {
     if (question.required) throw new Error('Check the form questions and required answers.');
     return undefined;
   }
+  if (question.type === 'single_choice') {
+    if (typeof value !== 'string' || !question.options?.some(option => option.id === value)) throw new Error('Choose a valid option.');
+    return value;
+  }
+  if (question.type === 'multiple_choice') {
+    if (!Array.isArray(value) || value.some(id => !question.options?.some(option => option.id === id)) || new Set(value).size !== value.length || (question.required && !value.length)) throw new Error('Select at least one valid option.');
+    return value.length ? [...value].sort() : undefined;
+  }
   if (question.type === 'phone') {
-    const raw = typeof value === 'object' ? value.number : String(value);
+    const raw = typeof value === 'object' && !Array.isArray(value) ? value.number : String(value);
     if (raw.length > 40 || !/^[+\d\s().-]+$/.test(raw)) throw new Error('Enter a valid phone number for the selected country.');
-    const phone = parsePhoneNumberFromString(raw, { defaultCountry: typeof value === 'object' ? value.country : 'CA', extract: false });
+    const phone = parsePhoneNumberFromString(raw, { defaultCountry: typeof value === 'object' && !Array.isArray(value) ? value.country : 'CA', extract: false });
     if (!phone?.isValid() || phone.ext) throw new Error('Enter a valid phone number for the selected country.');
     return phone.number;
   }
@@ -37,8 +45,8 @@ export function typedAnswer(question: Question, value: FormAnswer | undefined): 
 export function TypedFormField({ question, label, value, disabled, onChange }: { question: Question; label: string; value: FormAnswer | undefined; disabled: boolean; onChange: (value: FormAnswer) => void }) {
   const { t, i18n } = useTranslation();
   if (question.type === 'phone') {
-    const number = typeof value === 'object' ? value.number : typeof value === 'string' ? value : '';
-    const country = typeof value === 'object' ? value.country : parsePhoneNumberFromString(number)?.country ?? 'CA';
+    const number = typeof value === 'object' && !Array.isArray(value) ? value.number : typeof value === 'string' ? value : '';
+    const country = typeof value === 'object' && !Array.isArray(value) ? value.country : parsePhoneNumberFromString(number)?.country ?? 'CA';
     const names = new Intl.DisplayNames([i18n.language], { type: 'region' });
     let invalid = false;
     if (!disabled && number) { try { typedAnswer(question, { number, country }); } catch { invalid = true; } }

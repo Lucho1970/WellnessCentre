@@ -1,4 +1,16 @@
 const en = {
+  "Answer type: single_choice": "Single choice (radio buttons)",
+  "Answer type: multiple_choice": "Multiple choice (checkboxes)",
+  "Choose one option.": "Choose one option.",
+  "Select all that apply.": "Select all that apply.",
+  "Clear selection": "Clear selection",
+  "Option {{number}} (English)": "Option {{number}} (English)",
+  "Option {{number}} (French)": "Option {{number}} (French)",
+  "Remove option": "Remove option",
+  "Add option": "Add option",
+  "Choose a valid option.": "Choose a valid option.",
+  "Select at least one valid option.": "Select at least one valid option.",
+
   "Add question": "Add question",
   "Answer type": "Answer type",
   "Answers are visible only to the client and assigned practitioner.": "Answers are visible only to the client and assigned practitioner.",

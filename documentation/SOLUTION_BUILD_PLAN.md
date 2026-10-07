@@ -869,4 +869,6 @@ Follow-up on `feature/form-date-phone-fields`: Date, Phone number and Email answ
 
 Follow-up on `feature/form-question-sections`: named, ordered sections with bilingual titles and optional descriptions; direct question creation within sections and moving existing questions between sections. Removing a section preserves questions. Published section changes append versions and retain old assignment structure. No SQL migration or new runtime flag is required; matching API/portal deployment remains separate.
 
+Follow-up on `feature/form-choice-fields`: Single choice radio buttons and Multiple choice checkboxes with 2–20 bilingual options, required selections, stable stored option IDs and versioned labels. Checkbox selection order is canonicalized for retries. Matching API/portal deployment is required, with no new SQL migration.
+
 Next forms slice: draft saving and append-only corrections/amendments, followed by configurable due dates/reminders and template archival. Before collecting real client responses, complete the required privacy/clinical-content review and hosted isolation/consent acceptance. File uploads, consent withdrawal, notes, exports and retention/deletion are still separate Phase 7 tasks.

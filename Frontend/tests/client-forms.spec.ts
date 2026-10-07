@@ -165,3 +165,42 @@ test('French mobile forms show localized section titles and descriptions', async
   await expect(page.getByRole('group', { name: 'Renseignements du client', exact: true })).toBeVisible(); await expect(page.getByText('Vérifiez vos renseignements.')).toBeVisible(); await expect(page.getByRole('group', { name: 'Antécédents médicaux', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); await page.screenshot({ path: 'test-results/form-sections-mobile-fr.png', fullPage: true });
 });
+
+const choiceOptions = [{ id: 'low', label: 'Low', label_fr: 'Faible' }, { id: 'moderate', label: 'Moderate', label_fr: 'Modéré' }, { id: 'high', label: 'High', label_fr: 'Élevé' }];
+const choiceDefinition = { instructions: '', instructions_fr: '', questions: [
+  { id: 'stress', label: 'Average stress level', label_fr: 'Niveau de stress moyen', type: 'single_choice', required: true, options: choiceOptions },
+  { id: 'habits', label: 'Lifestyle choices', label_fr: 'Habitudes de vie', type: 'multiple_choice', required: true, options: choiceOptions }
+] };
+async function openChoices(page: Page) {
+  await fixture(page);
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition: choiceDefinition, answers: null } } }));
+  await page.goto(`${host}/client`); await page.getByRole('button', { name: 'My forms', exact: true }).click(); await page.getByRole('button', { name: 'Complete form', exact: true }).click();
+}
+test('required radio and checkbox questions reject empty answers and submit selected IDs', async ({ page }) => {
+  await openChoices(page); let body: any;
+  await page.route('**/api/v1/customer/forms/19/submit', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
+  await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check(); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByRole('alert').filter({ hasText: 'Check the form questions' })).toBeVisible(); expect(body).toBeUndefined();
+  await page.getByRole('radio', { name: 'Low', exact: true }).check(); await page.getByRole('radio', { name: 'Moderate', exact: true }).check(); await expect(page.getByRole('radio', { name: 'Low', exact: true })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Submit form', exact: true }).click(); expect(body).toBeUndefined();
+  await page.getByRole('checkbox', { name: 'Low', exact: true }).check(); await page.getByRole('checkbox', { name: 'High', exact: true }).check(); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(body.answers).toEqual({ stress: 'moderate', habits: ['high', 'low'] });
+});
+test('uncertain choice submission locks selections and retries the same answers', async ({ page }) => {
+  await openChoices(page); const bodies: any[] = [];
+  await page.route('**/api/v1/customer/forms/19/submit', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry' } } } : { json: { data: { id: 19, status: 'submitted' } } }); });
+  await page.getByRole('radio', { name: 'High', exact: true }).check(); await page.getByRole('checkbox', { name: 'Moderate', exact: true }).check(); await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check(); await page.getByRole('button', { name: 'Submit form', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Low', exact: true })).toBeDisabled(); await expect(page.getByRole('checkbox', { name: 'High', exact: true })).toBeDisabled(); await page.getByRole('button', { name: 'Retry confirmation', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(bodies[1]).toEqual(bodies[0]);
+});
+test('author publishes editable choice options in a new version', async ({ page }) => {
+  await fixture(page, 'practitioner'); let body: any;
+  await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
+  await page.getByRole('combobox', { name: /Answer type/ }).first().click(); await page.getByRole('option', { name: 'Single choice (radio buttons)', exact: true }).click();
+  await page.getByLabel('Option 1 (English)').fill('Low'); await page.getByLabel('Option 1 (French)').fill('Faible'); await page.getByLabel('Option 2 (English)').fill('Moderate'); await page.getByRole('button', { name: 'Add option', exact: true }).click(); await page.getByLabel('Option 3 (English)').fill('High');
+  await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible(); expect(body.definition.questions[0].options.map((option: any) => option.label)).toEqual(['Low', 'Moderate', 'High']); expect(body.definition.questions[0].type).toBe('single_choice'); expect(template.definition.questions[0].type).toBe('text');
+});
+test('saved choice answers display read-only French labels on mobile', async ({ page }) => {
+  await fixture(page); await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, status: 'submitted', definition: choiceDefinition, answers: { stress: 'moderate', habits: ['high', 'low'] } } } }));
+  await page.goto(`${host}/client`); await page.getByRole('button', { name: 'Language and region', exact: true }).click(); await page.getByRole('button', { name: /Français \(Canada\)/ }).click(); await page.getByRole('button', { name: 'Mes formulaires', exact: true }).click(); await page.getByRole('button', { name: 'Remplir le formulaire', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Modéré', exact: true })).toBeChecked(); await expect(page.getByRole('radio', { name: 'Modéré', exact: true })).toBeDisabled(); await expect(page.getByRole('checkbox', { name: 'Élevé', exact: true })).toBeChecked(); await expect(page.getByRole('checkbox', { name: 'Élevé', exact: true })).toBeDisabled(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); await page.screenshot({ path: 'test-results/form-choices-mobile-fr.png', fullPage: true });
+});

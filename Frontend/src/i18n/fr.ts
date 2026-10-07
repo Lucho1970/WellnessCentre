@@ -1,4 +1,16 @@
 const fr: Record<string, string> = {
+  "Answer type: single_choice": "Choix unique (boutons radio)",
+  "Answer type: multiple_choice": "Choix multiples (cases à cocher)",
+  "Choose one option.": "Choisissez une option.",
+  "Select all that apply.": "Sélectionnez toutes les réponses applicables.",
+  "Clear selection": "Effacer la sélection",
+  "Option {{number}} (English)": "Option {{number}} (anglais)",
+  "Option {{number}} (French)": "Option {{number}} (français)",
+  "Remove option": "Supprimer l’option",
+  "Add option": "Ajouter une option",
+  "Choose a valid option.": "Choisissez une option valide.",
+  "Select at least one valid option.": "Sélectionnez au moins une option valide.",
+
   "Add question": "Ajouter une question",
   "Answer type": "Type de réponse",
   "Answers are visible only to the client and assigned practitioner.": "Les réponses sont visibles uniquement par le client et le praticien désigné.",
