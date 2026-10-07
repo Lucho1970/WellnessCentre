@@ -2,6 +2,8 @@
 
 This package contains the matching intake forms API and portal implementation. Packaging does not merge the branch or deploy it. See `manifest.json` for the exact source revision, build time and archive hashes, and `CLIENT_INTAKE_FORMS.md` for permissions and synthetic acceptance checks.
 
+The sections release also contains Date, Phone number and Email answer types, optional no-future-date restrictions, and ordered sections with bilingual titles/descriptions. No additional SQL is required after migration 036. Upload both required archives, including the private API's updated `vendor` dependencies, before publishing these field types or sections. Earlier packages do not contain these additions.
+
 ## Required uploads
 
 1. Back up the existing private API and Willow portal files. Keep `CLIENT_FORMS_ENABLED=false` in private `/wellness-api/.env` during upload. Preserve that file and existing authentication, clinic routing and other rollout settings.
@@ -15,6 +17,8 @@ Only these two archives are required for this feature. The public website, neutr
 ## Acceptance and rollback
 
 - Practitioner/admin sidebar: **Intake and consent forms**. Publish a template and a new version; old assignments must retain their original questions.
+- Add **Client Information** and **Health History** sections with descriptions, place questions in each, and change their order. Verify titles/descriptions in the client view and French/mobile layout. Removing a section must preserve its questions.
+- Test Date, Phone number and Email questions, including the no-future-date option for birth dates. Phone entry should support a country selection and save an international number; invalid entries must not submit. Existing assignments must retain their original types and sections after a new version is published.
 - Client details: **Client forms**. Assign directly and inspect status; admin/reception must not see answers.
 - Client account: **My forms**. Submit explicitly, including a required No answer and consent acknowledgment where applicable.
 - Assigned practitioner: open the submitted form and mark it reviewed. Another practitioner/client must not read it.
