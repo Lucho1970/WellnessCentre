@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$ReleaseName,
-    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md','RECURRING_APPOINTMENTS_RELEASE.md','CLIENT_INTAKE_FORMS_RELEASE.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
+    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md','RECURRING_APPOINTMENTS_RELEASE.md','CLIENT_INTAKE_FORMS_RELEASE.md','GOOGLE_PRACTITIONER_ROLLOUT.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
 )
 $ErrorActionPreference = 'Stop'
 if ($ReleaseName -notmatch '^[a-zA-Z0-9_-]+$') { throw 'Use letters, digits, underscores, and hyphens for ReleaseName.' }
@@ -26,6 +26,11 @@ $requiredFrontendSettings = @(
     'VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID',
     'VITE_GOOGLE_MAPS_BROWSER_API_KEY'
 )
+$staffInvitationFlag = [Environment]::GetEnvironmentVariable('VITE_STAFF_INVITATIONS_ENABLED', 'Process')
+if ([string]::IsNullOrWhiteSpace($staffInvitationFlag)) { $staffInvitationFlag = $productionSettings['VITE_STAFF_INVITATIONS_ENABLED'] }
+if ($staffInvitationFlag -eq 'true') {
+    $requiredFrontendSettings += @('VITE_STAFF_EXTERNAL_TENANT_ID','VITE_STAFF_EXTERNAL_SUBDOMAIN','VITE_STAFF_EXTERNAL_API_CLIENT_ID','VITE_STAFF_EXTERNAL_SPA_CLIENT_ID')
+}
 $resolvedFrontendSettings = @{}
 foreach ($name in $requiredFrontendSettings) {
     $value = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -92,6 +97,15 @@ if ($DeploymentGuide -eq 'CLIENT_INTAKE_FORMS_RELEASE.md') {
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
 $manifest = [ordered]@{ release_name=$ReleaseName; source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-clinic-portal-and-neutral-landing'; deployment_guide=$DeploymentGuide; archives=@() }
+if ($staffInvitationFlag -eq 'true') {
+    $manifest.staff_authentication = [ordered]@{
+        enabled_in_portal=$true
+        tenant_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_TENANT_ID']
+        subdomain=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_SUBDOMAIN']
+        api_client_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_API_CLIENT_ID']
+        spa_client_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_SPA_CLIENT_ID']
+    }
+}
 foreach ($file in Get-ChildItem -LiteralPath $destination -Filter '*.zip') {
     $archive = [System.IO.Compression.ZipFile]::OpenRead($file.FullName)
     try {

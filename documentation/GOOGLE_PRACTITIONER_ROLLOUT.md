@@ -15,6 +15,27 @@ Microsoft instructions: [Google federation](https://learn.microsoft.com/en-us/en
 
 ## Matching release configuration
 
+Dedicated apps configured in Entra on 7 October 2026:
+
+| Setting | Value |
+|---|---|
+| Staff API app ID | `28c7d80a-53fc-45a0-8653-2f5b7d646087` |
+| Staff SPA app ID | `2ccf904c-2b78-4348-9acb-72773d931416` |
+| API scope | `api://28c7d80a-53fc-45a0-8653-2f5b7d646087/access_as_staff` |
+| User flow | `WellnessPractitionersSignUpSignIn` |
+
+The API manifest requests version 2 access tokens. The SPA has only the delegated staff scope, with tenant admin consent granted. Its registered SPA return URIs are the staff callback and portal root. Its separate user flow has Google and email one-time passcode authentication; it is associated only with the dedicated staff SPA. No new client secret was created. **MFA policy configuration and actual provider sign-in/token acceptance remain pending; do not enable the hosted pilot yet.**
+
+Merge these values into the shared private API `.env`, keeping the flag false until MFA/provider acceptance:
+
+```dotenv
+STAFF_INVITATIONS_ENABLED=false
+STAFF_EXTERNAL_TENANT_ID=0a3841c6-b244-410d-821f-bbd9ccd1b5e2
+STAFF_EXTERNAL_SUBDOMAIN=copihuewellnessclientsdev
+STAFF_EXTERNAL_API_CLIENT_ID=28c7d80a-53fc-45a0-8653-2f5b7d646087
+STAFF_EXTERNAL_SPA_CLIENT_ID=2ccf904c-2b78-4348-9acb-72773d931416
+```
+
 Keep `STAFF_INVITATIONS_ENABLED=false` in the shared private `/wellness-api/.env` during setup. Set `STAFF_EXTERNAL_TENANT_ID`, `STAFF_EXTERNAL_SUBDOMAIN`, `STAFF_EXTERNAL_API_CLIENT_ID` and `STAFF_EXTERNAL_SPA_CLIENT_ID` to the verified staff configuration. Preserve unrelated private settings.
 
 Build the portal with the corresponding `VITE_STAFF_EXTERNAL_*` values and `VITE_STAFF_INVITATIONS_ENABLED=true`. These are public build-time settings; changing the hosted private `.env` alone does not update the browser. Confirm migration 033 is present; do not rerun the full schema. Upload matching private API and portal packages, then enable `STAFF_INVITATIONS_ENABLED=true` for hosted acceptance. Record the source revision and configuration in the release manifest. No enabled release should be prepared using guessed staff application IDs.
