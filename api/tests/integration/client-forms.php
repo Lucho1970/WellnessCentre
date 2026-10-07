@@ -172,6 +172,33 @@ $assert((int)$pdo->query('SELECT COUNT(*) FROM client_form_tasks WHERE client_id
 $denies(fn()=>$forms->detail($client,$task['id'],'forms-test'),'form_not_found');
 $assert($forms->detail(new AuthContext(9,1,'','','','client',[]),$task['id'],'forms-test')['answers']['text']==='Synthetic only','Merged client owns preserved answers');
 $metadata=$pdo->query("SELECT metadata FROM audit_logs WHERE action LIKE 'form.%'")->fetchAll(PDO::FETCH_COLUMN);$assert(!str_contains(json_encode($metadata),'Synthetic only'),'Audit metadata excludes answers');
+// Reproduce a legacy result charset returning valid stored JSON as invalid UTF-8.
+$unicodeText="Client\u{2019}s stress: \u{00E9} \u{4E2D} \u{1F600}";
+$unicodeDefinition=\Wellness\Service\ClientFormDefinition::definition(['instructions'=>$unicodeText,'questions'=>[['id'=>'text','label'=>$unicodeText,'type'=>'text','required'=>true]]],'intake');
+$unicodeTemplate=$forms->publish($clinician,['owner_practitioner_id'=>3,'name'=>'UTF8 fixture','form_type'=>'intake','definition'=>$unicodeDefinition,'service_ids'=>[],'idempotency_key'=>'utf8-form-fixture-publish'],'forms-test');
+$unicodeJson=json_encode($unicodeDefinition,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+$pdo->prepare('UPDATE form_templates SET definition=? WHERE id=?')->execute([$unicodeJson,$unicodeTemplate['id']]);
+$mergedClient=new AuthContext(9,1,'','','','client',[]);
+$unicodeTask=$forms->assign($clinician,9,['template_id'=>$unicodeTemplate['id'],'idempotency_key'=>'utf8-task-fixture-key'],'forms-test');
+$unicodeSubmit=['version'=>1,'confirmed'=>true,'answers'=>['text'=>$unicodeText]];
+$forms->submit($mergedClient,$unicodeTask['id'],$unicodeSubmit,'forms-test');
+$pdo->prepare('UPDATE form_submissions SET response_data=? WHERE id=(SELECT submission_id FROM client_form_tasks WHERE id=?)')->execute([json_encode(['text'=>$unicodeText],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$unicodeTask['id']]);
+$beforeHex=$pdo->query('SELECT HEX(definition) FROM form_templates WHERE id='.$unicodeTemplate['id'])->fetchColumn();
+$pdo->exec("SET character_set_results=latin1");
+try{
+    $assert((int)$pdo->query('SELECT JSON_VALID(definition) FROM form_templates WHERE id='.$unicodeTemplate['id'])->fetchColumn()===1,'Stored Unicode JSON is valid in the database');
+    $raw=$pdo->query('SELECT definition FROM form_templates WHERE id='.$unicodeTemplate['id'])->fetchColumn();
+    try{json_decode($raw,true,32,JSON_THROW_ON_ERROR);throw new RuntimeException('Expected baseline UTF-8 transport failure');}catch(JsonException $e){$assert($e->getCode()===JSON_ERROR_UTF8,'Baseline reproduces the hosted JSON error code 5');}
+    $templates=$forms->templates($clinician,[])['items'];$unicodeRow=array_values(array_filter($templates,fn($row)=>(int)$row['id']===$unicodeTemplate['id']))[0];
+    $assert($unicodeRow['definition']===$unicodeDefinition,'Template list preserves Unicode despite the result charset');
+    $assert(is_string(json_encode($templates,JSON_THROW_ON_ERROR)),'Template response is valid UTF-8 JSON');
+    $assert($forms->history($clinician,$unicodeTemplate['id'])['items'][0]['definition']===$unicodeDefinition,'History preserves original Unicode');
+    $detail=$forms->detail($mergedClient,$unicodeTask['id'],'forms-test');
+    $assert($detail['definition']===$unicodeDefinition,'Assigned definition preserves Unicode');
+    $assert($detail['answers']['text']===$unicodeText,'Submitted answers preserve Unicode');
+    $assert($forms->submit($mergedClient,$unicodeTask['id'],$unicodeSubmit,'forms-test')['status']==='submitted','Unicode answer retry remains idempotent');
+    $assert($pdo->query('SELECT HEX(definition) FROM form_templates WHERE id='.$unicodeTemplate['id'])->fetchColumn()===$beforeHex,'Read path does not rewrite the stored form');
+}finally{$pdo->exec("SET character_set_results=utf8mb4");}
 $_ENV['CLIENT_FORMS_ENABLED']='false';$denies(fn()=>$forms->list($client,8,[],'forms-test'),'forms_disabled');
 $assert(!$pdo->inTransaction(),'No leaked transaction');
 echo "Client forms real SQL acceptance: $checks checks passed on ".$pdo->getAttribute(PDO::ATTR_SERVER_VERSION).".\n";

@@ -41,15 +41,16 @@ final class ClientFormsService
         return $row;
     }
     private function task(AuthContext $actor,int $id,bool $lock=false): array {
-        $s=$this->database->connection()->prepare('SELECT t.*,f.name,f.form_type,f.version template_version,f.definition,u.display_name practitioner_name FROM client_form_tasks t JOIN form_templates f ON f.id=t.form_template_id AND f.clinic_id=t.clinic_id JOIN practitioners p ON p.id=t.practitioner_id JOIN users u ON u.id=p.user_id AND u.clinic_id=t.clinic_id WHERE t.id=? AND t.clinic_id=?'.($lock?' FOR UPDATE':''));$s->execute([$id,$actor->clinicId]);$row=$s->fetch();
+        $s=$this->database->connection()->prepare('SELECT t.*,f.name,f.form_type,f.version template_version,CAST(f.definition AS BINARY) definition,u.display_name practitioner_name FROM client_form_tasks t JOIN form_templates f ON f.id=t.form_template_id AND f.clinic_id=t.clinic_id JOIN practitioners p ON p.id=t.practitioner_id JOIN users u ON u.id=p.user_id AND u.clinic_id=t.clinic_id WHERE t.id=? AND t.clinic_id=?'.($lock?' FOR UPDATE':''));$s->execute([$id,$actor->clinicId]);$row=$s->fetch();
         if(!$row||($actor->userType==='client'?(int)$row['client_id']!==$actor->userId:(!$this->operator($actor)&&(int)$row['practitioner_id']!==$this->ownPractitioner($actor))))throw new ApiException(404,'form_not_found','Form not found.');
         $this->client($actor,(int)$row['client_id']);return $row;
     }
+    // Native JSON/UTF-8 columns must reach PHP unchanged; result charset conversion can invalidate JSON text.
     public function templates(AuthContext $actor,array $query): array {
         $this->guard($actor);if($actor->userType!=='staff')throw new ApiException(403,'forbidden','Staff access is required.');
         $page=ClientOverviewService::page($query);$offset=($page-1)*20;$params=[$actor->clinicId];$scope='';
         if(!$this->operator($actor)){$scope=' AND f.owner_practitioner_id=?';$params[]=$this->ownPractitioner($actor)??0;}
-        $s=$this->database->connection()->prepare("SELECT f.id,f.family_key,f.name,f.form_type,f.version,f.owner_practitioner_id,f.definition,u.display_name practitioner_name FROM form_templates f JOIN practitioners p ON p.id=f.owner_practitioner_id JOIN users u ON u.id=p.user_id AND u.clinic_id=f.clinic_id WHERE f.clinic_id=? AND f.family_key IS NOT NULL AND f.active=1 $scope ORDER BY f.id DESC LIMIT 21 OFFSET $offset");$s->execute($params);$items=$s->fetchAll();
+        $s=$this->database->connection()->prepare("SELECT f.id,f.family_key,f.name,f.form_type,f.version,f.owner_practitioner_id,CAST(f.definition AS BINARY) definition,u.display_name practitioner_name FROM form_templates f JOIN practitioners p ON p.id=f.owner_practitioner_id JOIN users u ON u.id=p.user_id AND u.clinic_id=f.clinic_id WHERE f.clinic_id=? AND f.family_key IS NOT NULL AND f.active=1 $scope ORDER BY f.id DESC LIMIT 21 OFFSET $offset");$s->execute($params);$items=$s->fetchAll();
         foreach($items as &$row){$row['definition']=json_decode($row['definition'],true,32,JSON_THROW_ON_ERROR);$r=$this->database->connection()->prepare('SELECT service_id FROM form_assignments WHERE form_template_id=? AND service_id IS NOT NULL');$r->execute([$row['id']]);$row['service_ids']=array_map('intval',$r->fetchAll(PDO::FETCH_COLUMN));}unset($row);
         $p=$this->database->connection()->prepare("SELECT p.id,u.display_name FROM practitioners p JOIN users u ON u.id=p.user_id WHERE u.clinic_id=? AND u.status='active' AND p.active=1 ORDER BY u.display_name");$p->execute([$actor->clinicId]);$practitioners=$p->fetchAll();
         if(!$this->operator($actor))$practitioners=array_values(array_filter($practitioners,fn($p)=>(int)$p['id']===$this->ownPractitioner($actor)));
@@ -57,7 +58,7 @@ final class ClientFormsService
         return ['items'=>array_slice($items,0,20),'page'=>$page,'has_more'=>count($items)>20,'practitioners'=>$practitioners,'services'=>$s->fetchAll(),'drafts_enabled'=>ClientFormDraftsService::enabled(),'can_author'=>$actor->hasAnyRole('super_admin','clinic_admin')||$this->ownPractitioner($actor)!==null];
     }
     public function history(AuthContext $actor,int $id): array {
-        $this->templateAuthor($actor);$row=$this->template($actor,$id);$s=$this->database->connection()->prepare('SELECT id,name,form_type,version,definition,created_at FROM form_templates WHERE clinic_id=? AND family_key=? ORDER BY version DESC LIMIT 100');$s->execute([$actor->clinicId,$row['family_key']]);$rows=$s->fetchAll();foreach($rows as &$r)$r['definition']=json_decode($r['definition'],true,32,JSON_THROW_ON_ERROR);return ['items'=>$rows];
+        $this->templateAuthor($actor);$row=$this->template($actor,$id);$s=$this->database->connection()->prepare('SELECT id,name,form_type,version,CAST(definition AS BINARY) definition,created_at FROM form_templates WHERE clinic_id=? AND family_key=? ORDER BY version DESC LIMIT 100');$s->execute([$actor->clinicId,$row['family_key']]);$rows=$s->fetchAll();foreach($rows as &$r)$r['definition']=json_decode($r['definition'],true,32,JSON_THROW_ON_ERROR);return ['items'=>$rows];
     }
     public function publish(AuthContext $actor,array $body,string $cid,?int $previous=null): array {
         $this->templateAuthor($actor);$name=$body['name']??null;$type=$body['form_type']??null;
@@ -101,7 +102,7 @@ final class ClientFormsService
         $this->guard($actor);$row=$this->task($actor,$id);
         if($actor->userType!=='client'&&$this->ownPractitioner($actor)!==(int)$row['practitioner_id'])throw new ApiException(403,'forbidden','Only the client and assigned practitioner may read answers.');
         $row['definition']=json_decode($row['definition'],true,32,JSON_THROW_ON_ERROR);$row['answers']=null;
-        if($row['submission_id']){$s=$this->database->connection()->prepare('SELECT response_data FROM form_submissions WHERE id=? AND client_id=? AND form_template_id=?');$s->execute([$row['submission_id'],$row['client_id'],$row['form_template_id']]);$response=$s->fetchColumn();if($response===false)throw new ApiException(409,'form_changed','The form changed. Reload it.');$row['answers']=json_decode($response,true,32,JSON_THROW_ON_ERROR);}
+        if($row['submission_id']){$s=$this->database->connection()->prepare('SELECT CAST(response_data AS BINARY) response_data FROM form_submissions WHERE id=? AND client_id=? AND form_template_id=?');$s->execute([$row['submission_id'],$row['client_id'],$row['form_template_id']]);$response=$s->fetchColumn();if($response===false)throw new ApiException(409,'form_changed','The form changed. Reload it.');$row['answers']=json_decode($response,true,32,JSON_THROW_ON_ERROR);}
         $this->audit->write($actor->clinicId,$actor,$cid,'form.answers.view','client_form_task',$id);return $row;
     }
     public function assign(AuthContext $actor,int $clientId,array $body,string $cid): array {
@@ -116,7 +117,7 @@ final class ClientFormsService
     public function submit(AuthContext $actor,int $id,array $body,string $cid): array {
         $this->guard($actor);if($actor->userType!=='client')throw new ApiException(403,'forbidden','Client access is required.');$pdo=$this->database->connection();
         try{$pdo->beginTransaction();$row=$this->task($actor,$id,true);$definition=json_decode($row['definition'],true,32,JSON_THROW_ON_ERROR);$answers=ClientFormDefinition::answers($definition,$body['answers']??null);
-            if($row['submission_id']){$s=$pdo->prepare('SELECT response_data FROM form_submissions WHERE id=?');$s->execute([$row['submission_id']]);if(json_decode($s->fetchColumn(),true,32,JSON_THROW_ON_ERROR)!==$answers)throw new ApiException(409,'form_already_submitted','Submitted answers cannot be overwritten.');$pdo->commit();return ['id'=>$id,'status'=>$row['status']];}
+            if($row['submission_id']){$s=$pdo->prepare('SELECT CAST(response_data AS BINARY) response_data FROM form_submissions WHERE id=?');$s->execute([$row['submission_id']]);if(json_decode($s->fetchColumn(),true,32,JSON_THROW_ON_ERROR)!==$answers)throw new ApiException(409,'form_already_submitted','Submitted answers cannot be overwritten.');$pdo->commit();return ['id'=>$id,'status'=>$row['status']];}
             if($row['status']!=='pending'||!is_int($body['version']??null)||$body['version']!==(int)$row['version']||($body['confirmed']??false)!==true)throw new ApiException(409,'form_changed','Review the current form before submitting.');
             $s=$pdo->prepare("INSERT INTO form_submissions(form_template_id,appointment_id,client_id,response_data,status,submitted_at) VALUES(?,?,?,?,'submitted',UTC_TIMESTAMP())");$s->execute([$row['form_template_id'],$row['appointment_id'],$actor->userId,json_encode($answers,JSON_THROW_ON_ERROR)]);$submission=(int)$pdo->lastInsertId();
             $pdo->prepare("UPDATE client_form_tasks SET submission_id=?,status='submitted',submitted_at=UTC_TIMESTAMP(),version=version+1 WHERE id=?")->execute([$submission,$id]);
