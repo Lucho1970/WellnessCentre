@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import type { FormRequest } from './api';
 import { TypedFormField, typedAnswer, type FormAnswer } from './TypedFormField';
+import { questionGroups, type FormSection } from './sections';
 import { customerFetch } from '../customer/session';
 
-export type Question = { id: string; label: string; label_fr: string; type: 'text' | 'yes_no' | 'consent' | 'date' | 'phone' | 'email'; required: boolean; no_future?: boolean };
-export type Definition = { instructions: string; instructions_fr: string; questions: Question[] };
+export type Question = { id: string; label: string; label_fr: string; type: 'text' | 'yes_no' | 'consent' | 'date' | 'phone' | 'email'; required: boolean; no_future?: boolean; section_id?: string };
+export type Definition = { instructions: string; instructions_fr: string; questions: Question[]; sections?: FormSection[] };
 type Task = { id: number; name: string; status: string; version: number; template_version: number; practitioner_name: string; can_read_answers: boolean; required: boolean | number; appointment_id: number | null };
 type Detail = Task & { definition: Definition; answers: Record<string, FormAnswer> | null };
 export function FormTasks({ request, clientId, customer = false, onLockedChange }: { request: FormRequest; clientId?: number; customer?: boolean; onLockedChange?: (locked: boolean) => void }) {
@@ -50,12 +51,12 @@ export function FormTasks({ request, clientId, customer = false, onLockedChange 
       <Button disabled={busy || uncertain} onClick={leave}>{t('Back to forms')}</Button><Typography variant="h6">{detail.name}</Typography><Typography>{t('Form version {{version}}', { version: detail.template_version })} · {detail.practitioner_name}</Typography>
       <Typography sx={{ whiteSpace: 'pre-wrap' }}>{i18n.language.startsWith('fr') && detail.definition.instructions_fr ? detail.definition.instructions_fr : detail.definition.instructions}</Typography>
       <Stack component="form" spacing={2} onSubmit={event => { event.preventDefault(); void submit(); }}>
-        {detail.definition.questions.map(q => {
+        {questionGroups(detail.definition).map(group => <Stack key={group.section?.id ?? 'unsectioned'} component={group.section ? 'fieldset' : 'div'} spacing={2} sx={{ minWidth: 0, m: 0, p: group.section ? 2 : 0, border: group.section ? '1px solid' : 0, borderColor: 'divider', borderRadius: 1 }}>{group.section && <Typography component="legend" variant="h6">{i18n.language.startsWith('fr') && group.section.title_fr ? group.section.title_fr : group.section.title}</Typography>}{group.section && <Typography sx={{ whiteSpace: 'pre-wrap' }}>{i18n.language.startsWith('fr') && group.section.description_fr ? group.section.description_fr : group.section.description}</Typography>}{!group.section && Boolean(detail.definition.sections?.length) && <Typography variant="h6">{t('Questions without a section')}</Typography>}{group.questions.map(q => {
           const label = i18n.language.startsWith('fr') && q.label_fr ? q.label_fr : q.label; const disabled = busy || uncertain || !customer || detail.status !== 'pending';
           return ['date', 'phone', 'email'].includes(q.type) ? <TypedFormField key={q.id} question={q} label={label} value={answers[q.id]} disabled={disabled} onChange={value => setAnswers(a => ({ ...a, [q.id]: value }))}/> : q.type === 'text' ? <TextField key={q.id} multiline fullWidth minRows={2} required={q.required} label={label} disabled={disabled} value={typeof answers[q.id] === 'string' ? answers[q.id] : ''} inputProps={{ maxLength: 2000 }} onChange={event => setAnswers(a => ({ ...a, [q.id]: event.target.value }))}/>
             : q.type === 'yes_no' ? <TextField key={q.id} select fullWidth label={label} required={q.required} disabled={disabled} value={answers[q.id] === true ? 'yes' : answers[q.id] === false ? 'no' : ''} onChange={event => setAnswers(a => { const next = { ...a }; if (!event.target.value) delete next[q.id]; else next[q.id] = event.target.value === 'yes'; return next; })}><MenuItem value="">{t('Not answered')}</MenuItem><MenuItem value="yes">{t('Yes')}</MenuItem><MenuItem value="no">{t('No')}</MenuItem></TextField>
               : <FormControlLabel key={q.id} label={label} control={<Checkbox required={q.required && !disabled} disabled={disabled} checked={answers[q.id] === true} onChange={event => setAnswers(a => ({ ...a, [q.id]: event.target.checked }))}/>}/>;
-        })}
+        })}</Stack>)}
         {customer && detail.status === 'pending' && <><FormControlLabel label={t('I reviewed these answers and confirm submission.')} control={<Checkbox checked={confirmed} disabled={busy || uncertain} onChange={event => setConfirmed(event.target.checked)}/>}/><Button type="submit" variant="contained" disabled={busy || !confirmed}>{t(uncertain ? 'Retry confirmation' : 'Submit form')}</Button></>}
       </Stack>
       {!customer && detail.status === 'submitted' && <Button disabled={busy || uncertain} variant="contained" onClick={() => void action(detail, 'review')}>{t('Mark form reviewed')}</Button>}

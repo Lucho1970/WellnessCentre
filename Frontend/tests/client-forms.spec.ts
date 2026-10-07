@@ -121,3 +121,47 @@ test('saved typed answers are read-only on a French mobile screen', async ({ pag
   await expect(page.getByLabel('Date de naissance')).toBeDisabled(); await expect(page.getByLabel('Téléphone')).toHaveValue('+14165551234'); await expect(page.getByLabel('Courriel')).toBeDisabled(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/typed-form-mobile-fr.png', fullPage: true });
 });
+
+const sectionedDefinition = { ...definition, sections: [
+  { id: 'client_info', title: 'Client Information', title_fr: 'Renseignements du client', description: 'Please check your information.', description_fr: 'Vérifiez vos renseignements.' },
+  { id: 'health', title: 'Health History', title_fr: 'Antécédents médicaux', description: 'Use synthetic answers only.', description_fr: 'Utilisez uniquement des réponses fictives.' }
+], questions: definition.questions.map((question, index) => ({ ...question, section_id: index === 0 ? 'client_info' : 'health' })) };
+test('sections group client questions and descriptions without changing answer IDs', async ({ page }) => {
+  await fixture(page); let body: any;
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition: sectionedDefinition, answers: null } } }));
+  await page.route('**/api/v1/customer/forms/19/submit', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
+  await complete(page);
+  await expect(page.getByRole('group', { name: 'Client Information', exact: true }).getByLabel('Synthetic answer')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Health History', exact: true }).getByRole('checkbox', { name: 'Synthetic consent', exact: true })).toBeVisible();
+  await expect(page.getByText('Please check your information.')).toBeVisible(); await expect(page.getByText('Use synthetic answers only.')).toBeVisible();
+  await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(body.answers).toEqual({ q1: 'Test response', yes: false, consent: true });
+});
+test('author creates sections, adds questions into them and reorders sections', async ({ page }) => {
+  await fixture(page, 'practitioner'); let body: any;
+  await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
+  await page.getByRole('button', { name: 'Add section', exact: true }).click(); await page.getByLabel('Section 1 title (English)').fill('Client Information'); await page.getByLabel('Section 1 description (English)').fill('Check your details.');
+  await page.getByRole('button', { name: 'Add section', exact: true }).click(); await page.getByLabel('Section 2 title (English)').fill('Health History');
+  await page.getByRole('combobox', { name: 'Section for question 1' }).first().click(); await page.getByRole('option', { name: 'Client Information', exact: true }).click();
+  await page.getByRole('button', { name: 'Add question to Health History', exact: true }).click(); await page.getByRole('textbox', { name: 'Question (English)' }).last().fill('Synthetic history question');
+  await page.getByRole('button', { name: 'Move section down', exact: true }).first().click(); await expect(page.getByLabel('Section 1 title (English)')).toHaveValue('Health History');
+  await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible();
+  expect(body.definition.sections.map((section: any) => section.title)).toEqual(['Health History', 'Client Information']); expect(body.definition.sections[1].description).toBe('Check your details.');
+  expect(body.definition.questions[0].section_id).toBe(body.definition.sections[1].id); expect(body.definition.questions[3].section_id).toBe(body.definition.sections[0].id); expect(template.definition.questions).toHaveLength(3);
+});
+test('removing a section preserves its questions and uncertain publication locks sections', async ({ page }) => {
+  await fixture(page, 'practitioner'); const bodies: any[] = [];
+  await page.route('**/api/v1/forms/templates*', route => route.fulfill({ json: { data: { items: [{ ...template, definition: sectionedDefinition }], practitioners: [{ id: 7, display_name: 'Esther' }], services: [], can_author: true, has_more: false } } }));
+  await page.route('**/api/v1/forms/templates/12/versions', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry' } } } : { json: { data: { id: 13, version: 2 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Remove section', exact: true }).first().click(); await expect(page.getByText('Questions without a section', { exact: true }).first()).toBeVisible(); await expect(page.getByRole('textbox', { name: 'Question (English)' })).toHaveCount(3);
+  await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Retry confirmation', exact: true })).toBeVisible(); await expect(page.getByLabel('Section 1 title (English)')).toBeDisabled(); await expect(page.getByRole('button', { name: 'Add section', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Retry confirmation', exact: true }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible(); expect(bodies[1]).toEqual(bodies[0]); expect(bodies[0].definition.questions[0].section_id).toBeUndefined(); expect(bodies[0].definition.questions).toHaveLength(3);
+});
+test('French mobile forms show localized section titles and descriptions', async ({ page }) => {
+  await fixture(page); await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition: sectionedDefinition, answers: null } } }));
+  await page.goto(`${host}/client`); await page.getByRole('button', { name: 'Language and region', exact: true }).click(); await page.getByRole('button', { name: /Français \(Canada\)/ }).click(); await page.getByRole('button', { name: 'Mes formulaires', exact: true }).click(); await page.getByRole('button', { name: 'Remplir le formulaire', exact: true }).click();
+  await expect(page.getByRole('group', { name: 'Renseignements du client', exact: true })).toBeVisible(); await expect(page.getByText('Vérifiez vos renseignements.')).toBeVisible(); await expect(page.getByRole('group', { name: 'Antécédents médicaux', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); await page.screenshot({ path: 'test-results/form-sections-mobile-fr.png', fullPage: true });
+});

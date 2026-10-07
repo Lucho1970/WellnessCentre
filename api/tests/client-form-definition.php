@@ -33,4 +33,15 @@ $denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($q,[
 $denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($q,['type'=>'date','no_future'=>'true'])]],'intake'));
 $optionalTypes=ClientFormDefinition::definition(['questions'=>array_map(fn($type)=>array_replace($q,['id'=>$type,'type'=>$type,'required'=>false]),['date','phone','email'])],'intake');
 $assert(ClientFormDefinition::answers($optionalTypes,['date'=>'','phone'=>'','email'=>''])===[]);
+$section=['id'=>'client_info','title'=>'Client Information','title_fr'=>'Renseignements du client','description'=>'Synthetic instructions','description_fr'=>'Consignes fictives'];
+$sectioned=['sections'=>[$section,['id'=>'health_history','title'=>'Health History']],'questions'=>[array_replace($q,['section_id'=>'client_info'])]];
+$validatedSections=ClientFormDefinition::definition($sectioned,'intake');
+$assert($validatedSections['sections'][0]['description']==='Synthetic instructions');
+$assert($validatedSections['sections'][1]['description']==='');
+$assert($validatedSections['questions'][0]['section_id']==='client_info');
+$assert(ClientFormDefinition::answers($validatedSections,['health'=>' Test '])===['health'=>'Test']);
+$assert(!array_key_exists('sections',$optional));
+foreach([null, 'bad', [$section,$section], array_fill(0,16,$section), [array_replace($section,['id'=>'<script>'])], [array_replace($section,['title'=>' '])], [array_replace($section,['title'=>str_repeat('a',191)])], [array_replace($section,['description'=>str_repeat('a',2001)])], [array_replace($section,['description_fr'=>false])], [array_replace($section,['unknown'=>'text'])]] as $sections)$denies(fn()=>ClientFormDefinition::definition(array_replace($sectioned,['sections'=>$sections]),'intake'));
+foreach(['missing','',null,42] as $sectionId)$denies(fn()=>ClientFormDefinition::definition(array_replace($sectioned,['questions'=>[array_replace($q,['section_id'=>$sectionId])]]),'intake'));
+$assert(ClientFormDefinition::definition(['sections'=>[],'questions'=>[$q]],'intake')['sections']===[]);
 echo "Client form definition: $checks checks passed.\n";

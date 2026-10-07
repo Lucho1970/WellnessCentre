@@ -63,6 +63,9 @@ $typedPublish=array_replace($next,['expected_version'=>2,'idempotency_key'=>'typ
 $typedPublish['definition']['questions'][0]['type']='date';$typedPublish['definition']['questions'][0]['no_future']=true;
 $typedPublish['definition']['questions'][]=['id'=>'phone','label'=>'Synthetic phone','type'=>'phone','required'=>true];
 $typedPublish['definition']['questions'][]=['id'=>'email','label'=>'Synthetic email','type'=>'email','required'=>true];
+$typedPublish['definition']['sections']=[['id'=>'info','title'=>'Client Information','description'=>'Synthetic section instructions'],['id'=>'health','title'=>'Health History','title_fr'=>'Antécédents médicaux','description_fr'=>'Consignes fictives']];
+$typedPublish['definition']['questions'][0]['section_id']='info';
+$typedPublish['definition']['questions'][1]['section_id']='health';
 $third=$forms->publish($clinician,$typedPublish,'forms-test',$second['id']);
 $typedTask=$forms->assign($clinician,8,['template_id'=>$third['id'],'idempotency_key'=>'typed-form-assignment'],'forms-test');
 $typedAnswers=['text'=>'2000-02-29','yes'=>false,'consent'=>true,'phone'=>'+14165551234','email'=>'test@example.test'];
@@ -75,6 +78,15 @@ $assert($forms->submit($client,$typedTask['id'],$typedBody,'forms-test')===$type
 $assert($forms->detail($clinician,$typedTask['id'],'forms-test')['answers']['phone']==='+14165551234','Canonical phone stored');
 $assert($forms->detail($client,$task['id'],'forms-test')['definition']['questions'][0]['type']==='text','Old assignment retains text type');
 $assert($forms->detail($client,$task['id'],'forms-test')['answers']['text']==='Synthetic only','Old text response survives new date type');
+$sectionDetail=$forms->detail($client,$typedTask['id'],'forms-test');
+$assert(array_column($sectionDetail['definition']['sections'],'title')===['Client Information','Health History'],'Stored section order');
+$assert($sectionDetail['definition']['sections'][0]['description']==='Synthetic section instructions','Stored section description');
+$fourthBody=array_replace($typedPublish,['expected_version'=>3,'idempotency_key'=>'section-form-publish-four']);
+$fourthBody['definition']['sections'][0]['title']='Revised information';$fourthBody['definition']['sections'][0]['description']='Revised instructions';
+$fourth=$forms->publish($clinician,$fourthBody,'forms-test',$third['id']);
+$assert($forms->detail($client,$typedTask['id'],'forms-test')['definition']['sections'][0]['title']==='Client Information','Assigned section title pinned');
+$assert($forms->detail($client,$typedTask['id'],'forms-test')['definition']['sections'][0]['description']==='Synthetic section instructions','Assigned section description pinned');
+$assert($forms->history($clinician,$fourth['id'])['items'][0]['definition']['sections'][0]['title']==='Revised information','Section changes append a version');
 // Existing supervised client merge must move both tasks and immutable responses.
 $otherTemplate=$forms->publish($other,array_replace($publish,['owner_practitioner_id'=>12,'service_ids'=>[],'idempotency_key'=>'other-clinician-owned-form']),'forms-test');
 $denies(fn()=>$forms->assign($other,8,['template_id'=>$otherTemplate['id'],'idempotency_key'=>'unrelated-client-assignment'],'forms-test'),'client_not_found');

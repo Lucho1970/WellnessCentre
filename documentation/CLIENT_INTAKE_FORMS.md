@@ -13,7 +13,17 @@ Administrators may publish practitioner-owned templates and assign them to a cli
 
 ## Versioning and transactions
 
-### Date, phone number and email fields
+### Question sections
+
+The `feature/form-question-sections` follow-up adds up to 15 named sections with optional descriptions. Titles and descriptions have English/French fields; clients use French text where available, otherwise English. Sections are displayed in their configured order with each section's questions together. Unassigned questions remain under **Questions without a section** when sections exist; older flat forms keep their existing presentation.
+
+In the template editor, use **Add section**, enter its title and description, then **Add question to [section]**. Existing questions can move using their Section selector. **Move section up/down** changes section order. Removing a section requires confirmation and moves its questions to the unassigned group; it does not delete questions or answers. Question order within each group follows the template's existing question order. The existing limit of 30 questions per form remains.
+
+Section IDs are stable within a versioned form, unique, and referenced by each question's optional `section_id`. API validation rejects unknown references, duplicate IDs, more than 15 sections, blank titles, titles over 190 bytes and descriptions over 2,000 bytes. Sections are plain text and remain within the existing total definition-size bound. The definitions store `sections` alongside the existing flat `questions` array; answer keys remain question IDs, and permissions/answer validation are unchanged.
+
+Published title, description, order or membership changes require **Create new version**. Existing assignments and submissions retain their original section structure, including descriptions, and version history displays it. No SQL migration or new runtime flag is required. Matching API/portal code must be uploaded; previously generated ZIPs do not contain this follow-up.
+
+### Typed answer fields
 
 The `feature/form-date-phone-fields` follow-up adds three answer types without another SQL migration. A published Text question can become one of these types in a new version; previous assignments and answers retain their original types. Revoke a pending old assignment and assign the new version if the client should receive the updated fields.
 
@@ -82,6 +92,8 @@ Validation completed on 6 October 2026:
 These are local results. Matching hosted deployment, migration 036, runtime enablement and synthetic acceptance have not been performed.
 
 The Date/Phone/Email follow-up passed both frontend builds, TypeScript/content/translation checks (1,632 keys), all 47 PHP fixture files (including 51 definition checks), PHP syntax and Composer validation, 48 forms SQL checks plus 34 recurrence checks on disposable MariaDB 11.4.8, 11 focused forms browser scenarios and 13 production smoke tests. The French mobile typed-field screenshot was inspected at 390 pixels. Existing bundle-size warnings remain. Dependency audit reported an existing development-only `source-map-js` advisory; the new phone dependencies introduced no reported advisory. No hosted database or deployment was changed by this follow-up.
+
+The sections follow-up passed both frontend builds, TypeScript/content/translation checks (1,646 keys), all 47 PHP fixture files (including 71 definition checks), changed-file PHP syntax, 53 forms SQL checks plus 34 recurrence checks on disposable MariaDB 11.4.8, all 15 focused forms browser scenarios, and 13 production-build smoke tests. The French section-title/description layout was inspected at 390 pixels. Existing bundle-size warnings remain; exact hosted acceptance and deployment are still outstanding.
 
 ## Subsequent forms work
 

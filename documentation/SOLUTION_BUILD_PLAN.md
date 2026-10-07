@@ -867,4 +867,6 @@ Implemented on `feature/client-intake-forms`: practitioner-owned versioned templ
 
 Follow-up on `feature/form-date-phone-fields`: Date, Phone number and Email answer types, optional birth-date future restriction, country-based phone entry with canonical international storage, and API validation. Changes append template versions and preserve original assignments/answers. No new SQL migration is required; matching API dependencies and portal deployment are required. Profile contact and birth-date fields are not automatically changed.
 
+Follow-up on `feature/form-question-sections`: named, ordered sections with bilingual titles and optional descriptions; direct question creation within sections and moving existing questions between sections. Removing a section preserves questions. Published section changes append versions and retain old assignment structure. No SQL migration or new runtime flag is required; matching API/portal deployment remains separate.
+
 Next forms slice: draft saving and append-only corrections/amendments, followed by configurable due dates/reminders and template archival. Before collecting real client responses, complete the required privacy/clinical-content review and hosted isolation/consent acceptance. File uploads, consent withdrawal, notes, exports and retention/deletion are still separate Phase 7 tasks.
