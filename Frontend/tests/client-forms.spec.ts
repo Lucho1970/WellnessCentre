@@ -295,3 +295,13 @@ test('configured question limit permits more than 30 questions and stops at the 
   await expect(page.getByText('Draft saved. You can return after signing in again.')).toBeVisible();
   expect(saved.definition.questions).toHaveLength(32);
 });
+test('answer types use friendly translated English labels', async ({ page }) => {
+  await fixture(page, 'practitioner');
+  await page.goto(`${host}/practitioner/forms`);
+  await page.getByRole('button', { name: 'Create form', exact: true }).click();
+  await page.getByRole('combobox', { name: /Answer type/ }).click();
+  for (const label of ['Text', 'Yes/No', 'Consent', 'Date', 'Phone number', 'Email address', 'Single choice (radio buttons)', 'Multiple choice (checkboxes)']) {
+    await expect(page.getByRole('option', { name: label, exact: true })).toBeVisible();
+  }
+  await expect(page.getByRole('option', { name: 'Answer type: text', exact: true })).toHaveCount(0);
+});
