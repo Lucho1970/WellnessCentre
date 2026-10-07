@@ -152,6 +152,16 @@ $assert($drafts->detail($clinician,$d['id'],'forms-test')['status']==='published
 $assert(count($drafts->list($clinician,[])['items'])===1,'Published draft removed from resume list');
 $denies(fn()=>$drafts->save($clinician,$updated,'forms-test',$d['id']),'draft_changed');
 $denies(fn()=>$forms->publish($clinician,array_replace($draftPublish,['idempotency_key'=>'draft-republish-key']),'forms-test'),'draft_changed');
+// Some hosted PDO drivers return numeric columns as strings. API versions must remain JSON numbers.
+$originalStringify=$pdo->getAttribute(PDO::ATTR_STRINGIFY_FETCHES);
+$pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES,true);
+try {
+    $listed=array_values(array_filter($forms->templates($clinician,[])['items'],fn($row)=>(int)$row['id']===$publishedDraft['id']))[0];
+    $assert($listed['version']===1,'Template list returns integer versions with stringifying PDO');
+    $assert($forms->history($clinician,$publishedDraft['id'])['items'][0]['version']===1,'History returns integer versions with stringifying PDO');
+    $savedFromList=$drafts->save($clinician,array_replace($updated,['previous_template_id'=>$publishedDraft['id'],'expected_version'=>$listed['version'],'idempotency_key'=>'stringified-version-draft']),'forms-test');
+    $assert($savedFromList['status']==='draft','Draft of a listed template saves with stringifying PDO');
+} finally { $pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES,$originalStringify); }
 $versionDraft=array_replace($updated,['previous_template_id'=>$publishedDraft['id'],'expected_version'=>1,'idempotency_key'=>'version-draft-create']);unset($versionDraft['draft_version']);
 $vd=$drafts->save($clinician,$versionDraft,'forms-test');
 $vp=array_replace($versionDraft,['name'=>'Source revised','draft_id'=>$vd['id'],'draft_version'=>1,'idempotency_key'=>'version-draft-publish']);

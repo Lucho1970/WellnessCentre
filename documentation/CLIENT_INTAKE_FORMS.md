@@ -171,3 +171,14 @@ For the already deployed draft/source release and diagnostic overlay, upload onl
 
 
 UTF-8 hotfix validation: the new real SQL fixture reproduced `JSON_ERROR_UTF8` at the original template decode line before the patch; after the patch, 108 forms checks and 34 recurrence checks passed on disposable MariaDB 11.4.8. It verifies exact accented, curly-apostrophe, Chinese and emoji text through list/history/assigned definitions/submitted answers/retry; JSON response encoding succeeds; stored definition hex bytes remain unchanged. All 48 PHP fixtures and changed PHP syntax/whitespace checks passed. This PHP read-only change does not alter frontend bundles; hosted MySQL/column settings and post-upload acceptance remain separate.
+
+
+## Draft original-template version hotfix (7 October 2026)
+
+The owner supplied a valid exported definition with 30 questions and 12 sections. The failed draft response was `invalid_form` / `Check the original template.`. The editor forwards the listed template version as `expected_version`; PDO can return that numeric column as a string, while the draft validator correctly requires an integer. These expected validation rejections do not enter the server exception log. No question correction is indicated by this response.
+
+`bugs/form-draft-template-version` explicitly serializes list/history versions as integers. Original-template authorization and optimistic version checks remain strict; no database writes or schema changes are introduced by the read fix. A real SQL regression forces `PDO::ATTR_STRINGIFY_FETCHES=true`, verifies integer versions in list/history, then saves a draft using the listed version. It failed on the original list response before the fix. The earlier UTF-8 read fix is retained; the owner confirmed that it resolved form loading.
+
+Deploy the single service overlay into private `/wellness-api/src/Service/ClientFormsService.php`. Keep the exported JSON backup before refreshing the editor: a template already loaded before this patch still holds its old string version. After refresh, reopen Create new version, use View source to apply the exported form JSON, then Save draft. Import form JSON is also available when a new independent form is intended. No frontend or SQL deployment is required. Hosted draft-save acceptance remains pending.
+
+Validation: the regression failed before the patch; after the patch, 111 forms checks and 34 recurrence checks passed against disposable MariaDB 11.4.8, including draft creation from the listed version under stringifying PDO. All 48 PHP fixtures, changed PHP syntax and whitespace checks passed. No frontend code changed; frontend builds/browser tests were not repeated. The owner's uncommitted English resource edits remain preserved and excluded from this API overlay.
