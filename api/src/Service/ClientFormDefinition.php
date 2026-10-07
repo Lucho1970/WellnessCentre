@@ -13,7 +13,7 @@ final class ClientFormDefinition
         if(!is_string($value)||strlen($value)>$limit||($required&&trim($value)===''))self::invalid();
         return trim($value);
     }
-    public static function definition(mixed $value,string $type): array {
+    public static function definition(mixed $value,string $type,bool $draft=false): array {
         if(!is_array($value)||array_diff(array_keys($value),['instructions','instructions_fr','questions','sections']))self::invalid();
         $questions=$value['questions']??null;
         if(!is_array($questions)||!array_is_list($questions)||count($questions)<1||count($questions)>30)self::invalid();
@@ -26,7 +26,7 @@ final class ClientFormDefinition
             $sectionId=$section['id']??null;
             if(!is_string($sectionId)||!preg_match('/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/D',$sectionId)||isset($sectionIds[$sectionId]))self::invalid();
             $sectionIds[$sectionId]=true;
-            $result['sections'][]=['id'=>$sectionId,'title'=>self::text($section['title']??null,190,true),'title_fr'=>self::text($section['title_fr']??'',190),'description'=>self::text($section['description']??'',2000),'description_fr'=>self::text($section['description_fr']??'',2000)];
+            $result['sections'][]=['id'=>$sectionId,'title'=>self::text($section['title']??null,190,!$draft),'title_fr'=>self::text($section['title_fr']??'',190),'description'=>self::text($section['description']??'',2000),'description_fr'=>self::text($section['description_fr']??'',2000)];
         }
         foreach($questions as $q){
             if(!is_array($q)||array_diff(array_keys($q),['id','label','label_fr','type','required','no_future','section_id','options']))self::invalid();
@@ -36,7 +36,7 @@ final class ClientFormDefinition
             if(array_key_exists('no_future',$q)&&($kind!=='date'||!is_bool($q['no_future'])))self::invalid();
             if($kind==='consent'&&!$q['required'])self::invalid();
             $ids[$id]=true;$consent=$consent||$kind==='consent';
-            $result['questions'][]=['id'=>$id,'label'=>self::text($q['label']??null,500,true),'label_fr'=>self::text($q['label_fr']??'',500),'type'=>$kind,'required'=>$q['required']];
+            $result['questions'][]=['id'=>$id,'label'=>self::text($q['label']??null,500,!$draft),'label_fr'=>self::text($q['label_fr']??'',500),'type'=>$kind,'required'=>$q['required']];
             if($kind==='date')$result['questions'][array_key_last($result['questions'])]['no_future']=$q['no_future']??false;
             if(isset($q['section_id']))$result['questions'][array_key_last($result['questions'])]['section_id']=$q['section_id'];
             if(in_array($kind,['single_choice','multiple_choice'],true)){
@@ -46,12 +46,12 @@ final class ClientFormDefinition
                     if(!is_array($option)||array_diff(array_keys($option),['id','label','label_fr']))self::invalid();
                     $optionId=$option['id']??null;
                     if(!is_string($optionId)||!preg_match('/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/D',$optionId)||isset($optionIds[$optionId]))self::invalid();
-                    $optionIds[$optionId]=true;$validated[]=['id'=>$optionId,'label'=>self::text($option['label']??null,190,true),'label_fr'=>self::text($option['label_fr']??'',190)];
+                    $optionIds[$optionId]=true;$validated[]=['id'=>$optionId,'label'=>self::text($option['label']??null,190,!$draft),'label_fr'=>self::text($option['label_fr']??'',190)];
                 }
                 $result['questions'][array_key_last($result['questions'])]['options']=$validated;
             }elseif(array_key_exists('options',$q))self::invalid();
         }
-        if($type==='consent'&&!$consent)self::invalid();
+        if(!$draft&&$type==='consent'&&!$consent)self::invalid();
         if(strlen(json_encode($result,JSON_THROW_ON_ERROR))>55000)self::invalid();
         return $result;
     }

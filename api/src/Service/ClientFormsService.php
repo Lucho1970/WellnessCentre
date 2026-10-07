@@ -54,7 +54,7 @@ final class ClientFormsService
         $p=$this->database->connection()->prepare("SELECT p.id,u.display_name FROM practitioners p JOIN users u ON u.id=p.user_id WHERE u.clinic_id=? AND u.status='active' AND p.active=1 ORDER BY u.display_name");$p->execute([$actor->clinicId]);$practitioners=$p->fetchAll();
         if(!$this->operator($actor))$practitioners=array_values(array_filter($practitioners,fn($p)=>(int)$p['id']===$this->ownPractitioner($actor)));
         $s=$this->database->connection()->prepare('SELECT id,name FROM services WHERE clinic_id=? AND active=1 ORDER BY name');$s->execute([$actor->clinicId]);
-        return ['items'=>array_slice($items,0,20),'page'=>$page,'has_more'=>count($items)>20,'practitioners'=>$practitioners,'services'=>$s->fetchAll(),'can_author'=>$actor->hasAnyRole('super_admin','clinic_admin')||$this->ownPractitioner($actor)!==null];
+        return ['items'=>array_slice($items,0,20),'page'=>$page,'has_more'=>count($items)>20,'practitioners'=>$practitioners,'services'=>$s->fetchAll(),'drafts_enabled'=>ClientFormDraftsService::enabled(),'can_author'=>$actor->hasAnyRole('super_admin','clinic_admin')||$this->ownPractitioner($actor)!==null];
     }
     public function history(AuthContext $actor,int $id): array {
         $this->templateAuthor($actor);$row=$this->template($actor,$id);$s=$this->database->connection()->prepare('SELECT id,name,form_type,version,definition,created_at FROM form_templates WHERE clinic_id=? AND family_key=? ORDER BY version DESC LIMIT 100');$s->execute([$actor->clinicId,$row['family_key']]);$rows=$s->fetchAll();foreach($rows as &$r)$r['definition']=json_decode($r['definition'],true,32,JSON_THROW_ON_ERROR);return ['items'=>$rows];
@@ -69,6 +69,16 @@ final class ClientFormsService
         $pdo=$this->database->connection();
         try{$pdo->beginTransaction();$pdo->prepare('SELECT id FROM users WHERE id=? FOR UPDATE')->execute([$actor->userId]);
             $r=$pdo->prepare('SELECT id,version,publication_hash,created_by FROM form_templates WHERE clinic_id=? AND publication_key=?');$r->execute([$actor->clinicId,$key]);if($stored=$r->fetch()){if($stored['publication_hash']!==$hash||(int)$stored['created_by']!==$actor->userId)throw new ApiException(409,'idempotency_conflict','This key was used for another publication.');$this->template($actor,(int)$stored['id']);$pdo->commit();return ['id'=>(int)$stored['id'],'version'=>(int)$stored['version']];}
+            $draftId=$body['draft_id']??null;
+            if($draftId!==null){
+                if(!ClientFormDraftsService::enabled())throw new ApiException(503,'form_drafts_disabled','Form drafts are not enabled.');
+                if(!is_int($draftId)||$draftId<1||!is_int($body['draft_version']??null))throw new ApiException(422,'invalid_form','Check the draft version.');
+                $d=$pdo->prepare('SELECT * FROM form_template_drafts WHERE id=? AND clinic_id=? AND created_by=? FOR UPDATE');$d->execute([$draftId,$actor->clinicId,$actor->userId]);$draft=$d->fetch();
+                if(!$draft)throw new ApiException(404,'draft_not_found','Draft not found.');
+                if($draft['status']!=='draft'||(int)$draft['version']!==$body['draft_version'])throw new ApiException(409,'draft_changed','The draft changed. Reload it before publishing.');
+                $payload=json_decode($draft['payload'],true,32,JSON_THROW_ON_ERROR);
+                if(($payload['previous_template_id']??null)!==$previous)throw new ApiException(409,'draft_changed','Publish against the original template.');
+            }
             $version=1;$family=bin2hex(random_bytes(16));$owner=filter_var($body['owner_practitioner_id']??null,FILTER_VALIDATE_INT);
             if($previous){$old=$this->template($actor,$previous,true);if(!$old['active']||(int)($body['expected_version']??0)!==(int)$old['version'])throw new ApiException(409,'form_changed','The form changed. Reload it before publishing.');$owner=(int)$old['owner_practitioner_id'];$version=(int)$old['version']+1;$family=$old['family_key'];}
             if(!$owner||(!$actor->hasAnyRole('super_admin','clinic_admin')&&$owner!==$this->ownPractitioner($actor)))throw new ApiException(403,'forbidden','Select your practitioner profile.');
@@ -77,6 +87,7 @@ final class ClientFormsService
             $s=$pdo->prepare('INSERT INTO form_templates(clinic_id,owner_practitioner_id,name,form_type,version,definition,family_key,publication_key,publication_hash,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)');$s->execute([$actor->clinicId,$owner,trim($name),$type,$version,json_encode($definition,JSON_THROW_ON_ERROR),$family,$key,$hash,$actor->userId]);$id=(int)$pdo->lastInsertId();
             if($previous){$pdo->prepare('UPDATE form_templates SET active=0 WHERE id=?')->execute([$previous]);$pdo->prepare('DELETE FROM form_assignments WHERE form_template_id=?')->execute([$previous]);}
             foreach($services as $service)$pdo->prepare('INSERT INTO form_assignments(form_template_id,practitioner_id,service_id,required) VALUES(?,?,?,1)')->execute([$id,$owner,$service]);
+            if($draftId!==null)$pdo->prepare("UPDATE form_template_drafts SET status='published',published_template_id=?,version=version+1 WHERE id=?")->execute([$id,$draftId]);
             $this->audit->write($actor->clinicId,$actor,$cid,'form.template.publish','form_template',$id,'success',['version'=>$version]);$pdo->commit();return ['id'=>$id,'version'=>$version];
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }

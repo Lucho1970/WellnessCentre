@@ -56,4 +56,14 @@ $denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($q,[
 $optionalChoices=ClientFormDefinition::definition(['questions'=>[array_replace($single,['required'=>false]),array_replace($multiple,['required'=>false])]],'intake');
 $assert(ClientFormDefinition::answers($optionalChoices,['stress'=>'','habits'=>[]])===[]);
 $assert($choices['questions'][0]['options'][1]['label_fr']==='');
+// Private drafts may have unfinished labels, but retain the same schema boundaries.
+$unfinished=['sections'=>[['id'=>'info','title'=>'']],'questions'=>[array_replace($single,['label'=>'','section_id'=>'info','options'=>[['id'=>'low','label'=>''],['id'=>'high','label'=>'']]])]];
+$draft=ClientFormDefinition::definition($unfinished,'consent',true);
+$assert($draft['questions'][0]['label']===''&&$draft['sections'][0]['title']==='');
+$denies(fn()=>ClientFormDefinition::definition($unfinished,'consent'));
+$denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($single,['id'=>'bad id'])]],'intake',true));
+$denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($single,['section_id'=>'missing'])]],'intake',true));
+$denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($single,['options'=>[$options[0],$options[0]]])]],'intake',true));
+$denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($q,['answers'=>['private']])]],'intake',true));
+$denies(fn()=>ClientFormDefinition::definition(['questions'=>[array_replace($q,['label'=>str_repeat('a',501)])]],'intake',true));
 echo "Client form definition: $checks checks passed.\n";

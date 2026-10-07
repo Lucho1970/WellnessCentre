@@ -21,7 +21,9 @@ async function fixture(page: Page, mode: 'client' | 'admin' | 'practitioner' = '
     if (path === '/clients/8/invitations') data = { items: [], linked: false };
     if (path === '/customer/forms' || path === '/clients/8/forms') data = { client, items: [{ ...task, can_read_answers: mode !== 'admin' }], has_more: false };
     if (path === '/customer/forms/19' || path === '/forms/tasks/19') data = { ...task, definition, answers: null };
-    if (path === '/forms/templates') data = { items: [template], practitioners: [{ id: 7, display_name: 'Esther' }], services: [{ id: 4, name: 'Massage' }], can_author: true, has_more: false };
+    if (path === '/forms/templates') data = { items: [template], practitioners: [{ id: 7, display_name: 'Esther' }], services: [{ id: 4, name: 'Massage' }], can_author: true, has_more: false, drafts_enabled: true };
+    if (path === '/forms/drafts') data = { items: [], has_more: false };
+    if (path === '/forms/source/validate') data = route.request().postDataJSON().document;
     if (path === '/forms/templates/12/history') data = { items: [template] };
     return route.fulfill({ json: { data } });
   });
@@ -203,4 +205,76 @@ test('saved choice answers display read-only French labels on mobile', async ({ 
   await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, status: 'submitted', definition: choiceDefinition, answers: { stress: 'moderate', habits: ['high', 'low'] } } } }));
   await page.goto(`${host}/client`); await page.getByRole('button', { name: 'Language and region', exact: true }).click(); await page.getByRole('button', { name: /Français \(Canada\)/ }).click(); await page.getByRole('button', { name: 'Mes formulaires', exact: true }).click(); await page.getByRole('button', { name: 'Remplir le formulaire', exact: true }).click();
   await expect(page.getByRole('radio', { name: 'Modéré', exact: true })).toBeChecked(); await expect(page.getByRole('radio', { name: 'Modéré', exact: true })).toBeDisabled(); await expect(page.getByRole('checkbox', { name: 'Élevé', exact: true })).toBeChecked(); await expect(page.getByRole('checkbox', { name: 'Élevé', exact: true })).toBeDisabled(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); await page.screenshot({ path: 'test-results/form-choices-mobile-fr.png', fullPage: true });
+});
+
+const portable = { format: 'wellness-form', format_version: 1, name: template.name, form_type: template.form_type, definition };
+test('editable source validates JSON and publishes changes as a new version', async ({ page }) => {
+  await fixture(page, 'practitioner'); let body: any;
+  await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'View source', exact: true }).click();
+  const panel = page.getByRole('dialog'), raw = panel.getByRole('textbox', { name: 'Form JSON source' });
+  expect(JSON.parse(await raw.inputValue())).toEqual(portable);
+  await raw.fill('{broken'); await panel.getByRole('button', { name: 'Apply source', exact: true }).click();
+  await expect(panel.getByText('Enter valid JSON before applying the source.')).toBeVisible();
+  await expect(page.getByLabel('Form name', { exact: false })).toHaveValue(template.name);
+  const changed = structuredClone(portable); changed.name = 'Edited source'; changed.definition.questions[0].label = 'Source question'; await raw.fill(JSON.stringify(changed));
+  const download = page.waitForEvent('download'); await panel.getByRole('button', { name: 'Download JSON', exact: true }).click(); expect((await download).suggestedFilename()).toBe('form-source.json');
+  await panel.getByRole('button', { name: 'Apply source', exact: true }).click(); await expect(panel).toHaveCount(0);
+  await page.getByRole('button', { name: 'Publish new version', exact: true }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible();
+  expect(body.expected_version).toBe(1); expect(body.definition.questions[0].label).toBe('Source question'); expect(body.service_ids).toEqual([4]);
+});
+test('rejected source schema leaves the original editor intact', async ({ page }) => {
+  await fixture(page, 'practitioner'); await page.route('**/api/v1/forms/source/validate', route => route.fulfill({ status: 422, json: { error: { code: 'invalid_form', message: 'Invalid schema' } } }));
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'View source', exact: true }).click(); const panel = page.getByRole('dialog');
+  await panel.getByRole('textbox', { name: 'Form JSON source' }).fill(JSON.stringify({ ...portable, name: 'Should not apply', answers: ['private'] }));
+  await panel.getByRole('button', { name: 'Apply source', exact: true }).click(); await expect(panel.getByRole('alert')).toBeVisible(); await expect(page.getByLabel('Form name', { exact: false })).toHaveValue(template.name);
+});
+test('unfinished draft can be saved with blank labels and resumed after reload', async ({ page }) => {
+  await fixture(page, 'practitioner'); let stored: any;
+  await page.route('**/api/v1/forms/drafts*', route => { if (route.request().method() === 'POST') { stored = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 31, version: 1, status: 'draft' } } }); } return route.fulfill({ json: { data: { items: stored ? [{ id: 31, version: 1, name: stored.name, updated_at: '2026-10-06 12:00:00' }] : [], has_more: false } } }); });
+  await page.route('**/api/v1/forms/drafts/31', route => { const { idempotency_key, draft_version, ...payload } = stored; return route.fulfill({ json: { data: { id: 31, version: 1, status: 'draft', payload } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create form', exact: true }).click(); await page.getByRole('textbox', { name: 'Form name', exact: true }).fill('Unfinished intake');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click(); await expect(page.getByText('Draft saved. You can return after signing in again.')).toBeVisible(); expect(stored.definition.questions[0].label).toBe('');
+  await page.reload(); await page.getByRole('button', { name: 'Resume draft', exact: true }).click(); await expect(page.getByRole('textbox', { name: 'Form name', exact: true })).toHaveValue('Unfinished intake'); await expect(page.getByRole('textbox', { name: 'Question (English)', exact: true })).toHaveValue(''); await expect(page.getByText('Draft saved', { exact: true })).toBeVisible();
+});
+test('uncertain draft save locks editing and retries the identical request', async ({ page }) => {
+  await fixture(page, 'practitioner'); const requests: any[] = []; let publication: any;
+  await page.route('**/api/v1/forms/drafts', route => { requests.push(route.request().postDataJSON()); return route.fulfill(requests.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry draft' } } } : { json: { data: { id: 31, version: 1, status: 'draft' } } }); });
+  await page.route('**/api/v1/forms/templates/12/versions', route => { publication = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click(); await page.getByRole('button', { name: 'Save draft', exact: true }).click(); await expect(page.getByRole('textbox', { name: 'Form name', exact: true })).toBeDisabled(); await expect(page.getByRole('button', { name: 'View source', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Retry draft save', exact: true }).click(); await expect(page.getByText('Draft saved. You can return after signing in again.')).toBeVisible(); expect(requests[1]).toEqual(requests[0]);
+  await page.getByRole('button', { name: 'Publish new version', exact: true }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible(); expect(publication.draft_id).toBe(31); expect(publication.draft_version).toBe(1);
+});
+test('JSON file imports as a private draft with no inherited service bindings', async ({ page }) => {
+  await fixture(page, 'practitioner'); let imported: any;
+  await page.route('**/api/v1/forms/drafts/import', route => { imported = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 32, version: 1, status: 'draft' } } }); });
+  await page.route('**/api/v1/forms/drafts/32', route => route.fulfill({ json: { data: { id: 32, version: 1, status: 'draft', payload: { name: portable.name, form_type: portable.form_type, definition, owner_practitioner_id: 7, service_ids: [], previous_template_id: null, expected_version: 0 } } } }));
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Import form JSON', exact: true }).click(); const panel = page.getByRole('dialog'); await panel.locator('input[type=file]').setInputFiles({ name: 'test.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(portable)) });
+  await expect(panel.getByRole('textbox', { name: 'Form JSON source' })).toHaveValue(JSON.stringify(portable)); await panel.getByRole('button', { name: 'Import as draft', exact: true }).click(); await expect(panel).toHaveCount(0); await expect(page.getByRole('button', { name: 'Publish form', exact: true })).toBeVisible(); await expect(page.getByRole('checkbox', { name: 'Massage', exact: true })).not.toBeChecked(); expect(imported.document).toEqual(portable); expect(imported.owner_practitioner_id).toBe(7); expect(imported.service_ids).toBeUndefined();
+});
+test('French mobile source panel fits the viewport', async ({ page }) => {
+  await fixture(page, 'practitioner'); await page.setViewportSize({ width: 390, height: 844 }); await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Language and region', exact: true }).click(); await page.getByRole('button', { name: /Fran.+Canada/ }).click(); await page.getByRole('button', { name: 'Voir la source', exact: true }).click(); await expect(page.getByRole('dialog').getByRole('textbox', { name: 'Source JSON du formulaire' })).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); await page.screenshot({ path: 'test-results/form-source-mobile-fr.png', fullPage: true });
+});
+
+test('invalid import remains editable and uncertain import reuses its original key', async ({ page }) => {
+  await fixture(page, 'practitioner'); const imports: any[] = [];
+  await page.route('**/api/v1/forms/drafts/import', route => { imports.push(route.request().postDataJSON()); return route.fulfill(imports.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry import' } } } : { json: { data: { id: 32, version: 1, status: 'draft' } } }); });
+  await page.route('**/api/v1/forms/drafts/32', route => route.fulfill({ json: { data: { id: 32, version: 1, status: 'draft', payload: { name: portable.name, form_type: portable.form_type, definition, owner_practitioner_id: 7, service_ids: [], previous_template_id: null, expected_version: 0 } } } }));
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Import form JSON', exact: true }).click(); const panel = page.getByRole('dialog'), raw = panel.getByRole('textbox', { name: 'Form JSON source' });
+  await raw.fill('{broken'); await panel.getByRole('button', { name: 'Import as draft', exact: true }).click(); await expect(raw).toBeEnabled(); expect(imports).toHaveLength(0);
+  await raw.fill(JSON.stringify(portable)); await panel.getByRole('button', { name: 'Import as draft', exact: true }).click(); await expect(raw).toBeDisabled(); await expect(panel.getByRole('button', { name: 'Close', exact: true })).toBeDisabled();
+  await panel.getByRole('button', { name: 'Retry confirmation', exact: true }).click(); await expect(panel).toHaveCount(0); expect(imports[1]).toEqual(imports[0]);
+});
+
+test('draft loading errors do not block existing published forms or source viewing', async ({ page }) => {
+  await fixture(page, 'practitioner'); await page.route('**/api/v1/forms/drafts*', route => route.fulfill({ status: 503, json: { error: { code: 'unavailable', message: 'Draft list unavailable' } } }));
+  await page.goto(`${host}/practitioner/forms`); await expect(page.getByRole('alert').filter({ hasText: 'The service is temporarily unavailable.' })).toBeVisible(); await expect(page.getByText(template.name, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'View source', exact: true }).click(); await expect(page.getByRole('dialog')).toBeVisible();
+});
+test('source viewing remains available with draft storage disabled', async ({ page }) => {
+  await fixture(page, 'practitioner'); let draftRequests = 0;
+  await page.route('**/api/v1/forms/templates*', route => route.fulfill({ json: { data: { items: [template], practitioners: [{ id: 7, display_name: 'Esther' }], services: [], can_author: true, drafts_enabled: false } } }));
+  await page.route('**/api/v1/forms/drafts*', route => { draftRequests++; return route.fulfill({ status: 503, json: {} }); });
+  await page.goto(`${host}/practitioner/forms`); await expect(page.getByRole('button', { name: 'Import form JSON', exact: true })).toHaveCount(0); await page.getByRole('button', { name: 'View source', exact: true }).click(); const panel = page.getByRole('dialog'); await expect(panel.getByRole('textbox', { name: 'Form JSON source' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Close', exact: true }).click(); await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: 'Publish new version', exact: true })).toBeEnabled(); expect(draftRequests).toBe(0);
 });

@@ -76,6 +76,12 @@ final class Api
             }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
+                $routes->addRoute('GET','/api/v1/forms/drafts','formDrafts');
+                $routes->addRoute('POST','/api/v1/forms/drafts','saveFormDraft');
+                $routes->addRoute('POST','/api/v1/forms/drafts/import','importFormDraft');
+                $routes->addRoute('GET','/api/v1/forms/drafts/{id:\d+}','formDraftDetail');
+                $routes->addRoute('PATCH','/api/v1/forms/drafts/{id:\d+}','updateFormDraft');
+                $routes->addRoute('POST','/api/v1/forms/source/validate','validateFormSource');
                 $routes->addRoute('GET','/api/v1/forms/templates','formTemplates');
                 $routes->addRoute('POST','/api/v1/forms/templates','publishForm');
                 $routes->addRoute('POST','/api/v1/forms/templates/{id:\d+}/versions','publishFormVersion');
@@ -315,6 +321,12 @@ final class Api
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
                 'practitionerClients'=>$this->clients->practitionerList($this->user($request),$request->query),
+                'formDrafts'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->list($this->user($request),$request->query),
+                'saveFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId),
+                'updateFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'formDraftDetail'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->detail($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'importFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->import($this->user($request),$request->body,$request->correlationId),
+                'validateFormSource'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->validate($this->user($request),$request->body),
                 'formTemplates'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->templates($this->user($request),$request->query),
                 'publishForm'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId),
                 'publishFormVersion'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),

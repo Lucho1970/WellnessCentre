@@ -108,3 +108,45 @@ The sections follow-up passed both frontend builds, TypeScript/content/translati
 Choice-field validation on 6 October 2026: both frontend builds, TypeScript/content/translation checks (1,657 keys), all 47 PHP fixture files (including 94 definition checks), changed-file PHP syntax, 59 forms SQL checks plus 34 recurrence checks on disposable MariaDB 11.4.8, and 19 forms browser scenarios passed. The read-only French radio/checkbox mobile layout was inspected at 390 pixels. Existing bundle-size warnings remain. Hosted acceptance is separate; the existing local English translation edit is excluded from the feature commit and package.
 
 Draft saving, append-only amendments, configurable due dates/reminders, historical assignment backfills, template archival, consent withdrawal, uploads/private storage/malware scanning, practitioner notes, exports and retention/deletion policies remain separate development steps. Intake completion does not yet block appointment booking or invoice a client.
+
+
+## Form-author drafts and editable JSON source
+
+On `feature/form-drafts-json-import`, **Save draft** stores an unpublished form in the API database, including unfinished names, labels, sections and options. **My form drafts → Resume draft** restores it after a reload or a later sign-in. Drafts are private to the creating practitioner/admin in that clinic; administrators do not automatically see another author's work. Drafts are not assignable, do not create booking rules, and do not expose client answers. This is form-author draft saving, not client-answer draft saving.
+
+Saving is explicit. Wait for **Draft saved. You can return after signing in again.** before leaving. Unsaved changes show a warning; keeping a tab open does not guarantee preservation through authentication expiry, a refresh or browser closure. A failed or uncertain request is not a confirmed save. For an uncertain save/import, retry the identical request; the editor locks modifications until confirmation. Conflicting draft revisions return an error rather than overwriting newer work. Preserve edits with a JSON download before reloading a conflicted editor.
+
+**View source** opens an editable JSON panel from the form list or editor. It includes the current name, form type, instructions, questions, answer types/options and section titles/descriptions. **Apply source** validates the document on the server and updates the unpublished editor without saving or publishing. Invalid JSON/schema leaves the original editor unchanged. **Download JSON** exports the displayed text as a local file. Source edits to a published form start a new version; existing templates and client assignments stay immutable. When saving a resumed draft, its draft revision protects against concurrent changes; publishing marks that draft published in the same transaction as the new template.
+
+**Import form JSON** accepts pasted JSON or a `.json` file up to 64 KiB and imports it as a new private draft for an explicitly selected authorized practitioner. The portable format is:
+
+```json
+{
+  "format": "wellness-form",
+  "format_version": 1,
+  "name": "Client intake",
+  "form_type": "intake",
+  "definition": {
+    "instructions": "Please complete these questions.",
+    "instructions_fr": "",
+    "sections": [{ "id": "info", "title": "Client Information", "description": "" }],
+    "questions": [{ "id": "birth", "label": "Birth date", "type": "date", "required": true, "no_future": true, "section_id": "info" }]
+  }
+}
+```
+
+Exports intentionally omit clinic, practitioner, booking service, template family/version and client/response identifiers. Imports reject unknown document fields and do not restore booking bindings; review the selected practitioner and services in the editor before publishing. Existing schema limits still apply (including 30 questions, 15 sections and 2–20 options per choice question). Incomplete English labels are allowed in drafts only; publication requires complete valid labels and consent structure. Downloaded JSON must remain valid to be imported later. Form definitions are stored as JSON payload text in `form_template_drafts`; publication continues using immutable `form_templates.definition`.
+
+| API | Behavior |
+|---|---|
+| `GET/POST /api/v1/forms/drafts` | List the author's private drafts in pages of 20; create a draft with an idempotency key |
+| `GET/PATCH /api/v1/forms/drafts/{id}` | Resume or save with `draft_version` and a fresh idempotency key |
+| `POST /api/v1/forms/drafts/import` | Validate a portable `document` and import as a private draft |
+| `POST /api/v1/forms/source/validate` | Author-only portable JSON validation without database writes |
+
+Apply **037_form_template_drafts.sql** once after 036, then deploy the matching API/portal and enable `FORM_TEMPLATE_DRAFTS_ENABLED=true` in private `/wellness-api/.env`. This separate flag defaults to false: existing templates and View source do not query the new table while disabled. `CLIENT_FORMS_ENABLED` must also be true. Turning draft storage off hides save/resume/import controls but preserves saved rows. Do not modify published JSON directly in the database.
+
+A form-list service error, such as correlation `660c6767-4a43-4501-973f-662e6aec07be`, does not demonstrate deletion. Inspect the matching private PHP/server log and retry loading before assessing stored templates. This change cannot recover a form that was never successfully saved or published.
+
+
+Draft/source local validation on 6 October 2026: both frontend builds, TypeScript, four content checks and 1,683 English/French translation keys passed; all 47 PHP fixture files passed (including 101 definition checks), with syntax checks for changed services/routes. Migration 037 and draft/source flows passed 99 forms SQL checks plus 34 recurrence checks on disposable MariaDB 11.4.8. All 28 focused forms browser scenarios passed across the regression run and targeted reruns, including unfinished save/reload/resume, source download/edit/validation, import, uncertain retries, disabled storage, isolated draft-load failure and French mobile layout. An existing administrator startup scenario timed out before loading its page once and passed an isolated rerun. All 13 production smoke tests passed. The 390-pixel French source-panel screenshot was inspected. Existing bundle-size warnings remain. Git whitespace checks passed; the pre-existing English working-file edits were preserved outside this feature commit. No hosted migration, configuration, deployment or data recovery has been performed, and no deployment ZIP was generated by this implementation.
