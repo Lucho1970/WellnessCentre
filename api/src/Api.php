@@ -414,9 +414,20 @@ final class Api
         }catch(ApiException $e){Response::json(['error'=>array_filter(['code'=>$e->errorCode,'message'=>$e->getMessage(),'fields'=>$e->fields?:null,'correlation_id'=>$request?->correlationId])],$e->status,$request?->correlationId);}
         catch(Throwable $e){
             // Exception messages/traces can contain SQL contact values or authentication arguments.
-            error_log('API failure '.get_class($e).' correlation_id='.($request?->correlationId ?? 'unavailable'));
+            error_log(self::failureLog($e,$request?->correlationId));
             Response::json(['error'=>['code'=>'internal_error','message'=>'An unexpected error occurred.','correlation_id'=>$request?->correlationId]],500,$request?->correlationId);
         }
+    }
+
+    /** Log classification and source location, never exception messages or payloads. */
+    private static function failureLog(Throwable $error,?string $correlationId): string
+    {
+        $log='API failure '.get_class($error).' correlation_id='.($correlationId ?? 'unavailable');
+        if($error instanceof \JsonException){
+            $source=preg_replace('/[^A-Za-z0-9_.-]/','_',basename($error->getFile()));
+            $log.=' json_error_code='.$error->getCode().' source='.$source.':'.$error->getLine();
+        }
+        return $log;
     }
 
     private function customerMe(Request $request): array
