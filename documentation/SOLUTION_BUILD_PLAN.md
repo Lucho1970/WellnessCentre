@@ -875,3 +875,7 @@ Next forms slice: client-answer draft saving and append-only corrections/amendme
 
 
 Follow-up on `feature/form-drafts-json-import`: explicit private form-author Save draft/Resume draft; an editable **View source** JSON panel with server validation and local download; portable JSON/file import as a new unpublished draft. Draft revisions and request keys protect concurrent edits and uncertain retries; publication atomically closes the draft while preserving immutable versions. Requires migration 037 plus disabled-by-default `FORM_TEMPLATE_DRAFTS_ENABLED` and matching API/portal deployment. See [Client intake forms](CLIENT_INTAKE_FORMS.md) and [release instructions](CLIENT_INTAKE_FORMS_RELEASE.md). Client-answer drafts and conditional Other text fields remain separate work.
+
+### Supervised Esther identity migration
+
+Separate maintenance SQL now prepares a reviewed migration of Esther's existing user 2 / clinic 1 workforce membership to the dedicated external staff identity. See [Esther SQL migration](ESTHER_IDENTITY_MIGRATION.md). It uses a verified pending invitation claim, preserves practitioner and related records, and includes guarded rollback. No normal app approval flow or public maintenance endpoint is added. Provider/Google/MFA setup, enabled staff external build, hosted database rehearsal and final login acceptance remain outstanding; no hosted account has been migrated.
