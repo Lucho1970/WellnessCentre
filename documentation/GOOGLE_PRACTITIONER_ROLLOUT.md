@@ -48,7 +48,7 @@ Build the portal with the corresponding `VITE_STAFF_EXTERNAL_*` values and `VITE
 4. Configure her new services, availability and public profile. Check her own appointments and client access; confirm the new account has no elevated administrator permissions.
 5. After the new login works, deactivate her old local account through the normal admin flow. Preserve identity, membership and audit history. Keep a working workforce recovery administrator.
 
-No invitation has been delivered, old account deactivated, hosted data deleted or cloud provider configuration changed by preparing this guide.
+No invitation has been delivered, old account deactivated or hosted data deleted. The dedicated cloud applications, delegated scope and practitioner user flow have been configured; MFA and hosted activation remain pending.
 
 ## Acceptance and rollback
 
@@ -64,4 +64,8 @@ Hosted acceptance must cover Google sign-in and MFA, pending access denial, veri
 
 To stop the pilot, disable both invitation flags, revoke unused invitations and deactivate newly onboarded local users whose access must stop. Keep audit and membership rows. Do not remove memberships or enable legacy fallback to bypass revocation.
 
-Local checkpoint, 7 October 2026: 20 real SQL invitation checks passed on portable MariaDB 11.4.8, all 48 top-level PHP test scripts passed, and all four invitation browser tests passed using test authentication/network substitutes. The existing CLI session cannot access the External ID tenant; administrator sign-in is required before creating the staff applications. No enabled deployment package has been generated.
+Local checkpoint, 7 October 2026: 20 real SQL invitation checks passed on portable MariaDB 11.4.8, all 48 top-level PHP test scripts passed, and all four invitation browser tests passed using test authentication/network substitutes. Both frontend release builds and the built-site browser suite passed. All six release archive hashes and ZIP contents were verified; the portal contains the dedicated staff settings and scope, and private environment files are excluded.
+
+The matching package is `deployments/google-practitioner-pilot-2026-10-07`, built from source commit `9905ca6ae8d9f894f79b80893446dea0e9c6aad4`. Its portal invitation flag is enabled at build time. The private hosted flag must remain false until provider MFA and supervised hosted acceptance are ready. No code has been uploaded to Netfirms.
+
+MFA checkpoint: SMS is currently disabled and no staff Conditional Access policy has been created. Entra displays an additional charge per SMS and a Microsoft-provided SMS/voice retirement notice dated 1 February 2027. Confirm the notice's applicability to this external tenant and plan a supported replacement before relying on SMS long term. Microsoft's current [MFA concept documentation](https://learn.microsoft.com/en-us/entra/external-id/customers/concept-multifactor-authentication-customers) lists email OTP and SMS for external identity providers; [passkey registration](https://learn.microsoft.com/en-us/entra/external-id/customers/how-to-sign-in-with-passkey) is restricted to local password accounts and requires a custom domain and a credential-management implementation. These restrictions prevent substituting a passkey for Esther's Google login without changing the authentication design. Choosing and enabling paid SMS requires a separate approval; actual Google sign-in and MFA are not yet verified.
