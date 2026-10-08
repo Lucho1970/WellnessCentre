@@ -96,3 +96,26 @@ test('mobile invited sign-in remains separate from workforce and client sign-in'
   await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBeNull();
 });
+
+
+for (const [code, message] of [
+  ['email_already_exists', 'An account in this clinic already uses that email address.'],
+  ['membership_exists', 'This account or sign-in already has a staff membership.'],
+  ['invitation_conflict', 'The invitation conflicts with an existing account or membership.'],
+]) {
+  test(`approval displays ${code} instead of a generic conflict and stays pending`, async ({page}) => {
+    await setup(page);
+    await page.route('**/api/v1/admin/staff-invitations', route=>route.fulfill({json:{data:{items:[{id:9,recipient_email:'new@example.test',given_name:'New',family_name:'Practitioner',expires_at:'2099-01-01 00:00:00',revoked_at:null,accepted_at:null,claimant_name:'New Practitioner',claim_status:'pending',verification_code:verification}]}}}));
+    await page.route('**/api/v1/admin/staff-invitations/9/approve', route=>route.fulfill({status:409,json:{error:{code,message:'Conflict',correlation_id:'approval-test'}}}));
+    await page.goto(`${host}/admin/users`);
+    await page.getByRole('button',{name:'Review claim'}).click();
+    const dialog=page.getByRole('dialog');
+    await dialog.getByRole('checkbox').check();
+    await dialog.getByRole('textbox',{name:'Verification code'}).fill(verification);
+    await dialog.getByRole('button',{name:'Approve practitioner'}).click();
+    await expect(dialog.getByRole('alert').filter({hasText:message})).toBeVisible();
+    await expect(dialog.getByText(/Reference: approval-test/)).toBeVisible();
+    await expect(dialog.getByRole('textbox',{name:'Verification code'})).toHaveValue(verification);
+    await expect(page.getByText('New Practitioner · Awaiting approval')).toBeVisible();
+  });
+}

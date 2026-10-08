@@ -13,9 +13,13 @@ async function loadResources(language) {
   return (await import(moduleUrl)).default;
 }
 
-const featureSource = await readFile(resolve('src/i18n/workLocations.ts'), 'utf8');
-const featureOutput = ts.transpileModule(featureSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const featureResources = (await import(`data:text/javascript;base64,${Buffer.from(featureOutput).toString('base64')}`)).default;
+const featureResources = { en: {}, fr: {} };
+for (const feature of ['workLocations', 'staffInvitationErrors']) {
+  const featureSource = await readFile(resolve(`src/i18n/${feature}.ts`), 'utf8');
+  const featureOutput = ts.transpileModule(featureSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const translations = (await import(`data:text/javascript;base64,${Buffer.from(featureOutput).toString('base64')}`)).default;
+  for (const language of ['en', 'fr']) Object.assign(featureResources[language], translations[language]);
+}
 
 const resources = Object.fromEntries(await Promise.all(['en', 'fr'].map(async language =>
   [language, { translation: { ...await loadResources(language), ...featureResources[language] } }])));

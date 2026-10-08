@@ -62,3 +62,10 @@ Rollback: revoke unused invitations, deactivate newly onboarded local accounts i
 Next slices: supervised Esther identity migration, automatic invitation email delivery with retry/reissue handling, stronger recovery and provider acceptance, then broader staff roles and multi-clinic memberships. The planned **View appointments** button in admin client details remains a separate backlog item.
 
 Esther's existing workforce membership can be switched through the separate [SQL identity migration](ESTHER_IDENTITY_MIGRATION.md), retaining local user 2. This does not enable the external staff provider or bypass claim verification. Use a pending new invitation without an existing user ID, then the reviewed maintenance SQL instead of normal approval. Provider setup/rebuild and hosted acceptance remain required.
+
+
+## Approval conflict diagnostics
+
+The UI previously collapsed specific approval failures into a generic HTTP 409 message. On `bugs/practitioner-approval-errors`, English/French messages now preserve the API error code for existing-email, membership, binding, role, invitation-state and related approval conflicts. No account-linking rule is relaxed and a failed approval remains pending. Both frontend builds and seven invitation browser checks passed, including specific conflict messages, retained verification input and the normal approval flow. This frontend fix has not been deployed.
+
+To diagnose a hosted failure, open browser Developer Tools **before** retrying approval. In Network, enable recording, choose All or Fetch/XHR, clear text filters and click Approve practitioner again. Select the failed request ending in `/approve`, then copy only its Response JSON (`error.code`, `error.message`, `error.correlation_id`). Do not share Authorization headers, bearer tokens or an unredacted HAR. A screenshot of the generic message alone cannot distinguish an existing email from other conflicts. Do not change account IDs, delete records or bypass verification based solely on that screenshot.
