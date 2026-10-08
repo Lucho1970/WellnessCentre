@@ -15,6 +15,7 @@ use Wellness\Http\Response;
 use Wellness\Service\AuditLogger;
 use Wellness\Service\AdminService;
 use Wellness\Service\AddressCoverageService;
+use Wellness\Service\PractitionerWorkLocationService;
 use Wellness\Service\AppointmentLogisticsNotesService;
 use Wellness\Service\AvailabilityService;
 use Wellness\Service\BookingService;
@@ -46,6 +47,7 @@ final class Api
     private PractitionerPublicProfileService $publicProfiles;
     private ClientService $clients;
     private AddressCoverageService $addressCoverage;
+    private PractitionerWorkLocationService $workLocations;
     private PractitionerTravelService $practitionerTravel;
     private PractitionerVisitService $practitionerVisits;
     private PractitionerQualificationService $practitionerQualifications;
@@ -57,7 +59,7 @@ final class Api
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
+        $audit=new AuditLogger($database);$this->workLocations=new PractitionerWorkLocationService($database,$audit);$this->auth=new EntraAuthenticator($config,$database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
     }
 
     public function handle(): never
@@ -120,6 +122,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions','dashboardWidgetVersions');
                 $routes->addRoute('POST','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions/{version:\d+}/restore','restoreDashboardWidget');
                 $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
+                $routes->addRoute('GET','/api/v1/profile/work-location','myWorkLocation');
+                $routes->addRoute('PUT','/api/v1/profile/work-location','saveMyWorkLocation');
                 $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
                 $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
                 $routes->addRoute('DELETE','/api/v1/profile/avatar','deleteProfileAvatar');
@@ -281,6 +285,8 @@ final class Api
                 'dashboardWidgetVersions'=>$this->dashboard->versions($this->user($request),(string)$route[2]['id']),
                 'restoreDashboardWidget'=>$this->dashboard->restore($this->user($request),(string)$route[2]['id'],(int)$route[2]['version'],$request->correlationId),
                 'customerMe'=>$this->customerMe($request),
+                'myWorkLocation'=>$this->workLocations->get($this->user($request)),
+                'saveMyWorkLocation'=>$this->workLocations->save($this->user($request),$request->body,$request->correlationId),
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
                 'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),
                 'deleteProfileAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId),

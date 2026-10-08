@@ -34,15 +34,7 @@ final class AddressCoverageService
         $radius = (float)($rule['mobile_radius_km'] ?? 0);
         if ($radius <= 0) throw new ApiException(422, 'coverage_radius_not_configured', 'On-Site coverage is not configured for this practitioner and service.');
 
-        $origin = [
-            'address_line1' => trim((string)($rule['address_line1'] ?? '')),
-            'address_line2' => trim((string)($rule['address_line2'] ?? '')),
-            'city' => trim((string)($rule['city'] ?? '')),
-            'province' => trim((string)($rule['province'] ?? '')),
-            'postal_code' => trim((string)($rule['postal_code'] ?? '')),
-            'country' => 'Canada',
-            'instructions' => '',
-        ];
+        $origin = $this->origin($rule);
         foreach (['address_line1', 'city', 'province', 'postal_code'] as $field) {
             if ($origin[$field] === '') throw new ApiException(422, 'base_address_incomplete', 'The base location needs a complete address before On-Site coverage can be calculated.');
         }
@@ -52,7 +44,7 @@ final class AddressCoverageService
         $distanceMeters = $this->drivingDistance($validatedOrigin['location'], $validatedDestination['location']);
         $radiusMeters = (int)round($radius * 1000);
         if ($distanceMeters > $radiusMeters) {
-            throw new ApiException(422, 'outside_mobile_coverage', sprintf('This address is %.1f km away by road and is outside the %.1f km service area.', $distanceMeters / 1000, $radius));
+            throw new ApiException(422, 'outside_mobile_coverage', $actor->userType === 'client' ? 'This address is outside the practitioner’s On-Site service area.' : sprintf('This address is %.1f km away by road and is outside the %.1f km service area.', $distanceMeters / 1000, $radius));
         }
 
         $proof = [
@@ -62,16 +54,16 @@ final class AddressCoverageService
             'service_id' => (int)$body['service_id'],
             'practitioner_id' => (int)$body['practitioner_id'],
             'destination_hash' => self::destinationHash($destination),
-            'origin_hash' => self::addressHash($origin),
-            'distance_meters' => $distanceMeters,
+            'origin_hash' => $this->originFingerprint($rule),
             'radius_meters' => $radiusMeters,
             'iat' => time(),
             'exp' => time() + $this->config->addressValidationTokenTtlSeconds,
         ];
 
         return [
+            ...($actor->userType === 'staff' ? ['distance_km' => round($distanceMeters / 1000, 1)] : []),
+            'covered' => true,
             'destination' => $destination,
-            'distance_km' => round($distanceMeters / 1000, 1),
             'radius_km' => round($radius, 1),
             'token' => $this->sign($proof),
             'expires_at' => gmdate(DATE_ATOM, $proof['exp']),
@@ -87,7 +79,7 @@ final class AddressCoverageService
         }
         $proof = $this->verifyToken($actor, $body, $destination, $token);
         $rule = $this->rule($actor, $body);
-        if (($proof['origin_hash'] ?? null) !== self::addressHash($this->origin($rule)) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
+        if (($proof['origin_hash'] ?? null) !== $this->originFingerprint($rule) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
         return $proof;
     }
 
@@ -99,7 +91,7 @@ final class AddressCoverageService
         $rule = $this->rule($actor, $body);
         $origin = $this->origin($rule);
         $statement = $this->database->connection()->prepare('SELECT 1 FROM onsite_area_approvals WHERE clinic_id=:clinic AND client_id=:client AND location_id=:location AND practitioner_id=:practitioner AND service_id=:service AND destination_hash=:destination AND origin_hash=:origin AND radius_km=:radius LIMIT 1');
-        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => self::addressHash($origin), 'radius' => (int)$rule['mobile_radius_km']]);
+        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => $this->originFingerprint($rule), 'radius' => (int)$rule['mobile_radius_km']]);
         return ['approved' => (bool)$statement->fetchColumn()];
     }
 
@@ -113,12 +105,12 @@ final class AddressCoverageService
         $token = $body['address_validation_token'] ?? null;
         if (!is_string($token)) throw new ApiException(422, 'coverage_validation_required', 'Validate the visit address before approving it.');
         $proof = $this->verifyToken($actor, $body, $destination, $token);
-        if (($proof['origin_hash'] ?? null) !== self::addressHash($origin) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
+        if (($proof['origin_hash'] ?? null) !== $this->originFingerprint($rule) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
         $statement = $this->database->connection()->prepare("SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'");
         $statement->execute(['id' => $clientId, 'clinic' => $actor->clinicId]);
         if (!$statement->fetchColumn()) throw new ApiException(422, 'invalid_client', 'Select an active client in this clinic.');
         $statement = $this->database->connection()->prepare('INSERT INTO onsite_area_approvals(clinic_id,client_id,location_id,practitioner_id,service_id,destination_hash,origin_hash,radius_km,approved_by) VALUES(:clinic,:client,:location,:practitioner,:service,:destination,:origin,:radius,:staff) ON DUPLICATE KEY UPDATE approved_by=VALUES(approved_by),approved_at=UTC_TIMESTAMP()');
-        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => self::addressHash($origin), 'radius' => (int)$rule['mobile_radius_km'], 'staff' => $actor->userId]);
+        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => $this->originFingerprint($rule), 'radius' => (int)$rule['mobile_radius_km'], 'staff' => $actor->userId]);
         (new AuditLogger($this->database))->write($actor->clinicId, $actor, $correlationId, 'onsite_area.approve', 'client', $clientId, 'success', ['location_id' => (int)$body['location_id'], 'practitioner_id' => (int)$body['practitioner_id'], 'service_id' => (int)$body['service_id']]);
         return ['approved' => true];
     }
@@ -130,7 +122,7 @@ final class AddressCoverageService
         $destination = Delivery::destination(['delivery_mode' => 'mobile', 'destination' => $body['destination'] ?? null]);
         $rule = $this->rule($actor, $body);
         $statement = $this->database->connection()->prepare('DELETE FROM onsite_area_approvals WHERE clinic_id=:clinic AND client_id=:client AND location_id=:location AND practitioner_id=:practitioner AND service_id=:service AND destination_hash=:destination AND origin_hash=:origin AND radius_km=:radius');
-        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => self::addressHash($this->origin($rule)), 'radius' => (int)$rule['mobile_radius_km']]);
+        $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => $this->originFingerprint($rule), 'radius' => (int)$rule['mobile_radius_km']]);
         if ($statement->rowCount()) (new AuditLogger($this->database))->write($actor->clinicId, $actor, $correlationId, 'onsite_area.revoke', 'client', $clientId, 'success', ['location_id' => (int)$body['location_id'], 'practitioner_id' => (int)$body['practitioner_id'], 'service_id' => (int)$body['service_id']]);
         return ['approved' => false];
     }
@@ -166,7 +158,7 @@ final class AddressCoverageService
 
     private function rule(AuthContext $actor, array $body): array
     {
-        $sql = "SELECT ps.mobile_radius_km,l.address_line1,l.address_line2,l.city,l.province,l.postal_code,p.user_id,p.booking_mode
+        $sql = "SELECT p.id practitioner_id,ps.mobile_radius_km,l.address_line1,l.address_line2,l.city,l.province,l.postal_code,p.user_id,p.booking_mode
                   FROM practitioner_services ps
                   JOIN services s ON s.id=ps.service_id AND s.clinic_id=:clinic AND s.active=1
                   JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=:location AND sl.active=1
@@ -180,6 +172,13 @@ final class AddressCoverageService
         $practitionerOnly = $actor->hasAnyRole('practitioner') && !$actor->hasAnyRole('super_admin', 'clinic_admin', 'reception') && !$actor->hasPermission('schedule_for_other_practitioners');
         if ($practitionerOnly && ((int)$rule['user_id'] !== $actor->userId || $rule['booking_mode'] !== 'practitioner_managed')) {
             throw new ApiException(403, 'forbidden', 'Practitioners can only validate addresses for their own practitioner-managed appointments.');
+        }
+        $private = $this->database->connection()->prepare('SELECT home_address,work_address,work_same_as_home,version FROM practitioner_private_locations WHERE practitioner_id=:id');
+        $private->execute(['id' => (int)$rule['practitioner_id']]);
+        $row = $private->fetch();
+        if ($row) {
+            $rule['private_origin'] = json_decode($row[(bool)$row['work_same_as_home'] ? 'home_address' : 'work_address'], true, 32, JSON_THROW_ON_ERROR);
+            $rule['origin_version'] = (int)$row['version'];
         }
         return $rule;
     }
@@ -197,7 +196,16 @@ final class AddressCoverageService
 
     private function origin(array $rule): array
     {
+        if (isset($rule['private_origin'])) return $rule['private_origin'];
         return ['address_line1' => trim((string)($rule['address_line1'] ?? '')), 'address_line2' => trim((string)($rule['address_line2'] ?? '')), 'city' => trim((string)($rule['city'] ?? '')), 'province' => trim((string)($rule['province'] ?? '')), 'postal_code' => trim((string)($rule['postal_code'] ?? '')), 'country' => 'Canada'];
+    }
+
+    private function originFingerprint(array $rule): string
+    {
+        if (!isset($rule['private_origin'])) return self::addressHash($this->origin($rule));
+        // A keyed fingerprint cannot be checked against guesses of a home address.
+        // The version also invalidates approvals after changing back to an old address.
+        return hash_hmac('sha256', $rule['practitioner_id'] . ':' . $rule['origin_version'] . ':' . self::addressHash($this->origin($rule)), $this->config->addressValidationSigningKey);
     }
 
     private static function addressHash(array $address): string

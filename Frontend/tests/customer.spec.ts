@@ -720,7 +720,7 @@ test("linked client books only for the signed-in client through the customer API
       json: {
         data: {
           destination: route.request().postDataJSON().destination,
-          distance_km: 7.2,
+          covered: true,
           radius_km: 25,
           token: "coverage-proof",
         },
@@ -759,7 +759,7 @@ test("linked client books only for the signed-in client through the customer API
   await page
     .getByRole("button", { name: "Validate address and coverage" })
     .click();
-  await expect(page.getByText(/Address confirmed: 7.2 km/)).toBeVisible();
+  await expect(page.getByText("Your address is within the practitioner’s On-Site service area.")).toBeVisible();
   await page.getByRole("button", { name: "Find a time" }).click();
   await page.getByLabel("Appointment date").fill("2099-10-01");
   await page.getByRole("button", { name: "Find times" }).click();
@@ -796,7 +796,7 @@ test("selected public On-Site time survives sign-in and address validation", asy
   } } } }));
   await page.route("**/api/v1/customer/address-coverage/approval", route => route.fulfill({ json: { data: { approved: false } } }));
   await page.route("**/api/v1/customer/address-coverage/validate", route => route.fulfill({ json: { data: {
-    destination: route.request().postDataJSON().destination, distance_km: 7.2, radius_km: 25, token: "coverage-proof",
+    destination: route.request().postDataJSON().destination, covered: true, radius_km: 25, token: "coverage-proof",
   } } }));
   let availabilityChecks = 0;
   await page.route("**/api/v1/customer/availability?**", route => {

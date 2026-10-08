@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$MariaDbDirectory,
     [string]$PhpExecutable = 'php',
     [ValidateRange(1024, 65535)][int]$Port = 13317,
-    [ValidateSet('recurring-bookings.php','client-forms.php','staff-identity-migration.php','staff-invitations.php')][string]$IntegrationTest = 'recurring-bookings.php'
+    [ValidateSet('recurring-bookings.php','client-forms.php','staff-identity-migration.php','staff-invitations.php','practitioner-work-location.php')][string]$IntegrationTest = 'recurring-bookings.php'
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent

@@ -136,6 +136,7 @@ async function fixtures(
         phone: "905-555-0100",
       };
     if (path === "/auth/me") data = { roles: roles ?? [], permissions };
+    if (path === "/profile/work-location") data = {home_address:null,work_address:null,work_same_as_home:false,version:0};
     if (path === "/profile/avatar") data = { image_base64: null };
     if (path === "/profile/public-card") data = { public_name: "Test Practitioner", booking_name: "Test", summary: "", summary_fr: "", public_website_url: "", public_contact_email: "", public_contact_phone: "", public_contact_sms: false, slug: "test-practitioner", published: true };
     if (path === "/profile/notifications") data = { work_email: "staff@example.test", email_enabled: false, email_destination: "work", personal_email: null, personal_email_verified: false, mobile_phone: null, sms_requested: false, sms_delivery_active: false };
@@ -3375,4 +3376,57 @@ test('practitioner saves and clears their public website URL', async ({ page }) 
   await page.getByRole('button', { name: 'Save public card', exact: true }).click();
   await expect(page.getByText('Public card saved.', { exact: true })).toBeVisible();
   expect(card.public_website_url).toBe('');
+});
+
+
+test("private work location stays linked to home and can be changed to a separate office", async ({ page }) => {
+  await fixtures(page, ["practitioner"]);
+  const home = {address_line1:"12 Private Street",address_line2:"",city:"Toronto",province:"Ontario",postal_code:"M2M 2M2",country:"Canada"};
+  let settings = {home_address:home,work_address:null as typeof home|null,work_same_as_home:true,version:1};
+  const saves: typeof settings[] = [];
+  await page.route("**/api/v1/profile/work-location", route => {
+    if(route.request().method()==="PUT") { const body=route.request().postDataJSON(); saves.push(body); settings={...body,version:settings.version+1}; }
+    return route.fulfill({json:{data:settings}});
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  const homeSection=page.getByRole("region",{name:"Home address",exact:true});
+  const workSection=page.getByRole("region",{name:"Work location",exact:true});
+  await expect(page.getByRole("checkbox",{name:"Same as home address"})).toBeChecked();
+  await expect(workSection.getByRole("textbox",{name:"Street address"})).toHaveCount(0);
+  await homeSection.getByRole("textbox",{name:"Street address"}).fill("14 Private Street");
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  await expect(page.getByText("Work location saved. Previous coverage checks must be renewed.")).toBeVisible();
+  expect(saves[0]).toMatchObject({home_address:{address_line1:"14 Private Street"},work_address:null,work_same_as_home:true,version:1});
+  await page.reload();
+  await expect(homeSection.getByRole("textbox",{name:"Street address"})).toHaveValue("14 Private Street");
+  await page.getByRole("checkbox",{name:"Same as home address"}).uncheck();
+  await workSection.getByRole("textbox",{name:"Street address"}).fill("99 Office Street");
+  await workSection.getByRole("textbox",{name:"City",exact:true}).fill("Toronto");
+  await workSection.getByRole("textbox",{name:"Province / region"}).fill("Ontario");
+  await workSection.getByRole("textbox",{name:"Postal code"}).fill("M3M 3M3");
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  await expect(page.getByText("Work location saved. Previous coverage checks must be renewed.")).toBeVisible();
+  expect(saves[1]).toMatchObject({home_address:{address_line1:"14 Private Street"},work_address:{address_line1:"99 Office Street"},work_same_as_home:false,version:2});
+});
+
+test("same as home requires a complete home address and failed saves retain edits", async ({ page }) => {
+  await fixtures(page,["practitioner"]);
+  let attempted=0;
+  await page.route("**/api/v1/profile/work-location", route=>{
+    if(route.request().method()==="PUT") {attempted++;return route.fulfill({status:409,json:{error:{code:"work_location_changed",message:"Settings changed",correlation_id:"location-test"}}});}
+    return route.fulfill({json:{data:{home_address:null,work_address:null,work_same_as_home:false,version:0}}});
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole("checkbox",{name:"Same as home address"}).check();
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  expect(attempted).toBe(0);
+  const home=page.getByRole("region",{name:"Home address",exact:true});
+  await home.getByRole("textbox",{name:"Street address"}).fill("12 Private Street");
+  await home.getByRole("textbox",{name:"City",exact:true}).fill("Toronto");
+  await home.getByRole("textbox",{name:"Province / region"}).fill("Ontario");
+  await home.getByRole("textbox",{name:"Postal code"}).fill("M2M 2M2");
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  await expect(page.getByText(/Reference: location-test/)).toBeVisible();
+  expect(attempted).toBe(1);
+  await expect(home.getByRole("textbox",{name:"Street address"})).toHaveValue("12 Private Street");
 });
