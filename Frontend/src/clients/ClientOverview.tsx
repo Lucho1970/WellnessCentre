@@ -1,5 +1,6 @@
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, Divider, MenuItem, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, Divider, MenuItem, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { ArrowLeft, ArrowRight, CalendarDays, Eye } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +16,8 @@ type Access = { practitioner_id: number; user_id: number; display_name: string; 
 type AccessList = { client: Client; items: Access[]; page: number; has_more: boolean };
 type Request = (path: string, init?: RequestInit) => Promise<unknown>;
 
-export function ClientOverview({ clientId, initialTab, request, back, onLockedChange }: { clientId: number; initialTab: OverviewTab; request: Request; back: () => void; onLockedChange?: (locked: boolean) => void }) {
+function ClientOverviewForm({ clientId, initialTab, request, back, onLockedChange }: { clientId: number; initialTab: OverviewTab; request: Request; back: () => void; onLockedChange?: (locked: boolean) => void }) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const [tab, setTab] = useState<OverviewTab>(initialTab), [view, setView] = useState('all');
   const [formsLocked, setFormsLocked] = useState(false);
@@ -25,15 +27,15 @@ export function ClientOverview({ clientId, initialTab, request, back, onLockedCh
   const [history, setHistory] = useState<History | null>(null), [access, setAccess] = useState<AccessList | null>(null);
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   useEffect(() => {
-    if(tab==='forms'){setBusy(false);setError('');return;}
-    const controller = new AbortController(); setBusy(true); setError('');
+    if(tab==='forms'){setBusy(false);(formValidation.clear(), setError(''));return;}
+    const controller = new AbortController(); setBusy(true); (formValidation.clear(), setError(''));
     const path = tab === 'appointments' ? `/${clientId}/appointments?view=${view}&page=${historyPage}` : `/${clientId}/practitioner-access?page=${accessPage}`;
     void request(path, { signal: controller.signal }).then(result => {
       if (controller.signal.aborted) return;
       const data = result as History | AccessList;
       if (Number(data.client?.id) !== clientId || !Array.isArray(data.items)) throw new Error(t('The client overview response is invalid.'));
       if (tab === 'appointments') setHistory(data as History); else setAccess(data as AccessList);
-    }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load client overview.')); })
+    }).catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load client overview.')); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [clientId, tab, view, historyPage, accessPage, request, retry, t]);
@@ -50,7 +52,7 @@ export function ClientOverview({ clientId, initialTab, request, back, onLockedCh
     </Tabs>
     {tab === 'forms' && <ClientForms key={clientId} clientId={clientId} onLockedChange={setFormsLocked}/>}
     {tab === 'appointments' && <>
-      <TextField select label={t('Appointment history filter')} value={view} onChange={event => { setView(event.target.value); setHistoryPage(1); }}>
+      <TextField name="view" select label={t('Appointment history filter')} value={view} onChange={event => { setView(event.target.value); setHistoryPage(1); }}>
         <MenuItem value="all">{t('All appointments')}</MenuItem><MenuItem value="upcoming">{t('Upcoming appointments')}</MenuItem><MenuItem value="past">{t('Past appointments')}</MenuItem><MenuItem value="canceled">{t('Cancelled appointments')}</MenuItem>
       </TextField>
       {!busy && !error && history && <Stack direction="row" gap={1} flexWrap="wrap" aria-label={t('Appointment totals')}>
@@ -103,21 +105,24 @@ export function ClientOverview({ clientId, initialTab, request, back, onLockedCh
     {tab !== 'forms' && !busy && !error && current && <Box><Stack direction="row" justifyContent="space-between" alignItems="center"><Button startIcon={<ArrowLeft size={16}/>} disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}', { page })}</Typography><Button endIcon={<ArrowRight size={16}/>} disabled={!current.has_more} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack></Box>}
   </Stack>;
 }
+export const ClientOverview = withFormValidation(ClientOverviewForm);
+
 
 type Change = { id: number; kind: 'status' | 'reassignment' | 'fee_adjustment'; created_at: string; from_status: string | null; to_status: string | null; actor_name: string | null; reason: string | null; fee_triggered_cents: number | null; original_fee_cents: number | null; adjusted_fee_cents: number | null; previous_practitioner: string | null; next_practitioner: string | null };
-function AppointmentChanges({ clientId, appointmentId, timezone, currency, request }: { clientId: number; appointmentId: number; timezone: string; currency: string; request: Request }) {
+function AppointmentChangesValidated({ clientId, appointmentId, timezone, currency, request }: { clientId: number; appointmentId: number; timezone: string; currency: string; request: Request }) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [page, setPage] = useState(1), [retry, setRetry] = useState(0);
   const [data, setData] = useState<{ items: Change[]; has_more: boolean } | null>(null);
   useEffect(() => {
     if (!open) return;
-    const controller = new AbortController(); setBusy(true); setError('');
+    const controller = new AbortController(); setBusy(true); (formValidation.clear(), setError(''));
     void request(`/${clientId}/appointments/${appointmentId}/history?page=${page}`, { signal: controller.signal }).then(result => {
       if (controller.signal.aborted) return;
       const response = result as { appointment: { id: number }; items: Change[]; has_more: boolean };
       if (Number(response.appointment?.id) !== appointmentId || !Array.isArray(response.items)) throw new Error(t('The client overview response is invalid.'));
       setData(response);
-    }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load recorded changes.')); })
+    }).catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load recorded changes.')); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [open, clientId, appointmentId, page, retry, request, t]);
@@ -144,3 +149,4 @@ function AppointmentChanges({ clientId, appointmentId, timezone, currency, reque
     </Stack>}
   </Stack>;
 }
+const AppointmentChanges = withFormValidation(AppointmentChangesValidated);

@@ -1,20 +1,11 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState } from "react";
-import {
-  Alert,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  Grid,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Button, Checkbox, Grid, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { Plus, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStaffAuth } from "../auth/AuthProvider";
-import { apiErrorMessage, normalizeNumericIds } from "../shared/api";
+import { normalizeNumericIds } from "../shared/api";
 import { useUnsavedChanges } from "../shared/UnsavedChanges";
 const api = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 type Named = { id: number; name: string };
@@ -23,7 +14,8 @@ type State = {
   rooms: { room_id: number; capability_id: number }[];
   services: { service_id: number; capability_id: number }[];
 };
-export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void } = {}) {
+function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void } = {}) {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [catalog, setCatalog] = useState<State>({
@@ -60,13 +52,7 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
       b = await Promise.all(rs.map((r) => r.json()));
     const failed = rs.findIndex((r) => !r.ok);
     if (failed >= 0)
-      throw new Error(
-        apiErrorMessage(
-          b[failed],
-          rs[failed].status,
-          t("Unable to load room capabilities."),
-        ),
-      );
+      throw new ApiError(b[failed], rs[failed].status, t("Unable to load room capabilities."));
     const loadedRooms = normalizeNumericIds<Named[]>(b[1].data);
     const loadedServices = normalizeNumericIds<Named[]>(b[2].data);
     setCatalog(normalizeNumericIds(b[0].data));
@@ -104,7 +90,7 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
   ) => set(on ? [...list, id] : list.filter((x) => x !== id));
   const add = async () => {
     setBusy(true);
-    setError("");
+    (formValidation.clear(), setError(""));
     try {
       const token = await getAccessToken(),
         r = await fetch(`${api}/admin/room-capabilities`, {
@@ -117,13 +103,11 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
         }),
         b = await r.json();
       if (!r.ok)
-        throw new Error(
-          apiErrorMessage(b, r.status, t("Unable to add capability.")),
-        );
+        throw new ApiError(b, r.status, t("Unable to add capability."));
       setName("");
       await load();
       setMessage(t("Capability added."));
-    } catch (c) {
+    } catch (c) { formValidation.capture(c);
       setError(c instanceof Error ? c.message : t("Unable to add capability."));
     } finally {
       setBusy(false);
@@ -131,7 +115,7 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
   };
   const save = async () => {
     setBusy(true);
-    setError("");
+    (formValidation.clear(), setError(""));
     try {
       const token = await getAccessToken(),
         r = await fetch(`${api}/admin/room-capability-assignments`, {
@@ -149,12 +133,10 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
         }),
         b = await r.json();
       if (!r.ok)
-        throw new Error(
-          apiErrorMessage(b, r.status, t("Unable to save requirements.")),
-        );
+        throw new ApiError(b, r.status, t("Unable to save requirements."));
       await load();
       setMessage(t("Room capabilities and service requirements saved."));
-    } catch (c) {
+    } catch (c) { formValidation.capture(c);
       setError(
         c instanceof Error ? c.message : t("Unable to save requirements."),
       );
@@ -171,7 +153,7 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
         )}
       </Typography>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-        <TextField
+        <TextField name="name"
           fullWidth
           label={t("New capability")}
           placeholder={t("e.g. Massage table")}
@@ -189,7 +171,7 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
       </Stack>
       <Grid container spacing={3} mt={1}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <TextField
+          <TextField name="room"
             select
             fullWidth
             label={t("Room")}
@@ -221,7 +203,7 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
           ))}
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <TextField
+          <TextField name="service"
             select
             fullWidth
             label={t("Service")}
@@ -275,3 +257,4 @@ export function RoomCapabilities({ onDirtyChange }: { onDirtyChange?: (dirty: bo
     </Paper>
   );
 }
+export const RoomCapabilities = withFormValidation<{ onDirtyChange?: (dirty: boolean) => void }>(RoomCapabilitiesForm);

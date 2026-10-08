@@ -1,10 +1,12 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, Chip, Divider, Drawer, FormControlLabel, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Switch, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, Chip, Divider, Drawer, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Switch, Typography } from '@mui/material';
 import { RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { apiBaseUrl, normalizeNumericIds } from '../shared/api';
 import { NotificationHealthBanner, type NotificationHealth } from '../shared/NotificationHealthBanner';
 
 type Status = 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | 'canceled' | 'needs_review' | 'resolved';
@@ -21,7 +23,8 @@ const outcomeLabel: Record<string, string> = { provider_accepted: 'Provider hist
 const eventLabel: Record<string, string> = { booking_confirmation: 'Booking confirmation', booking_change: 'Booking change', booking_cancellation: 'Booking cancellation', appointment_reminder: 'Appointment reminder', staff_booking_confirmation: 'Staff booking notice', staff_booking_change: 'Staff change notice', staff_booking_cancellation: 'Staff cancellation notice', staff_booking_reassigned_away: 'Appointment moved off schedule' };
 const time = (value: string | null) => value ? new Date(`${value.replace(' ', 'T')}Z`).toLocaleString() : '—';
 
-export function NotificationStatusAdmin() {
+function NotificationStatusAdminForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -60,23 +63,23 @@ export function NotificationStatusAdmin() {
       ...(payload ? { body: JSON.stringify(payload) } : {}),
     });
     const body = await response.json();
-    if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+    if (!response.ok) throw new ApiError(body, response.status);
     return (normalizeNumericIds(body.data) as ReminderSchedule[]).map(row => ({ ...row, minutes_before: Number(row.minutes_before) }));
   }, [getAccessToken]);
   const openReminders = async () => {
-    setReminderOpen(true); setReminderBusy(true); setReminderError('');
+    setReminderOpen(true); setReminderBusy(true); (formValidation.clear(), setReminderError(''));
     try { setReminders(await reminderRequest()); }
-    catch (cause) { setReminderError(cause instanceof Error ? cause.message : t('Unable to load reminder settings.')); }
+    catch (cause) { formValidation.capture(cause); setReminderError(cause instanceof Error ? cause.message : t('Unable to load reminder settings.')); }
     finally { setReminderBusy(false); }
   };
   const changeReminders = async (method: string, path: string, payload: object) => {
-    setReminderBusy(true); setReminderError('');
+    setReminderBusy(true); (formValidation.clear(), setReminderError(''));
     try { setReminders(await reminderRequest(method, path, payload)); void load(); }
-    catch (cause) { setReminderError(cause instanceof Error ? cause.message : t('Unable to save reminder settings.')); }
+    catch (cause) { formValidation.capture(cause); setReminderError(cause instanceof Error ? cause.message : t('Unable to save reminder settings.')); }
     finally { setReminderBusy(false); }
   };
   const load = useCallback(async () => {
-    setLoading(true); setError('');
+    setLoading(true); (formValidation.clear(), setError(''));
     try {
       const token = await getAccessToken();
       const params = new URLSearchParams({ page: String(page) });
@@ -85,17 +88,17 @@ export function NotificationStatusAdmin() {
       if (period) params.set('period', period);
       const response = await fetch(`${apiBaseUrl}/admin/notifications?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+      if (!response.ok) throw new ApiError(body, response.status);
       setData(normalizeNumericIds(body.data));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load notification status.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load notification status.')); }
     finally { setLoading(false); }
   }, [getAccessToken, page, status, channel, period, t]);
   useEffect(() => { void load(); }, [load]);
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.page_size ?? 25)));
-  const openEvent = (item: Event) => { setSelected(item); setReviewOutcome('no_longer_needed'); setCheckedProvider(false); setCheckedRecipient(false); setReviewError(''); };
+  const openEvent = (item: Event) => { setSelected(item); setReviewOutcome('no_longer_needed'); setCheckedProvider(false); setCheckedRecipient(false); (formValidation.clear(), setReviewError('')); };
   const review = async (decision: 'resolve' | 'retry') => {
     if (!selected) return;
-    setReviewBusy(true); setReviewError('');
+    setReviewBusy(true); (formValidation.clear(), setReviewError(''));
     try {
       const token = await getAccessToken();
       const response = await fetch(`${apiBaseUrl}/admin/notifications/${selected.id}/review`, {
@@ -103,9 +106,9 @@ export function NotificationStatusAdmin() {
         body: JSON.stringify({ decision, outcome: decision === 'retry' ? 'provider_not_sent' : reviewOutcome, checked_provider_history: checkedProvider, checked_recipient: checkedRecipient }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+      if (!response.ok) throw new ApiError(body, response.status);
       setSelected(null); void load();
-    } catch (cause) { setReviewError(cause instanceof Error ? cause.message : t('Unable to save notification review.')); }
+    } catch (cause) { formValidation.capture(cause); setReviewError(cause instanceof Error ? cause.message : t('Unable to save notification review.')); }
     finally { setReviewBusy(false); }
   };
   const retryAge = selected ? Date.now() - Date.parse(`${selected.scheduled_at.replace(' ', 'T')}Z`) : Number.POSITIVE_INFINITY;
@@ -118,13 +121,13 @@ export function NotificationStatusAdmin() {
     <NotificationHealthBanner health={data?.health} />
     {error && <Alert severity="error">{error}</Alert>}
     <Paper variant="outlined"><Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems={{ sm: 'center' }} p={1.5}>
-      <TextField select size="small" label={t('Status')} value={status} onChange={event => setFilter('status', event.target.value)} sx={{ minWidth: 220 }}>
+      <TextField name="status" select size="small" label={t('Status')} value={status} onChange={event => setFilter('status', event.target.value)} sx={{ minWidth: 220 }}>
         <MenuItem value="">{t('All statuses')}</MenuItem>{statuses.map(item => <MenuItem value={item} key={item}>{t(statusLabel[item])} ({data?.counts[item] ?? 0})</MenuItem>)}
       </TextField>
-      <TextField select size="small" label={t('Channel')} value={channel} onChange={event => setFilter('channel', event.target.value)} sx={{ minWidth: 150 }}>
+      <TextField name="channel" select size="small" label={t('Channel')} value={channel} onChange={event => setFilter('channel', event.target.value)} sx={{ minWidth: 150 }}>
         <MenuItem value="">{t('All channels')}</MenuItem><MenuItem value="email">{t('Email')}</MenuItem><MenuItem value="sms">SMS</MenuItem>
       </TextField>
-      <TextField select size="small" label={t('Scheduled date')} value={period} onChange={event => setFilter('period', event.target.value)} sx={{ minWidth: 170 }}>
+      <TextField name="period" select size="small" label={t('Scheduled date')} value={period} onChange={event => setFilter('period', event.target.value)} sx={{ minWidth: 170 }}>
         <MenuItem value="">{t('All dates')}</MenuItem><MenuItem value="today">{t('Today')}</MenuItem><MenuItem value="last7">{t('Last 7 days')}</MenuItem><MenuItem value="week">{t('This calendar week')}</MenuItem>
       </TextField>
       <Button startIcon={<RefreshCw size={17} />} onClick={() => void load()} disabled={loading}>{t('Refresh')}</Button>
@@ -156,9 +159,9 @@ export function NotificationStatusAdmin() {
         {selected.status === 'needs_review' && <Stack spacing={1.5}>
           <Divider />
           <Typography variant="h6">{t('Review this notification')}</Typography>
-          <FormControlLabel control={<Checkbox checked={checkedProvider} onChange={event => setCheckedProvider(event.target.checked)} />} label={t('I checked provider message history.')} />
-          <FormControlLabel control={<Checkbox checked={checkedRecipient} onChange={event => setCheckedRecipient(event.target.checked)} />} label={t('I checked whether the recipient received the notice.')} />
-          <TextField select size="small" label={t('Review outcome')} value={reviewOutcome} onChange={event => setReviewOutcome(event.target.value as ReviewOutcome)}>
+          <FormControlLabel name="checkedProvider" control={<Checkbox checked={checkedProvider} onChange={event => setCheckedProvider(event.target.checked)} />} label={t('I checked provider message history.')} />
+          <FormControlLabel name="checkedRecipient" control={<Checkbox checked={checkedRecipient} onChange={event => setCheckedRecipient(event.target.checked)} />} label={t('I checked whether the recipient received the notice.')} />
+          <TextField name="reviewOutcome" select size="small" label={t('Review outcome')} value={reviewOutcome} onChange={event => setReviewOutcome(event.target.value as ReviewOutcome)}>
             {(['provider_accepted','handled_manually','no_longer_needed'] as const).map(value => <MenuItem key={value} value={value}>{t(outcomeLabel[value])}</MenuItem>)}
           </TextField>
           {reviewError && <Alert severity="error">{reviewError}</Alert>}
@@ -177,7 +180,7 @@ export function NotificationStatusAdmin() {
       {!reminders.length && !reminderBusy && <Typography color="text.secondary">{t('No email reminders configured.')}</Typography>}
       <Divider />
       <Typography fontWeight={700}>{t('Add reminder time')}</Typography>
-      <TextField select label={t('Send before appointment')} size="small" value={selectedReminderTime} disabled={!availableReminderTimes.length} onChange={event => setNewReminder(Number(event.target.value))}>
+      <TextField name="selectedReminderTime" select label={t('Send before appointment')} size="small" value={selectedReminderTime} disabled={!availableReminderTimes.length} onChange={event => setNewReminder(Number(event.target.value))}>
         {availableReminderTimes.map(minutes => <MenuItem key={minutes} value={minutes}>{t(reminderLabel[minutes])}</MenuItem>)}
       </TextField>
       <Button variant="contained" disabled={reminderBusy || !selectedReminderTime || reminders.filter(reminderActive).length >= 3} onClick={() => void changeReminders('POST', '', { minutes_before: selectedReminderTime })}>{t('Add email reminder')}</Button>
@@ -185,3 +188,4 @@ export function NotificationStatusAdmin() {
     </Stack></Box></Drawer>
   </Stack>;
 }
+export const NotificationStatusAdmin = withFormValidation(NotificationStatusAdminForm);

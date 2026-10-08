@@ -1,5 +1,7 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, withFormValidation, useFormValidation, ValidationField } from '../shared/FormValidation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, Checkbox, FormControlLabel, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Checkbox, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
@@ -9,7 +11,8 @@ const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const empty = (): AddressValue => ({ address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada' });
 type Settings = { home_address: AddressValue | null; work_address: AddressValue | null; work_same_as_home: boolean; version: number };
 
-export function PractitionerWorkLocation() {
+function PractitionerWorkLocationForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [home, setHome] = useState<AddressValue>(empty);
@@ -31,22 +34,22 @@ export function PractitionerWorkLocation() {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(apiErrorMessage(result, response.status, t('Unable to load or save your work location.')));
+    if (!response.ok) throw new ApiError(result, response.status, t('Unable to load or save your work location.'));
     return result.data;
   };
   const load = async () => {
-    setLoading(true); setError(''); setMessage('');
-    try { apply(await request()); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load or save your work location.')); }
+    setLoading(true); (formValidation.clear(), setError('')); setMessage('');
+    try { apply(await request()); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load or save your work location.')); }
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, []);
   const save = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError(''); setMessage('');
+    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setMessage('');
     const homeEntered = [home.address_line1, home.address_line2, home.city, home.province, home.postal_code].some(value => value.trim());
     try {
       apply(await request({ home_address: same || homeEntered ? home : null, work_address: same ? null : work, work_same_as_home: same, version }));
       setMessage(t('Work location saved. Previous coverage checks must be renewed.'));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load or save your work location.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load or save your work location.')); }
     finally { setBusy(false); }
   };
   return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
@@ -57,13 +60,13 @@ export function PractitionerWorkLocation() {
         <Box component="section" aria-label={t('Home address')}>
           <Typography variant="h6" mb={2}>{t('Home address')}</Typography>
           <Typography color="text.secondary" mb={2}>{t('Optional unless your work location is the same as home.')}</Typography>
-          <AddressEntry value={home} onChange={value => { setHome(value); setMessage(''); }} required={same} disabled={busy} />
+          <ValidationField name="home_address"><AddressEntry namePrefix="home_address." value={home} onChange={value => { setHome(value); setMessage(''); }} required={same} disabled={busy} /></ValidationField>
         </Box>
         <Box component="section" aria-label={t('Work location')}>
           <Typography variant="h6">{t('Work location')}</Typography>
-          <FormControlLabel control={<Checkbox checked={same} disabled={busy} onChange={event => { setSame(event.target.checked); setMessage(''); }} />} label={t('Same as home address')} />
+          <FormControlLabel name="work_same_as_home" control={<Checkbox checked={same} disabled={busy} onChange={event => { setSame(event.target.checked); setMessage(''); }} />} label={t('Same as home address')} />
           {same ? <Alert severity="info">{t('Your saved home address will be used. Updating it also updates your work location.')}</Alert>
-            : <AddressEntry value={work} onChange={value => { setWork(value); setMessage(''); }} required disabled={busy} />}
+            : <ValidationField name="work_address"><AddressEntry namePrefix="work_address." value={work} onChange={value => { setWork(value); setMessage(''); }} required disabled={busy} /></ValidationField>}
         </Box>
       </>}
       {error && <Alert severity="error">{error}</Alert>}
@@ -72,3 +75,4 @@ export function PractitionerWorkLocation() {
     </Stack>
   </Paper>;
 }
+export const PractitionerWorkLocation = withFormValidation(PractitionerWorkLocationForm);

@@ -106,7 +106,9 @@ test('invalid typed answers remain editable and do not send a submission', async
   await page.getByLabel('Birth date').fill('9999-01-01'); await page.getByRole('textbox', { name: 'Contact telephone', exact: true }).fill('123'); await page.getByLabel('Contact email').fill('invalid'); await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check();
   await page.getByRole('button', { name: 'Submit form', exact: true }).click(); expect(sent).toBe(0);
   await page.getByLabel('Birth date').fill('2000-01-01'); await page.getByLabel('Contact email').fill('test@example.test'); await page.getByRole('button', { name: 'Submit form', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'Enter a valid phone number for the selected country.' })).toBeVisible(); expect(sent).toBe(0); await expect(page.getByRole('textbox', { name: 'Contact telephone', exact: true })).toBeEnabled();
+  const phone = page.getByRole('textbox', { name: 'Contact telephone', exact: true });
+  await expect(phone).toHaveAccessibleDescription('Enter a valid phone number for the selected country.');
+  await expect(phone).toBeFocused(); await expect(phone).toBeInViewport(); expect(sent).toBe(0); await expect(phone).toBeEnabled();
   await page.getByRole('textbox', { name: 'Contact telephone', exact: true }).fill('(416) 555-1234'); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(sent).toBe(1);
 });
 test('a new version changes text to date while the existing version remains text', async ({ page }) => {

@@ -886,3 +886,7 @@ Separate maintenance SQL now prepares a reviewed migration of Esther's existing 
 ### Private practitioner starting location
 
 On `feature/private-practitioner-work-location`: practitioners can save a private work origin or choose **Same as home address**, which stays linked to home updates. On-Site coverage uses this origin with existing practitioner/service limits; client responses and readable validation tokens omit exact distance and origin addresses/coordinates. Versioned keyed origin fingerprints invalidate earlier checks and saved approvals on every save. Existing practitioners retain their public clinic base until private settings are configured. Migration 038 and matching private API/portal deployment are required. See [private work location](PRIVATE_PRACTITIONER_WORK_LOCATION.md). Actual travel between appointments and route optimization remain separate work.
+
+### Shared form validation feedback
+
+On `bugs/form-field-validation`: staff/client editors retain API field details, display errors below matching controls, and scroll/focus the first invalid field. Dialogs, address/choice groups, intake typed answers and French mobile layouts share the same handling. Unmapped fields and non-field failures stay in a focused summary with their correlation reference. Entered values are retained. See [form validation](FORM_VALIDATION.md) for the integration contract and hosted acceptance steps. This is a portal-only change with no migration; hosted deployment remains pending.

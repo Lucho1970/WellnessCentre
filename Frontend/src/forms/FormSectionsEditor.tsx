@@ -1,5 +1,6 @@
+import { TextField } from '../shared/FormValidation';
 import type { Dispatch, SetStateAction } from 'react';
-import { Button, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Button, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import type { Definition } from './FormTasks';
 
@@ -21,10 +22,10 @@ export function FormSectionsEditor({ definition, setDefinition, disabled }: { de
   return <Stack spacing={2}>
     <Typography variant="h6">{t('Form sections')}</Typography>
     {sections.map((section, index) => <Paper key={section.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
-      <TextField required fullWidth label={t('Section {{number}} title (English)', { number: index + 1 })} disabled={disabled} value={section.title} inputProps={{ maxLength: 190 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, title: event.target.value } : item) }))}/>
-      <TextField fullWidth label={t('Section {{number}} title (French)', { number: index + 1 })} disabled={disabled} value={section.title_fr} inputProps={{ maxLength: 190 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, title_fr: event.target.value } : item) }))}/>
-      <TextField fullWidth multiline minRows={2} label={t('Section {{number}} description (English)', { number: index + 1 })} disabled={disabled} value={section.description ?? ''} inputProps={{ maxLength: 2000 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, description: event.target.value } : item) }))}/>
-      <TextField fullWidth multiline minRows={2} label={t('Section {{number}} description (French)', { number: index + 1 })} disabled={disabled} value={section.description_fr ?? ''} inputProps={{ maxLength: 2000 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, description_fr: event.target.value } : item) }))}/>
+      <TextField name="title" required fullWidth label={t('Section {{number}} title (English)', { number: index + 1 })} disabled={disabled} value={section.title} inputProps={{ maxLength: 190 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, title: event.target.value } : item) }))}/>
+      <TextField name="title_fr" fullWidth label={t('Section {{number}} title (French)', { number: index + 1 })} disabled={disabled} value={section.title_fr} inputProps={{ maxLength: 190 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, title_fr: event.target.value } : item) }))}/>
+      <TextField name="description" fullWidth multiline minRows={2} label={t('Section {{number}} description (English)', { number: index + 1 })} disabled={disabled} value={section.description ?? ''} inputProps={{ maxLength: 2000 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, description: event.target.value } : item) }))}/>
+      <TextField name="description_fr" fullWidth multiline minRows={2} label={t('Section {{number}} description (French)', { number: index + 1 })} disabled={disabled} value={section.description_fr ?? ''} inputProps={{ maxLength: 2000 }} onChange={event => setDefinition(current => ({ ...current, sections: current.sections?.map(item => item.id === section.id ? { ...item, description_fr: event.target.value } : item) }))}/>
       <Stack direction="row" gap={1} flexWrap="wrap">
         <Button disabled={disabled || index === 0} onClick={() => move(index, -1)}>{t('Move section up')}</Button>
         <Button disabled={disabled || index === sections.length - 1} onClick={() => move(index, 1)}>{t('Move section down')}</Button>

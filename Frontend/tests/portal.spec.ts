@@ -3452,3 +3452,122 @@ test("invited practitioner profile and menu use approved local identity instead 
   await expect(page.getByRole('menu').getByText('Approved Practitioner',{exact:true})).toBeVisible();
   await expect(page.getByRole('menu').getByText('practitioner@example.test',{exact:true})).toBeVisible();
 });
+
+async function teamValidationFixture(page: Page) {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/team-profiles', route => route.fulfill({json:{data:[{
+    user_id:7,given_name:'New',display_name:'New Practitioner',status:'active',practitioner_id:3,
+    slug:'new-practitioner',section:'practitioner',public_name:'New Practitioner',booking_name:'New',
+    public_title:'Practitioner',published:0,show_booking_action:0,has_image:0,
+  }]}}));
+  await page.goto(`${portalHost}/admin/team`);
+  await expect(page.getByRole('button',{name:'Save team profile'})).toBeEnabled();
+}
+
+test('team phone error is inline, focused, scrolled and cleared on correction without losing edits', async ({page}) => {
+  await teamValidationFixture(page);
+  let attempts=0;
+  await page.route('**/api/v1/admin/team-profiles/7', route => {
+    attempts++;
+    return attempts < 3 ? route.fulfill({status:422,json:{error:{code:'validation_error',message:'Use an international public phone number, for example +12892975234.',fields:{public_contact_phone:'Use + and 8 to 15 digits'},correlation_id:'team-phone-test'}}}) : route.fulfill({json:{data:{user_id:7,published:false}}});
+  });
+  const phone=page.getByRole('textbox',{name:'Public contact phone',exact:true});
+  await phone.fill('2892975234');
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  await expect(phone).toHaveAttribute('aria-invalid','true');
+  await expect(phone).toHaveAccessibleDescription('Use + and 8 to 15 digits');
+  await expect(phone).toBeFocused();
+  await expect(phone).toBeInViewport();
+  await expect(phone).toHaveValue('2892975234');
+  await expect(page.getByText(/Reference: team-phone-test/)).toBeAttached();
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  await expect.poll(()=>attempts).toBe(2);
+  await expect(phone).toBeFocused();
+  await phone.fill('+12892975234');
+  await expect(phone).toBeFocused();
+  await expect(phone).toHaveAttribute('aria-invalid','false');
+  await expect(phone).toHaveAccessibleDescription('Use international format, for example +12892975234.');
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  await expect(page.getByText('Public team profile saved.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Use + and 8 to 15 digits',{exact:true})).toHaveCount(0);
+});
+
+test('multiple team field errors focus visual order and checkbox errors appear below the control', async ({page}) => {
+  await teamValidationFixture(page);
+  await page.route('**/api/v1/admin/team-profiles/7',route=>route.fulfill({status:422,json:{error:{code:'validation_error',message:'Check contact details.',fields:{public_contact_phone:'Use + and 8 to 15 digits',public_contact_email:'Invalid email',public_contact_sms:'Phone required'},correlation_id:'team-multiple'}}}));
+  await page.getByRole('textbox',{name:'Public contact phone',exact:true}).fill('invalid');
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  const email=page.getByRole('textbox',{name:'Public contact email',exact:true});
+  await expect(email).toHaveAccessibleDescription('Invalid email');
+  await expect(email).toBeFocused();
+  await expect(email).toBeInViewport();
+  await expect(page.getByText('Phone required',{exact:true})).toBeAttached();
+  await email.fill('valid@example.test');
+  await expect(email).toHaveAttribute('aria-invalid','false');
+  await expect(page.getByRole('textbox',{name:'Public contact phone',exact:true})).toHaveAttribute('aria-invalid','true');
+});
+
+test('unmapped validation fields remain visible and focused as a form-level error', async ({page}) => {
+  await teamValidationFixture(page);
+  await page.route('**/api/v1/admin/team-profiles/7',route=>route.fulfill({status:422,json:{error:{code:'validation_error',message:'Check the profile.',fields:{future_field:'Review this setting'},correlation_id:'team-unknown'}}}));
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  const alert=page.getByRole('alert').filter({hasText:'future_field: Review this setting'});
+  await expect(alert).toBeFocused();
+  await expect(alert).toBeInViewport();
+  await expect(page.getByRole('textbox',{name:'Preferred public name',exact:true})).toHaveValue('New Practitioner');
+});
+
+test('public card uses shared field errors and preserves unsaved biography', async ({page}) => {
+  await fixtures(page,['practitioner']);
+  await page.route('**/api/v1/profile/public-card',route=>route.request().method()==='PUT' ? route.fulfill({status:422,json:{error:{code:'validation_error',message:'Use an international public phone number, for example +12892975234.',fields:{public_contact_phone:'Use + and 8 to 15 digits'},correlation_id:'self-card-phone'}}}) : route.fulfill({json:{data:{public_name:'Test Practitioner',booking_name:'Test',summary:'',summary_fr:'',slug:'test',published:false}}}));
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole('textbox',{name:'Biography (English)',exact:true}).fill('Unsaved biography');
+  await page.getByRole('textbox',{name:'Public contact phone',exact:true}).fill('2892975234');
+  await page.getByRole('button',{name:'Save public card',exact:true}).click();
+  const phone=page.getByRole('textbox',{name:'Public contact phone',exact:true});
+  await expect(phone).toHaveAccessibleDescription('Use + and 8 to 15 digits');
+  await expect(phone).toBeFocused();
+  await expect(phone).toBeInViewport();
+  await expect(page.getByRole('textbox',{name:'Biography (English)',exact:true})).toHaveValue('Unsaved biography');
+});
+
+test('field errors and unmapped errors stay inside the active location drawer', async ({page}) => {
+  await fixtures(page,['super_admin']);
+  let attempts=0;
+  await page.route('**/api/v1/admin/locations',route=> {
+    if(route.request().method()==='GET') return route.fulfill({json:{data:[]}});
+    attempts++;
+    return route.fulfill({status:422,json:{error:{code:'validation_error',message:'Review this location.',fields:attempts===1?{timezone:'Invalid timezone'}:{future_setting:'Review this setting'},correlation_id:'location-validation'}}});
+  });
+  await page.goto(`${portalHost}/admin/locations`);
+  await page.getByRole('button',{name:'New location',exact:true}).first().click();
+  await page.getByRole('textbox',{name:'Location name',exact:true}).fill('Test location');
+  await page.getByRole('button',{name:'Add location',exact:true}).last().click();
+  const timezone=page.getByRole('textbox',{name:'Timezone',exact:true});
+  await expect(timezone).toHaveAccessibleDescription('Invalid timezone');
+  await expect(timezone).toBeFocused();
+  await expect(timezone).toBeInViewport();
+  await page.getByRole('button',{name:'Add location',exact:true}).last().click();
+  const summary=page.getByRole('alert').filter({hasText:'future_setting: Review this setting'});
+  await expect(summary).toBeFocused();
+  await expect(summary).toBeInViewport();
+  await expect(page.getByRole('textbox',{name:'Location name',exact:true})).toHaveValue('Test location');
+  page.once('dialog', dialog => void dialog.accept());
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(page.getByText('future_setting: Review this setting',{exact:true})).toHaveCount(0);
+});
+
+test('French mobile field errors stay accessible with reduced motion', async ({page}) => {
+  await page.setViewportSize({width:390,height:650});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.addInitScript(()=>localStorage.setItem('wellness.language','fr'));
+  await fixtures(page,['practitioner']);
+  await page.route('**/api/v1/profile/public-card',route=>route.request().method()==='PUT' ? route.fulfill({status:422,json:{error:{code:'validation_error',message:'Use an international public phone number, for example +12892975234.',fields:{public_contact_phone:'Use + and 8 to 15 digits'},correlation_id:'fr-phone'}}}) : route.fulfill({json:{data:{public_name:'Test',booking_name:'Test',summary:'',summary_fr:'',slug:'test',published:false}}}));
+  await page.goto(`${portalHost}/practitioner/profile`);
+  const phone=page.locator('input[name="public_contact_phone"]');
+  await phone.fill('123');
+  await page.getByRole('button',{name:'Enregistrer la fiche publique',exact:true}).click();
+  await expect(phone).toHaveAccessibleDescription('Utilisez + suivi de 8 à 15 chiffres');
+  await expect(phone).toBeFocused();
+  await expect(phone).toBeInViewport();
+});

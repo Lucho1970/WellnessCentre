@@ -1,12 +1,11 @@
+import { ApiError } from '../shared/api';
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import {
-  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, Divider, Drawer, Grid, IconButton,
-  List, ListItemButton, ListItemText, MenuItem, Paper, Stack, TextField, Typography,
-} from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, Divider, Drawer, Grid, IconButton, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { Archive, CalendarOff, ChevronDown, Eye, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { normalizeNumericIds } from '../shared/api';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { pagePath } from '../portal/access';
 import { Link as RouterLink } from 'react-router-dom';
@@ -39,7 +38,8 @@ const utcToLocalInput = (value: string, timezone: string) => {
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 };
 
-export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMode?: boolean }) {
+function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?: boolean }) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [people, setPeople] = useState<Practitioner[]>([]);
@@ -60,7 +60,7 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
   const formGuard = useUnsavedForm();
 
   const load = useCallback(async () => {
-    setBusy(true); setLoadError('');
+    setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken(); const headers = { Authorization: `Bearer ${token}` };
       const responses = practitionerMode
@@ -75,7 +75,7 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
         ]);
       const bodies = await Promise.all(responses.map(response => response.json()));
       const failed = responses.findIndex(response => !response.ok);
-      if (failed >= 0) throw new Error(apiErrorMessage(bodies[failed], responses[failed].status, t('Unable to load availability.')));
+      if (failed >= 0) throw new ApiError(bodies[failed], responses[failed].status, t('Unable to load availability.'));
       if (practitionerMode) {
         const context = bodies[0].data;
         const practitioners = normalizeNumericIds<Practitioner[]>(context.practitioners);
@@ -92,7 +92,7 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
         setExceptions(normalizeNumericIds<Exception[]>(bodies[3].data));
         setCanManage(true);
       }
-    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to load availability.')); }
+    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load availability.')); }
     finally { setBusy(false); }
   }, [getAccessToken, practitionerMode, t]);
   useEffect(() => { void load(); }, [load]);
@@ -108,25 +108,25 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
   const selectItem = (item: SelectedItem) => { setSelected(current => current?.kind === item.kind && current.id === item.id ? null : item); };
   const startNew = (kind: ItemKind) => {
     if (!selectedPractitioner || !canManage) return;
-    formGuard.markClean(); setImpactReview(null); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); setPanelError(''); setPanelMode('new');
+    formGuard.markClean(); setImpactReview(null); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); (formValidation.clear(), setPanelError('')); setPanelMode('new');
   };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelKind(selected.kind); setPanelError(''); setPanelMode('details'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelKind(selected.kind); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
   const startEdit = () => {
     if (!selected || !canManage) return;
     const location = itemLocation(selected) ?? locations.find(item => item.id === defaultLocationId(selectedPractitioner)) ?? locations[0];
     const next = blankForm(selected.kind, location?.id ?? null);
     if (selected.rule) Object.assign(next, { location_id: String(selected.rule.location_id), weekday: String(selected.rule.weekday), start_time: selected.rule.start_time.slice(0, 5), end_time: selected.rule.end_time.slice(0, 5), valid_from: selected.rule.valid_from, valid_until: selected.rule.valid_until ?? '' });
     if (selected.exception) Object.assign(next, { location_id: String(location?.id ?? ''), starts_at: utcToLocalInput(selected.exception.starts_at, location?.timezone ?? 'America/Toronto'), ends_at: utcToLocalInput(selected.exception.ends_at, location?.timezone ?? 'America/Toronto'), type: selected.exception.type, reason: selected.exception.reason ?? '' });
-    formGuard.markClean(); setImpactReview(null); setPanelKind(selected.kind); setForm(next); setPanelError(''); setPanelMode('edit');
+    formGuard.markClean(); setImpactReview(null); setPanelKind(selected.kind); setForm(next); (formValidation.clear(), setPanelError('')); setPanelMode('edit');
   };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); setPanelError('');
+    formGuard.markClean(); setPanelMode(null); (formValidation.clear(), setPanelError(''));
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (!selectedPractitioner || !canManage) return;
-    setBusy(true); setPanelError(''); setSaved('');
+    setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
     try {
       const token = await getAccessToken();
       const resource = panelKind === 'rule' ? 'availability-rules' : panelKind === 'override' ? 'availability-overrides' : 'time-off';
@@ -137,30 +137,30 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
       if (panelKind === 'time_off' && impactReview === null) {
         const review = await fetch(`${api}/admin/time-off/impact`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const reviewBody = await review.json();
-        if (!review.ok) throw new Error(apiErrorMessage(reviewBody, review.status, t('Unable to review affected appointments.')));
+        if (!review.ok) throw new ApiError(reviewBody, review.status, t('Unable to review affected appointments.'));
         setImpactReview(normalizeNumericIds<AffectedAppointment[]>(reviewBody.data.appointments));
         return;
       }
       const savePayload = panelKind === 'time_off' ? { ...payload, expected_affected_appointment_ids: impactReview?.map(item => item.id) ?? [] } : payload;
       const response = await fetch(`${api}/admin/${resource}${editingId ? `/${editingId}` : ''}`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(savePayload) });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save availability.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to save availability.'));
       formGuard.markClean(); setImpactReview(null); setPanelMode(null); setSelected(null); await load();
       const affected = Number(body.data?.affected_appointment_count ?? 0);
       setSaved(t(editingId ? 'Schedule item updated.' : panelKind === 'rule' ? 'Working hours added.' : panelKind === 'override' ? 'Schedule change added.' : 'Time off added.') + (affected ? ` ${t('{{count}} appointments need follow-up. Select this time off for the list.', { count: affected })}` : ''));
-    } catch (cause) { if (panelKind === 'time_off') setImpactReview(null); setPanelError(cause instanceof Error ? cause.message : t('Unable to save availability.')); }
+    } catch (cause) { formValidation.capture(cause); if (panelKind === 'time_off') setImpactReview(null); setPanelError(cause instanceof Error ? cause.message : t('Unable to save availability.')); }
     finally { setBusy(false); }
   };
 
   const remove = async () => {
     if (!canManage || !selected || !window.confirm(t(selected.kind === 'rule' ? 'Archive these working hours?' : 'Remove this schedule item?'))) return;
-    setBusy(true); setLoadError('');
+    setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken(); const resource = selected.kind === 'rule' ? 'availability-rules' : selected.kind === 'override' ? 'availability-overrides' : 'time-off';
       const response = await fetch(`${api}/admin/${resource}/${selected.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-      const body = await response.json(); if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to remove schedule item.')));
+      const body = await response.json(); if (!response.ok) throw new ApiError(body, response.status, t('Unable to remove schedule item.'));
       setSelected(null); await load(); setSaved(t(selected.kind === 'rule' ? 'Working hours archived.' : 'Schedule item removed.'));
-    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to remove schedule item.')); }
+    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to remove schedule item.')); }
     finally { setBusy(false); }
   };
 
@@ -202,15 +202,15 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
       {panelMode === 'details' && selected && <><ItemDetails item={selected} locations={locations} language={i18n.resolvedLanguage} edit={startEdit} canEdit={canManage}/>{selected.kind === 'time_off' && <SavedTimeOffImpact id={selected.id} getAccessToken={getAccessToken} appointmentsPath={pagePath(practitionerMode ? 'practitioner' : 'admin', 'appointments')} language={i18n.resolvedLanguage}/>}</>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={submit} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Typography color="text.secondary" mb={2}>{panelKind === 'rule' ? t('Define recurring working hours for this practitioner.') : t('Enter times in {{timezone}}.', { timezone: selectedLocation?.timezone ?? t("the selected location's timezone") })}</Typography><Grid container spacing={2}>
-          <Grid size={12}><TextField required select fullWidth label={t(panelKind === 'rule' ? 'Location' : 'Timezone location')} value={form.location_id} onChange={event => field('location_id', event.target.value)}>{locations.map(location => <MenuItem key={location.id} value={String(location.id)}>{location.name} ({location.timezone})</MenuItem>)}</TextField></Grid>
+          <Grid size={12}><TextField name="location_id" required select fullWidth label={t(panelKind === 'rule' ? 'Location' : 'Timezone location')} value={form.location_id} onChange={event => field('location_id', event.target.value)}>{locations.map(location => <MenuItem key={location.id} value={String(location.id)}>{location.name} ({location.timezone})</MenuItem>)}</TextField></Grid>
           {panelKind === 'rule' ? <>
-            <Grid size={12}><TextField select fullWidth label={t('Day')} value={form.weekday} onChange={event => field('weekday', event.target.value)}>{days.map((day, index) => <MenuItem key={day} value={String(index + 1)}>{t(day)}</MenuItem>)}</TextField></Grid>
-            <Grid size={{ xs: 6 }}><TextField required type="time" fullWidth label={t('Starts')} value={form.start_time} onChange={event => field('start_time', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid><Grid size={{ xs: 6 }}><TextField required type="time" fullWidth label={t('Ends')} value={form.end_time} onChange={event => field('end_time', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid>
-            <Grid size={{ xs: 6 }}><TextField required type="date" fullWidth label={t('Valid from')} value={form.valid_from} onChange={event => field('valid_from', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid><Grid size={{ xs: 6 }}><TextField type="date" fullWidth label={t('Valid until (optional)')} value={form.valid_until} onChange={event => field('valid_until', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid>
+            <Grid size={12}><TextField name="weekday" select fullWidth label={t('Day')} value={form.weekday} onChange={event => field('weekday', event.target.value)}>{days.map((day, index) => <MenuItem key={day} value={String(index + 1)}>{t(day)}</MenuItem>)}</TextField></Grid>
+            <Grid size={{ xs: 6 }}><TextField name="start_time" required type="time" fullWidth label={t('Starts')} value={form.start_time} onChange={event => field('start_time', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid><Grid size={{ xs: 6 }}><TextField name="end_time" required type="time" fullWidth label={t('Ends')} value={form.end_time} onChange={event => field('end_time', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid>
+            <Grid size={{ xs: 6 }}><TextField name="valid_from" required type="date" fullWidth label={t('Valid from')} value={form.valid_from} onChange={event => field('valid_from', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid><Grid size={{ xs: 6 }}><TextField name="valid_until" type="date" fullWidth label={t('Valid until (optional)')} value={form.valid_until} onChange={event => field('valid_until', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid>
           </> : <>
-            <Grid size={{ xs: 12, md: 6 }}><TextField required type="datetime-local" fullWidth label={t('Starts')} value={form.starts_at} onChange={event => field('starts_at', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid><Grid size={{ xs: 12, md: 6 }}><TextField required type="datetime-local" fullWidth label={t('Ends')} value={form.ends_at} onChange={event => field('ends_at', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid>
-            <Grid size={{ xs: 12, md: 4 }}><TextField select fullWidth label={t(panelKind === 'override' ? 'Availability' : 'Reason type')} value={form.type} onChange={event => field('type', event.target.value)}>{(panelKind === 'override' ? [['blocked', 'Blocked'], ['available', 'Available']] : [['vacation', 'Vacation'], ['sick', 'Sick'], ['personal', 'Personal'], ['other', 'Other']]).map(([value, label]) => <MenuItem key={value} value={value}>{t(label)}</MenuItem>)}</TextField></Grid>
-            <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth label={t('Notes (optional)')} value={form.reason} inputProps={{ maxLength: 500 }} onChange={event => field('reason', event.target.value)}/></Grid>
+            <Grid size={{ xs: 12, md: 6 }}><TextField name="starts_at" required type="datetime-local" fullWidth label={t('Starts')} value={form.starts_at} onChange={event => field('starts_at', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid><Grid size={{ xs: 12, md: 6 }}><TextField name="ends_at" required type="datetime-local" fullWidth label={t('Ends')} value={form.ends_at} onChange={event => field('ends_at', event.target.value)} InputLabelProps={{ shrink: true }}/></Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField name="type" select fullWidth label={t(panelKind === 'override' ? 'Availability' : 'Reason type')} value={form.type} onChange={event => field('type', event.target.value)}>{(panelKind === 'override' ? [['blocked', 'Blocked'], ['available', 'Available']] : [['vacation', 'Vacation'], ['sick', 'Sick'], ['personal', 'Personal'], ['other', 'Other']]).map(([value, label]) => <MenuItem key={value} value={value}>{t(label)}</MenuItem>)}</TextField></Grid>
+            <Grid size={{ xs: 12, md: 8 }}><TextField name="reason" fullWidth label={t('Notes (optional)')} value={form.reason} inputProps={{ maxLength: 500 }} onChange={event => field('reason', event.target.value)}/></Grid>
           </>}
         </Grid>{impactReview !== null && panelKind === 'time_off' && <Box sx={{ mt: 2 }}><Alert severity={impactReview.length ? 'warning' : 'success'}>{impactReview.length ? t('{{count}} booked appointments overlap this time off. Saving will not cancel or move them.', { count: impactReview.length }) : t('No booked appointments overlap this time off.')}</Alert>{impactReview.length > 0 && <AffectedAppointmentList appointments={impactReview} language={i18n.resolvedLanguage}/>}</Box>}{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box>
         <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}><Button onClick={closePanel} disabled={busy}>{t('Cancel')}</Button><Button type="submit" variant="contained" disabled={busy || !form.location_id} startIcon={<Save size={17}/>}>{t(busy ? 'Saving…' : panelKind === 'time_off' && impactReview === null ? 'Review affected appointments' : panelMode === 'edit' ? 'Save changes' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Button></Stack>
@@ -218,6 +218,8 @@ export function AvailabilityAdmin({ practitionerMode = false }: { practitionerMo
     </Drawer>
   </Stack>;
 }
+export const AvailabilityAdmin = withFormValidation(AvailabilityAdminForm);
+
 
 type Row = { key: string; selected: boolean; primary: string; secondary: string; onClick: () => void };
 function ScheduleSection({ title, empty, items }: { title: string; empty: string; items: Row[] }) {
@@ -247,7 +249,8 @@ function AffectedAppointmentList({ appointments, language }: { appointments: Aff
   </List>;
 }
 
-function SavedTimeOffImpact({ id, getAccessToken, appointmentsPath, language }: { id: number; getAccessToken: () => Promise<string>; appointmentsPath: string; language: string | undefined }) {
+function SavedTimeOffImpactValidated({ id, getAccessToken, appointmentsPath, language }: { id: number; getAccessToken: () => Promise<string>; appointmentsPath: string; language: string | undefined }) {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const [appointments, setAppointments] = useState<AffectedAppointment[] | null>(null);
   const [error, setError] = useState('');
@@ -259,9 +262,9 @@ function SavedTimeOffImpact({ id, getAccessToken, appointmentsPath, language }: 
         if (controller.signal.aborted) return;
         const response = await fetch(`${api}/admin/time-off/${id}/impact`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
         const body = await response.json();
-        if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load affected appointments.')));
+        if (!response.ok) throw new ApiError(body, response.status, t('Unable to load affected appointments.'));
         if (!controller.signal.aborted) setAppointments(normalizeNumericIds<AffectedAppointment[]>(body.data.appointments));
-      } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load affected appointments.')); }
+      } catch (cause) { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load affected appointments.')); }
     })();
     return () => controller.abort();
   }, [getAccessToken, id, t]);
@@ -272,3 +275,4 @@ function SavedTimeOffImpact({ id, getAccessToken, appointmentsPath, language }: 
     {appointments && appointments.length > 0 && <><Alert severity="warning" sx={{ mt: 1 }}>{t('{{count}} booked appointments still need staff follow-up. They have not been canceled or moved.', { count: appointments.length })}</Alert><AffectedAppointmentList appointments={appointments} language={language}/>{appointments.map(item => <Button key={item.id} href={`${appointmentsPath}?appointment_id=${item.id}`} variant="outlined" sx={{ mr: 1, mb: 1 }}>{t('Review appointment #{{id}}', { id: item.id })}</Button>)}</>}
   </Box>;
 }
+const SavedTimeOffImpact = withFormValidation(SavedTimeOffImpactValidated);

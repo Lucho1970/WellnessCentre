@@ -1,3 +1,4 @@
+import { withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState } from 'react';
 import { Alert, Button, CircularProgress, Stack } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -5,13 +6,14 @@ import { customerFetch } from './session';
 import { clearAppointmentLink, pendingAppointmentLink } from './appointmentLink';
 import { CustomerAppointmentManager, type CustomerAppointment } from './CustomerAppointmentManager';
 
-export function CustomerAppointmentLink({ close, complete, onLockedChange }: { onLockedChange?: (locked: boolean) => void; close: () => void; complete: (message: string) => void }) {
+function CustomerAppointmentLinkForm({ close, complete, onLockedChange }: { onLockedChange?: (locked: boolean) => void; close: () => void; complete: (message: string) => void }) {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const [token] = useState(pendingAppointmentLink);
   const [appointment, setAppointment] = useState<CustomerAppointment | null>(null);
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    const controller = new AbortController(); setBusy(true); setError('');
+    const controller = new AbortController(); setBusy(true); (formValidation.clear(), setError(''));
     if (!token || token === 'invalid') { setBusy(false); setError(t('This appointment link is invalid. Open My appointments or contact the clinic.')); return; }
     void customerFetch('/appointment-links/resolve', { method: 'POST', body: JSON.stringify({ token }), signal: controller.signal }).then(data => {
       if (controller.signal.aborted) return;
@@ -23,7 +25,7 @@ export function CustomerAppointmentLink({ close, complete, onLockedChange }: { o
       try { new Intl.DateTimeFormat('en', { timeZone: item.timezone }); }
       catch { throw new Error(t('The appointment link response is invalid.')); }
       setAppointment(item); clearAppointmentLink();
-    }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to open the appointment link.')); })
+    }).catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to open the appointment link.')); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [token, attempt, t]);
@@ -36,3 +38,4 @@ export function CustomerAppointmentLink({ close, complete, onLockedChange }: { o
     <Stack direction="row" gap={1} flexWrap="wrap">{error && token && token !== 'invalid' && <Button onClick={() => setAttempt(value => value + 1)}>{t('Retry')}</Button>}<Button onClick={leave}>{t('Back to My appointments')}</Button></Stack>
   </Stack>;
 }
+export const CustomerAppointmentLink = withFormValidation(CustomerAppointmentLinkForm);

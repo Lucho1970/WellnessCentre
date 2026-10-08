@@ -1,10 +1,12 @@
+import { ApiError } from '../shared/api';
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, CircularProgress, Divider, Drawer, Link as MuiLink, List, ListItemButton, ListItemText, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Divider, Drawer, Link as MuiLink, List, ListItemButton, ListItemText, Paper, Stack, Typography } from '@mui/material';
 import { RefreshCw } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { apiBaseUrl, normalizeNumericIds } from '../shared/api';
 import { pagePath } from './access';
 import { ClientForms } from '../forms/ClientForms';
 
@@ -19,7 +21,8 @@ function phoneHrefs(value: string | null) {
   return /^\+?\d{7,15}$/.test(phone) ? { call: `tel:${phone}`, text: `sms:${phone}` } : null;
 }
 
-export function PractitionerClients() {
+function PractitionerClientsForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [draft, setDraft] = useState('');
@@ -34,7 +37,7 @@ export function PractitionerClients() {
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError('');
+    setLoading(true); (formValidation.clear(), setError(''));
     void (async () => {
       try {
         const token = await getAccessToken();
@@ -42,9 +45,9 @@ export function PractitionerClients() {
         if (query) params.set('q', query);
         const response = await fetch(`${apiBaseUrl}/practitioner/clients?${params}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
         const body = await response.json();
-        if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+        if (!response.ok) throw new ApiError(body, response.status);
         if (!controller.signal.aborted) setData(normalizeNumericIds(body.data));
-      } catch (cause) {
+      } catch (cause) { formValidation.capture(cause);
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load your clients.'));
       } finally { if (!controller.signal.aborted) setLoading(false); }
     })();
@@ -57,7 +60,7 @@ export function PractitionerClients() {
   return <Stack spacing={2}>
     <Alert severity="info">{t('This list includes clients you have booked or added yourself. It is not the clinic-wide client directory.')}</Alert>
     <Paper variant="outlined" component="form" onSubmit={search} sx={{ p: 1.5 }}><Stack direction="row" flexWrap="wrap" useFlexGap gap={1} alignItems="center">
-      <TextField size="small" label={t('Search my clients')} value={draft} onChange={event => setDraft(event.target.value)} inputProps={{ maxLength: 190 }} sx={{ flex: '1 1 220px' }} />
+      <TextField name="draft" size="small" label={t('Search my clients')} value={draft} onChange={event => setDraft(event.target.value)} inputProps={{ maxLength: 190 }} sx={{ flex: '1 1 220px' }} />
       <Button type="submit" variant="contained">{t('Search')}</Button>
       <Button startIcon={<RefreshCw size={17} />} disabled={loading} onClick={() => setRefresh(value => value + 1)}>{t('Refresh')}</Button>
     </Stack></Paper>
@@ -84,3 +87,4 @@ export function PractitionerClients() {
     </Stack></Drawer>
   </Stack>;
 }
+export const PractitionerClients = withFormValidation(PractitionerClientsForm);

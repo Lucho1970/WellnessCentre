@@ -1,5 +1,6 @@
+import { Alert, TextField } from './FormValidation';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Grid, Link, Stack, TextField, Typography } from '@mui/material';
+import { Box, Grid, Link, Stack, Typography } from '@mui/material';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import { useTranslation } from 'react-i18next';
 
@@ -19,6 +20,7 @@ type Props = {
   disabled?: boolean;
   required?: boolean;
   showInstructions?: boolean;
+  namePrefix?: string;
 };
 
 const browserKey = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY?.trim() ?? '';
@@ -47,7 +49,7 @@ export function GoogleMapsAttribution() {
   </Typography>;
 }
 
-export function AddressEntry({ value, onChange, disabled = false, required = false, showInstructions = false }: Props) {
+export function AddressEntry({ value, onChange, disabled = false, required = false, showInstructions = false, namePrefix = '' }: Props) {
   const { t, i18n } = useTranslation();
   const host = useRef<HTMLDivElement | null>(null);
   const autocomplete = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);
@@ -120,13 +122,13 @@ export function AddressEntry({ value, onChange, disabled = false, required = fal
       {googleError && <Alert severity="warning">{googleError}</Alert>}
     </> : <Alert severity="info">{t('Address suggestions are not configured. Enter the address manually.')}</Alert>}
     <Grid container spacing={2}>
-      <Grid size={{ xs: 12, md: 8 }}><TextField fullWidth required={required} disabled={disabled} label={t('Street address')} value={value.address_line1} inputProps={{ maxLength: 190 }} onChange={event => update('address_line1', event.target.value)} /></Grid>
-      <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth disabled={disabled} label={t('Unit (optional)')} value={value.address_line2} inputProps={{ maxLength: 190 }} onChange={event => update('address_line2', event.target.value)} /></Grid>
-      <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth required={required} disabled={disabled} label={t('City')} value={value.city} inputProps={{ maxLength: 100 }} onChange={event => update('city', event.target.value)} /></Grid>
-      <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth required={required} disabled={disabled} label={t('Province / region')} value={value.province} inputProps={{ maxLength: 80 }} onChange={event => update('province', event.target.value)} /></Grid>
-      <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth required={required} disabled={disabled} label={t('Postal code')} value={value.postal_code} inputProps={{ maxLength: 20 }} onChange={event => update('postal_code', event.target.value)} /></Grid>
-      <Grid size={12}><TextField fullWidth required={required} disabled={disabled} label={t('Country')} value={value.country} inputProps={{ maxLength: 80 }} onChange={event => update('country', event.target.value)} /></Grid>
-      {showInstructions && <Grid size={12}><TextField fullWidth disabled={disabled} multiline minRows={2} label={t('Access instructions (optional)')} value={value.instructions ?? ''} inputProps={{ maxLength: 500 }} onChange={event => update('instructions', event.target.value)} /></Grid>}
+      <Grid size={{ xs: 12, md: 8 }}><TextField name={namePrefix + 'address_line1'} fullWidth required={required} disabled={disabled} label={t('Street address')} value={value.address_line1} inputProps={{ maxLength: 190 }} onChange={event => update('address_line1', event.target.value)} /></Grid>
+      <Grid size={{ xs: 12, md: 4 }}><TextField name={namePrefix + 'address_line2'} fullWidth disabled={disabled} label={t('Unit (optional)')} value={value.address_line2} inputProps={{ maxLength: 190 }} onChange={event => update('address_line2', event.target.value)} /></Grid>
+      <Grid size={{ xs: 12, md: 4 }}><TextField name={namePrefix + 'city'} fullWidth required={required} disabled={disabled} label={t('City')} value={value.city} inputProps={{ maxLength: 100 }} onChange={event => update('city', event.target.value)} /></Grid>
+      <Grid size={{ xs: 12, md: 4 }}><TextField name={namePrefix + 'province'} fullWidth required={required} disabled={disabled} label={t('Province / region')} value={value.province} inputProps={{ maxLength: 80 }} onChange={event => update('province', event.target.value)} /></Grid>
+      <Grid size={{ xs: 12, md: 4 }}><TextField name={namePrefix + 'postal_code'} fullWidth required={required} disabled={disabled} label={t('Postal code')} value={value.postal_code} inputProps={{ maxLength: 20 }} onChange={event => update('postal_code', event.target.value)} /></Grid>
+      <Grid size={12}><TextField name={namePrefix + 'country'} fullWidth required={required} disabled={disabled} label={t('Country')} value={value.country} inputProps={{ maxLength: 80 }} onChange={event => update('country', event.target.value)} /></Grid>
+      {showInstructions && <Grid size={12}><TextField name={namePrefix + 'instructions'} fullWidth disabled={disabled} multiline minRows={2} label={t('Access instructions (optional)')} value={value.instructions ?? ''} inputProps={{ maxLength: 500 }} onChange={event => update('instructions', event.target.value)} /></Grid>}
     </Grid>
   </Stack>;
 }

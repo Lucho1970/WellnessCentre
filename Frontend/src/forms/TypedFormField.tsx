@@ -1,4 +1,5 @@
-import { Stack, TextField, MenuItem } from '@mui/material';
+import { TextField } from '../shared/FormValidation';
+import { Stack, MenuItem } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
 import type { Question } from './FormTasks';
@@ -51,9 +52,9 @@ export function TypedFormField({ question, label, value, disabled, onChange }: {
     let invalid = false;
     if (!disabled && number) { try { typedAnswer(question, { number, country }); } catch { invalid = true; } }
     return <Stack spacing={1}>
-      {!disabled && <TextField select fullWidth label={t('Country for {{question}}', { question: label })} value={country} onChange={event => onChange({ number, country: event.target.value as CountryCode })}>{getCountries().map(code => <MenuItem key={code} value={code}>{names.of(code)} (+{getCountryCallingCode(code)})</MenuItem>)}</TextField>}
-      <TextField fullWidth type="tel" label={label} required={question.required} disabled={disabled} value={number} error={invalid} helperText={t(invalid ? 'Enter a valid phone number for the selected country.' : 'Enter a national number or include + and the country calling code. No extensions.')} inputProps={{ maxLength: 40 }} onChange={event => onChange({ number: event.target.value, country })}/>
+      {!disabled && <TextField name="country" select fullWidth label={t('Country for {{question}}', { question: label })} value={country} onChange={event => onChange({ number, country: event.target.value as CountryCode })}>{getCountries().map(code => <MenuItem key={code} value={code}>{names.of(code)} (+{getCountryCallingCode(code)})</MenuItem>)}</TextField>}
+      <TextField name={`answers.${question.id}`} fullWidth type="tel" label={label} required={question.required} disabled={disabled} value={number} error={invalid} helperText={t(invalid ? 'Enter a valid phone number for the selected country.' : 'Enter a national number or include + and the country calling code. No extensions.')} inputProps={{ maxLength: 40 }} onChange={event => onChange({ number: event.target.value, country })}/>
     </Stack>;
   }
-  return <TextField fullWidth type={question.type === 'date' ? 'date' : 'email'} label={label} required={question.required} disabled={disabled} value={typeof value === 'string' ? value : ''} InputLabelProps={{ shrink: true }} inputProps={question.type === 'date' ? { min: '0001-01-01', max: question.no_future ? formToday() : '9999-12-31' } : { maxLength: 254 }} onChange={event => onChange(event.target.value)}/>;
+  return <TextField name={`answers.${question.id}`} fullWidth type={question.type === 'date' ? 'date' : 'email'} label={label} required={question.required} disabled={disabled} value={typeof value === 'string' ? value : ''} InputLabelProps={{ shrink: true }} inputProps={question.type === 'date' ? { min: '0001-01-01', max: question.no_future ? formToday() : '9999-12-31' } : { maxLength: 254 }} onChange={event => onChange(event.target.value)}/>;
 }

@@ -1,5 +1,6 @@
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Button, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
 import i18n from '../i18n';
@@ -29,21 +30,22 @@ export function SeriesReview({ result }: { result: SeriesResult }) {
   </Stack>;
 }
 
-export function RecurringBooking({ payload, request, single, complete, setBusy }: { payload: Record<string, unknown>; request: SeriesRequest; single: ReactNode; complete: (id: number, message?: string) => void; setBusy: (busy: boolean) => void }) {
+function RecurringBookingForm({ payload, request, single, complete, setBusy }: { payload: Record<string, unknown>; request: SeriesRequest; single: ReactNode; complete: (id: number, message?: string) => void; setBusy: (busy: boolean) => void }) {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const [frequency, setFrequency] = useState('single'), [count, setCount] = useState('6'), [endMode, setEndMode] = useState('count'), [until, setUntil] = useState('');
   const [result, setResult] = useState<SeriesResult | null>(null), [error, setError] = useState(''), [busy, localBusy] = useState(false), [uncertain, setUncertain] = useState(false);
   const key = useRef(crypto.randomUUID()), sending = useRef(false);
   const serialized = JSON.stringify(payload);
-  useEffect(() => { setResult(null); setError(''); key.current = crypto.randomUUID(); }, [serialized, frequency, count, endMode, until]);
+  useEffect(() => { setResult(null); (formValidation.clear(), setError('')); key.current = crypto.randomUUID(); }, [serialized, frequency, count, endMode, until]);
   const send = async (apply: boolean) => {
     let hold = false;
     if (sending.current) return;
-    sending.current = true; localBusy(true); setBusy(true); setError('');
+    sending.current = true; localBusy(true); setBusy(true); (formValidation.clear(), setError(''));
     try {
       const response = readSeriesResult(await request(`/recurring-series${apply ? '' : '/preview'}`, { method: 'POST', body: JSON.stringify({ ...payload, idempotency_key: key.current, recurrence: { frequency, ...(endMode === 'count' ? { count: Number(count) } : { until }) }, ...(apply ? { preview_token: result?.preview_token } : {}) }) }));
       setResult(response); setUncertain(false); hold = response.applied;
-    } catch (cause) {
+    } catch (cause) { formValidation.capture(cause);
       // Keep the same request and key for an ambiguous response; edits would risk duplicates.
       const status = (cause as { status?: number }).status;
       hold = apply && (!status || status >= 500); setUncertain(hold);
@@ -53,11 +55,11 @@ export function RecurringBooking({ payload, request, single, complete, setBusy }
   };
   const locked = busy || uncertain || Boolean(result?.applied);
   return <Stack spacing={2}>
-    <TextField select label={t('Repeat appointment')} value={frequency} disabled={locked} onChange={event => setFrequency(event.target.value)}>{['single', 'weekly', 'biweekly', 'monthly'].map(value => <MenuItem key={value} value={value}>{t(({ single: 'One appointment', weekly: 'Weekly', biweekly: 'Every two weeks', monthly: 'Monthly' } as Record<string, string>)[value])}</MenuItem>)}</TextField>
+    <TextField name="frequency" select label={t('Repeat appointment')} value={frequency} disabled={locked} onChange={event => setFrequency(event.target.value)}>{['single', 'weekly', 'biweekly', 'monthly'].map(value => <MenuItem key={value} value={value}>{t(({ single: 'One appointment', weekly: 'Weekly', biweekly: 'Every two weeks', monthly: 'Monthly' } as Record<string, string>)[value])}</MenuItem>)}</TextField>
     {frequency === 'single' ? single : <>
       <Alert severity="info">{t('The series keeps the same local time. Monthly dates use the last day when that day is missing. Every date must be available; nothing is saved if any date conflicts.')}</Alert>
-      <TextField select label={t('Series ends')} disabled={locked} value={endMode} onChange={event => setEndMode(event.target.value)}><MenuItem value="count">{t('After a number of appointments')}</MenuItem><MenuItem value="date">{t('On an end date')}</MenuItem></TextField>
-      {endMode === 'count' ? <TextField type="number" label={t('Number of appointments (including the first)')} inputProps={{ min: 2, max: 26 }} value={count} disabled={locked} onChange={event => setCount(event.target.value)} /> : <TextField type="date" label={t('Series end date')} InputLabelProps={{ shrink: true }} value={until} disabled={locked} onChange={event => setUntil(event.target.value)} />}
+      <TextField name="endMode" select label={t('Series ends')} disabled={locked} value={endMode} onChange={event => setEndMode(event.target.value)}><MenuItem value="count">{t('After a number of appointments')}</MenuItem><MenuItem value="date">{t('On an end date')}</MenuItem></TextField>
+      {endMode === 'count' ? <TextField name="count" type="number" label={t('Number of appointments (including the first)')} inputProps={{ min: 2, max: 26 }} value={count} disabled={locked} onChange={event => setCount(event.target.value)} /> : <TextField name="until" type="date" label={t('Series end date')} InputLabelProps={{ shrink: true }} value={until} disabled={locked} onChange={event => setUntil(event.target.value)} />}
       {error && <Alert severity="error">{error}</Alert>}
       {uncertain && <Alert severity="warning">{t('The response could not be verified. Retry this same confirmation before starting another series.')}</Alert>}
       {result && <SeriesReview result={result} />}
@@ -68,3 +70,4 @@ export function RecurringBooking({ payload, request, single, complete, setBusy }
     </>}
   </Stack>;
 }
+export const RecurringBooking = withFormValidation(RecurringBookingForm);

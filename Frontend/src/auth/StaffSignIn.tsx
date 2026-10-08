@@ -1,3 +1,4 @@
+import { withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import { LogIn, ShieldCheck } from 'lucide-react';
@@ -7,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 
 type StaffAccess = { roles: string[]; permissions: string[] };
 
-export function StaffSignIn({ children }: { children: (access: StaffAccess) => ReactNode }) {
+function StaffSignInForm({ children }: { children: (access: StaffAccess) => ReactNode }) {
+  const formValidation = useFormValidation();
   const externalStaff = import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.provider') === 'external';
   const { t } = useTranslation();
   const { account, configured, isAuthenticated, sessionExpired, signIn, getAccessToken } = useStaffAuth();
@@ -15,7 +17,7 @@ export function StaffSignIn({ children }: { children: (access: StaffAccess) => R
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const [access, setAccess] = useState<(StaffAccess & { account: string }) | null>(null);
   useEffect(() => {
-    const controller = new AbortController(); setAccess(null); setError('');
+    const controller = new AbortController(); setAccess(null); (formValidation.clear(), setError(''));
     if (!isAuthenticated || sessionExpired) return () => controller.abort();
     setBusy(true);
     void getAccessToken().then(token => apiRequest<{ roles: string[]; permissions?: string[] }>('/auth/me', { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }))
@@ -23,13 +25,13 @@ export function StaffSignIn({ children }: { children: (access: StaffAccess) => R
         if (!Array.isArray(data.roles) || !data.roles.every(role => typeof role === 'string')) throw new Error(t('The service returned invalid staff permissions.'));
         if (data.permissions !== undefined && (!Array.isArray(data.permissions) || !data.permissions.every(permission => typeof permission === 'string'))) throw new Error(t('The service returned invalid staff permissions.'));
         if (!controller.signal.aborted) setAccess({ account: accountKey, roles: data.roles, permissions: data.permissions ?? [] });
-      }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Staff authorization failed.')); })
+      }).catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Staff authorization failed.')); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [getAccessToken, isAuthenticated, sessionExpired, accountKey, retry, t]);
   const login = async () => {
-    setBusy(true); setError('');
-    try { await signIn(); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); }
+    setBusy(true); (formValidation.clear(), setError(''));
+    try { await signIn(); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); }
     finally { setBusy(false); }
   };
   if (!isAuthenticated) return <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, maxWidth: 650, mx: 'auto' }}>
@@ -49,3 +51,4 @@ export function StaffSignIn({ children }: { children: (access: StaffAccess) => R
   if (!access.roles.length) return <Alert severity="warning">{t('This account has no active staff permissions. Please contact the clinic administrator.')}</Alert>;
   return <div key={accountKey}>{children({ roles: access.roles, permissions: access.permissions })}</div>;
 }
+export const StaffSignIn = withFormValidation(StaffSignInForm);

@@ -1,9 +1,11 @@
+import { TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useState } from 'react';
-import { Button, Stack, TextField, Typography } from '@mui/material';
+import { Button, Stack, Typography } from '@mui/material';
 import { Copy, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export function ShareBookingLink({ path, title, kind = 'booking' }: { path: string; title: string; kind?: 'booking' | 'profile' }) {
+function ShareBookingLinkForm({ path, title, kind = 'booking' }: { path: string; title: string; kind?: 'booking' | 'profile' }) {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const [showLink, setShowLink] = useState(false);
@@ -26,7 +28,7 @@ export function ShareBookingLink({ path, title, kind = 'booking' }: { path: stri
     try {
       await navigator.share({ title, url });
       setMessage('');
-    } catch (error) {
+    } catch (error) { formValidation.capture(error);
       if ((error as Error)?.name !== 'AbortError') await copy();
     }
   }
@@ -37,6 +39,7 @@ export function ShareBookingLink({ path, title, kind = 'booking' }: { path: stri
       <Button size="small" startIcon={<Copy size={16}/>} onClick={() => void copy()}>{t('Copy link')}</Button>
     </Stack>
     {message && <Typography role="status" variant="body2">{message}</Typography>}
-    {showLink && <TextField size="small" label={t(isProfile ? 'Profile link' : 'Booking link')} value={url} InputProps={{ readOnly: true }} onFocus={event => event.target.select()} />}
+    {showLink && <TextField name="url" size="small" label={t(isProfile ? 'Profile link' : 'Booking link')} value={url} InputProps={{ readOnly: true }} onFocus={event => event.target.select()} />}
   </Stack>;
 }
+export const ShareBookingLink = withFormValidation(ShareBookingLinkForm);

@@ -1,8 +1,10 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, Checkbox, Chip, Divider, Drawer, FormControlLabel, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, Chip, Divider, Drawer, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { normalizeNumericIds } from '../shared/api';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { StaffInvitations } from './StaffInvitations';
@@ -17,7 +19,8 @@ type NewStaff = { display_name: string; email: string; tenant_id: string; object
 type PanelMode = 'new' | 'details' | 'edit' | null;
 const blank = (): NewStaff => ({ display_name: '', email: '', tenant_id: '', object_id: '', role: 'reception' });
 
-export function StaffAdmin() {
+function StaffAdminForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { account, getAccessToken } = useStaffAuth();
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -39,41 +42,41 @@ export function StaffAdmin() {
   }, [staff, query]);
 
   const load = useCallback(async (preferredId?: number | null) => {
-    setBusy(true); setLoadError('');
+    setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load staff.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to load staff.'));
       const loaded = normalizeNumericIds<Staff[]>(body.data).map(member => ({ ...member, permissions: member.permissions ?? [] }));
       setStaff(loaded);
       setSelectedId(current => {
         const requested = Number(preferredId ?? current ?? 0) || null;
         return loaded.some(member => member.id === requested) ? requested : null;
       });
-    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to load staff.')); }
+    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load staff.')); }
     finally { setBusy(false); }
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
 
-  const startNew = () => { formGuard.markClean(); setNewStaff(blank()); setEditing(null); setPanelError(''); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelError(''); setPanelMode('details'); };
+  const startNew = () => { formGuard.markClean(); setNewStaff(blank()); setEditing(null); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
   const startEdit = (member = selected) => {
     if (!member || isSelf(member)) return;
     formGuard.markClean(); setSelectedId(member.id);
     setEditing({ ...member, roles: [...member.roles], permissions: [...member.permissions] });
-    setPanelError(''); setPanelMode('edit');
+    (formValidation.clear(), setPanelError('')); setPanelMode('edit');
   };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); setEditing(null); setPanelError('');
+    formGuard.markClean(); setPanelMode(null); setEditing(null); (formValidation.clear(), setPanelError(''));
   };
   const setEdit = <K extends keyof Staff>(key: K, value: Staff[K]) => setEditing(current => current ? { ...current, [key]: value } : null);
   const setNew = <K extends keyof NewStaff>(key: K, value: NewStaff[K]) => setNewStaff(current => ({ ...current, [key]: value }));
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (panelMode === 'edit' && !editing) return;
-    setBusy(true); setPanelError(''); setSaved('');
+    setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
     try {
       const token = await getAccessToken();
       const creating = panelMode === 'new';
@@ -83,11 +86,11 @@ export function StaffAdmin() {
         body: JSON.stringify(creating ? newStaff : editing),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save staff member.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to save staff member.'));
       const savedId = Number(body.data?.id ?? editing?.id ?? 0) || null;
       formGuard.markClean(); setPanelMode(null); setEditing(null);
       await load(savedId); setSaved(t(creating ? 'Staff account added.' : 'Staff access updated.'));
-    } catch (cause) { setPanelError(cause instanceof Error ? cause.message : t('Unable to save staff member.')); }
+    } catch (cause) { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save staff member.')); }
     finally { setBusy(false); }
   };
 
@@ -97,7 +100,7 @@ export function StaffAdmin() {
       <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
       <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
       <Button startIcon={<Pencil size={17}/>} disabled={!selected || isSelf(selected)} onClick={() => startEdit()}>{t('Edit')}</Button>
-      <TextField size="small" label={t('Filter staff')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
+      <TextField name="query" size="small" label={t('Filter staff')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
     </Stack></Paper>
     {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}
     {loadError && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>{t('Retry')}</Button>}>{loadError}</Alert>}
@@ -118,16 +121,16 @@ export function StaffAdmin() {
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Stack spacing={2}>
           {panelMode === 'new' && <>
             <Alert severity="info">{t('Configure the Microsoft Entra account and app role first. Enter the tenant ID and user object ID from that account.')}</Alert>
-            <TextField required label={t('Display name')} value={newStaff.display_name} onChange={event => setNew('display_name', event.target.value)}/>
-            <TextField required type="email" label={t('Email')} value={newStaff.email} onChange={event => setNew('email', event.target.value)}/>
-            <TextField required label={t('Microsoft Entra tenant ID')} value={newStaff.tenant_id} onChange={event => setNew('tenant_id', event.target.value)}/>
-            <TextField required label={t('Microsoft Entra user object ID')} value={newStaff.object_id} onChange={event => setNew('object_id', event.target.value)}/>
-            <TextField select required label={t('Initial local role')} value={newStaff.role} onChange={event => setNew('role', event.target.value)}>{roleOptions.map(role => <MenuItem key={role} value={role}>{role.replaceAll('_', ' ')}</MenuItem>)}</TextField>
+            <TextField name="display_name" required label={t('Display name')} value={newStaff.display_name} onChange={event => setNew('display_name', event.target.value)}/>
+            <TextField name="email" required type="email" label={t('Email')} value={newStaff.email} onChange={event => setNew('email', event.target.value)}/>
+            <TextField name="tenant_id" required label={t('Microsoft Entra tenant ID')} value={newStaff.tenant_id} onChange={event => setNew('tenant_id', event.target.value)}/>
+            <TextField name="object_id" required label={t('Microsoft Entra user object ID')} value={newStaff.object_id} onChange={event => setNew('object_id', event.target.value)}/>
+            <TextField name="role" select required label={t('Initial local role')} value={newStaff.role} onChange={event => setNew('role', event.target.value)}>{roleOptions.map(role => <MenuItem key={role} value={role}>{role.replaceAll('_', ' ')}</MenuItem>)}</TextField>
           </>}
           {panelMode === 'edit' && editing && <>
-            <TextField required label={t('Display name')} value={editing.display_name} onChange={event => setEdit('display_name', event.target.value)}/>
-            <TextField required type="email" label={t('Email')} value={editing.email} onChange={event => setEdit('email', event.target.value)}/>
-            <TextField select label={t('Status')} value={editing.status} onChange={event => setEdit('status', event.target.value)}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem><MenuItem value="locked">{t('Locked')}</MenuItem></TextField>
+            <TextField name="display_name" required label={t('Display name')} value={editing.display_name} onChange={event => setEdit('display_name', event.target.value)}/>
+            <TextField name="email" required type="email" label={t('Email')} value={editing.email} onChange={event => setEdit('email', event.target.value)}/>
+            <TextField name="status" select label={t('Status')} value={editing.status} onChange={event => setEdit('status', event.target.value)}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem><MenuItem value="locked">{t('Locked')}</MenuItem></TextField>
             <Typography fontWeight={700}>{t('Local roles')}</Typography>
             {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => {
               const roles = event.target.checked ? [...editing.roles, role] : editing.roles.filter(item => item !== role);
@@ -150,3 +153,4 @@ export function StaffAdmin() {
     </Drawer>
   </Stack>;
 }
+export const StaffAdmin = withFormValidation(StaffAdminForm);

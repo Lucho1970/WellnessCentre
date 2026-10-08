@@ -1,5 +1,7 @@
+import { ApiError } from '../shared/api';
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { ImagePlus, Save, Trash2 } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useClinicConfig, type ClinicConfig } from '../config/ClinicConfigProvider';
@@ -28,7 +30,8 @@ async function normalizeBrandImage(file: File, type: BrandAssetType, invalid: st
   return { mime_type: 'image/webp', image_base64: canvas.toDataURL('image/webp', .88).split(',')[1] };
 }
 
-export function BusinessSettings() {
+function BusinessSettingsForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { config, refresh } = useClinicConfig();
   const { getAccessToken } = useStaffAuth();
@@ -56,27 +59,27 @@ export function BusinessSettings() {
 
   const setField = (field: keyof ClinicConfig, value: string) => setForm(current => ({ ...current, [field]: value }));
   const submit = async (event: FormEvent) => {
-    event.preventDefault();setSaving(true);setError('');setSaved(false);
+    event.preventDefault();setSaving(true);(formValidation.clear(), setError(''));setSaved(false);
     try {
       const token = await getAccessToken();
       const response = await fetch(`${apiBaseUrl}/admin/clinic`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save business settings.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to save business settings.'));
       markClean(); await refresh();setSaved(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save business settings.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to save business settings.')); }
     finally { setSaving(false); }
   };
 
   const uploadAsset = async (type: BrandAssetType, event: ChangeEvent<HTMLInputElement>) => {
-    const file=event.target.files?.[0]; if(!file)return; setAssetBusy(type);setError('');setAssetMessage('');
-    try{const payload=await normalizeBrandImage(file,type,t('Choose an image file.'),t('Choose an image smaller than 5 MB.'),t('Image processing is unavailable.')),token=await getAccessToken();const response=await fetch(`${apiBaseUrl}/admin/clinic/branding/${type}`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)}),body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to upload brand image.')));await refresh();setAssetMessage(t(type==='logo'?'Business logo updated.':'Favicon updated.'));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to upload brand image.'));}finally{setAssetBusy(null);event.target.value='';}
+    const file=event.target.files?.[0]; if(!file)return; setAssetBusy(type);(formValidation.clear(), setError(''));setAssetMessage('');
+    try{const payload=await normalizeBrandImage(file,type,t('Choose an image file.'),t('Choose an image smaller than 5 MB.'),t('Image processing is unavailable.')),token=await getAccessToken();const response=await fetch(`${apiBaseUrl}/admin/clinic/branding/${type}`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)}),body=await response.json();if(!response.ok)throw new ApiError(body, response.status, t('Unable to upload brand image.'));await refresh();setAssetMessage(t(type==='logo'?'Business logo updated.':'Favicon updated.'));}catch(cause){ formValidation.capture(cause);setError(cause instanceof Error?cause.message:t('Unable to upload brand image.'));}finally{setAssetBusy(null);event.target.value='';}
   };
-  const removeAsset = async (type: BrandAssetType) => {setAssetBusy(type);setError('');setAssetMessage('');try{const token=await getAccessToken(),response=await fetch(`${apiBaseUrl}/admin/clinic/branding/${type}`,{method:'DELETE',headers:{Authorization:`Bearer ${token}`}}),body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to remove brand image.')));await refresh();setAssetMessage(t(type==='logo'?'Business logo removed.':'Favicon removed.'));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to remove brand image.'));}finally{setAssetBusy(null);}};
-  const saveTheme = async (event: FormEvent) => {event.preventDefault();setThemeBusy(true);setError('');setThemeMessage('');try{const token=await getAccessToken(),response=await fetch(`${apiBaseUrl}/admin/clinic/portal-theme`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({primary_color:themePrimary,secondary_color:themeSecondary,font_family:themeFont})}),body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to save portal theme.')));markClean();await refresh();setThemeMessage(t('Portal theme saved.'));}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to save portal theme.'));}finally{setThemeBusy(false);}};
+  const removeAsset = async (type: BrandAssetType) => {setAssetBusy(type);(formValidation.clear(), setError(''));setAssetMessage('');try{const token=await getAccessToken(),response=await fetch(`${apiBaseUrl}/admin/clinic/branding/${type}`,{method:'DELETE',headers:{Authorization:`Bearer ${token}`}}),body=await response.json();if(!response.ok)throw new ApiError(body, response.status, t('Unable to remove brand image.'));await refresh();setAssetMessage(t(type==='logo'?'Business logo removed.':'Favicon removed.'));}catch(cause){ formValidation.capture(cause);setError(cause instanceof Error?cause.message:t('Unable to remove brand image.'));}finally{setAssetBusy(null);}};
+  const saveTheme = async (event: FormEvent) => {event.preventDefault();setThemeBusy(true);(formValidation.clear(), setError(''));setThemeMessage('');try{const token=await getAccessToken(),response=await fetch(`${apiBaseUrl}/admin/clinic/portal-theme`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({primary_color:themePrimary,secondary_color:themeSecondary,font_family:themeFont})}),body=await response.json();if(!response.ok)throw new ApiError(body, response.status, t('Unable to save portal theme.'));markClean();await refresh();setThemeMessage(t('Portal theme saved.'));}catch(cause){ formValidation.capture(cause);setError(cause instanceof Error?cause.message:t('Unable to save portal theme.'));}finally{setThemeBusy(false);}};
   const saveWelcome = async (event: FormEvent) => {
-    event.preventDefault();setWelcomeBusy(true);setWelcomeError('');setWelcomeMessage('');
-    try { const token=await getAccessToken();const response=await fetch(`${apiBaseUrl}/admin/clinic/portal-welcome`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(welcome)});const body=await response.json();if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Unable to save portal welcome message.')));welcomeGuard.markClean();await refresh();setWelcomeMessage(t('Portal welcome message saved.')); }
-    catch(cause){setWelcomeError(cause instanceof Error?cause.message:t('Unable to save portal welcome message.'));}
+    event.preventDefault();setWelcomeBusy(true);(formValidation.clear(), setWelcomeError(''));setWelcomeMessage('');
+    try { const token=await getAccessToken();const response=await fetch(`${apiBaseUrl}/admin/clinic/portal-welcome`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(welcome)});const body=await response.json();if(!response.ok)throw new ApiError(body, response.status, t('Unable to save portal welcome message.'));welcomeGuard.markClean();await refresh();setWelcomeMessage(t('Portal welcome message saved.')); }
+    catch(cause){ formValidation.capture(cause);setWelcomeError(cause instanceof Error?cause.message:t('Unable to save portal welcome message.'));}
     finally{setWelcomeBusy(false);}
   };
 
@@ -84,10 +87,10 @@ export function BusinessSettings() {
     <Typography variant="h5">{t('Clinic identity')}</Typography>
     <Typography color="text.secondary" mb={3}>{t('These values update public branding and clinic contact information without rebuilding the site.')}</Typography>
     <Stack spacing={2} maxWidth={680}>
-      <TextField required label={t('Operating name')} value={form.name} onChange={event => setField('name', event.target.value)} inputProps={{ maxLength: 160 }} />
-      <TextField label={t('Legal business name')} value={form.legal_name ?? ''} onChange={event => setField('legal_name', event.target.value)} inputProps={{ maxLength: 190 }} />
-      <TextField type="email" label={t('Business email')} value={form.email ?? ''} onChange={event => setField('email', event.target.value)} inputProps={{ maxLength: 190 }} />
-      <TextField label={t('Business phone')} value={form.phone ?? ''} onChange={event => setField('phone', event.target.value)} inputProps={{ maxLength: 40 }} />
+      <TextField name="name" required label={t('Operating name')} value={form.name} onChange={event => setField('name', event.target.value)} inputProps={{ maxLength: 160 }} />
+      <TextField name="legal_name" label={t('Legal business name')} value={form.legal_name ?? ''} onChange={event => setField('legal_name', event.target.value)} inputProps={{ maxLength: 190 }} />
+      <TextField name="email" type="email" label={t('Business email')} value={form.email ?? ''} onChange={event => setField('email', event.target.value)} inputProps={{ maxLength: 190 }} />
+      <TextField name="phone" label={t('Business phone')} value={form.phone ?? ''} onChange={event => setField('phone', event.target.value)} inputProps={{ maxLength: 40 }} />
       {error && <Alert severity="error">{error}</Alert>}
       {saved && <Alert severity="success">{t('Business settings saved.')}</Alert>}
       <Button type="submit" variant="contained" startIcon={<Save size={18}/>} disabled={saving} sx={{ alignSelf: 'flex-start' }}>{t(saving ? 'Saving…' : 'Save settings')}</Button>
@@ -100,14 +103,16 @@ export function BusinessSettings() {
       {assetMessage&&<Alert severity="success">{assetMessage}</Alert>}
     </Stack>
   </Paper><Paper component="form" onSubmit={saveWelcome} onChange={welcomeGuard.markDirty} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}><Typography variant="h5">{t('Portal welcome message')}</Typography><Typography color="text.secondary" mb={2}>{t('Introduce your clinic to visitors before they explore treatments. Provide both languages so the portal can switch cleanly.')}</Typography><Stack spacing={2} maxWidth={760}>
-    <TextField required label={t('Welcome title (English)')} value={welcome.welcome_title_en} onChange={event=>setWelcome(current=>({...current,welcome_title_en:event.target.value}))} inputProps={{maxLength:160}}/>
-    <TextField required label={t('Welcome message (English)')} multiline minRows={3} value={welcome.welcome_body_en} onChange={event=>setWelcome(current=>({...current,welcome_body_en:event.target.value}))} inputProps={{maxLength:3000}}/>
-    <TextField required label={t('Welcome title (French)')} value={welcome.welcome_title_fr} onChange={event=>setWelcome(current=>({...current,welcome_title_fr:event.target.value}))} inputProps={{maxLength:160}}/>
-    <TextField required label={t('Welcome message (French)')} multiline minRows={3} value={welcome.welcome_body_fr} onChange={event=>setWelcome(current=>({...current,welcome_body_fr:event.target.value}))} inputProps={{maxLength:3000}}/>
+    <TextField name="welcome_title_en" required label={t('Welcome title (English)')} value={welcome.welcome_title_en} onChange={event=>setWelcome(current=>({...current,welcome_title_en:event.target.value}))} inputProps={{maxLength:160}}/>
+    <TextField name="welcome_body_en" required label={t('Welcome message (English)')} multiline minRows={3} value={welcome.welcome_body_en} onChange={event=>setWelcome(current=>({...current,welcome_body_en:event.target.value}))} inputProps={{maxLength:3000}}/>
+    <TextField name="welcome_title_fr" required label={t('Welcome title (French)')} value={welcome.welcome_title_fr} onChange={event=>setWelcome(current=>({...current,welcome_title_fr:event.target.value}))} inputProps={{maxLength:160}}/>
+    <TextField name="welcome_body_fr" required label={t('Welcome message (French)')} multiline minRows={3} value={welcome.welcome_body_fr} onChange={event=>setWelcome(current=>({...current,welcome_body_fr:event.target.value}))} inputProps={{maxLength:3000}}/>
     {welcomeError&&<Alert severity="error">{welcomeError}</Alert>}{welcomeMessage&&<Alert severity="success">{welcomeMessage}</Alert>}
     <Button type="submit" variant="contained" disabled={welcomeBusy} sx={{alignSelf:'flex-start'}}>{t('Save welcome message')}</Button>
-  </Stack></Paper><Paper component="form" onSubmit={saveTheme} onChange={markDirty} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}><Typography variant="h5">{t('Portal appearance')}</Typography><Typography color="text.secondary" mb={2}>{t('Match the booking portal to the clinic website. Changes apply to guest, client, and staff portal pages.')}</Typography><Stack spacing={2} maxWidth={500}><TextField type="color" label={t('Primary colour')} value={themePrimary} onChange={event=>setThemePrimary(event.target.value)} slotProps={{ inputLabel: { shrink: true } }}/><TextField type="color" label={t('Accent colour')} value={themeSecondary} onChange={event=>setThemeSecondary(event.target.value)} slotProps={{ inputLabel: { shrink: true } }}/><TextField select label={t('Portal font')} value={themeFont} onChange={event=>setThemeFont(event.target.value as ClinicConfig['theme_font_family'])}><MenuItem value="Inter">Inter</MenuItem><MenuItem value="Arial">Arial</MenuItem><MenuItem value="Georgia">Georgia</MenuItem></TextField>{themeMessage&&<Alert severity="success">{themeMessage}</Alert>}<Button type="submit" disabled={themeBusy} variant="contained" sx={{ alignSelf: 'flex-start' }}>{t('Save portal appearance')}</Button></Stack></Paper></Stack>;
+  </Stack></Paper><Paper component="form" onSubmit={saveTheme} onChange={markDirty} variant="outlined" sx={{ p: { xs: 2, md: 3 } }}><Typography variant="h5">{t('Portal appearance')}</Typography><Typography color="text.secondary" mb={2}>{t('Match the booking portal to the clinic website. Changes apply to guest, client, and staff portal pages.')}</Typography><Stack spacing={2} maxWidth={500}><TextField name="primary_color" type="color" label={t('Primary colour')} value={themePrimary} onChange={event=>setThemePrimary(event.target.value)} slotProps={{ inputLabel: { shrink: true } }}/><TextField name="secondary_color" type="color" label={t('Accent colour')} value={themeSecondary} onChange={event=>setThemeSecondary(event.target.value)} slotProps={{ inputLabel: { shrink: true } }}/><TextField name="font_family" select label={t('Portal font')} value={themeFont} onChange={event=>setThemeFont(event.target.value as ClinicConfig['theme_font_family'])}><MenuItem value="Inter">Inter</MenuItem><MenuItem value="Arial">Arial</MenuItem><MenuItem value="Georgia">Georgia</MenuItem></TextField>{themeMessage&&<Alert severity="success">{themeMessage}</Alert>}<Button type="submit" disabled={themeBusy} variant="contained" sx={{ alignSelf: 'flex-start' }}>{t('Save portal appearance')}</Button></Stack></Paper></Stack>;
 }
+export const BusinessSettings = withFormValidation(BusinessSettingsForm);
+
 
 function BrandAssetEditor({type,title,description,version,busy,upload,remove}:{type:BrandAssetType;title:string;description:string;version:string|null;busy:boolean;upload:(type:BrandAssetType,event:ChangeEvent<HTMLInputElement>)=>void;remove:(type:BrandAssetType)=>void}){
   const {t}=useTranslation();const source=version?`${apiBaseUrl}/brand/${type}?v=${encodeURIComponent(version)}`:'';

@@ -1,6 +1,7 @@
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { ManageRecurringSeries } from '../booking/ManageRecurringSeries';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
@@ -19,7 +20,8 @@ const databaseInstant = (value: string) => new Date(`${value.replace(' ', 'T')}Z
 const localDate = (value: string, timezone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(databaseInstant(value));
 const today = (timezone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
-export function CustomerAppointmentManager({ appointment, close, complete, onLockedChange }: Props) {
+function CustomerAppointmentManagerForm({ appointment, close, complete, onLockedChange }: Props) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const originalDate = localDate(appointment.starts_at, appointment.timezone);
   const [seriesManaging, setSeriesManaging] = useState(false);
@@ -41,33 +43,33 @@ export function CustomerAppointmentManager({ appointment, close, complete, onLoc
   const closeSafely = () => { if (!dirty || window.confirm(t('Discard your unsaved changes?'))) close(); };
 
   const beginCancel = async () => {
-    setBusy(true); setError('');
+    setBusy(true); (formValidation.clear(), setError(''));
     try { setCancellation(await customerFetch(`/appointments/${appointment.id}/cancellation-preview`)); setAction('cancel'); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }
+    catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }
     finally { setBusy(false); }
   };
 
   const display = (value: string, database = false) => formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, i18n.resolvedLanguage, { timeZone: appointment.timezone, dateStyle: 'medium', timeStyle: 'short' });
   const loadSlots = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError(''); setSlots([]); setSlot(null); setSearched(false);
+    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setSlots([]); setSlot(null); setSearched(false);
     try {
       const data = await customerFetch(`/appointments/${appointment.id}/availability?date_from=${date}&date_to=${date}`);
       const currentStart = databaseInstant(appointment.starts_at).getTime();
       setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(appointment.duration_option_id) && new Date(item.starts_at).getTime() !== currentStart));
       setSearched(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
   const submit = async () => {
     if (action === 'reschedule' && (!slot || (needsRoom && !room))) return;
-    setBusy(true); setError('');
+    setBusy(true); (formValidation.clear(), setError(''));
     try {
       const body = action === 'cancel'
         ? { action, version: appointment.version, reason, expected_cancellation_fee_cents: Number(cancellation?.fee_cents) }
         : { action, version: appointment.version, starts_at: slot!.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), reason };
       await customerFetch(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify(body) });
       complete(t(action === 'cancel' ? 'Appointment #{{id}} was canceled.' : 'Appointment #{{id}} was rescheduled.', { id: appointment.id }));
-    } catch (cause) {
+    } catch (cause) { formValidation.capture(cause);
       setError(cause instanceof Error ? cause.message : t('Unable to change the appointment.'));
       if (cause instanceof CustomerRequestError && ['schedule_conflict','room_conflict'].includes(cause.code)) {
         setSlots([]); setSlot(null); setSearched(false); setRoom('');
@@ -97,18 +99,19 @@ export function CustomerAppointmentManager({ appointment, close, complete, onLoc
     </Stack>}
     {action === 'reschedule' && <Stack spacing={2}>
       <Typography>{t('Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.')}</Typography>
-      <Stack component="form" direction={{ xs: 'column', sm: 'row' }} gap={2} onSubmit={loadSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(appointment.timezone) }} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(null); setSearched(false); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
+      <Stack component="form" direction={{ xs: 'column', sm: 'row' }} gap={2} onSubmit={loadSlots}><TextField name="date" required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(appointment.timezone) }} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(null); setSearched(false); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
       {searched && slots.length === 0 && <Alert severity="info">{t('No bookable times on this day. Try another day.')}</Alert>}
       <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{display(item.starts_at)}</Button>)}</Stack>
-      {slot && needsRoom && <TextField select required label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(id => <MenuItem key={id} value={String(id)}>{id === appointment.room_id && appointment.room_name ? appointment.room_name : t('Room {{number}}', { number: id })}</MenuItem>)}</TextField>}
-      <TextField label={t('Reason or note (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
+      {slot && needsRoom && <TextField name="room_id" select required label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(id => <MenuItem key={id} value={String(id)}>{id === appointment.room_id && appointment.room_name ? appointment.room_name : t('Room {{number}}', { number: id })}</MenuItem>)}</TextField>}
+      <TextField name="reason" label={t('Reason or note (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
       <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('details')}>{t('Back')}</Button><Button variant="contained" disabled={busy || !slot || (needsRoom && !room)} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm reschedule')}</Button></Stack>
     </Stack>}
     {action === 'cancel' && <Stack spacing={2}>
       <Alert severity="warning">{t('Canceling releases the appointment time. The canceled appointment remains in your history.')}</Alert>
       {cancellation && <Alert severity={cancellation.fee_cents > 0 ? 'warning' : 'info'}>{cancellation.fee_cents > 0 ? t('Canceling now will apply a {{fee}} cancellation fee under the policy accepted when this appointment was booked.', { fee: formatCad(cancellation.fee_cents, i18n.resolvedLanguage) }) : t('No cancellation fee applies if you cancel now.')}</Alert>}
-      <TextField label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
+      <TextField name="reason" label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
       <Stack direction="row" gap={2}><Button disabled={busy} onClick={() => setAction('details')}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy || !cancellation} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
     </Stack>}
   </Paper>;
 }
+export const CustomerAppointmentManager = withFormValidation(CustomerAppointmentManagerForm);

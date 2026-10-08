@@ -2,7 +2,24 @@ import i18n from '../i18n';
 
 export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1').replace(/\/$/, '');
 
-type ErrorBody = { error?: { code?: unknown; message?: unknown; correlation_id?: unknown } } | null | undefined;
+type ErrorBody = { error?: { code?: unknown; message?: unknown; correlation_id?: unknown; fields?: unknown } } | null | undefined;
+
+/** Keep field validation attached to errors instead of losing it in a string. */
+export class ApiError extends Error {
+  readonly fields: Record<string, string>;
+  readonly code: string;
+  constructor(body: ErrorBody, readonly status: number, fallback?: string) {
+    super(apiErrorMessage(body, status, fallback));
+    this.name = 'ApiError';
+    this.code = typeof body?.error?.code === 'string' ? body.error.code : '';
+    this.fields = validationFields(body?.error?.fields);
+  }
+}
+
+export function validationFields(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== ''));
+}
 
 const numericIdKey = /(^id$|_id$|_ids$)/;
 const unsignedInteger = /^(0|[1-9]\d*)$/;
@@ -57,7 +74,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   let body;
   try { body = text ? JSON.parse(text) : null; } catch { /* Infrastructure failures may be HTML. */ }
   if (!response.ok || !body || typeof body !== 'object' || !('data' in body)) {
-    throw new Error(apiErrorMessage(body, response.status));
+    throw new ApiError(body, response.status);
   }
   return normalizeNumericIds(body.data as T);
 }
