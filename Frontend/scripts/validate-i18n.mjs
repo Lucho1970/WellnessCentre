@@ -14,7 +14,7 @@ async function loadResources(language) {
 }
 
 const featureResources = { en: {}, fr: {} };
-for (const feature of ['workLocations', 'staffInvitationErrors']) {
+for (const feature of ['workLocations', 'staffInvitationErrors', 'staffProfileMessages']) {
   const featureSource = await readFile(resolve(`src/i18n/${feature}.ts`), 'utf8');
   const featureOutput = ts.transpileModule(featureSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
   const translations = (await import(`data:text/javascript;base64,${Buffer.from(featureOutput).toString('base64')}`)).default;

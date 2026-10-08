@@ -135,7 +135,7 @@ async function fixtures(
         email: "clinic@example.test",
         phone: "905-555-0100",
       };
-    if (path === "/auth/me") data = { roles: roles ?? [], permissions };
+    if (path === "/auth/me") data = { id:1, display_name:"Test Staff", email:"staff@example.test", roles: roles ?? [], permissions };
     if (path === "/profile/work-location") data = {home_address:null,work_address:null,work_same_as_home:false,version:0};
     if (path === "/profile/avatar") data = { image_base64: null };
     if (path === "/profile/public-card") data = { public_name: "Test Practitioner", booking_name: "Test", summary: "", summary_fr: "", public_website_url: "", public_contact_email: "", public_contact_phone: "", public_contact_sms: false, slug: "test-practitioner", published: true };
@@ -3429,4 +3429,26 @@ test("same as home requires a complete home address and failed saves retain edit
   await expect(page.getByText(/Reference: location-test/)).toBeVisible();
   expect(attempted).toBe(1);
   await expect(home.getByRole("textbox",{name:"Street address"})).toHaveValue("12 Private Street");
+});
+
+
+test("invited practitioner profile and menu use approved local identity instead of generated Entra claims", async ({page}) => {
+  await fixtures(page,["practitioner"]);
+  await page.route("**/src/auth/AuthProvider.tsx",route=>route.fulfill({contentType:"application/javascript",body:`
+    const account={homeAccountId:'external-profile',name:'unknown',username:'generated-id@tenant.onmicrosoft.com'};
+    const auth={account,configured:true,isAuthenticated:true,signIn:async()=>{},signOut:async()=>{},getAccessToken:async()=>'test-only-token'};
+    export const msalInstance={initialize:async()=>{},handleRedirectPromise:async()=>null,getActiveAccount:()=>account,getAllAccounts:()=>[account],setActiveAccount:()=>{}};
+    export const StaffAuthProvider=({children})=>children; export const selectStaffAccount=()=>account;export const useStaffAuth=()=>auth;
+  `}));
+  await page.route("**/api/v1/auth/me",route=>route.fulfill({json:{data:{id:23,clinic_id:1,display_name:"Approved Practitioner",email:"practitioner@example.test",roles:["practitioner"],permissions:[]}}}));
+  await page.goto(`${portalHost}/practitioner/profile`);
+  const card=page.getByRole('heading',{name:'Account profile',exact:true}).locator('..');
+  await expect(card.getByText('Approved Practitioner',{exact:true})).toBeVisible();
+  await expect(card.getByText('practitioner@example.test',{exact:true})).toBeVisible();
+  await expect(card.getByText('AP',{exact:true})).toBeVisible();
+  await expect(page.getByText('unknown',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('generated-id@tenant.onmicrosoft.com',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Open account menu for Approved Practitioner'}).click();
+  await expect(page.getByRole('menu').getByText('Approved Practitioner',{exact:true})).toBeVisible();
+  await expect(page.getByRole('menu').getByText('practitioner@example.test',{exact:true})).toBeVisible();
 });
