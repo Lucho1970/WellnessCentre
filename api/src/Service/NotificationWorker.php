@@ -34,13 +34,14 @@ final class NotificationWorker
                     || ($event['channel'] === 'sms' && strtotime((string)$details['scheduled_at'] . ' UTC') < time() - 3600)
                     || (str_starts_with((string)$details['event_code'], 'staff_') && !$this->staffRecipientStillAllowed($details));
                 $staffNotice = !$superseded && str_starts_with((string)$details['event_code'], 'staff_');
+                $portalUrl = $superseded ? $this->clientPortalUrl : ClinicPortalUrl::resolve($this->pdo,(int)$details['clinic_id'],$this->clientPortalUrl);
                 if (!$superseded && !$staffNotice && $event['channel'] === 'email') {
-                    $details['appointment_action_url'] = (new AppointmentActionLinks($this->pdo, $this->appointmentActionLinksEnabled))->issue($details, $this->clientPortalUrl);
+                    $details['appointment_action_url'] = (new AppointmentActionLinks($this->pdo, $this->appointmentActionLinksEnabled))->issue($details, $portalUrl);
                 }
                 $message = $superseded ? null : ($event['channel'] === 'sms'
-                    ? StaffAppointmentSms::compose($details, $this->clientPortalUrl)
-                    : ($staffNotice ? StaffAppointmentEmail::compose($details, $this->clientPortalUrl) : AppointmentEmail::compose($details, $this->clientPortalUrl)));
-                $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $this->clientPortalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
+                    ? StaffAppointmentSms::compose($details, $portalUrl)
+                    : ($staffNotice ? StaffAppointmentEmail::compose($details, $portalUrl) : AppointmentEmail::compose($details, $portalUrl)));
+                $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $portalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
             } catch (Throwable $e) {
                 $this->finish($event, 'needs_review', 'Notification could not be prepared (' . get_class($e) . ').');
                 $summary['review']++;

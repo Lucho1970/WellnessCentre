@@ -27,6 +27,12 @@ final class EntraAuthenticator implements IdentityAdapter
     public function authenticateForClinic(?string $token, \Wellness\ClinicContext $clinic): AuthContext
     {
         $identity = $this->verify($token);
+        if ($this->config->clinicManagementEnabled) {
+            // Once an identity uses clinic memberships, revocation cannot fall back to its legacy link.
+            $query=$this->database->connection()->prepare('SELECT 1 FROM product_identities i JOIN staff_memberships m ON m.identity_id=i.id WHERE i.adapter=:adapter AND i.issuer=:issuer AND i.subject=:subject LIMIT 1');
+            $query->execute(['adapter'=>$identity->adapter,'issuer'=>$identity->issuer,'subject'=>$identity->subject]);
+            if ($query->fetchColumn()) return (new StaffMembershipResolver($this->database))->resolve($identity,$clinic);
+        }
         $legacy = $clinic->assertActor($this->loadUser($identity->tenantId, $identity->subject, $identity->directoryRoles));
         if (!$this->config->staffMembershipPilotEnabled || !in_array($legacy->userId, $this->config->staffMembershipPilotUserIds, true)) return $legacy;
         // A revoked/missing pilot membership must never fall back to legacy access.

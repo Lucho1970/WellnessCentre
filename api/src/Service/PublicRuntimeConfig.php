@@ -7,9 +7,9 @@ use RuntimeException;
 
 final class PublicRuntimeConfig
 {
-    public static function fromEnvironment(): array
+    public static function fromEnvironment(?string $websiteUrl=null): array
     {
-        $url = trim((string)($_ENV['PUBLIC_WEBSITE_URL'] ?? getenv('PUBLIC_WEBSITE_URL') ?: ''));
+        $url = $websiteUrl ?? trim((string)($_ENV['PUBLIC_WEBSITE_URL'] ?? getenv('PUBLIC_WEBSITE_URL') ?: ''));
         $parts = parse_url($url);
         if ($url === '' || strlen($url) > 2048 || !filter_var($url, FILTER_VALIDATE_URL)
             || !is_array($parts) || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)
@@ -26,7 +26,14 @@ final class PublicRuntimeConfig
         header('Cache-Control: no-store, max-age=0');
         header('X-Content-Type-Options: nosniff');
         try {
-            echo json_encode(self::fromEnvironment(), JSON_THROW_ON_ERROR);
+            $websiteUrl=null;
+            if (filter_var($_ENV['CLINIC_MANAGEMENT_ENABLED']??getenv('CLINIC_MANAGEMENT_ENABLED')?:'false',FILTER_VALIDATE_BOOL)) {
+                $config=\Wellness\Config::fromEnvironment();$database=new \Wellness\Database($config);
+                $context=\Wellness\ClinicContext::resolve($config,$database,\Wellness\Http\Request::capture());
+                $query=$database->connection()->prepare('SELECT website_url FROM clinics WHERE id=?');$query->execute([$context->clinicId]);
+                $websiteUrl=$query->fetchColumn()?:'https://'.$context->host.'/';
+            }
+            echo json_encode(self::fromEnvironment($websiteUrl), JSON_THROW_ON_ERROR);
         } catch (\Throwable $error) {
             error_log('Public runtime configuration: ' . $error->getMessage());
             http_response_code(503);

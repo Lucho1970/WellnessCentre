@@ -38,6 +38,7 @@ import {
   X,
 } from "lucide-react";
 const BusinessSettings = lazy(() => import('../admin/BusinessSettings').then(module => ({ default: module.BusinessSettings })));
+const ClinicAdmin = lazy(() => import('../admin/ClinicAdmin').then(module => ({ default: module.ClinicAdmin })));
 const PractitionerAdmin = lazy(() => import('../admin/PractitionerAdmin').then(module => ({ default: module.PractitionerAdmin })));
 const LocationAdmin = lazy(() => import('../admin/LocationAdmin').then(module => ({ default: module.LocationAdmin })));
 const ProfileSettings = lazy(() => import('../profile/ProfileSettings').then(module => ({ default: module.ProfileSettings })));
@@ -65,6 +66,7 @@ type NavigationItem = {
 };
 
 const navigation: NavigationItem[] = [
+  { id: 'clinics', label: 'Clinics', description: 'Separate clinics and their portal hosts', icon: <Building2 size={20}/> },
   { id: "dashboard", label: "Dashboard", description: "Today at a glance", icon: <LayoutDashboard size={20} /> },
   { id: "appointments", label: "Appointments", description: "Bookings and scheduled visits", icon: <CalendarDays size={20} /> },
   { id: "schedule_calendar", label: "My calendar", description: "Your appointments and time off by day, week, or month", icon: <CalendarDays size={20} /> },
@@ -182,6 +184,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "rooms" && <RoomAdmin />}
         {page === "services" && <ServiceAdmin />}
         {page === "business" && <BusinessSettings />}
+        {page === 'clinics' && <ClinicAdmin />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}

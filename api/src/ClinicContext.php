@@ -50,6 +50,17 @@ final readonly class ClinicContext
 
     public static function resolve(Config $config, Database $database, Request $request): self
     {
+        if ($config->clinicManagementEnabled) {
+            $host = self::normalizeHost((string)($request->headers['host'] ?? ''));
+            $query = $database->connection()->prepare('SELECT clinic_id FROM clinic_hosts WHERE host=:host');
+            $query->execute(['host'=>$host]);
+            $id = $query->fetchColumn();
+            if ($id) {
+                $context = new self((int)$id, $host);
+                $context->assertActive($database);
+                return $context;
+            }
+        }
         $context = self::forHost($config, (string)($request->headers['host'] ?? ''));
         $context->assertActive($database);
         return $context;

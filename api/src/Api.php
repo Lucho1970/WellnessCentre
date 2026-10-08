@@ -69,7 +69,9 @@ final class Api
             $request=Request::capture();$this->cors($request);
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
             if (!in_array($request->path, ['/api/v1/health', '/api/v1/health/database'], true)) {
-                $this->clinicContext = ClinicContext::forHost($this->config, (string)($request->headers['host'] ?? ''));
+                $this->clinicContext = $this->config->clinicManagementEnabled
+                    ? ClinicContext::resolve($this->config, $this->database, $request)
+                    : ClinicContext::forHost($this->config, (string)($request->headers['host'] ?? ''));
                 $this->catalog = new CatalogService($this->database, $this->clinicContext->clinicId);
                 $this->availability = new AvailabilityService($this->database, $this->clinicContext->clinicId);
             }
@@ -94,6 +96,9 @@ final class Api
                 $routes->addRoute('POST','/api/v1/clients/{id:\d+}/forms','assignClientForm');
                 $routes->addRoute('GET','/api/v1/health/database','databaseHealth');
                 $routes->addRoute('GET','/api/v1/site-config','siteConfig');
+                $routes->addRoute('GET','/api/v1/admin/clinics','managedClinics');
+                $routes->addRoute('POST','/api/v1/admin/clinics','createClinic');
+                $routes->addRoute('PATCH','/api/v1/admin/clinics/{id:\\d+}','configureClinic');
                 $routes->addRoute('GET','/api/v1/brand/{type:logo|favicon}','brandAsset');
                 $routes->addRoute('GET','/api/v1/locations','locations');
                 $routes->addRoute('GET','/api/v1/services','services');
@@ -364,6 +369,9 @@ final class Api
                 'issueClientInvitation'=>$this->onboarding()->invite($this->user($request),(int)$route[2]['id'],$request->correlationId,(string)($request->body['delivery']??'manual')),
                 'reviewClientInvitation'=>$this->onboarding()->review($this->user($request),(int)$route[2]['id'],(int)$route[2]['invitation'],$request->body,$request->correlationId),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
+                'managedClinics'=>$this->clinicManagement()->list($this->user($request)),
+                'createClinic'=>$this->clinicManagement()->create($this->user($request),$request->body,$request->correlationId),
+                'configureClinic'=>$this->clinicManagement()->configure($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'adminLocations'=>$this->admin->locations($this->user($request)),
                 'updateLocation'=>$this->admin->updateLocation($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createRoom'=>$this->admin->createRoom($this->user($request),$request->body,$request->correlationId),
@@ -455,11 +463,17 @@ final class Api
         return new CustomerOnboarding($this->database->connection(), $this->config, $this->clinicContext?->clinicId);
     }
 
+    private function clinicManagement(): \Wellness\Service\ClinicManagementService
+    {
+        if (!$this->config->clinicManagementEnabled) throw new ApiException(503,'clinic_management_unavailable','Clinic management is not enabled.');
+        return new \Wellness\Service\ClinicManagementService($this->database,new AuditLogger($this->database),$this->config);
+    }
+
     private function customerRoute(Request $r): array
     {
         $this->clinicContext->assertActive($this->database);
         $route = $r->method . ' ' . substr($r->path, strlen('/api/v1/customer/'));
-        if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled && $this->clinicContext?->clinicId === $this->config->customerClinicId];
+        if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled && ($this->config->clinicManagementEnabled || $this->clinicContext?->clinicId === $this->config->customerClinicId)];
         $service = $this->onboarding();
         if ($route === 'POST auth/challenge') return $service->challenge($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         $token = $r->headers['x-customer-session'] ?? null;
@@ -488,7 +502,7 @@ final class Api
         }
         if ($route === 'POST appointment-links/resolve') return (new \Wellness\Service\AppointmentActionLinks($this->database->connection(),$this->config->appointmentActionLinksEnabled,new AuditLogger($this->database)))->resolve($bookingActor(),$r->body,$r->correlationId);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/availability$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->updateAvailability($bookingActor(),(int)$matches[1],$r->query);
-        if($r->method==='GET'&&preg_match('#^appointments/(\d+)/calendar$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->customerCalendar($bookingActor(),(int)$matches[1],$this->config->clientPortalUrl);
+        if($r->method==='GET'&&preg_match('#^appointments/(\d+)/calendar$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->customerCalendar($bookingActor(),(int)$matches[1],\Wellness\Service\ClinicPortalUrl::resolve($this->database->connection(),$this->clinicContext->clinicId,$this->config->clientPortalUrl,$this->config->clinicManagementEnabled));
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/cancellation-preview$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->cancellationPreview($bookingActor(),(int)$matches[1]);
         if($r->method==='PATCH'&&preg_match('#^appointments/(\d+)$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->update($bookingActor(),(int)$matches[1],$r->body,$r->correlationId);
         return match ($route) {

@@ -17,7 +17,7 @@ final class CustomerOnboarding
         $this->clinicId = $clinicId ?? $config->customerClinicId;
         // The existing identity links and application sessions are single-clinic.
         // Do not enable a second clinic's customer sessions before MT1 migration.
-        if ($this->clinicId !== $config->customerClinicId) throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled for this clinic.');
+        if (!$config->clinicManagementEnabled && $this->clinicId !== $config->customerClinicId) throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled for this clinic.');
     }
     private static function stamp(?int $time = null): string { return gmdate('Y-m-d H:i:s', $time ?? time()); }
     private function query(string $sql, array $params = []): \PDOStatement {
@@ -61,6 +61,7 @@ final class CustomerOnboarding
         $this->clinic(); $this->rate('challenge', $ip, 20, 600);
         $nonce = bin2hex(random_bytes(32));
         $this->query('INSERT INTO customer_auth_challenges(nonce_hash,created_at,expires_at) VALUES(?,?,?)', [hash('sha256', $nonce), self::stamp(), self::stamp(time() + 600)]);
+        if ($this->config->clinicManagementEnabled) $this->query('UPDATE customer_auth_challenges SET clinic_id=? WHERE nonce_hash=?',[$this->clinicId,hash('sha256',$nonce)]);
         return ['nonce' => $nonce];
     }
     public static function validateFreshProof(array $access, array $proof, array $challenge, int $now): void {
@@ -78,6 +79,7 @@ final class CustomerOnboarding
         return $this->transaction(function () use ($access, $proof, $nonce, $cid) {
             $challenge = $this->query('SELECT * FROM customer_auth_challenges WHERE nonce_hash=? FOR UPDATE', [hash('sha256', $nonce)])->fetch();
             if (!$challenge) throw new ApiException(401, 'fresh_sign_in_required', 'Start a new sign-in from this portal.');
+            if ($this->config->clinicManagementEnabled && (int)($challenge['clinic_id']??0)!==$this->clinicId) throw new ApiException(401,'fresh_sign_in_required','Start a new sign-in from this clinic portal.');
             self::validateFreshProof($access, $proof, $challenge, time());
             $identity = $this->identity($access);
             $this->query('UPDATE customer_auth_challenges SET consumed_at=? WHERE nonce_hash=?', [self::stamp(), hash('sha256', $nonce)]);
@@ -85,6 +87,7 @@ final class CustomerOnboarding
             $expires = $proof['auth_time'] + 28800;
             $this->query('INSERT INTO customer_sessions(token_hash,identity_id,authenticated_at,created_at,last_activity_at,expires_at) VALUES(?,?,?,?,?,?)',
                 [hash('sha256', $token), $identity, self::stamp($proof['auth_time']), self::stamp(), self::stamp(), self::stamp($expires)]);
+            if ($this->config->clinicManagementEnabled) $this->query('UPDATE customer_sessions SET clinic_id=? WHERE token_hash=?',[$this->clinicId,hash('sha256',$token)]);
             $this->audit('customer.session.start', $identity, $cid);
             return ['session_token' => $token, 'idle_expires_at' => time() + 1800, 'absolute_expires_at' => $expires];
         });
@@ -98,6 +101,7 @@ final class CustomerOnboarding
         if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/D', $token)) throw new ApiException(401, 'customer_session_required', 'Please sign in again to start a secure client session.');
         return $this->transaction(function () use ($claims, $token, $activity) {
             $row = $this->query('SELECT s.* FROM customer_sessions s JOIN customer_identities i ON i.id=s.identity_id WHERE s.token_hash=? AND i.identity_hash=? FOR UPDATE', [hash('sha256', $token), self::identityHash($claims)])->fetch();
+            if ($this->config->clinicManagementEnabled && (int)($row['clinic_id']??0)!==$this->clinicId) throw new ApiException(401,'customer_session_expired','Sign in to this clinic portal.');
             if (!$row || !self::sessionIsActive($row, time())) throw new ApiException(401, 'customer_session_expired', 'Your client session has ended. Please sign in again.');
             if ($activity) {
                 $row['last_activity_at'] = self::stamp();
@@ -110,7 +114,8 @@ final class CustomerOnboarding
         $this->clinic();
         if (is_string($token) && preg_match('/^[a-f0-9]{64}$/D', $token)) {
             $this->transaction(function () use ($token, $cid) {
-                $row = $this->query('SELECT identity_id FROM customer_sessions WHERE token_hash=? FOR UPDATE', [hash('sha256', $token)])->fetch();
+                $row = $this->query('SELECT identity_id'.($this->config->clinicManagementEnabled?',clinic_id':'').' FROM customer_sessions WHERE token_hash=? FOR UPDATE', [hash('sha256', $token)])->fetch();
+                if ($this->config->clinicManagementEnabled && (int)($row['clinic_id']??0)!==$this->clinicId) return;
                 $this->query('UPDATE customer_sessions SET revoked_at=? WHERE token_hash=?', [self::stamp(), hash('sha256', $token)]);
                 if ($row) $this->audit('customer.session.end', (int)$row['identity_id'], $cid);
             });
@@ -226,7 +231,7 @@ final class CustomerOnboarding
             try {
                 $env = static fn(string $key): string => trim((string)($_ENV[$key] ?? getenv($key) ?: ''));
                 if (!filter_var($env('MAIL_ENABLED'), FILTER_VALIDATE_BOOL)) throw new \RuntimeException('Mail is disabled.');
-                $portal = rtrim($this->config->clientPortalUrl, '/');
+                $portal = rtrim(ClinicPortalUrl::resolve($this->db,$actor->clinicId,$this->config->clientPortalUrl,$this->config->clinicManagementEnabled), '/');
                 if (!filter_var($portal, FILTER_VALIDATE_URL) || !str_starts_with($portal, 'https://')) throw new \RuntimeException('Client portal URL is invalid.');
                 $recipient = (string)$this->query('SELECT email FROM users WHERE id=? AND clinic_id=?', [$client, $actor->clinicId])->fetchColumn();
                 $mailer = new GraphMailClient($env('MAIL_TENANT_ID'), $env('MAIL_CLIENT_ID'), $env('MAIL_CLIENT_SECRET'), $env('MAIL_FROM_ADDRESS'));
