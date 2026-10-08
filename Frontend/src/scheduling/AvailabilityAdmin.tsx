@@ -108,6 +108,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
   const selectItem = (item: SelectedItem) => { setSelected(current => current?.kind === item.kind && current.id === item.id ? null : item); };
   const startNew = (kind: ItemKind) => {
     if (!selectedPractitioner || !canManage) return;
+    setSaved('');
     formGuard.markClean(); setImpactReview(null); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); (formValidation.clear(), setPanelError('')); setPanelMode('new');
   };
   const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelKind(selected.kind); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
@@ -120,6 +121,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
     formGuard.markClean(); setImpactReview(null); setPanelKind(selected.kind); setForm(next); (formValidation.clear(), setPanelError('')); setPanelMode('edit');
   };
   const closePanel = () => {
+    if (busy) return;
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
     formGuard.markClean(); setPanelMode(null); (formValidation.clear(), setPanelError(''));
   };
@@ -145,7 +147,9 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
       const response = await fetch(`${api}/admin/${resource}${editingId ? `/${editingId}` : ''}`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(savePayload) });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save availability.'));
-      formGuard.markClean(); setImpactReview(null); setPanelMode(null); setSelected(null); await load();
+      formGuard.markClean(); setImpactReview(null);
+      if (panelMode !== 'new' || panelKind !== 'rule') setPanelMode(null);
+      setSelected(null); await load();
       const affected = Number(body.data?.affected_appointment_count ?? 0);
       setSaved(t(editingId ? 'Schedule item updated.' : panelKind === 'rule' ? 'Working hours added.' : panelKind === 'override' ? 'Schedule change added.' : 'Time off added.') + (affected ? ` ${t('{{count}} appointments need follow-up. Select this time off for the list.', { count: affected })}` : ''));
     } catch (cause) { formValidation.capture(cause); if (panelKind === 'time_off') setImpactReview(null); setPanelError(cause instanceof Error ? cause.message : t('Unable to save availability.')); }
@@ -164,12 +168,12 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
     finally { setBusy(false); }
   };
 
-  const field = <K extends keyof Form>(key: K, value: Form[K]) => { setImpactReview(null); setForm(current => ({ ...current, [key]: value })); };
+  const field = <K extends keyof Form>(key: K, value: Form[K]) => { setSaved(''); formGuard.markDirty(); setImpactReview(null); setForm(current => ({ ...current, [key]: value })); };
   const selectedLocation = locations.find(location => String(location.id) === form.location_id);
   const practitionerName = (person: Practitioner) => person.preferred_name || person.display_name;
   return <Stack spacing={2}>
     <Box><Button component={RouterLink} to={pagePath(practitionerMode ? 'practitioner' : 'admin', 'appointments')} state={{ startBooking: true }} variant="contained">{t('Book appointment')}</Button></Box>
-    {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}
+    {saved && !(panelMode === 'new' && panelKind === 'rule') && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}
     {loadError && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>{t('Retry')}</Button>}>{loadError}</Alert>}
     {practitionerMode && !canManage && <Alert severity="info">{t('Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.')}</Alert>}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
@@ -201,6 +205,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'details' ? 'Schedule details' : panelMode === 'edit' ? 'Edit schedule item' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Typography><Typography variant="h5">{selectedPractitioner ? practitionerName(selectedPractitioner) : ''}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={closePanel}><X/></IconButton></Stack>
       {panelMode === 'details' && selected && <><ItemDetails item={selected} locations={locations} language={i18n.resolvedLanguage} edit={startEdit} canEdit={canManage}/>{selected.kind === 'time_off' && <SavedTimeOffImpact id={selected.id} getAccessToken={getAccessToken} appointmentsPath={pagePath(practitionerMode ? 'practitioner' : 'admin', 'appointments')} language={i18n.resolvedLanguage}/>}</>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={submit} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+        {saved && panelMode === 'new' && panelKind === 'rule' && <Alert severity="success" role="status" onClose={() => setSaved('')} sx={{ mx: 3, mt: 2 }}>{saved}</Alert>}
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Typography color="text.secondary" mb={2}>{panelKind === 'rule' ? t('Define recurring working hours for this practitioner.') : t('Enter times in {{timezone}}.', { timezone: selectedLocation?.timezone ?? t("the selected location's timezone") })}</Typography><Grid container spacing={2}>
           <Grid size={12}><TextField name="location_id" required select fullWidth label={t(panelKind === 'rule' ? 'Location' : 'Timezone location')} value={form.location_id} onChange={event => field('location_id', event.target.value)}>{locations.map(location => <MenuItem key={location.id} value={String(location.id)}>{location.name} ({location.timezone})</MenuItem>)}</TextField></Grid>
           {panelKind === 'rule' ? <>
@@ -213,7 +218,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
             <Grid size={{ xs: 12, md: 8 }}><TextField name="reason" fullWidth label={t('Notes (optional)')} value={form.reason} inputProps={{ maxLength: 500 }} onChange={event => field('reason', event.target.value)}/></Grid>
           </>}
         </Grid>{impactReview !== null && panelKind === 'time_off' && <Box sx={{ mt: 2 }}><Alert severity={impactReview.length ? 'warning' : 'success'}>{impactReview.length ? t('{{count}} booked appointments overlap this time off. Saving will not cancel or move them.', { count: impactReview.length }) : t('No booked appointments overlap this time off.')}</Alert>{impactReview.length > 0 && <AffectedAppointmentList appointments={impactReview} language={i18n.resolvedLanguage}/>}</Box>}{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box>
-        <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}><Button onClick={closePanel} disabled={busy}>{t('Cancel')}</Button><Button type="submit" variant="contained" disabled={busy || !form.location_id} startIcon={<Save size={17}/>}>{t(busy ? 'Saving…' : panelKind === 'time_off' && impactReview === null ? 'Review affected appointments' : panelMode === 'edit' ? 'Save changes' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Button></Stack>
+        <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}><Button onClick={closePanel} disabled={busy}>{t('Close')}</Button><Button type="submit" variant="contained" disabled={busy || !form.location_id} startIcon={<Save size={17}/>}>{t(busy ? 'Saving…' : panelKind === 'time_off' && impactReview === null ? 'Review affected appointments' : panelMode === 'edit' ? 'Save changes' : panelKind === 'rule' ? 'Add hours' : panelKind === 'override' ? 'Add change' : 'Add time off')}</Button></Stack>
       </Box>}
     </Drawer>
   </Stack>;

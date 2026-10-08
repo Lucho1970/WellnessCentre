@@ -3340,6 +3340,78 @@ test("practitioner manages only their own availability at assigned locations", a
   await expect.poll(() => created).toMatchObject({ practitioner_id: 8, location_id: 1 });
 });
 
+for (const role of ['super_admin', 'practitioner']) {
+  test(`${role} adds consecutive hours without reopening the panel and confirms unsaved close`, async ({ page }) => {
+    await fixtures(page, [role]);
+    const person = { practitioner_id: 8, display_name: 'Esther', location_id: 1, active: 1 };
+    const location = { id: 1, name: 'Holland Landing', timezone: 'America/Toronto' };
+    const created: Record<string, unknown>[] = [];
+    const rules: Record<string, unknown>[] = [];
+    let failedOnce = false;
+    await page.route('**/api/v1/admin/practitioners', route => route.fulfill({ json: { data: [person] } }));
+    await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [location] } }));
+    await page.route('**/api/v1/practitioner/availability-context', route => route.fulfill({ json: { data: { practitioners: [person], locations: [location], can_manage: true } } }));
+    await page.route('**/api/v1/admin/schedule-exceptions', route => route.fulfill({ json: { data: [] } }));
+    await page.route('**/api/v1/admin/availability-rules', route => {
+      if (route.request().method() === 'POST') {
+        const payload = route.request().postDataJSON();
+        if (payload.weekday === 2 && !failedOnce) {
+          failedOnce = true;
+          return route.fulfill({ status: 422, json: { error: { code: 'validation_error', fields: { end_time: 'These hours overlap another rule.' } } } });
+        }
+        created.push(payload);
+        rules.push({ ...payload, id: created.length, practitioner_name: 'Esther', location_name: location.name, active: 1 });
+        return route.fulfill({ json: { data: { id: created.length } } });
+      }
+      return route.fulfill({ json: { data: rules } });
+    });
+    await page.goto(`${portalHost}/${role === 'super_admin' ? 'admin' : 'practitioner'}/availability`);
+    if (role === 'super_admin') await page.getByRole('button', { name: /Esther.*0 hour rules/ }).click();
+    await page.getByRole('button', { name: 'Add hours', exact: true }).click();
+    const panel = page.locator('.MuiDrawer-paper');
+    await panel.getByLabel('Starts').fill('10:00');
+    await panel.getByLabel('Ends').fill('16:00');
+    await panel.getByLabel('Valid from').fill('2026-10-08');
+    await panel.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await expect(panel.getByRole('status')).toHaveText('Working hours added.');
+    await expect(panel.getByLabel('Starts')).toHaveValue('10:00');
+    await expect(panel.getByLabel('Ends')).toHaveValue('16:00');
+    await expect(panel.getByLabel('Valid from')).toHaveValue('2026-10-08');
+    await panel.getByLabel('Day', { exact: true }).click();
+    await page.getByRole('option', { name: 'Tuesday', exact: true }).click();
+    await expect(panel.getByRole('status')).toHaveCount(0);
+    await panel.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await expect(panel.getByText('These hours overlap another rule.')).toBeVisible();
+    await expect(panel.getByLabel('Ends')).toHaveValue('16:00');
+    page.once('dialog', async dialog => {
+      expect(dialog.message()).toBe('Discard your unsaved changes?');
+      await dialog.dismiss();
+    });
+    await panel.getByRole('button', { name: 'Close', exact: true }).last().click();
+    await expect(panel.getByLabel('Day', { exact: true })).toContainText('Tuesday');
+    await panel.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await expect(panel.getByRole('status')).toHaveText('Working hours added.');
+    expect(created).toEqual([
+      expect.objectContaining({ weekday: 1, start_time: '10:00', end_time: '16:00', valid_from: '2026-10-08', location_id: 1, practitioner_id: 8 }),
+      expect.objectContaining({ weekday: 2, start_time: '10:00', end_time: '16:00', valid_from: '2026-10-08', location_id: 1, practitioner_id: 8 }),
+    ]);
+    let prompts = 0;
+    const unexpectedPrompt = async (dialog: import('@playwright/test').Dialog) => { prompts++; await dialog.dismiss(); };
+    page.on('dialog', unexpectedPrompt);
+    await panel.getByRole('button', { name: 'Close', exact: true }).last().click();
+    await expect(panel).toHaveCount(0);
+    expect(prompts).toBe(0);
+    page.off('dialog', unexpectedPrompt);
+    await expect(page.getByRole('button', { name: /Tuesday.*10:00–16:00/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await panel.getByLabel('Ends').fill('18:00');
+    page.once('dialog', dialog => dialog.accept());
+    await panel.getByRole('button', { name: 'Close panel' }).click();
+    await expect(panel).toHaveCount(0);
+    expect(created).toHaveLength(2);
+  });
+}
+
 test("clinic-managed practitioner availability is read-only", async ({ page }) => {
   await fixtures(page, ["practitioner"]);
   await page.route("**/api/v1/practitioner/availability-context", route => route.fulfill({ json: { data: {
