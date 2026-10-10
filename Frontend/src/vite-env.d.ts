@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-declare const __APP_SURFACE__: 'public' | 'portal';
+declare const __APP_SURFACE__: 'public' | 'portal' | 'application-admin';
 
 interface ImportMetaEnv {
   readonly VITE_CUSTOMER_ENTRA_TENANT_ID?: string;

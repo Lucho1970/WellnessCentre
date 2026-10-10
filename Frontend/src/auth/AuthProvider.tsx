@@ -6,7 +6,7 @@ import { selectAccount } from './accountSelection';
 import i18n from '../i18n';
 import { claimStaffSessionRecovery, clearStaffSessionRecovery, needsInteractiveStaffAuth } from './staffSessionRecovery';
 
-export const externalStaff = import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.provider') === 'external';
+export const externalStaff = __APP_SURFACE__ !== 'application-admin' && import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.provider') === 'external';
 const tenantId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_TENANT_ID : import.meta.env.VITE_ENTRA_TENANT_ID) ?? '';
 const spaClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_SPA_CLIENT_ID : import.meta.env.VITE_ENTRA_SPA_CLIENT_ID) ?? '';
 const apiClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_API_CLIENT_ID : import.meta.env.VITE_ENTRA_API_CLIENT_ID) ?? '';
@@ -14,7 +14,7 @@ const externalHost = `${import.meta.env.VITE_STAFF_EXTERNAL_SUBDOMAIN ?? ''}.cia
 const configured = Boolean(tenantId && spaClientId && apiClientId && (!externalStaff || /^[a-z0-9][a-z0-9-]{0,62}$/.test(import.meta.env.VITE_STAFF_EXTERNAL_SUBDOMAIN ?? '')));
 const apiScopes = apiClientId ? [`api://${apiClientId}/${externalStaff ? 'access_as_staff' : 'access_as_user'}`] : [];
 const portalRoot = new URL(import.meta.env.BASE_URL, window.location.origin).href;
-const redirect = new URL(externalStaff ? `${import.meta.env.BASE_URL}staff/external` : import.meta.env.VITE_ENTRA_REDIRECT_URI || portalRoot,window.location.origin);
+const redirect = new URL(__APP_SURFACE__ === 'application-admin' ? portalRoot : externalStaff ? `${import.meta.env.BASE_URL}staff/external` : import.meta.env.VITE_ENTRA_REDIRECT_URI || portalRoot,window.location.origin);
 if (redirect.origin !== window.location.origin || !redirect.pathname.startsWith(import.meta.env.BASE_URL) || redirect.search || redirect.hash) {
   throw new Error(i18n.t('Staff authentication must return to this portal, without query or fragment.'));
 }

@@ -7,6 +7,7 @@ import staffInvitationErrors from './staffInvitationErrors';
 import staffProfileMessages from './staffProfileMessages';
 import formValidationMessages from './formValidationMessages';
 import clinics from './clinics';
+import applicationAdmin from './applicationAdmin';
 
 export const supportedLanguages = ['en', 'fr'] as const;
 export type SupportedLanguage = typeof supportedLanguages[number];
@@ -28,7 +29,7 @@ function initialLanguage(): SupportedLanguage {
 }
 
 void i18n.use(initReactI18next).init({
-  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr } } },
+  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr } } },
   lng: initialLanguage(),
   fallbackLng: 'en',
   supportedLngs: supportedLanguages,

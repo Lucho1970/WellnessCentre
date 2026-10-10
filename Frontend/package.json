@@ -8,7 +8,7 @@
     "dev:portal": "vite --config vite.portal.config.ts",
     "validate:content": "node scripts/validate-content.mjs",
     "validate:i18n": "node scripts/validate-i18n.mjs",
-    "build": "npm run validate:content && npm run validate:i18n && tsc --noEmit && npm run build:public && npm run build:portal",
+    "build": "npm run validate:content && npm run validate:i18n && tsc --noEmit && npm run build:public && npm run build:portal && npm run build:application-admin",
     "build:public": "vite build --config vite.config.ts",
     "build:portal": "vite build --config vite.portal.config.ts",
     "preview:public": "vite preview --config vite.config.ts",
@@ -16,7 +16,9 @@
     "lint": "eslint .",
     "test": "playwright test",
     "test:build": "npm run build && playwright test --config playwright.build.config.ts",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "build:application-admin": "vite build --config vite.application-admin.config.ts",
+    "dev:application-admin": "vite --config vite.application-admin.config.ts"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.19.0",

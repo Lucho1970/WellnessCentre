@@ -41,6 +41,8 @@ final readonly class Config
         public string $staffExternalSpaClientId = '',
         public bool $appointmentActionLinksEnabled = false,
         public bool $clinicManagementEnabled = false,
+        public bool $applicationAdminEnabled = false,
+        public string $applicationAdminHost = 'portal.copihue.ca',
     ) {}
 
     public static function fromEnvironment(): self
@@ -86,6 +88,8 @@ final readonly class Config
             $value('STAFF_EXTERNAL_SPA_CLIENT_ID'),
             filter_var($value('APPOINTMENT_ACTION_LINKS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             filter_var($value('CLINIC_MANAGEMENT_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            filter_var($value('APPLICATION_ADMIN_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            $value('APPLICATION_ADMIN_HOST', 'portal.copihue.ca'),
         );
     }
 

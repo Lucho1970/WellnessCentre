@@ -68,6 +68,13 @@ final class Api
         try{
             $request=Request::capture();$this->cors($request);
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
+            $host=ClinicContext::normalizeHost((string)($request->headers['host']??''));
+            $centralHost=ClinicContext::normalizeHost($this->config->applicationAdminHost);
+            if (str_starts_with($request->path, '/api/v1/application/')) {
+                if ($host!==$centralHost) throw new ApiException(404,'not_found','Route not found.');
+                Response::json(['data'=>$this->applicationRoute($request)],200,$request->correlationId);
+            }
+            if ($host===$centralHost && !in_array($request->path,['/api/v1/health','/api/v1/health/database'],true)) throw new ApiException(404,'not_found','Route not found.');
             if (!in_array($request->path, ['/api/v1/health', '/api/v1/health/database'], true)) {
                 $this->clinicContext = $this->config->clinicManagementEnabled
                     ? ClinicContext::resolve($this->config, $this->database, $request)
@@ -369,9 +376,9 @@ final class Api
                 'issueClientInvitation'=>$this->onboarding()->invite($this->user($request),(int)$route[2]['id'],$request->correlationId,(string)($request->body['delivery']??'manual')),
                 'reviewClientInvitation'=>$this->onboarding()->review($this->user($request),(int)$route[2]['id'],(int)$route[2]['invitation'],$request->body,$request->correlationId),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
-                'managedClinics'=>$this->clinicManagement()->list($this->user($request)),
-                'createClinic'=>$this->clinicManagement()->create($this->user($request),$request->body,$request->correlationId),
-                'configureClinic'=>$this->clinicManagement()->configure($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'managedClinics'=>throw new ApiException(403,'central_administration_required','Manage clinics from the application administration portal.'),
+                'createClinic'=>throw new ApiException(403,'central_administration_required','Manage clinics from the application administration portal.'),
+                'configureClinic'=>throw new ApiException(403,'central_administration_required','Manage clinics from the application administration portal.'),
                 'adminLocations'=>$this->admin->locations($this->user($request)),
                 'updateLocation'=>$this->admin->updateLocation($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createRoom'=>$this->admin->createRoom($this->user($request),$request->body,$request->correlationId),
@@ -463,10 +470,18 @@ final class Api
         return new CustomerOnboarding($this->database->connection(), $this->config, $this->clinicContext?->clinicId);
     }
 
-    private function clinicManagement(): \Wellness\Service\ClinicManagementService
+    private function applicationRoute(Request $request): array
     {
-        if (!$this->config->clinicManagementEnabled) throw new ApiException(503,'clinic_management_unavailable','Clinic management is not enabled.');
-        return new \Wellness\Service\ClinicManagementService($this->database,new AuditLogger($this->database),$this->config);
+        if (!$this->config->applicationAdminEnabled || !$this->config->clinicManagementEnabled) throw new ApiException(503,'application_admin_unavailable','Application administration is not enabled.');
+        header('Cache-Control: no-store');
+        $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($request->bearerToken());
+        $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
+        $path=substr($request->path,strlen('/api/v1/application/'));
+        if ($request->method==='GET' && $path==='me') return ['id'=>$actor->id,'display_name'=>$actor->displayName,'email'=>$actor->email,'roles'=>['application_admin']];
+        if ($request->method==='GET' && $path==='clinics') return $service->list($actor);
+        if ($request->method==='POST' && $path==='clinics') return $service->create($actor,$request->body,$request->correlationId);
+        if ($request->method==='PATCH' && preg_match('#^clinics/(\d+)$#D',$path,$match)) return $service->configure($actor,(int)$match[1],$request->body,$request->correlationId);
+        throw new ApiException(404,'not_found','Route not found.');
     }
 
     private function customerRoute(Request $r): array

@@ -14,14 +14,14 @@ function ClinicAdminForm() {
   const [clinics, setClinics] = useState<Clinic[]>([]); const [draft, setDraft] = useState<Draft | null>(null);
   const [editing, setEditing] = useState<number | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [saved, setSaved] = useState('');
   const headers = async () => ({ Authorization: `Bearer ${await getAccessToken()}`, 'Content-Type': 'application/json' });
-  const load = async () => { const data = await apiRequest<{items: Clinic[]}>('/admin/clinics', { headers: await headers() }); setClinics(data.items); };
+  const load = async () => { const data = await apiRequest<{items: Clinic[]}>('/application/clinics', { headers: await headers() }); setClinics(data.items); };
   useEffect(() => { void load().catch(cause => { validation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load clinics.')); }); }, [getAccessToken]);
-  const open = (clinic?: Clinic) => { guard.markClean(); validation.clear(); setError(''); setSaved(''); setEditing(clinic?.id ?? null); setDraft(clinic ? { ...blank(), name: clinic.name, website_url: clinic.website_url ?? '', portal_host: clinic.portal_host ?? window.location.hostname } : blank()); };
+  const open = (clinic?: Clinic) => { guard.markClean(); validation.clear(); setError(''); setSaved(''); setEditing(clinic?.id ?? null); setDraft(clinic ? { ...blank(), name: clinic.name, website_url: clinic.website_url ?? '', portal_host: clinic.portal_host ?? '' } : blank()); };
   const close = () => { if (guard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; guard.markClean(); setDraft(null); validation.clear(); setError(''); };
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (!draft) return; setBusy(true); setError(''); setSaved(''); validation.clear();
     try {
-      await apiRequest(`/admin/clinics${editing ? `/${editing}` : ''}`, { method: editing ? 'PATCH' : 'POST', headers: await headers(), body: JSON.stringify(draft) });
+      await apiRequest(`/application/clinics${editing ? `/${editing}` : ''}`, { method: editing ? 'PATCH' : 'POST', headers: await headers(), body: JSON.stringify(draft) });
       guard.markClean(); setDraft(null); setSaved(t(editing ? 'Clinic settings saved.' : 'Clinic created. Configure its portal host before opening it.')); await load();
     } catch (cause) { validation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to save clinic.')); }
     finally { setBusy(false); }
@@ -41,7 +41,7 @@ function ClinicAdminForm() {
     {clinics.map(clinic => <Paper key={clinic.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}>
       <Typography variant="h6">{clinic.name}</Typography><Typography>{clinic.portal_host || t('Portal host not configured')}</Typography>
       <Typography>{t('{{count}} locations in this clinic', { count: clinic.location_count })}</Typography>
-      {clinic.current ? <Stack direction="row" spacing={1}><Button onClick={() => open(clinic)} disabled={!!draft}>{t('Edit clinic')}</Button><Button href="/admin/locations">{t('Manage locations')}</Button></Stack> : clinic.portal_host && <Button component="a" href={`https://${clinic.portal_host}/staff/login`}>{t('Open clinic portal')}</Button>}
+      <Stack direction="row" spacing={1}><Button onClick={() => open(clinic)} disabled={!!draft}>{t('Edit clinic')}</Button>{clinic.portal_host && <Button component="a" href={`https://${clinic.portal_host}/staff/login`}>{t('Open clinic portal')}</Button>}</Stack>
     </Stack></Paper>)}
   </Stack>;
 }

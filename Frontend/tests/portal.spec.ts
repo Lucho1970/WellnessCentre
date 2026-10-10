@@ -9,43 +9,8 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
-test('super admin creates a separate clinic and manages locations in the current clinic', async ({ page }) => {
+test('clinic super admin cannot open central clinic management in a clinic portal', async ({ page }) => {
   await fixtures(page, ['super_admin']);
-  const items = [{ id: 1, name: 'Willow Wellness Virtual', portal_host: 'willow.test', current: true, location_count: 2 }];
-  let payload: Record<string, unknown> | undefined;
-  let rejectHost = true;
-  await page.route('**/api/v1/admin/clinics', route => {
-    if (route.request().method() === 'POST') {
-      payload = route.request().postDataJSON();
-      if (rejectHost) return route.fulfill({ status: 422, json: { error: { code: 'validation_error', fields: { portal_host: 'Enter a hostname without a path.' } } } });
-      items.push({ id: 2, name: String(payload!.name), portal_host: String(payload!.portal_host), current: false, location_count: 1 });
-      return route.fulfill({ json: { data: { id: 2 } } });
-    }
-    return route.fulfill({ json: { data: { items, current_clinic_id: 1 } } });
-  });
-  await page.goto(`${portalHost}/admin/clinics`);
-  await expect(page.getByText('2 locations in this clinic')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Manage locations' })).toHaveAttribute('href', '/admin/locations');
-  await page.getByRole('button', { name: 'Create clinic', exact: true }).click();
-  await page.getByLabel('Clinic name').fill("Livin' Lively");
-  await page.getByLabel('Portal hostname').fill('livinlively.copihue.ca/client');
-  await page.getByLabel('First location name').fill('Holland Landing');
-  await page.getByRole('button', { name: 'Create clinic', exact: true }).click();
-  await expect(page.getByText('Enter a hostname without a path.')).toBeVisible();
-  await expect(page.getByLabel('Portal hostname')).toBeFocused();
-  await page.getByLabel('Portal hostname').fill('livinlively.copihue.ca');
-  rejectHost = false;
-  await page.getByRole('button', { name: 'Create clinic', exact: true }).click();
-  await expect(page.getByText('Clinic created. Configure its portal host before opening it.')).toBeVisible();
-  expect(payload).toMatchObject({ name: "Livin' Lively", portal_host: 'livinlively.copihue.ca', initial_location_name: 'Holland Landing', timezone: 'America/Toronto' });
-  await expect(page.getByRole('link', { name: 'Open clinic portal' })).toHaveAttribute('href', 'https://livinlively.copihue.ca/staff/login');
-  await page.getByRole('button', { name: 'Edit clinic', exact: true }).click();
-  await expect(page.getByLabel('Clinic name')).toHaveValue('Willow Wellness Virtual');
-  await expect(page.getByLabel('First location name')).toHaveCount(0);
-});
-
-test('clinic administration is unavailable to practitioners and ordinary clinic administrators', async ({ page }) => {
-  await fixtures(page, ['clinic_admin']);
   await page.goto(`${portalHost}/admin/clinics`);
   await expect(page.getByText('You do not have permission to access this page.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Clinics', exact: true })).toHaveCount(0);

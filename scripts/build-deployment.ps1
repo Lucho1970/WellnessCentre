@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$ReleaseName,
-    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md','RECURRING_APPOINTMENTS_RELEASE.md','CLIENT_INTAKE_FORMS_RELEASE.md','GOOGLE_PRACTITIONER_ROLLOUT.md','PRIVATE_PRACTITIONER_WORK_LOCATION.md','SEPARATE_CLINIC_PORTALS.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
+    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md','RECURRING_APPOINTMENTS_RELEASE.md','CLIENT_INTAKE_FORMS_RELEASE.md','GOOGLE_PRACTITIONER_ROLLOUT.md','PRIVATE_PRACTITIONER_WORK_LOCATION.md','SEPARATE_CLINIC_PORTALS.md','APPLICATION_ADMINISTRATION.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
 )
 $ErrorActionPreference = 'Stop'
 if ($ReleaseName -notmatch '^[a-zA-Z0-9_-]+$') { throw 'Use letters, digits, underscores, and hyphens for ReleaseName.' }
@@ -20,6 +20,9 @@ foreach ($productionEnv in @((Join-Path $repo 'Frontend/.env.production'),(Join-
     }
 }
 $requiredFrontendSettings = @(
+    'VITE_ENTRA_TENANT_ID',
+    'VITE_ENTRA_API_CLIENT_ID',
+    'VITE_ENTRA_SPA_CLIENT_ID',
     'VITE_CUSTOMER_ENTRA_TENANT_ID',
     'VITE_CUSTOMER_ENTRA_SUBDOMAIN',
     'VITE_CUSTOMER_ENTRA_API_CLIENT_ID',
@@ -54,6 +57,11 @@ foreach ($name in $requiredFrontendSettings) {
     }
     if (-not $found) { throw "Production portal bundle is missing required setting: $name" }
 }
+$centralScripts = Get-ChildItem -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin/assets') -Filter '*.js' -File
+foreach ($name in @('VITE_ENTRA_TENANT_ID','VITE_ENTRA_API_CLIENT_ID','VITE_ENTRA_SPA_CLIENT_ID')) {
+    $expected = $resolvedFrontendSettings[$name]
+    if (-not @($centralScripts | Where-Object { [System.IO.File]::ReadAllText($_.FullName).Contains($expected) }).Count) { throw "Administration build is missing required setting: $name" }
+}
 Copy-Item -LiteralPath (Join-Path $repo 'api/composer.json'),(Join-Path $repo 'api/composer.lock') -Destination $private
 Copy-Item -LiteralPath (Join-Path $repo 'api/src'),(Join-Path $repo 'api/bin') -Destination $private -Recurse
 Push-Location $private
@@ -79,7 +87,13 @@ Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal/.htaccess'),(Jo
 # Both public entry points resolve to the same private application; no backend copy.
 Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $portalStage 'api') -Recurse
 Write-DeploymentZip $portalStage (Join-Path $destination 'wellness-portal.zip')
-Write-DeploymentZip (Join-Path $repo 'hosting/netfirms/portal-landing') (Join-Path $destination 'copihue-portal-landing.zip')
+$centralStage = Join-Path $stage 'central'
+Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-landing') -Destination $centralStage -Recurse
+$adminStage = Join-Path $centralStage 'admin'
+Copy-Item -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin') -Destination $adminStage -Recurse
+Move-Item -LiteralPath (Join-Path $adminStage 'central.html') -Destination (Join-Path $adminStage 'index.html')
+Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $centralStage 'api') -Recurse
+Write-DeploymentZip $centralStage (Join-Path $destination 'copihue-portal-landing.zip')
 Write-DeploymentZip $private (Join-Path $destination 'wellness-api-private.zip')
 Write-DeploymentZip (Join-Path $repo 'api/deploy/netfirms/public') (Join-Path $destination 'wellness-api-public.zip')
 Write-DeploymentZip (Join-Path $repo 'hosting/netfirms/main-domain') (Join-Path $destination 'tuff-tar-mail-bridge.zip')

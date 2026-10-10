@@ -10,7 +10,7 @@ export function pagesFor(roles: string[], workspace: Workspace): PortalPage[] {
   if (workspace === 'practitioner') return ['dashboard', 'schedule_calendar', 'appointments', 'clients', 'forms', 'my_notifications', 'calendar', 'profile'];
   return ['dashboard', ...(roles.some(role => bookingRoles.includes(role)) ? ['appointments' as const, 'clients' as const] : []),
     ...(roles.some(role => ['super_admin', 'clinic_admin'].includes(role)) ? ['notifications' as const, 'forms' as const] : []),
-    ...(roles.includes('super_admin') ? ['clinics', 'calendar', 'practitioners', 'staff', 'team', 'widgets', 'locations', 'rooms', 'services', 'business'] as PortalPage[] : []), 'profile'];
+    ...(roles.includes('super_admin') ? ['calendar', 'practitioners', 'staff', 'team', 'widgets', 'locations', 'rooms', 'services', 'business'] as PortalPage[] : []), 'profile'];
 }
 const slugs: Record<PortalPage, string> = { clinics: 'clinics', dashboard: '', appointments: 'appointments', clients: 'clients', forms: 'forms', calendar: 'availability', schedule_calendar: 'calendar', business: 'settings', practitioners: 'practitioners', staff: 'users', team: 'team', widgets: 'dashboard-widgets', notifications: 'notifications', my_notifications: 'notifications', locations: 'locations', rooms: 'rooms', services: 'services', profile: 'profile' };
 export function pagePath(workspace: Workspace, page: PortalPage) {
