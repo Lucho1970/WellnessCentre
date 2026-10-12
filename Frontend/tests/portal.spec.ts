@@ -1245,14 +1245,16 @@ test("appointment client finder filters by exact birthdate and debounced contact
     page.getByRole("button", { name: "Select Test Client" }),
   ).toBeVisible();
   expect(searches).toEqual([{ q: "", dateOfBirth: "1980-05-06" }]);
+  await page.clock.install();
   await search.fill("Te");
-  await page.waitForTimeout(100);
+  await page.clock.fastForward(100);
   expect(searches).toHaveLength(1);
   await search.fill("Test");
+  await page.clock.fastForward(400);
   await expect(
     page.getByRole("button", { name: "Select Test Client" }),
   ).toBeVisible();
-  expect(searches).toEqual([
+  await expect.poll(() => searches).toEqual([
     { q: "", dateOfBirth: "1980-05-06" },
     { q: "Test", dateOfBirth: "1980-05-06" },
   ]);

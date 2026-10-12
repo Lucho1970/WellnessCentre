@@ -25,6 +25,8 @@ Start with these two authoritative documents:
 
 ## Supporting records and historical sources
 
+- [12 October development checkpoint](GIT_CHECKPOINT_2026-10-12.md): integration baseline, validation evidence, coordinated release and the next forms slice.
+
 - [Public/portal separation checkpoint](PORTAL_SEPARATION.md): build outputs, routes, preserved permissions, subdomain deployment steps and acceptance checks.
 - [Portal treatment catalogue](PORTAL_CATALOGUE.md): configurable bilingual welcome text, category navigation, public practitioner previews, booking entry points and migration 028.
 

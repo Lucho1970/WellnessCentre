@@ -52,3 +52,13 @@ The shared `.env` remains infrastructure configuration. Clinic business settings
 Run `npm run build`, normal browser regressions, `npx playwright test --config playwright.application-admin.config.ts` and applicable PHP checks. The synthetic localhost rehearsal is `api/tests/integration/application-administration.php` with `CLINIC_TEST_ALLOW_CREATE=true`, default MariaDB port 13319; it retains a random database and does not load private `.env`.
 
 Hosted acceptance must confirm the real Entra callback, direct `/admin` and `/admin/` access, anonymous/unauthorized denial, successful registration, duplicate rollback, revoked grant denial and separation of clinic APIs. Local development does not deploy files, apply hosted SQL or configure provider callbacks.
+
+On Windows, both database rehearsals can use the managed portable MariaDB runner, which starts a loopback-only disposable server and stops it afterward:
+
+```powershell
+$env:OPENSSL_CONF = 'C:/Program Files/Git/usr/ssl/openssl.cnf'
+./scripts/test-recurring-sql.ps1 -MariaDbDirectory .tmp/recurrence-db-runtime/package/mariadb-11.4.8-winx64 -Port 13319 -IntegrationTest application-administration.php
+./scripts/test-recurring-sql.ps1 -MariaDbDirectory .tmp/recurrence-db-runtime/package/mariadb-11.4.8-winx64 -Port 13319 -IntegrationTest separate-clinics.php
+```
+
+Run these sequentially. Adjust the runtime/configuration paths for the local installation. Synthetic databases and server logs remain under ignored `.tmp` for inspection; the runner does not read private `.env` or connect to hosted data.

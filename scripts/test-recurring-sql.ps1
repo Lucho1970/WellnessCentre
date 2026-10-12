@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$MariaDbDirectory,
     [string]$PhpExecutable = 'php',
     [ValidateRange(1024, 65535)][int]$Port = 13317,
-    [ValidateSet('recurring-bookings.php','client-forms.php','staff-identity-migration.php','staff-invitations.php','practitioner-work-location.php')][string]$IntegrationTest = 'recurring-bookings.php'
+    [ValidateSet('recurring-bookings.php','client-forms.php','staff-identity-migration.php','staff-invitations.php','practitioner-work-location.php','separate-clinics.php','application-administration.php')][string]$IntegrationTest = 'recurring-bookings.php'
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -19,7 +19,12 @@ try { $probe.Start() } finally { $probe.Stop() }
 $run = Join-Path $repo ('.tmp/recurring-sql-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $run | Out-Null
 $data = Join-Path $run 'data'
-$prefix = if ($IntegrationTest -eq 'staff-invitations.php') { 'STAFF_INVITATION_TEST' } else { 'RECURRING_TEST' }
+$prefix = switch ($IntegrationTest) {
+    'staff-invitations.php' { 'STAFF_INVITATION_TEST' }
+    'separate-clinics.php' { 'CLINIC_TEST' }
+    'application-administration.php' { 'CLINIC_TEST' }
+    default { 'RECURRING_TEST' }
+}
 $names = @("${prefix}_ALLOW_CREATE", "${prefix}_PORT", "${prefix}_USER", "${prefix}_PASSWORD")
 $previous = @{}
 foreach ($name in $names) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
