@@ -7,6 +7,13 @@ use DateTimeImmutable;
 
 final class CancellationPolicy
 {
+    public static function acknowledge(array $body, array $preview): void
+    {
+        $value = $body['expected_cancellation_fee_cents'] ?? null;
+        if (!is_int($value) || $value < 0) throw new \Wellness\Http\ApiException(422,'cancellation_fee_acknowledgement_required','Review the cancellation fee before confirming.');
+        if ($value !== (int)$preview['fee_cents']) throw new \Wellness\Http\ApiException(409,'cancellation_fee_changed','The cancellation fee changed. Review the updated fee before confirming.');
+    }
+
     public static function preview(array $appointment,?DateTimeImmutable $now=null): array
     {
         $now??=new DateTimeImmutable('now',new \DateTimeZone('UTC'));

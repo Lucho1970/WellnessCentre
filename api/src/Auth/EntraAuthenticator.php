@@ -14,11 +14,34 @@ use Wellness\Config;
 use Wellness\Database;
 use Wellness\Http\ApiException;
 
-final class EntraAuthenticator
+final class EntraAuthenticator implements IdentityAdapter
 {
     public function __construct(private readonly Config $config, private readonly Database $database, private readonly ?\Closure $keyLoader = null) {}
 
     public function authenticate(?string $token): AuthContext
+    {
+        $identity = $this->verify($token);
+        return $this->loadUser($identity->tenantId, $identity->subject, $identity->directoryRoles);
+    }
+
+    public function authenticateForClinic(?string $token, \Wellness\ClinicContext $clinic): AuthContext
+    {
+        $identity = $this->verify($token);
+        if ($this->config->clinicManagementEnabled) {
+            // Once an identity uses clinic memberships, revocation cannot fall back to its legacy link.
+            $query=$this->database->connection()->prepare('SELECT 1 FROM product_identities i JOIN staff_memberships m ON m.identity_id=i.id WHERE i.adapter=:adapter AND i.issuer=:issuer AND i.subject=:subject LIMIT 1');
+            $query->execute(['adapter'=>$identity->adapter,'issuer'=>$identity->issuer,'subject'=>$identity->subject]);
+            if ($query->fetchColumn()) return (new StaffMembershipResolver($this->database))->resolve($identity,$clinic);
+        }
+        $legacy = $clinic->assertActor($this->loadUser($identity->tenantId, $identity->subject, $identity->directoryRoles));
+        if (!$this->config->staffMembershipPilotEnabled || !in_array($legacy->userId, $this->config->staffMembershipPilotUserIds, true)) return $legacy;
+        // A revoked/missing pilot membership must never fall back to legacy access.
+        $member = (new StaffMembershipResolver($this->database))->resolve($identity, $clinic);
+        if ($member->userId !== $legacy->userId) throw new ApiException(403, 'membership_binding_mismatch', 'Staff membership does not match the existing account.');
+        return $member;
+    }
+
+    public function verify(?string $token): VerifiedIdentity
     {
         if (!$token) throw new ApiException(401, 'unauthorized', 'A bearer access token is required.');
         if ($this->config->entraTenantId === '' || $this->config->entraApiClientId === '') {
@@ -59,7 +82,7 @@ final class EntraAuthenticator
         if ($objectId === '') throw new ApiException(401, 'invalid_token_claims', 'The token has no stable user identifier.');
         $roleMap=['Wellness.SuperAdmin'=>'super_admin','Wellness.ClinicAdmin'=>'clinic_admin','Wellness.Reception'=>'reception','Wellness.Practitioner'=>'practitioner','Wellness.Accountant'=>'accountant'];
         $directoryRoles=array_values(array_filter(array_map(static fn($role)=>$roleMap[(string)$role]??null,(array)($claims['roles']??[]))));
-        return $this->loadUser($tenant, $objectId, $directoryRoles);
+        return new VerifiedIdentity('entra-workforce', $expectedIssuer, $objectId, $tenant, $directoryRoles);
     }
 
     private function loadUser(string $tenantId, string $objectId, array $directoryRoles): AuthContext

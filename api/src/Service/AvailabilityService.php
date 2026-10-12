@@ -12,7 +12,7 @@ use Wellness\Http\ApiException;
 
 final class AvailabilityService
 {
-    public function __construct(private readonly Database $database) {}
+    public function __construct(private readonly Database $database, private readonly ?int $publicClinicId = null) {}
 
     public function publicSearch(array $query): array
     {
@@ -23,6 +23,7 @@ final class AvailabilityService
 
     public function search(array $query,?int $excludeAppointmentId=null,bool $publicOnly=false,bool $existingBookingTransfer=false): array
     {
+        if ($publicOnly && (!$this->publicClinicId || $this->publicClinicId < 1)) throw new ApiException(503, 'clinic_not_configured', 'The clinic has not been configured.');
         $mode=Delivery::mode($query);
         $serviceId=(int)($query['service_id']??0); $practitionerId=(int)($query['practitioner_id']??0); $locationId=(int)($query['location_id']??0);
         if(!$serviceId||!$practitionerId||!$locationId) throw new ApiException(422,'validation_error','service_id, practitioner_id, and location_id are required.');
@@ -37,9 +38,9 @@ final class AvailabilityService
                 JOIN users u ON u.id=p.user_id AND u.status='active' AND u.clinic_id=s.clinic_id
                 JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=l.id AND pl.active=1
                WHERE s.id=:service AND s.active=1 AND l.is_bookable=1 AND l.clinic_id=s.clinic_id";
-        if ($publicOnly) $sql .= " AND s.published=1 AND s.clinic_id=(SELECT id FROM clinics WHERE status='active' ORDER BY id LIMIT 1) AND EXISTS(SELECT 1 FROM public_team_profiles t WHERE t.user_id=p.user_id AND t.clinic_id=s.clinic_id AND t.published=1 AND t.section='practitioner' AND t.show_booking_action=1)";
+        if ($publicOnly) $sql .= " AND s.published=1 AND s.clinic_id=:public_clinic AND EXISTS(SELECT 1 FROM public_team_profiles t WHERE t.user_id=p.user_id AND t.clinic_id=s.clinic_id AND t.published=1 AND t.section='practitioner' AND t.show_booking_action=1)";
         $sql .= ' ORDER BY d.duration_minutes,d.id';
-        $statement=$this->database->connection()->prepare($sql);$statement->execute(['location'=>$locationId,'practitioner'=>$practitionerId,'service'=>$serviceId]);$options=$statement->fetchAll();
+        $statement=$this->database->connection()->prepare($sql);$statement->execute(['location'=>$locationId,'practitioner'=>$practitionerId,'service'=>$serviceId] + ($publicOnly ? ['public_clinic' => $this->publicClinicId] : []));$options=$statement->fetchAll();
         if(!$options) throw new ApiException(404,'service_not_available','That practitioner does not offer this service at the selected location.');
         $timezone=new DateTimeZone($options[0]['timezone']); $slots=[];
         $now=new DateTimeImmutable('now',new DateTimeZone('UTC'));

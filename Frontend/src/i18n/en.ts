@@ -1,24 +1,228 @@
 const en = {
+  "View source": "View source",
+  "Form JSON source": "Form JSON source",
+  "Apply source": "Apply source",
+  "Download JSON": "Download JSON",
+  "Import form JSON": "Import form JSON",
+  "Import as draft": "Import as draft",
+  "Choose JSON file": "Choose JSON file",
+  "Save draft": "Save draft",
+  "Retry draft save": "Retry draft save",
+  "Resume draft": "Resume draft",
+  "My form drafts": "My form drafts",
+  "No saved drafts yet.": "No saved drafts yet.",
+  "Untitled form": "Untitled form",
+  "Previous drafts": "Previous drafts",
+  "Next drafts": "Next drafts",
+  "Loading drafts": "Loading drafts",
+  "Draft saved": "Draft saved",
+  "Unsaved changes": "Unsaved changes",
+  "Draft saved. You can return after signing in again.": "Draft saved. You can return after signing in again.",
+  "This draft has already been published.": "This draft has already been published.",
+  "Form JSON must be no larger than 64 KB.": "Form JSON must be no larger than 64 KB.",
+  "Unable to read the JSON file.": "Unable to read the JSON file.",
+  "Enter valid JSON before applying the source.": "Enter valid JSON before applying the source.",
+  "Source applied to the editor. Save a draft to keep these changes.": "Source applied to the editor. Save a draft to keep these changes.",
+  "Discard unapplied source changes?": "Discard unapplied source changes?",
+  "Source changes stay unpublished. Apply them to the editor, then save a draft or publish when ready.": "Source changes stay unpublished. Apply them to the editor, then save a draft or publish when ready.",
+
+  "Answer type: single_choice": "Single choice (radio buttons)",
+  "Answer type: multiple_choice": "Multiple choice (checkboxes)",
+  "Choose one option.": "Choose one option.",
+  "Select all that apply.": "Select all that apply.",
+  "Clear selection": "Clear selection",
+  "Option {{number}} (English)": "Option {{number}} (English)",
+  "Option {{number}} (French)": "Option {{number}} (French)",
+  "Remove option": "Remove option",
+  "Add option": "Add option",
+  "Choose a valid option.": "Choose a valid option.",
+  "Select at least one valid option.": "Select at least one valid option.",
+
+  "Add question": "Add question",
+  "Answer type": "Answer type",
+  "Answers are visible only to the client and assigned practitioner.":
+    "Answers are visible only to the client and assigned practitioner.",
+  "Assign form": "Assign form",
+  "Assigned practitioner": "Assigned practitioner",
+  "Automatically assign on new bookings for these services with this practitioner:":
+    "Automatically assign on new bookings for these services with this practitioner:",
+  "Back to forms": "Back to forms",
+  "Confirm assignment": "Confirm assignment",
+  "Confirmation is uncertain. Retry the same answers before making changes.":
+    "Confirmation is uncertain. Retry the same answers before making changes.",
+  "Create form": "Create form",
+  "Create new version": "Create new version",
+  "Discard these unsaved answers?": "Discard these unsaved answers?",
+  "Discard this unpublished form?": "Discard this unpublished form?",
+  "Form assigned.": "Form assigned.",
+  "Form name": "Form name",
+  "Form submitted. Your answers have been saved.":
+    "Form submitted. Your answers have been saved.",
+  "Form template": "Form template",
+  "Form type": "Form type",
+  "Form version {{version}}": "Form version {{version}}",
+  "I reviewed these answers and confirm submission.":
+    "I reviewed these answers and confirm submission.",
+  "Instructions (English)": "Instructions (English)",
+  "Instructions (French)": "Instructions (French)",
+  "Intake and consent forms": "Intake and consent forms",
+  "Invalid form response.": "Invalid form response.",
+  "Loading forms": "Loading forms",
+  "Mark form reviewed": "Mark form reviewed",
+  "No form templates yet.": "No form templates yet.",
+  "No forms assigned yet.": "No forms assigned yet.",
+  "Not answered": "Not answered",
+  "Publishing creates an immutable version. Existing assignments keep their original questions.":
+    "Publishing creates an immutable version. Existing assignments keep their original questions.",
+  "Question (English)": "Question (English)",
+  "Question (French)": "Question (French)",
+  "Question {{number}}": "Question {{number}}",
+  "Remove question": "Remove question",
+  "Revoke assignment": "Revoke assignment",
+  "Revoke this pending form assignment?":
+    "Revoke this pending form assignment?",
+  "Submitted answers are preserved with this form version.":
+    "Submitted answers are preserved with this form version.",
+  "Version history": "Version history",
+  "Client forms": "Client forms",
+  "My forms": "My forms",
+  "Complete form": "Complete form",
+  "View form": "View form",
+  "Submit form": "Submit form",
+  "Publish form": "Publish form",
+  "Questionnaires, consent and template versions":
+    "Questionnaires, consent and template versions",
+  "Form status: pending": "Form status: pending",
+  "Form status: submitted": "Form status: submitted",
+  "Form status: reviewed": "Form status: reviewed",
+  "Form status: revoked": "Form status: revoked",
+  "Form type: intake": "Form type: intake",
+  "Form type: consent": "Form type: consent",
+  "Form type: follow_up": "Form type: follow_up",
+  "Form type: questionnaire": "Form type: questionnaire",
+  "Answer type: text": "Text",
+  "Answer type: yes_no": "Yes/No",
+  "Form sections": "Form sections",
+  "Questions without a section": "Questions without a section",
+  "Section {{number}} title (English)": "Section {{number}} title (English)",
+  "Section {{number}} title (French)": "Section {{number}} title (French)",
+  "Section {{number}} description (English)":
+    "Section {{number}} description (English)",
+  "Section {{number}} description (French)":
+    "Section {{number}} description (French)",
+  "Move section up": "Move section up",
+  "Move section down": "Move section down",
+  "Remove section": "Remove section",
+  "Add section": "Add section",
+  "Untitled section": "Untitled section",
+  "Section for question {{number}}": "Section for question {{number}}",
+  "Add question to {{section}}": "Add question to {{section}}",
+  "Remove this section? Its questions will move to Questions without a section.":
+    "Remove this section? Its questions will move to Questions without a section.",
+  "Answer type: date": "Date",
+  "Answer type: phone": "Phone number",
+  "Answer type: email": "Email address",
+  "No future dates (for example, birth date)":
+    "No future dates (for example, birth date)",
+  "Country for {{question}}": "Country for {{question}}",
+  "Enter a valid phone number for the selected country.":
+    "Enter a valid phone number for the selected country.",
+  "Enter a national number or include + and the country calling code. No extensions.":
+    "Enter a national number or include + and the country calling code. No extensions.",
+  "Enter a valid date within the allowed range.":
+    "Enter a valid date within the allowed range.",
+  "Enter a valid email address.": "Enter a valid email address.",
+  "Answer type: consent": "Consent",
+  "Client forms are not enabled.": "Client forms are not enabled.",
+  "Check the form questions and required answers.":
+    "Check the form questions and required answers.",
+  "Submitted answers cannot be overwritten.":
+    "Submitted answers cannot be overwritten.",
+  "The form changed. Reload it before publishing.":
+    "The form changed. Reload it before publishing.",
+  "The form changed. Reload it.": "The form changed. Reload it.",
+  "Review the current form before submitting.":
+    "Review the current form before submitting.",
+  "Only the client and assigned practitioner may read answers.":
+    "Only the client and assigned practitioner may read answers.",
+  "Select services offered by this practitioner.":
+    "Select services offered by this practitioner.",
+  "The server returned an incomplete series response. Retry the same request.":
+    "The server returned an incomplete series response. Retry the same request.",
+  "All appointments in this review were saved.":
+    "All appointments in this review were saved.",
+  "All dates passed validation. Confirm to save the entire series.":
+    "All dates passed validation. Confirm to save the entire series.",
+  "Nothing was saved. Resolve the conflicts or choose a different pattern.":
+    "Nothing was saved. Resolve the conflicts or choose a different pattern.",
+  "Location timezone": "Location timezone",
+  "Subtotal before tax": "Subtotal before tax",
+  "Unable to save the series.": "Unable to save the series.",
+  "Repeat appointment": "Repeat appointment",
+  "One appointment": "One appointment",
+  Weekly: "Weekly",
+  "Every two weeks": "Every two weeks",
+  Monthly: "Monthly",
+  "The series keeps the same local time. Monthly dates use the last day when that day is missing. Every date must be available; nothing is saved if any date conflicts.":
+    "The series keeps the same local time. Monthly dates use the last day when that day is missing. Every date must be available; nothing is saved if any date conflicts.",
+  "Series ends": "Series ends",
+  "After a number of appointments": "After a number of appointments",
+  "On an end date": "On an end date",
+  "Number of appointments (including the first)":
+    "Number of appointments (including the first)",
+  "Series end date": "Series end date",
+  "The response could not be verified. Retry this same confirmation before starting another series.":
+    "The response could not be verified. Retry this same confirmation before starting another series.",
+  "Recurring series #{{id}} confirmed with {{count}} appointments.":
+    "Recurring series #{{id}} confirmed with {{count}} appointments.",
+  "Preview all dates": "Preview all dates",
+  "Retry series confirmation": "Retry series confirmation",
+  "Confirm entire series": "Confirm entire series",
+  "Manage future series": "Manage future series",
+  "Only the future active appointments listed here will change. Past and canceled appointments stay in history. All listed changes must pass validation before any are saved.":
+    "Only the future active appointments listed here will change. Past and canceled appointments stay in history. All listed changes must pass validation before any are saved.",
+  "Series action": "Series action",
+  "Cancel all listed appointments": "Cancel all listed appointments",
+  "Reschedule all listed appointments": "Reschedule all listed appointments",
+  "Review the cancellation fee for each appointment before confirming.":
+    "Review the cancellation fee for each appointment before confirming.",
+  "Canceling this series is clinic-initiated. No client cancellation fees will be charged.":
+    "Canceling this series is clinic-initiated. No client cancellation fees will be charged.",
+  "All {{count}} future appointments in series #{{id}} were updated.":
+    "All {{count}} future appointments in series #{{id}} were updated.",
+  "Preview series changes": "Preview series changes",
+  "New appointment time": "New appointment time",
+  "Reload series": "Reload series",
+  "Recurring series #{{id}}": "Recurring series #{{id}}",
+  "This appointment belongs to a recurring series. Ordinary reschedule and cancel actions change only this appointment.":
+    "This appointment belongs to a recurring series. Ordinary reschedule and cancel actions change only this appointment.",
   Call: "Call",
   Text: "Text",
   "Public practitioner card": "Public practitioner card",
-  "Your preferred public name and biography can differ from your sign-in account. Contact fields below are public only if you enter them; your private notification details stay private.": "Your preferred public name and biography can differ from your sign-in account. Contact fields below are public only if you enter them; your private notification details stay private.",
+  "Your preferred public name and biography can differ from your sign-in account. Contact fields below are public only if you enter them; your private notification details stay private.":
+    "Your preferred public name and biography can differ from your sign-in account. Contact fields below are public only if you enter them; your private notification details stay private.",
   "Unable to load your public card.": "Unable to load your public card.",
   "Unable to save your public card.": "Unable to save your public card.",
   "Public card saved.": "Public card saved.",
-  "Your card is not published yet. Ask a clinic administrator to publish your team profile.": "Your card is not published yet. Ask a clinic administrator to publish your team profile.",
+  "Your card is not published yet. Ask a clinic administrator to publish your team profile.":
+    "Your card is not published yet. Ask a clinic administrator to publish your team profile.",
   "Short booking name": "Short booking name",
   "Biography (English)": "Biography (English)",
   "Biography (French)": "Biography (French)",
-  "Only enter contact details you want everyone to see. Leave them blank to hide contact actions.": "Only enter contact details you want everyone to see. Leave them blank to hide contact actions.",
-  "Only enter contact details the practitioner agrees to publish. Private staff notification addresses are not used here.": "Only enter contact details the practitioner agrees to publish. Private staff notification addresses are not used here.",
+  "Only enter contact details you want everyone to see. Leave them blank to hide contact actions.":
+    "Only enter contact details you want everyone to see. Leave them blank to hide contact actions.",
+  "Only enter contact details the practitioner agrees to publish. Private staff notification addresses are not used here.":
+    "Only enter contact details the practitioner agrees to publish. Private staff notification addresses are not used here.",
   "Public contact email": "Public contact email",
   "Public contact phone": "Public contact phone",
-  "Use international format, for example +12892975234.": "Use international format, for example +12892975234.",
-  "Offer a Text action for this public phone number": "Offer a Text action for this public phone number",
+  "Use international format, for example +12892975234.":
+    "Use international format, for example +12892975234.",
+  "Offer a Text action for this public phone number":
+    "Offer a Text action for this public phone number",
   "Save public card": "Save public card",
   "View public profile": "View public profile",
-  "Shown on public team and service pages; it does not change the identity-provider name.": "Shown on public team and service pages; it does not change the identity-provider name.",
+  "Shown on public team and service pages; it does not change the identity-provider name.":
+    "Shown on public team and service pages; it does not change the identity-provider name.",
   language: "Language",
   English: "English",
   French: "French",
@@ -49,7 +253,8 @@ const en = {
   Explore: "Explore",
   "Explore services": "Explore services",
   "Get in touch": "Get in touch",
-  "Questions about booking or your first visit? We are here to help.": "Questions about booking or your first visit? We are here to help.",
+  "Questions about booking or your first visit? We are here to help.":
+    "Questions about booking or your first visit? We are here to help.",
   "Book online": "Book online",
   "New clients": "New clients",
   About: "About",
@@ -79,7 +284,8 @@ const en = {
   "Staff sign-in is not configured for this environment. Please contact the administrator.":
     "Staff sign-in is not configured for this environment. Please contact the administrator.",
   "Sign in with Microsoft": "Sign in with Microsoft",
-  "Your staff session has expired. Sign in with Microsoft to continue.": "Your staff session has expired. Sign in with Microsoft to continue.",
+  "Your staff session has expired. Sign in with Microsoft to continue.":
+    "Your staff session has expired. Sign in with Microsoft to continue.",
   "Client sign in / booking": "Client sign in / booking",
   Retry: "Retry",
   "Verifying staff access…": "Verifying staff access…",
@@ -181,15 +387,24 @@ const en = {
   "Appointment length": "Appointment length",
   "Prices shown before taxes.": "Prices shown before taxes.",
   "Select a length": "Select a length",
-  "Choose an appointment length before selecting a time.": "Choose an appointment length before selecting a time.",
-  "No appointment lengths are configured for this service.": "No appointment lengths are configured for this service.",
-  "Available times for {{minutes}} minutes, shown in {{timezone}}.": "Available times for {{minutes}} minutes, shown in {{timezone}}.",
-  "Checking the time you selected before sign-in…": "Checking the time you selected before sign-in…",
-  "We saved your selected service and time for this sign-in. We will check availability again before you confirm.": "We saved your selected service and time for this sign-in. We will check availability again before you confirm.",
-  "Your selected appointment is no longer offered. Please choose a service and time again.": "Your selected appointment is no longer offered. Please choose a service and time again.",
-  "Your selected {{service}} appointment ({{minutes}} min) at {{time}} is still available. It is not reserved until you confirm.": "Your selected {{service}} appointment ({{minutes}} min) at {{time}} is still available. It is not reserved until you confirm.",
-  "Confirm the visit address to continue with this time.": "Confirm the visit address to continue with this time.",
-  "The time you selected before sign-in is no longer available. Please choose another time.": "The time you selected before sign-in is no longer available. Please choose another time.",
+  "Choose an appointment length before selecting a time.":
+    "Choose an appointment length before selecting a time.",
+  "No appointment lengths are configured for this service.":
+    "No appointment lengths are configured for this service.",
+  "Available times for {{minutes}} minutes, shown in {{timezone}}.":
+    "Available times for {{minutes}} minutes, shown in {{timezone}}.",
+  "Checking the time you selected before sign-in…":
+    "Checking the time you selected before sign-in…",
+  "We saved your selected service and time for this sign-in. We will check availability again before you confirm.":
+    "We saved your selected service and time for this sign-in. We will check availability again before you confirm.",
+  "Your selected appointment is no longer offered. Please choose a service and time again.":
+    "Your selected appointment is no longer offered. Please choose a service and time again.",
+  "Your selected {{service}} appointment ({{minutes}} min) at {{time}} is still available. It is not reserved until you confirm.":
+    "Your selected {{service}} appointment ({{minutes}} min) at {{time}} is still available. It is not reserved until you confirm.",
+  "Confirm the visit address to continue with this time.":
+    "Confirm the visit address to continue with this time.",
+  "The time you selected before sign-in is no longer available. Please choose another time.":
+    "The time you selected before sign-in is no longer available. Please choose another time.",
   "Previous month": "Previous month",
   "Next month": "Next month",
   "Select a date on the calendar to load its available times. You can also enter a date below.":
@@ -271,11 +486,14 @@ const en = {
   "What happened?": "What happened?",
   "What did you expect?": "What did you expect?",
   "Reference ID (if shown):": "Reference ID (if shown):",
-  "Please do not include passwords, medical information, or another person’s details.": "Please do not include passwords, medical information, or another person’s details.",
-  "For beta feedback, describe the steps and any reference ID. Do not send sensitive information.": "For beta feedback, describe the steps and any reference ID. Do not send sensitive information.",
+  "Please do not include passwords, medical information, or another person’s details.":
+    "Please do not include passwords, medical information, or another person’s details.",
+  "For beta feedback, describe the steps and any reference ID. Do not send sensitive information.":
+    "For beta feedback, describe the steps and any reference ID. Do not send sensitive information.",
   "My clients": "My clients",
   "Clients linked to your appointments": "Clients linked to your appointments",
-  "This list includes clients you have booked or added yourself. It is not the clinic-wide client directory.": "This list includes clients you have booked or added yourself. It is not the clinic-wide client directory.",
+  "This list includes clients you have booked or added yourself. It is not the clinic-wide client directory.":
+    "This list includes clients you have booked or added yourself. It is not the clinic-wide client directory.",
   "Search my clients": "Search my clients",
   "Unable to load your clients.": "Unable to load your clients.",
   "No clients match this search.": "No clients match this search.",
@@ -285,7 +503,8 @@ const en = {
   "Text client": "Text client",
   "Loading appointment details": "Loading appointment details",
   "More details": "More details",
-  "Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.": "Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.",
+  "Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.":
+    "Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.",
   "Travel reserved: {{minutes}} minutes before and after":
     "Travel reserved: {{minutes}} minutes before and after",
   Previous: "Previous",
@@ -316,7 +535,8 @@ const en = {
   "Save new client": "Save new client",
   "This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.":
     "This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.",
-  "Send a private portal invitation to {{email}}?": "Send a private portal invitation to {{email}}?",
+  "Send a private portal invitation to {{email}}?":
+    "Send a private portal invitation to {{email}}?",
   "Send portal invitation email": "Send portal invitation email",
   "Sending invitation…": "Sending invitation…",
   "The mail provider accepted the invitation. The client must still complete sign-in and identity review.":
@@ -477,12 +697,15 @@ const en = {
   "Add staff access": "Add staff access",
   "Staff details": "Staff details",
   "Filter staff": "Filter staff",
-  "Select a staff member to view or edit local access.": "Select a staff member to view or edit local access.",
+  "Select a staff member to view or edit local access.":
+    "Select a staff member to view or edit local access.",
   "No matching staff": "No matching staff",
   "No staff members yet": "No staff members yet",
   "Try another name, email, or role.": "Try another name, email, or role.",
-  "Add a staff account after configuring its Microsoft Entra identity.": "Add a staff account after configuring its Microsoft Entra identity.",
-  "Configure the Microsoft Entra account and app role first. Enter the tenant ID and user object ID from that account.": "Configure the Microsoft Entra account and app role first. Enter the tenant ID and user object ID from that account.",
+  "Add a staff account after configuring its Microsoft Entra identity.":
+    "Add a staff account after configuring its Microsoft Entra identity.",
+  "Configure the Microsoft Entra account and app role first. Enter the tenant ID and user object ID from that account.":
+    "Configure the Microsoft Entra account and app role first. Enter the tenant ID and user object ID from that account.",
   "Microsoft Entra tenant ID": "Microsoft Entra tenant ID",
   "Microsoft Entra user object ID": "Microsoft Entra user object ID",
   "Initial local role": "Initial local role",
@@ -495,7 +718,8 @@ const en = {
   "Edit staff access": "Edit staff access",
   "Display name": "Display name",
   "Internal display name": "Internal display name",
-  "Used in staff and administration areas.": "Used in staff and administration areas.",
+  "Used in staff and administration areas.":
+    "Used in staff and administration areas.",
   Locked: "Locked",
   "Local roles": "Local roles",
   Save: "Save",
@@ -673,11 +897,14 @@ const en = {
   "Effective {{from}}{{until}}": "Effective {{from}}{{until}}",
   " through {{date}}": " through {{date}}",
   Changes: "Changes",
-  "No one-time schedule changes have been added.": "No one-time schedule changes have been added.",
+  "No one-time schedule changes have been added.":
+    "No one-time schedule changes have been added.",
   "No time off has been added.": "No time off has been added.",
   "No active practitioners": "No active practitioners",
-  "Add or activate a practitioner before defining availability.": "Add or activate a practitioner before defining availability.",
-  "Define recurring working hours for this practitioner.": "Define recurring working hours for this practitioner.",
+  "Add or activate a practitioner before defining availability.":
+    "Add or activate a practitioner before defining availability.",
+  "Define recurring working hours for this practitioner.":
+    "Define recurring working hours for this practitioner.",
   "Enter times in {{timezone}}.": "Enter times in {{timezone}}.",
   Type: "Type",
   Time: "Time",
@@ -700,17 +927,25 @@ const en = {
   "Time off added.": "Time off added.",
   "Review affected appointments": "Review affected appointments",
   "Affected appointments": "Affected appointments",
-  "Unable to review affected appointments.": "Unable to review affected appointments.",
-  "Unable to load affected appointments.": "Unable to load affected appointments.",
+  "Unable to review affected appointments.":
+    "Unable to review affected appointments.",
+  "Unable to load affected appointments.":
+    "Unable to load affected appointments.",
   "Loading affected appointments…": "Loading affected appointments…",
-  "No booked appointments overlap this time off.": "No booked appointments overlap this time off.",
-  "{{count}} booked appointments overlap this time off. Saving will not cancel or move them.": "{{count}} booked appointments overlap this time off. Saving will not cancel or move them.",
-  "{{count}} booked appointments still need staff follow-up. They have not been canceled or moved.": "{{count}} booked appointments still need staff follow-up. They have not been canceled or moved.",
-  "{{count}} appointments need follow-up. Select this time off for the list.": "{{count}} appointments need follow-up. Select this time off for the list.",
+  "No booked appointments overlap this time off.":
+    "No booked appointments overlap this time off.",
+  "{{count}} booked appointments overlap this time off. Saving will not cancel or move them.":
+    "{{count}} booked appointments overlap this time off. Saving will not cancel or move them.",
+  "{{count}} booked appointments still need staff follow-up. They have not been canceled or moved.":
+    "{{count}} booked appointments still need staff follow-up. They have not been canceled or moved.",
+  "{{count}} appointments need follow-up. Select this time off for the list.":
+    "{{count}} appointments need follow-up. Select this time off for the list.",
   "{{count}} need follow-up": "{{count}} need follow-up",
   "Review appointment #{{id}}": "Review appointment #{{id}}",
-  "{{count}} upcoming appointments overlap your time off and need follow-up.": "{{count}} upcoming appointments overlap your time off and need follow-up.",
-  "These appointments have not been moved or canceled. Review each booking and contact the affected client as needed.": "These appointments have not been moved or canceled. Review each booking and contact the affected client as needed.",
+  "{{count}} upcoming appointments overlap your time off and need follow-up.":
+    "{{count}} upcoming appointments overlap your time off and need follow-up.",
+  "These appointments have not been moved or canceled. Review each booking and contact the affected client as needed.":
+    "These appointments have not been moved or canceled. Review each booking and contact the affected client as needed.",
   "View all time off": "View all time off",
   "Unable to load appointment.": "Unable to load appointment.",
   "Schedule changes and time off": "Schedule changes and time off",
@@ -844,22 +1079,32 @@ const en = {
   "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.":
     "Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.",
   "Validate address and coverage": "Validate address and coverage",
-  "Checking for a saved service-area approval…": "Checking for a saved service-area approval…",
-  "A distance check alone is not saved for future bookings. Approve this address once to reuse it.": "A distance check alone is not saved for future bookings. Approve this address once to reuse it.",
+  "Checking for a saved service-area approval…":
+    "Checking for a saved service-area approval…",
+  "A distance check alone is not saved for future bookings. Approve this address once to reuse it.":
+    "A distance check alone is not saved for future bookings. Approve this address once to reuse it.",
   "Clear service": "Clear service",
   "Clear practitioner": "Clear practitioner",
-  "Clinic staff approved this address for the selected On-Site service. You can book without another distance check.": "Clinic staff approved this address for the selected On-Site service. You can book without another distance check.",
-  "Clinic staff approved this address for the selected On-Site service. No new distance check is needed.": "Clinic staff approved this address for the selected On-Site service. No new distance check is needed.",
-  "Approve this address for future On-Site bookings": "Approve this address for future On-Site bookings",
+  "Clinic staff approved this address for the selected On-Site service. You can book without another distance check.":
+    "Clinic staff approved this address for the selected On-Site service. You can book without another distance check.",
+  "Clinic staff approved this address for the selected On-Site service. No new distance check is needed.":
+    "Clinic staff approved this address for the selected On-Site service. No new distance check is needed.",
+  "Approve this address for future On-Site bookings":
+    "Approve this address for future On-Site bookings",
   "Saving approval…": "Saving approval…",
-  "I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?": "I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?",
-  "Unable to save the On-Site approval.": "Unable to save the On-Site approval.",
+  "I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?":
+    "I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?",
+  "Unable to save the On-Site approval.":
+    "Unable to save the On-Site approval.",
   "Remove On-Site approval": "Remove On-Site approval",
   "Removing approval…": "Removing approval…",
-  "Remove this On-Site approval? Future bookings will require a new distance check.": "Remove this On-Site approval? Future bookings will require a new distance check.",
-  "Unable to remove the On-Site approval.": "Unable to remove the On-Site approval.",
+  "Remove this On-Site approval? Future bookings will require a new distance check.":
+    "Remove this On-Site approval? Future bookings will require a new distance check.",
+  "Unable to remove the On-Site approval.":
+    "Unable to remove the On-Site approval.",
   "Approve On-Site service areas": "Approve On-Site service areas",
-  "Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.": "Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.",
+  "Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.":
+    "Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.",
   "Validating address…": "Validating address…",
   "Address confirmed: {{distance}} km driving distance ({{radius}} km limit).":
     "Address confirmed: {{distance}} km driving distance ({{radius}} km limit).",
@@ -1056,9 +1301,12 @@ const en = {
   "Public full name": "Public full name",
   "Preferred public name": "Preferred public name",
   "Booking name": "Booking name",
-  "Shown on public team and service pages.": "Shown on public team and service pages.",
-  "Used in friendly actions such as “Book with Esther”.": "Used in friendly actions such as “Book with Esther”.",
-  "Another published practitioner uses this booking name. Add a surname initial or another familiar identifier.": "Another published practitioner uses this booking name. Add a surname initial or another familiar identifier.",
+  "Shown on public team and service pages.":
+    "Shown on public team and service pages.",
+  "Used in friendly actions such as “Book with Esther”.":
+    "Used in friendly actions such as “Book with Esther”.",
+  "Another published practitioner uses this booking name. Add a surname initial or another familiar identifier.":
+    "Another published practitioner uses this booking name. Add a surname initial or another familiar identifier.",
   "Lowercase letters, numbers, and hyphens only.":
     "Lowercase letters, numbers, and hyphens only.",
   "Team section": "Team section",
@@ -1111,24 +1359,33 @@ const en = {
     "Explore practitioner profiles, the services they offer, and book with the person who feels right for you.",
   "All services": "All services",
   "Loading practitioners": "Loading practitioners",
-  "Practitioner profiles are being prepared.": "Practitioner profiles are being prepared.",
-  "No practitioners offer the selected service.": "No practitioners offer the selected service.",
+  "Practitioner profiles are being prepared.":
+    "Practitioner profiles are being prepared.",
+  "No practitioners offer the selected service.":
+    "No practitioners offer the selected service.",
   "Unable to load this practitioner.": "Unable to load this practitioner.",
   "Loading practitioner": "Loading practitioner",
-  "This practitioner profile is not available.": "This practitioner profile is not available.",
+  "This practitioner profile is not available.":
+    "This practitioner profile is not available.",
   "Back to practitioners": "Back to practitioners",
   "Practitioner profile": "Practitioner profile",
   "Services offered": "Services offered",
-  "Contact the clinic for service availability.": "Contact the clinic for service availability.",
-  "Start with a practitioner (optional)": "Start with a practitioner (optional)",
-  "Choose a practitioner first to see only the services they offer.": "Choose a practitioner first to see only the services they offer.",
+  "Contact the clinic for service availability.":
+    "Contact the clinic for service availability.",
+  "Start with a practitioner (optional)":
+    "Start with a practitioner (optional)",
+  "Choose a practitioner first to see only the services they offer.":
+    "Choose a practitioner first to see only the services they offer.",
   "Any practitioner": "Any practitioner",
   "Brand images": "Brand images",
-  "Upload a wide business logo and a separate simple square favicon. Both update without rebuilding the site.": "Upload a wide business logo and a separate simple square favicon. Both update without rebuilding the site.",
+  "Upload a wide business logo and a separate simple square favicon. Both update without rebuilding the site.":
+    "Upload a wide business logo and a separate simple square favicon. Both update without rebuilding the site.",
   "Business logo": "Business logo",
   "Browser favicon": "Browser favicon",
-  "Use a transparent PNG or another image up to 5 MB. It will be resized to fit the site header.": "Use a transparent PNG or another image up to 5 MB. It will be resized to fit the site header.",
-  "Use a simple square image that remains recognizable at small sizes. It will be cropped to a square.": "Use a simple square image that remains recognizable at small sizes. It will be cropped to a square.",
+  "Use a transparent PNG or another image up to 5 MB. It will be resized to fit the site header.":
+    "Use a transparent PNG or another image up to 5 MB. It will be resized to fit the site header.",
+  "Use a simple square image that remains recognizable at small sizes. It will be cropped to a square.":
+    "Use a simple square image that remains recognizable at small sizes. It will be cropped to a square.",
   "Current business logo": "Current business logo",
   "Current favicon": "Current favicon",
   "Default icon": "Default icon",
@@ -1141,28 +1398,36 @@ const en = {
   "Unable to remove brand image.": "Unable to remove brand image.",
   "On-Site": "On-Site",
   "Today's appointments": "Today's appointments",
-  "All active appointments scheduled today.": "All active appointments scheduled today.",
+  "All active appointments scheduled today.":
+    "All active appointments scheduled today.",
   "Awaiting confirmation": "Awaiting confirmation",
-  "Requested appointments that still need confirmation.": "Requested appointments that still need confirmation.",
+  "Requested appointments that still need confirmation.":
+    "Requested appointments that still need confirmation.",
   "Today's On-Site visits": "Today's On-Site visits",
-  "Appointments taking place at a client location.": "Appointments taking place at a client location.",
+  "Appointments taking place at a client location.":
+    "Appointments taking place at a client location.",
   "My appointments today": "My appointments today",
-  "Your active appointments scheduled today.": "Your active appointments scheduled today.",
+  "Your active appointments scheduled today.":
+    "Your active appointments scheduled today.",
   "My next appointment": "My next appointment",
   "Your next active appointment.": "Your next active appointment.",
   "My On-Site visits today": "My On-Site visits today",
-  "Your visits taking place at a client location.": "Your visits taking place at a client location.",
+  "Your visits taking place at a client location.":
+    "Your visits taking place at a client location.",
   "Your day at a glance": "Your day at a glance",
   "Clinic activity at a glance": "Clinic activity at a glance",
-  "Dashboard information is live and limited to what your role may access.": "Dashboard information is live and limited to what your role may access.",
+  "Dashboard information is live and limited to what your role may access.":
+    "Dashboard information is live and limited to what your role may access.",
   "Customize dashboard": "Customize dashboard",
   "Save layout": "Save layout",
   "Loading dashboard": "Loading dashboard",
   "Unable to load dashboard.": "Unable to load dashboard.",
   "Unable to save dashboard.": "Unable to save dashboard.",
   "Unable to reset dashboard.": "Unable to reset dashboard.",
-  "Use the controls on each card to show, hide, resize, or reorder it. Changes apply only to this workspace and your account.": "Use the controls on each card to show, hide, resize, or reorder it. Changes apply only to this workspace and your account.",
-  "There are no dashboard widgets available for your current role yet.": "There are no dashboard widgets available for your current role yet.",
+  "Use the controls on each card to show, hide, resize, or reorder it. Changes apply only to this workspace and your account.":
+    "Use the controls on each card to show, hide, resize, or reorder it. Changes apply only to this workspace and your account.",
+  "There are no dashboard widgets available for your current role yet.":
+    "There are no dashboard widgets available for your current role yet.",
   Visible: "Visible",
   Hidden: "Hidden",
   Hide: "Hide",
@@ -1177,15 +1442,18 @@ const en = {
   "This week": "This week",
   "Last 7 days": "Last 7 days",
   "This calendar week": "This calendar week",
-  "{{count}} notifications need review across all dates.": "{{count}} notifications need review across all dates.",
+  "{{count}} notifications need review across all dates.":
+    "{{count}} notifications need review across all dates.",
   "Review items": "Review items",
   "All channels": "All channels",
   "Scheduled date": "Scheduled date",
   "All dates": "All dates",
   "Reset to default layout": "Reset to default layout",
   "Dashboard widgets": "Dashboard widgets",
-  "Upload, version, and publish dashboard cards": "Upload, version, and publish dashboard cards",
-  "Upload only trusted widget JSON. The server accepts approved renderers, projections, permissions, filters, routes, and icons; executable code and SQL are never allowed.": "Upload only trusted widget JSON. The server accepts approved renderers, projections, permissions, filters, routes, and icons; executable code and SQL are never allowed.",
+  "Upload, version, and publish dashboard cards":
+    "Upload, version, and publish dashboard cards",
+  "Upload only trusted widget JSON. The server accepts approved renderers, projections, permissions, filters, routes, and icons; executable code and SQL are never allowed.":
+    "Upload only trusted widget JSON. The server accepts approved renderers, projections, permissions, filters, routes, and icons; executable code and SQL are never allowed.",
   "Upload widget JSON": "Upload widget JSON",
   Versions: "Versions",
   Disable: "Disable",
@@ -1202,39 +1470,55 @@ const en = {
   "System default": "System default",
   "Replace existing widget?": "Replace existing widget?",
   "Review widget upload": "Review widget upload",
-  "A widget with ID “{{id}}” already exists. Publishing creates a recoverable new version and makes it active.": "A widget with ID “{{id}}” already exists. Publishing creates a recoverable new version and makes it active.",
+  "A widget with ID “{{id}}” already exists. Publishing creates a recoverable new version and makes it active.":
+    "A widget with ID “{{id}}” already exists. Publishing creates a recoverable new version and makes it active.",
   "Publish new version": "Publish new version",
   "Validate and publish": "Validate and publish",
   "Widget versions": "Widget versions",
-  "Restore the definition included with the application.": "Restore the definition included with the application.",
+  "Restore the definition included with the application.":
+    "Restore the definition included with the application.",
   Restore: "Restore",
   "No uploaded versions yet.": "No uploaded versions yet.",
   "Version {{version}}": "Version {{version}}",
   "Unable to load dashboard widgets.": "Unable to load dashboard widgets.",
-  "Widget JSON files must be 64 KB or smaller.": "Widget JSON files must be 64 KB or smaller.",
-  "The selected file is not valid widget JSON.": "The selected file is not valid widget JSON.",
-  "Widget version {{version}} published.": "Widget version {{version}} published.",
+  "Widget JSON files must be 64 KB or smaller.":
+    "Widget JSON files must be 64 KB or smaller.",
+  "The selected file is not valid widget JSON.":
+    "The selected file is not valid widget JSON.",
+  "Widget version {{version}} published.":
+    "Widget version {{version}} published.",
   "Widget uploaded and published.": "Widget uploaded and published.",
   "Unable to publish widget.": "Unable to publish widget.",
   "Unable to load widget versions.": "Unable to load widget versions.",
   "System widget definition restored.": "System widget definition restored.",
-  "Widget version {{version}} restored.": "Widget version {{version}} restored.",
+  "Widget version {{version}} restored.":
+    "Widget version {{version}} restored.",
   "Unable to restore widget version.": "Unable to restore widget version.",
   "Widget disabled.": "Widget disabled.",
   "Widget enabled.": "Widget enabled.",
   "Unable to update widget.": "Unable to update widget.",
   "My availability": "My availability",
-  "Review and manage your regular hours, schedule changes, and time off.": "Review and manage your regular hours, schedule changes, and time off.",
-  "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.": "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.",
-  "Book a new appointment or manage an upcoming appointment here.": "Book a new appointment or manage an upcoming appointment here.",
+  "Review and manage your regular hours, schedule changes, and time off.":
+    "Review and manage your regular hours, schedule changes, and time off.",
+  "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.":
+    "Your clinic manages this schedule. You can review availability here, but only clinic administrators can change it.",
+  "Book a new appointment or manage an upcoming appointment here.":
+    "Book a new appointment or manage an upcoming appointment here.",
   "View or change": "View or change",
-  "Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.": "Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.",
-  "Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.": "Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.",
-  "No bookable times on this day. Try another day.": "No bookable times on this day. Try another day.",
-  "Canceling releases the appointment time. The canceled appointment remains in your history.": "Canceling releases the appointment time. The canceled appointment remains in your history.",
-  "Unable to load the cancellation policy.": "Unable to load the cancellation policy.",
-  "Canceling now will apply a {{fee}} cancellation fee under the policy accepted when this appointment was booked.": "Canceling now will apply a {{fee}} cancellation fee under the policy accepted when this appointment was booked.",
-  "No cancellation fee applies if you cancel now.": "No cancellation fee applies if you cancel now.",
+  "Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.":
+    "Cancellation charges are not calculated online yet. The clinic will contact you if its current cancellation policy applies.",
+  "Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.":
+    "Choose a new available time. The service, practitioner, location, delivery mode, duration, and price remain unchanged.",
+  "No bookable times on this day. Try another day.":
+    "No bookable times on this day. Try another day.",
+  "Canceling releases the appointment time. The canceled appointment remains in your history.":
+    "Canceling releases the appointment time. The canceled appointment remains in your history.",
+  "Unable to load the cancellation policy.":
+    "Unable to load the cancellation policy.",
+  "Canceling now will apply a {{fee}} cancellation fee under the policy accepted when this appointment was booked.":
+    "Canceling now will apply a {{fee}} cancellation fee under the policy accepted when this appointment was booked.",
+  "No cancellation fee applies if you cancel now.":
+    "No cancellation fee applies if you cancel now.",
   "Cancellation policy": "Cancellation policy",
   "No cancellation fee": "No cancellation fee",
   "{{fee}} within {{minutes}} minutes": "{{fee}} within {{minutes}} minutes",
@@ -1242,141 +1526,251 @@ const en = {
   "Cancellation fee type": "Cancellation fee type",
   "No fee": "No fee",
   "Fixed amount": "Fixed amount",
-  "Percentage": "Percentage",
+  Percentage: "Percentage",
   "Cancellation fee (CAD)": "Cancellation fee (CAD)",
   "Cancellation fee (%)": "Cancellation fee (%)",
-  "This fee applies only when the client cancels inside the configured window. Existing appointments retain the policy accepted when booked.": "This fee applies only when the client cancels inside the configured window. Existing appointments retain the policy accepted when booked.",
-  "This cancellation was requested by the client": "This cancellation was requested by the client",
-  "The calculated policy fee is {{fee}}.": "The calculated policy fee is {{fee}}.",
+  "This fee applies only when the client cancels inside the configured window. Existing appointments retain the policy accepted when booked.":
+    "This fee applies only when the client cancels inside the configured window. Existing appointments retain the policy accepted when booked.",
+  "This cancellation was requested by the client":
+    "This cancellation was requested by the client",
+  "The calculated policy fee is {{fee}}.":
+    "The calculated policy fee is {{fee}}.",
   "No cancellation fee applies.": "No cancellation fee applies.",
-  "Clinic-initiated cancellations do not assess a client fee.": "Clinic-initiated cancellations do not assess a client fee.",
+  "Clinic-initiated cancellations do not assess a client fee.":
+    "Clinic-initiated cancellations do not assess a client fee.",
   "Assessed cancellation fee (CAD)": "Assessed cancellation fee (CAD)",
-  "Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.": "Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.",
+  "Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.":
+    "Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.",
   "Email status": "Email status",
   "Notification status": "Notification status",
-  "Review appointment notification delivery": "Review appointment notification delivery",
-  "Notification status reflects the queue and provider acceptance, not proof of delivery. Items needing review are never resent automatically.": "Notification status reflects the queue and provider acceptance, not proof of delivery. Items needing review are never resent automatically.",
+  "Review appointment notification delivery":
+    "Review appointment notification delivery",
+  "Notification status reflects the queue and provider acceptance, not proof of delivery. Items needing review are never resent automatically.":
+    "Notification status reflects the queue and provider acceptance, not proof of delivery. Items needing review are never resent automatically.",
   "Unable to load notification status.": "Unable to load notification status.",
   "Loading notification status…": "Loading notification status…",
-  "Notifications": "Notifications",
-  "Channel": "Channel",
+  Notifications: "Notifications",
+  Channel: "Channel",
   "Review appointment email delivery": "Review appointment email delivery",
-  "Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.": "Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.",
+  "Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.":
+    "Email status reflects the queue and provider acceptance, not proof of inbox delivery. Items needing review are never resent automatically.",
   "Unable to load email status.": "Unable to load email status.",
-  "All statuses": "All statuses", "Needs review": "Needs review", "Failed": "Failed", "Queued": "Queued", "Sending": "Sending", "Accepted by provider": "Accepted by provider", "Delivered": "Delivered", "Canceled": "Canceled",
-  "Booking confirmation": "Booking confirmation", "Booking change": "Booking change", "Booking cancellation": "Booking cancellation",
-  "{{count}} notifications": "{{count}} notifications", "Loading email status…": "Loading email status…", "No notifications match this status.": "No notifications match this status.", "Email notifications": "Email notifications",
-  "Page {{page}} of {{total}}": "Page {{page}} of {{total}}", "Notification #{{id}}": "Notification #{{id}}",
-  "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.": "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.",
-  "Appointment ID": "Appointment ID", "Event": "Event", "Recipient": "Recipient", "Scheduled": "Scheduled", "Next attempt": "Next attempt", "Provider accepted": "Provider accepted", "Attempts": "Attempts",
+  "All statuses": "All statuses",
+  "Needs review": "Needs review",
+  Failed: "Failed",
+  Queued: "Queued",
+  Sending: "Sending",
+  "Accepted by provider": "Accepted by provider",
+  Delivered: "Delivered",
+  Canceled: "Canceled",
+  "Booking confirmation": "Booking confirmation",
+  "Booking change": "Booking change",
+  "Booking cancellation": "Booking cancellation",
+  "{{count}} notifications": "{{count}} notifications",
+  "Loading email status…": "Loading email status…",
+  "No notifications match this status.": "No notifications match this status.",
+  "Email notifications": "Email notifications",
+  "Page {{page}} of {{total}}": "Page {{page}} of {{total}}",
+  "Notification #{{id}}": "Notification #{{id}}",
+  "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.":
+    "Delivery outcome may be unknown. Check the provider and recipient before deciding whether to send manually.",
+  "Appointment ID": "Appointment ID",
+  Event: "Event",
+  Recipient: "Recipient",
+  Scheduled: "Scheduled",
+  "Next attempt": "Next attempt",
+  "Provider accepted": "Provider accepted",
+  Attempts: "Attempts",
   "My calendar": "My calendar",
-  "Your appointments by day, week, or month": "Your appointments by day, week, or month",
-  "Your appointments and time off by day, week, or month": "Your appointments and time off by day, week, or month",
-  "This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.": "This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.",
-  "This calendar shows your appointments and time off. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.": "This calendar shows your appointments and time off. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.",
+  "Your appointments by day, week, or month":
+    "Your appointments by day, week, or month",
+  "Your appointments and time off by day, week, or month":
+    "Your appointments and time off by day, week, or month",
+  "This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.":
+    "This calendar shows your clinic appointments. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.",
+  "This calendar shows your appointments and time off. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.":
+    "This calendar shows your appointments and time off. Times use your device timezone ({{zone}}). Personal calendar connections are not enabled yet.",
   "Unable to load the calendar.": "Unable to load the calendar.",
-  "Private appointment": "Private appointment", "Requested": "Requested", "Today": "Today", "Week": "Week", "Month": "Month", "Calendar view": "Calendar view",
-  "Previous period": "Previous period", "Next period": "Next period", "Privacy mode — hide client names": "Privacy mode — hide client names", "Loading calendar": "Loading calendar", "No appointments in this period.": "No appointments in this period.",
-  "No appointments or time off in this period.": "No appointments or time off in this period.",
-  "Clinic visit": "Clinic visit", "Open appointments": "Open appointments", "Close": "Close",
+  "Private appointment": "Private appointment",
+  Requested: "Requested",
+  Today: "Today",
+  Week: "Week",
+  Month: "Month",
+  "Calendar view": "Calendar view",
+  "Previous period": "Previous period",
+  "Next period": "Next period",
+  "Privacy mode — hide client names": "Privacy mode — hide client names",
+  "Loading calendar": "Loading calendar",
+  "No appointments in this period.": "No appointments in this period.",
+  "No appointments or time off in this period.":
+    "No appointments or time off in this period.",
+  "Clinic visit": "Clinic visit",
+  "Open appointments": "Open appointments",
+  Close: "Close",
   "Add to calendar": "Add to calendar",
-  "The calendar file could not be prepared.": "The calendar file could not be prepared.",
-  "Unable to download the calendar file.": "Unable to download the calendar file.",
+  "The calendar file could not be prepared.":
+    "The calendar file could not be prepared.",
+  "Unable to download the calendar file.":
+    "Unable to download the calendar file.",
   "Appointment notifications": "Appointment notifications",
-  "Staff booking notice": "Staff booking notice", "Staff change notice": "Staff change notice", "Staff cancellation notice": "Staff cancellation notice",
-  "These settings do not change your Microsoft sign-in address. Only assigned practitioners receive booking notices.": "These settings do not change your Microsoft sign-in address. Only assigned practitioners receive booking notices.",
+  "Staff booking notice": "Staff booking notice",
+  "Staff change notice": "Staff change notice",
+  "Staff cancellation notice": "Staff cancellation notice",
+  "These settings do not change your Microsoft sign-in address. Only assigned practitioners receive booking notices.":
+    "These settings do not change your Microsoft sign-in address. Only assigned practitioners receive booking notices.",
   "Personal notification email": "Personal notification email",
-  "Save this address before requesting a verification code.": "Save this address before requesting a verification code.",
-  "Verified": "Verified", "Not verified": "Not verified", "Optional": "Optional",
-  "Send verification code": "Send verification code", "Eight-digit code": "Eight-digit code", "Verify email": "Verify email",
+  "Save this address before requesting a verification code.":
+    "Save this address before requesting a verification code.",
+  Verified: "Verified",
+  "Not verified": "Not verified",
+  Optional: "Optional",
+  "Send verification code": "Send verification code",
+  "Eight-digit code": "Eight-digit code",
+  "Verify email": "Verify email",
   "Send appointment notices by email": "Send appointment notices by email",
-  "Send email to": "Send email to", "Work email": "Work email", "Verified personal email": "Verified personal email", "Both email addresses": "Both email addresses",
+  "Send email to": "Send email to",
+  "Work email": "Work email",
+  "Verified personal email": "Verified personal email",
+  "Both email addresses": "Both email addresses",
   "Mobile number for SMS": "Mobile number for SMS",
-  "SMS notices require a Canadian number. This number is not shown to clients.": "SMS notices require a Canadian number. This number is not shown to clients.",
+  "SMS notices require a Canadian number. This number is not shown to clients.":
+    "SMS notices require a Canadian number. This number is not shown to clients.",
   "Request SMS appointment notices": "Request SMS appointment notices",
-  "SMS notices are active for staff who requested them.": "SMS notices are active for staff who requested them.",
-  "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.": "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.",
-  "Save notification preferences": "Save notification preferences", "Notification preferences saved.": "Notification preferences saved.",
-  "Verification code sent to your personal email.": "Verification code sent to your personal email.", "Personal email verified.": "Personal email verified.",
-  "Unable to update notification preferences.": "Unable to update notification preferences.", "Unable to load notification preferences.": "Unable to load notification preferences.",
+  "SMS notices are active for staff who requested them.":
+    "SMS notices are active for staff who requested them.",
+  "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.":
+    "SMS delivery is not active yet. Selecting it records your preference but sends no texts until the clinic enables an approved provider.",
+  "Save notification preferences": "Save notification preferences",
+  "Notification preferences saved.": "Notification preferences saved.",
+  "Verification code sent to your personal email.":
+    "Verification code sent to your personal email.",
+  "Personal email verified.": "Personal email verified.",
+  "Unable to update notification preferences.":
+    "Unable to update notification preferences.",
+  "Unable to load notification preferences.":
+    "Unable to load notification preferences.",
   "Appointment reminder": "Appointment reminder",
-  "Reminder settings": "Reminder settings", "Email reminder settings": "Email reminder settings",
-  "New reminder times apply to future bookings. Disabling a time cancels its pending emails; enabling it again does not recreate them.": "New reminder times apply to future bookings. Disabling a time cancels its pending emails; enabling it again does not recreate them.",
-  "Unable to load reminder settings.": "Unable to load reminder settings.", "Unable to save reminder settings.": "Unable to save reminder settings.",
-  "No email reminders configured.": "No email reminders configured.", "Add reminder time": "Add reminder time", "Send before appointment": "Send before appointment", "Add email reminder": "Add email reminder",
-  "Up to three reminder times can be active. These are operational emails, not SMS.": "Up to three reminder times can be active. These are operational emails, not SMS.",
-  "1 hour before": "1 hour before", "3 hours before": "3 hours before", "1 day before": "1 day before", "2 days before": "2 days before", "3 days before": "3 days before",
-  "Closed after review": "Closed after review", "Review outcome": "Review outcome", "Review this notification": "Review this notification",
-  "I checked provider message history.": "I checked provider message history.", "I checked whether the recipient received the notice.": "I checked whether the recipient received the notice.",
-  "Provider history confirms acceptance": "Provider history confirms acceptance", "Recipient contacted manually": "Recipient contacted manually", "Notice no longer needed": "Notice no longer needed", "Provider and recipient confirm not sent": "Provider and recipient confirm not sent",
-  "Close after review": "Close after review", "Retry recent SMS — confirmed not sent": "Retry recent SMS — confirmed not sent",
-  "Only recent staff SMS can be retried here. Handle older notices and email manually.": "Only recent staff SMS can be retried here. Handle older notices and email manually.",
+  "Reminder settings": "Reminder settings",
+  "Email reminder settings": "Email reminder settings",
+  "New reminder times apply to future bookings. Disabling a time cancels its pending emails; enabling it again does not recreate them.":
+    "New reminder times apply to future bookings. Disabling a time cancels its pending emails; enabling it again does not recreate them.",
+  "Unable to load reminder settings.": "Unable to load reminder settings.",
+  "Unable to save reminder settings.": "Unable to save reminder settings.",
+  "No email reminders configured.": "No email reminders configured.",
+  "Add reminder time": "Add reminder time",
+  "Send before appointment": "Send before appointment",
+  "Add email reminder": "Add email reminder",
+  "Up to three reminder times can be active. These are operational emails, not SMS.":
+    "Up to three reminder times can be active. These are operational emails, not SMS.",
+  "1 hour before": "1 hour before",
+  "3 hours before": "3 hours before",
+  "1 day before": "1 day before",
+  "2 days before": "2 days before",
+  "3 days before": "3 days before",
+  "Closed after review": "Closed after review",
+  "Review outcome": "Review outcome",
+  "Review this notification": "Review this notification",
+  "I checked provider message history.": "I checked provider message history.",
+  "I checked whether the recipient received the notice.":
+    "I checked whether the recipient received the notice.",
+  "Provider history confirms acceptance":
+    "Provider history confirms acceptance",
+  "Recipient contacted manually": "Recipient contacted manually",
+  "Notice no longer needed": "Notice no longer needed",
+  "Provider and recipient confirm not sent":
+    "Provider and recipient confirm not sent",
+  "Close after review": "Close after review",
+  "Retry recent SMS — confirmed not sent":
+    "Retry recent SMS — confirmed not sent",
+  "Only recent staff SMS can be retried here. Handle older notices and email manually.":
+    "Only recent staff SMS can be retried here. Handle older notices and email manually.",
   "Unable to save notification review.": "Unable to save notification review.",
-  "Delivery outcome may be unknown. Check provider history and the recipient before choosing a recovery action.": "Delivery outcome may be unknown. Check provider history and the recipient before choosing a recovery action.",
+  "Delivery outcome may be unknown. Check provider history and the recipient before choosing a recovery action.":
+    "Delivery outcome may be unknown. Check provider history and the recipient before choosing a recovery action.",
   "My notifications": "My notifications",
   "Booking notices sent to you": "Booking notices sent to you",
-  "This is a read-only history of booking notices addressed to you. Provider acceptance does not prove delivery. Clinic administrators handle items that need review.": "This is a read-only history of booking notices addressed to you. Provider acceptance does not prove delivery. Clinic administrators handle items that need review.",
+  "This is a read-only history of booking notices addressed to you. Provider acceptance does not prove delivery. Clinic administrators handle items that need review.":
+    "This is a read-only history of booking notices addressed to you. Provider acceptance does not prove delivery. Clinic administrators handle items that need review.",
   "Unable to load your notifications.": "Unable to load your notifications.",
   "Activity date": "Activity date",
-  "No notifications match these filters.": "No notifications match these filters.",
-  "A clinic administrator will review this notice. It will not be resent automatically.": "A clinic administrator will review this notice. It will not be resent automatically.",
+  "No notifications match these filters.":
+    "No notifications match these filters.",
+  "A clinic administrator will review this notice. It will not be resent automatically.":
+    "A clinic administrator will review this notice. It will not be resent automatically.",
   "View appointment": "View appointment",
   "Notification scheduler": "Notification scheduler",
-  "Healthy": "Healthy",
+  Healthy: "Healthy",
   "No scheduled run recorded yet": "No scheduled run recorded yet",
   "Scheduled run in progress": "Scheduled run in progress",
   "Last scheduled run failed": "Last scheduled run failed",
   "Scheduled run appears stuck": "Scheduled run appears stuck",
-  "Scheduler has not succeeded recently": "Scheduler has not succeeded recently",
+  "Scheduler has not succeeded recently":
+    "Scheduler has not succeeded recently",
   "Notifications are overdue": "Notifications are overdue",
   "Last successful scheduled run": "Last successful scheduled run",
-  "Overdue notices (more than 30 minutes)": "Overdue notices (more than 30 minutes)",
-  "The next scheduled run should establish a health baseline. Immediate booking sends do not count as scheduled runs.": "The next scheduled run should establish a health baseline. Immediate booking sends do not count as scheduled runs.",
-  "Check the Azure scheduler and Netfirms trigger; a successful HTTP call alone does not prove queue processing.": "Check the Azure scheduler and Netfirms trigger; a successful HTTP call alone does not prove queue processing.",
+  "Overdue notices (more than 30 minutes)":
+    "Overdue notices (more than 30 minutes)",
+  "The next scheduled run should establish a health baseline. Immediate booking sends do not count as scheduled runs.":
+    "The next scheduled run should establish a health baseline. Immediate booking sends do not count as scheduled runs.",
+  "Check the Azure scheduler and Netfirms trigger; a successful HTTP call alone does not prove queue processing.":
+    "Check the Azure scheduler and Netfirms trigger; a successful HTTP call alone does not prove queue processing.",
   "Last failed scheduled run": "Last failed scheduled run",
   "Travel to your next On-Site visit": "Travel to your next On-Site visit",
   "Loading next On-Site visit": "Loading next On-Site visit",
-  "No On-Site visit starts in the next 24 hours.": "No On-Site visit starts in the next 24 hours.",
+  "No On-Site visit starts in the next 24 hours.":
+    "No On-Site visit starts in the next 24 hours.",
   "Check from my location": "Check from my location",
   "Check from clinic": "Check from clinic",
-  "Your location is requested only when you choose to check from it, then sent to Google for this estimate. It is not saved or tracked by the clinic.": "Your location is requested only when you choose to check from it, then sent to Google for this estimate. It is not saved or tracked by the clinic.",
+  "Your location is requested only when you choose to check from it, then sent to Google for this estimate. It is not saved or tracked by the clinic.":
+    "Your location is requested only when you choose to check from it, then sent to Google for this estimate. It is not saved or tracked by the clinic.",
   "Checking travel time": "Checking travel time",
-  "With current traffic: about {{minutes}} min · {{distance}} km": "With current traffic: about {{minutes}} min · {{distance}} km",
-  "Suggested leave time (10 min early): {{time}}": "Suggested leave time (10 min early): {{time}}",
-  "Leave now to aim for 10 minutes early.": "Leave now to aim for 10 minutes early.",
-  "Checked at {{time}}. Traffic may change; check again before leaving.": "Checked at {{time}}. Traffic may change; check again before leaving.",
+  "With current traffic: about {{minutes}} min · {{distance}} km":
+    "With current traffic: about {{minutes}} min · {{distance}} km",
+  "Suggested leave time (10 min early): {{time}}":
+    "Suggested leave time (10 min early): {{time}}",
+  "Leave now to aim for 10 minutes early.":
+    "Leave now to aim for 10 minutes early.",
+  "Checked at {{time}}. Traffic may change; check again before leaving.":
+    "Checked at {{time}}. Traffic may change; check again before leaving.",
   "Open Google Maps directions": "Open Google Maps directions",
   "Route and traffic estimate by": "Route and traffic estimate by",
-  "Unable to load the next On-Site visit.": "Unable to load the next On-Site visit.",
+  "Unable to load the next On-Site visit.":
+    "Unable to load the next On-Site visit.",
   "Unable to check travel time.": "Unable to check travel time.",
-  "Location is not available on this device.": "Location is not available on this device.",
-  "Location permission was denied or the device could not determine your position. Try the clinic starting point.": "Location permission was denied or the device could not determine your position. Try the clinic starting point.",
+  "Location is not available on this device.":
+    "Location is not available on this device.",
+  "Location permission was denied or the device could not determine your position. Try the clinic starting point.":
+    "Location permission was denied or the device could not determine your position. Try the clinic starting point.",
   "Today’s visits": "Today’s visits",
-  "Optional visit steps are timestamped for your records. They do not track your location or notify the client.": "Optional visit steps are timestamped for your records. They do not track your location or notify the client.",
+  "Optional visit steps are timestamped for your records. They do not track your location or notify the client.":
+    "Optional visit steps are timestamped for your records. They do not track your location or notify the client.",
   "Loading today’s visits": "Loading today’s visits",
   "Unable to load today’s visits.": "Unable to load today’s visits.",
   "No appointments scheduled today.": "No appointments scheduled today.",
   "Visit steps (optional)": "Visit steps (optional)",
   "En route": "En route",
-  "Arrived": "Arrived",
+  Arrived: "Arrived",
   "Started {{service}}": "Started {{service}}",
   "Finished {{service}}": "Finished {{service}}",
   "Left residence": "Left residence",
   "Last step: {{step}} at {{time}}": "Last step: {{step}} at {{time}}",
   "Undo last step": "Undo last step",
-  "Visit steps become available within four hours of the appointment.": "Visit steps become available within four hours of the appointment.",
+  "Visit steps become available within four hours of the appointment.":
+    "Visit steps become available within four hours of the appointment.",
   "Mark completed": "Mark completed",
   "Mark no-show": "Mark no-show",
   "Mark this appointment completed?": "Mark this appointment completed?",
   "Mark this appointment as a no-show?": "Mark this appointment as a no-show?",
   "Undo this appointment outcome?": "Undo this appointment outcome?",
   "Undo outcome": "Undo outcome",
-  "This appointment must be confirmed before visit steps can be recorded.": "This appointment must be confirmed before visit steps can be recorded.",
+  "This appointment must be confirmed before visit steps can be recorded.":
+    "This appointment must be confirmed before visit steps can be recorded.",
   "Unable to save the visit step.": "Unable to save the visit step.",
   "Unable to update the appointment.": "Unable to update the appointment.",
   "Book next visit": "Book next visit",
   "Visit step history": "Visit step history",
-  "These are manually recorded steps and corrections, not proof of physical location or treatment.": "These are manually recorded steps and corrections, not proof of physical location or treatment.",
+  "These are manually recorded steps and corrections, not proof of physical location or treatment.":
+    "These are manually recorded steps and corrections, not proof of physical location or treatment.",
   "No visit steps recorded.": "No visit steps recorded.",
   "Loading visit history": "Loading visit history",
   "Unable to load visit history.": "Unable to load visit history.",
@@ -1384,9 +1778,11 @@ const en = {
   "Undid {{step}}": "Undid {{step}}",
   "Showing the latest 100 visit steps.": "Showing the latest 100 visit steps.",
   "Visit outcome": "Visit outcome",
-  "Appointment #{{id}} marked completed.": "Appointment #{{id}} marked completed.",
+  "Appointment #{{id}} marked completed.":
+    "Appointment #{{id}} marked completed.",
   "Appointment #{{id}} marked no-show.": "Appointment #{{id}} marked no-show.",
-  "Appointment #{{id}} outcome restored.": "Appointment #{{id}} outcome restored.",
+  "Appointment #{{id}} outcome restored.":
+    "Appointment #{{id}} outcome restored.",
   "Visit activity · last 7 days": "Visit activity · last 7 days",
   "Loading visit activity": "Loading visit activity",
   "Unable to load visit activity.": "Unable to load visit activity.",
@@ -1397,42 +1793,48 @@ const en = {
   "Optional steps currently recorded": "Optional steps currently recorded",
   "On-Site arrivals recorded": "On-Site arrivals recorded",
   "On-Site departures recorded": "On-Site departures recorded",
-  "Visits are grouped by scheduled date and current booking status. Steps are optional; an unrecorded step does not mean care was missed.": "Visits are grouped by scheduled date and current booking status. Steps are optional; an unrecorded step does not mean care was missed.",
+  "Visits are grouped by scheduled date and current booking status. Steps are optional; an unrecorded step does not mean care was missed.":
+    "Visits are grouped by scheduled date and current booking status. Steps are optional; an unrecorded step does not mean care was missed.",
   "Review past appointments": "Review past appointments",
   "Needs visit outcome": "Needs visit outcome",
   "Review visits awaiting outcome": "Review visits awaiting outcome",
   "Appointment logistics": "Appointment logistics",
-  "For arrival, access, and equipment details only. Do not enter treatment or health information. These notes stay with staff and are not sent to the client.": "For arrival, access, and equipment details only. Do not enter treatment or health information. These notes stay with staff and are not sent to the client.",
+  "For arrival, access, and equipment details only. Do not enter treatment or health information. These notes stay with staff and are not sent to the client.":
+    "For arrival, access, and equipment details only. Do not enter treatment or health information. These notes stay with staff and are not sent to the client.",
   "Loading logistics notes": "Loading logistics notes",
   "Unable to load logistics notes.": "Unable to load logistics notes.",
   "Unable to save logistics note.": "Unable to save logistics note.",
   "No logistics notes recorded.": "No logistics notes recorded.",
-  "Showing the latest 100 logistics notes.": "Showing the latest 100 logistics notes.",
+  "Showing the latest 100 logistics notes.":
+    "Showing the latest 100 logistics notes.",
   "Add logistics note": "Add logistics note",
-  "Examples: use side entrance; call on arrival; bring portable table.": "Examples: use side entrance; call on arrival; bring portable table.",
+  "Examples: use side entrance; call on arrival; bring portable table.":
+    "Examples: use side entrance; call on arrival; bring portable table.",
   "Save note": "Save note",
   "Practitioner qualifications": "Practitioner qualifications",
-  "Submitted records need administrator review. Expiry warnings appear here 90 days before expiry; email reminders are not enabled yet.": "Submitted records need administrator review. Expiry warnings appear here 90 days before expiry; email reminders are not enabled yet.",
+  "Submitted records need administrator review. Expiry warnings appear here 90 days before expiry; email reminders are not enabled yet.":
+    "Submitted records need administrator review. Expiry warnings appear here 90 days before expiry; email reminders are not enabled yet.",
   "Unable to load qualifications.": "Unable to load qualifications.",
   "Unable to save qualification.": "Unable to save qualification.",
   "Qualification submitted for review.": "Qualification submitted for review.",
   "Qualification type added.": "Qualification type added.",
   "Qualification review saved.": "Qualification review saved.",
   "Revoke this qualification?": "Revoke this qualification?",
-  "At least one verified qualification needs renewal soon or has expired.": "At least one verified qualification needs renewal soon or has expired.",
+  "At least one verified qualification needs renewal soon or has expired.":
+    "At least one verified qualification needs renewal soon or has expired.",
   "No qualifications recorded yet.": "No qualifications recorded yet.",
   "Pending review": "Pending review",
   "Verified by clinic": "Verified by clinic",
-  "Rejected": "Rejected",
-  "Expired": "Expired",
+  Rejected: "Rejected",
+  Expired: "Expired",
   "Renewal due soon": "Renewal due soon",
-  "Issued": "Issued",
-  "Expires": "Expires",
+  Issued: "Issued",
+  Expires: "Expires",
   "No expiry": "No expiry",
   "Review note": "Review note",
-  "Verify": "Verify",
-  "Reject": "Reject",
-  "Revoke": "Revoke",
+  Verify: "Verify",
+  Reject: "Reject",
+  Revoke: "Revoke",
   "Submit qualification or renewal": "Submit qualification or renewal",
   "Qualification type": "Qualification type",
   "Issuing organization": "Issuing organization",
@@ -1444,14 +1846,19 @@ const en = {
   "Expiry date required": "Expiry date required",
   "Add type": "Add type",
   "Review qualifications": "Review qualifications",
-  "{{count}} qualification(s) need renewal attention.": "{{count}} qualification(s) need renewal attention.",
+  "{{count}} qualification(s) need renewal attention.":
+    "{{count}} qualification(s) need renewal attention.",
   "Read the full service description": "Read the full service description",
   "Book this time": "Book this time",
-  "Only available appointment times are shown. A time is not reserved until you confirm your booking.": "Only available appointment times are shown. A time is not reserved until you confirm your booking.",
-  "Opening appointment availability in the portal…": "Opening appointment availability in the portal…",
-  "Unable to start client sign-in. Please try again.": "Unable to start client sign-in. Please try again.",
+  "Only available appointment times are shown. A time is not reserved until you confirm your booking.":
+    "Only available appointment times are shown. A time is not reserved until you confirm your booking.",
+  "Opening appointment availability in the portal…":
+    "Opening appointment availability in the portal…",
+  "Unable to start client sign-in. Please try again.":
+    "Unable to start client sign-in. Please try again.",
   "Portal appearance": "Portal appearance",
-  "Match the booking portal to the clinic website. Changes apply to guest, client, and staff portal pages.": "Match the booking portal to the clinic website. Changes apply to guest, client, and staff portal pages.",
+  "Match the booking portal to the clinic website. Changes apply to guest, client, and staff portal pages.":
+    "Match the booking portal to the clinic website. Changes apply to guest, client, and staff portal pages.",
   "Primary colour": "Primary colour",
   "Accent colour": "Accent colour",
   "Portal font": "Portal font",
@@ -1462,14 +1869,18 @@ const en = {
   "Log in": "Log in",
   "My account": "My account",
   "Welcome to {{clinic}}": "Welcome to {{clinic}}",
-  "Explore our treatments, meet the practitioners who provide them, and choose an available appointment time. You can browse without signing in. Sign in when you are ready to book.": "Explore our treatments, meet the practitioners who provide them, and choose an available appointment time. You can browse without signing in. Sign in when you are ready to book.",
+  "Explore our treatments, meet the practitioners who provide them, and choose an available appointment time. You can browse without signing in. Sign in when you are ready to book.":
+    "Explore our treatments, meet the practitioners who provide them, and choose an available appointment time. You can browse without signing in. Sign in when you are ready to book.",
   "Explore treatments": "Explore treatments",
   "Find an appointment": "Find an appointment",
-  "Compare descriptions, appointment lengths, and prices before choosing care.": "Compare descriptions, appointment lengths, and prices before choosing care.",
+  "Compare descriptions, appointment lengths, and prices before choosing care.":
+    "Compare descriptions, appointment lengths, and prices before choosing care.",
   "Meet practitioners": "Meet practitioners",
-  "Read public practitioner profiles and see who offers each treatment.": "Read public practitioner profiles and see who offers each treatment.",
-  "Check live availability without signing in, then sign in to confirm your booking.": "Check live availability without signing in, then sign in to confirm your booking.",
-  "Treatments": "Treatments",
+  "Read public practitioner profiles and see who offers each treatment.":
+    "Read public practitioner profiles and see who offers each treatment.",
+  "Check live availability without signing in, then sign in to confirm your booking.":
+    "Check live availability without signing in, then sign in to confirm your booking.",
+  Treatments: "Treatments",
   "Find the care that fits.": "Find the care that fits.",
   "Loading treatments": "Loading treatments",
   "Unable to load treatments.": "Unable to load treatments.",
@@ -1478,25 +1889,30 @@ const en = {
   "Other treatments": "Other treatments",
   "Book this treatment": "Book this treatment",
   "Practitioners for this treatment": "Practitioners for this treatment",
-  "Practitioner details are being prepared.": "Practitioner details are being prepared.",
+  "Practitioner details are being prepared.":
+    "Practitioner details are being prepared.",
   "Back to treatments": "Back to treatments",
   "Portal welcome message": "Portal welcome message",
-  "Introduce your clinic to visitors before they explore treatments. Provide both languages so the portal can switch cleanly.": "Introduce your clinic to visitors before they explore treatments. Provide both languages so the portal can switch cleanly.",
+  "Introduce your clinic to visitors before they explore treatments. Provide both languages so the portal can switch cleanly.":
+    "Introduce your clinic to visitors before they explore treatments. Provide both languages so the portal can switch cleanly.",
   "Welcome title (English)": "Welcome title (English)",
   "Welcome message (English)": "Welcome message (English)",
   "Welcome title (French)": "Welcome title (French)",
   "Welcome message (French)": "Welcome message (French)",
   "Save welcome message": "Save welcome message",
   "Portal welcome message saved.": "Portal welcome message saved.",
-  "Unable to save portal welcome message.": "Unable to save portal welcome message.",
+  "Unable to save portal welcome message.":
+    "Unable to save portal welcome message.",
   "Category name (English)": "Category name (English)",
   "Category name (French)": "Category name (French)",
   "Category description (English)": "Category description (English)",
   "Category description (French)": "Category description (French)",
   "Save category": "Save category",
   "Category updated.": "Category updated.",
-  "Final price is checked before confirmation; practitioner or On-Site charges may apply.": "Final price is checked before confirmation; practitioner or On-Site charges may apply.",
-  "Book {{minutes}} minutes of {{service}}": "Book {{minutes}} minutes of {{service}}",
+  "Final price is checked before confirmation; practitioner or On-Site charges may apply.":
+    "Final price is checked before confirmation; practitioner or On-Site charges may apply.",
+  "Book {{minutes}} minutes of {{service}}":
+    "Book {{minutes}} minutes of {{service}}",
   "Share booking link": "Share booking link",
   "Copy link": "Copy link",
   "Booking link copied.": "Booking link copied.",
@@ -1506,18 +1922,184 @@ const en = {
   "Profile link copied.": "Profile link copied.",
   "Select and copy this profile link.": "Select and copy this profile link.",
   "Profile link": "Profile link",
-  "This treatment is not available for online booking.": "This treatment is not available for online booking.",
+  "This treatment is not available for online booking.":
+    "This treatment is not available for online booking.",
   "Change practitioner": "Change practitioner",
-  "Appointment #{{id}} was assigned to a new practitioner.": "Appointment #{{id}} was assigned to a new practitioner.",
-  "Only practitioners available for this in-clinic appointment at the same time, room, and price are shown. The client and both practitioners will be notified.": "Only practitioners available for this in-clinic appointment at the same time, room, and price are shown. The client and both practitioners will be notified.",
-  "No other practitioner can take this appointment without changing its time or price.": "No other practitioner can take this appointment without changing its time or price.",
+  "Appointment #{{id}} was assigned to a new practitioner.":
+    "Appointment #{{id}} was assigned to a new practitioner.",
+  "Only practitioners available for this in-clinic appointment at the same time, room, and price are shown. The client and both practitioners will be notified.":
+    "Only practitioners available for this in-clinic appointment at the same time, room, and price are shown. The client and both practitioners will be notified.",
+  "No other practitioner can take this appointment without changing its time or price.":
+    "No other practitioner can take this appointment without changing its time or price.",
   "Reason for reassignment": "Reason for reassignment",
   "Confirm practitioner change": "Confirm practitioner change",
   "Unable to change the practitioner.": "Unable to change the practitioner.",
   "Appointment moved off schedule": "Appointment moved off schedule",
   "Website or social page URL": "Website or social page URL",
-  "Optional public link to your website or social page. Include https://.": "Optional public link to your website or social page. Include https://.",
+  "Optional public link to your website or social page. Include https://.":
+    "Optional public link to your website or social page. Include https://.",
   "Website / social page": "Website / social page",
+  "Practitioner invitation": "Practitioner invitation",
+  "Practitioner invitations": "Practitioner invitations",
+  "Sign in or register, then submit your invitation for clinic approval. This does not publish your profile or grant access immediately.":
+    "Sign in or register, then submit your invitation for clinic approval. This does not publish your profile or grant access immediately.",
+  "Invited staff sign-in is not configured.":
+    "Invited staff sign-in is not configured.",
+  "Open the invitation link supplied by the clinic.":
+    "Open the invitation link supplied by the clinic.",
+  "Your claim is waiting for clinic approval. Contact the clinic to verify your identity.":
+    "Your claim is waiting for clinic approval. Contact the clinic to verify your identity.",
+  "Verification code": "Verification code",
+  "Give this code to the clinic through your usual contact method. After approval, continue to staff sign-in.":
+    "Give this code to the clinic through your usual contact method. After approval, continue to staff sign-in.",
+  "Continue to staff sign-in": "Continue to staff sign-in",
+  "Your name": "Your name",
+  "Submit invitation claim": "Submit invitation claim",
+  "Sign in or register as invited staff":
+    "Sign in or register as invited staff",
+  "Existing workforce staff sign-in": "Existing workforce staff sign-in",
+  "Invited practitioners sign in with their approved staff account.":
+    "Invited practitioners sign in with their approved staff account.",
+  "Invited practitioner sign-in": "Invited practitioner sign-in",
+  "Unable to load invitations.": "Unable to load invitations.",
+  "Unable to create invitation.": "Unable to create invitation.",
+  "Invite a practitioner without creating a workforce account. Sign-in claims require your approval before access is granted.":
+    "Invite a practitioner without creating a workforce account. Sign-in claims require your approval before access is granted.",
+  "Copy this link now and send it to the intended practitioner. No email has been sent. The link expires in 48 hours.":
+    "Copy this link now and send it to the intended practitioner. No email has been sent. The link expires in 48 hours.",
+  "Invitation link": "Invitation link",
+  "Existing staff user ID (optional)": "Existing staff user ID (optional)",
+  "Leave blank for a new practitioner. Accounts with an existing membership require a separate reviewed migration.":
+    "Leave blank for a new practitioner. Accounts with an existing membership require a separate reviewed migration.",
+  "Create practitioner invitation": "Create practitioner invitation",
+  "Recent invitations": "Recent invitations",
+  "No invitations yet.": "No invitations yet.",
+  Approved: "Approved",
+  "Awaiting approval": "Awaiting approval",
+  "Awaiting sign-in": "Awaiting sign-in",
+  "Claimed by: {{name}}": "Claimed by: {{name}}",
+  "Review claim": "Review claim",
+  "Revoke invitation": "Revoke invitation",
+  "Review practitioner claim": "Review practitioner claim",
+  "Contact the intended recipient through a known channel and ask for the verification code shown on their claim. A matching name or email is not proof of identity.":
+    "Contact the intended recipient through a known channel and ask for the verification code shown on their claim. A matching name or email is not proof of identity.",
+  "I verified this claim with the intended recipient.":
+    "I verified this claim with the intended recipient.",
+  "Approval creates practitioner access for this clinic. It does not grant administration access or publish the public profile.":
+    "Approval creates practitioner access for this clinic. It does not grant administration access or publish the public profile.",
+  "Approve practitioner": "Approve practitioner",
+
+  "Client overview": "Client overview",
+  "Practitioner access": "Practitioner access",
+  "Appointment history": "Appointment history",
+  "Client overview sections": "Client overview sections",
+  "Back to client details": "Back to client details",
+  "Back to client history": "Back to client history",
+  "Appointment history filter": "Appointment history filter",
+  "Upcoming appointments": "Upcoming appointments",
+  "Past appointments": "Past appointments",
+  "Cancelled appointments": "Cancelled appointments",
+  "Appointment totals": "Appointment totals",
+  "Total: {{count}}": "Total: {{count}}",
+  "Upcoming: {{count}}": "Upcoming: {{count}}",
+  "Past: {{count}}": "Past: {{count}}",
+  "Cancelled: {{count}}": "Cancelled: {{count}}",
+  "The client overview response is invalid.":
+    "The client overview response is invalid.",
+  "Unable to load client overview.": "Unable to load client overview.",
+  "Loading client overview": "Loading client overview",
+  "No appointments match this view.": "No appointments match this view.",
+  "Open appointment": "Open appointment",
+  "Appointment price": "Appointment price",
+  "Not recorded": "Not recorded",
+  "On-Site fee": "On-Site fee",
+  Created: "Created",
+  "All clinic appointments": "All clinic appointments",
+  "Their own appointments only": "Their own appointments only",
+  "No configured access": "No configured access",
+  "Configured access": "Configured access",
+  "These are configured portal permissions. Actual access also requires authorized staff sign-in. Booking contact access does not grant access to another practitioner’s private notes.":
+    "These are configured portal permissions. Actual access also requires authorized staff sign-in. Booking contact access does not grant access to another practitioner’s private notes.",
+  "All clinic practitioner profiles are shown, including inactive accounts and profiles without a relationship. Appointment relationships include cancelled appointments.":
+    "All clinic practitioner profiles are shown, including inactive accounts and profiles without a relationship. Appointment relationships include cancelled appointments.",
+  "No practitioner profiles in this clinic.":
+    "No practitioner profiles in this clinic.",
+  "Active account": "Active account",
+  "Account access blocked": "Account access blocked",
+  "The practitioner profile is inactive. Deactivate the staff account to block its configured staff access.":
+    "The practitioner profile is inactive. Deactivate the staff account to block its configured staff access.",
+  "Appointments with this client: {{count}}":
+    "Appointments with this client: {{count}}",
+  "This practitioner created the client record.":
+    "This practitioner created the client record.",
+  "No appointment or client-creation relationship.":
+    "No appointment or client-creation relationship.",
+  "First scheduled appointment (UTC)": "First scheduled appointment (UTC)",
+  "Latest scheduled appointment (UTC)": "Latest scheduled appointment (UTC)",
+  "Booking contact details": "Booking contact details",
+  "Client administration": "Client administration",
+  "Appointment visibility": "Appointment visibility",
+  "Appointment changes": "Appointment changes",
+  "Appointment logistics notes": "Appointment logistics notes",
+  super_admin: "super_admin",
+  clinic_admin: "clinic_admin",
+  reception: "reception",
+  accountant: "accountant",
+  practitioner: "practitioner",
+  schedule_for_other_practitioners: "schedule_for_other_practitioners",
+  add_clients: "add_clients",
+  approve_onsite_service_area: "approve_onsite_service_area",
+  "Cancellation fee": "Cancellation fee",
+  "The required staff identity or membership is inactive or missing. Membership access is blocked.":
+    "The required staff identity or membership is inactive or missing. Membership access is blocked.",
+  "View recorded changes": "View recorded changes",
+  "Hide recorded changes": "Hide recorded changes",
+  "Only saved status changes, practitioner reassignments and cancellation fee adjustments are shown. Unrecorded previous appointment times cannot be reconstructed.":
+    "Only saved status changes, practitioner reassignments and cancellation fee adjustments are shown. Unrecorded previous appointment times cannot be reconstructed.",
+  "Loading recorded changes": "Loading recorded changes",
+  "Unable to load recorded changes.": "Unable to load recorded changes.",
+  "No recorded changes for this appointment.":
+    "No recorded changes for this appointment.",
+  "Status change": "Status change",
+  "Practitioner reassignment": "Practitioner reassignment",
+  "Cancellation fee adjustment": "Cancellation fee adjustment",
+  "System or unavailable staff": "System or unavailable staff",
+  "No previous status": "No previous status",
+  "Previous changes": "Previous changes",
+  "Next changes": "Next changes",
+  "This appointment link is invalid. Open My appointments or contact the clinic.":
+    "This appointment link is invalid. Open My appointments or contact the clinic.",
+  "The appointment link response is invalid.":
+    "The appointment link response is invalid.",
+  "Unable to open the appointment link.":
+    "Unable to open the appointment link.",
+  "Opening this link does not change your appointment. Review the booking before confirming cancellation or rescheduling.":
+    "Opening this link does not change your appointment. Review the booking before confirming cancellation or rescheduling.",
+  "Opening appointment link": "Opening appointment link",
+  "Back to My appointments": "Back to My appointments",
+  "Sign in with the client account linked to this booking to review the appointment link. The link alone does not grant access or change the appointment.":
+    "Sign in with the client account linked to this booking to review the appointment link. The link alone does not grant access or change the appointment.",
+  "Appointment email links": "Appointment email links",
+  "Revoke existing appointment email links if a message was shared by mistake. Clients can still manage their own appointments after sign-in. Future messages may include new links.":
+    "Revoke existing appointment email links if a message was shared by mistake. Clients can still manage their own appointments after sign-in. Future messages may include new links.",
+  "Existing appointment email links were revoked.":
+    "Existing appointment email links were revoked.",
+  "Confirm link revocation": "Confirm link revocation",
+  "Revoke existing email links": "Revoke existing email links",
+  "Unable to revoke appointment links.": "Unable to revoke appointment links.",
+  "Client sign-in is required.": "Client sign-in is required.",
+  "Clinic administration access is required to revoke appointment links.":
+    "Clinic administration access is required to revoke appointment links.",
+  "Appointment links are not enabled. Open My appointments after signing in.":
+    "Appointment links are not enabled. Open My appointments after signing in.",
+  "This appointment link is unavailable. Sign in with the account linked to this booking, or open My appointments.":
+    "This appointment link is unavailable. Sign in with the account linked to this booking, or open My appointments.",
+  "Review the cancellation fee before confirming.":
+    "Review the cancellation fee before confirming.",
+  "The cancellation fee changed. Review the updated fee before confirming.":
+    "The cancellation fee changed. Review the updated fee before confirming.",
+  "The requested time is no longer bookable. Refresh availability and choose another time.":
+    "The requested time is no longer bookable. Refresh availability and choose another time.",
 } as const;
 
 export default en;

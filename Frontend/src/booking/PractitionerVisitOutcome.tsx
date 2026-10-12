@@ -1,3 +1,4 @@
+import { withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useState } from 'react';
 import { Alert, Button, Divider, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,8 @@ type Props = {
 };
 const utcMillis = (value: string) => new Date(`${value.replace(' ', 'T')}Z`).getTime();
 
-export function PractitionerVisitOutcome({ appointment, request, onChanged }: Props) {
+function PractitionerVisitOutcomeForm({ appointment, request, onChanged }: Props) {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -28,11 +30,11 @@ export function PractitionerVisitOutcome({ appointment, request, onChanged }: Pr
   const update = async (outcome: 'completed' | 'no_show' | 'reopen') => {
     const question = outcome === 'completed' ? 'Mark this appointment completed?' : outcome === 'no_show' ? 'Mark this appointment as a no-show?' : 'Undo this appointment outcome?';
     if (!window.confirm(t(question))) return;
-    setBusy(true); setError('');
+    setBusy(true); (formValidation.clear(), setError(''));
     try {
       await request(`/practitioner/today/${appointment.id}/outcome`, { method: 'POST', body: JSON.stringify({ outcome, version: appointment.version }) });
       onChanged(t(outcome === 'reopen' ? 'Appointment #{{id}} outcome restored.' : outcome === 'no_show' ? 'Appointment #{{id}} marked no-show.' : 'Appointment #{{id}} marked completed.', { id: appointment.id }));
-    } catch (cause) {
+    } catch (cause) { formValidation.capture(cause);
       setError(cause instanceof Error ? cause.message : t('Unable to update the appointment.'));
     } finally { setBusy(false); }
   };
@@ -47,3 +49,4 @@ export function PractitionerVisitOutcome({ appointment, request, onChanged }: Pr
     {error && <Alert severity="error">{error}</Alert>}
   </Stack>;
 }
+export const PractitionerVisitOutcome = withFormValidation(PractitionerVisitOutcomeForm);

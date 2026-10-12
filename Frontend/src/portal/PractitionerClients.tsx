@@ -1,11 +1,14 @@
+import { ApiError } from '../shared/api';
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, CircularProgress, Divider, Drawer, Link as MuiLink, List, ListItemButton, ListItemText, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Divider, Drawer, Link as MuiLink, List, ListItemButton, ListItemText, Paper, Stack, Typography } from '@mui/material';
 import { RefreshCw } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { apiBaseUrl, normalizeNumericIds } from '../shared/api';
 import { pagePath } from './access';
+import { ClientForms } from '../forms/ClientForms';
 
 type Client = { id: number; display_name: string; email: string; phone: string | null; preferred_contact: string | null; status: string; appointment_count: number; recent_appointment_id: number | null };
 type Result = { items: Client[]; page: number; has_more: boolean };
@@ -18,7 +21,8 @@ function phoneHrefs(value: string | null) {
   return /^\+?\d{7,15}$/.test(phone) ? { call: `tel:${phone}`, text: `sms:${phone}` } : null;
 }
 
-export function PractitionerClients() {
+function PractitionerClientsForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [draft, setDraft] = useState('');
@@ -27,11 +31,13 @@ export function PractitionerClients() {
   const [refresh, setRefresh] = useState(0);
   const [data, setData] = useState<Result | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
+  const [showForms, setShowForms] = useState(false);
+  const [formsLocked, setFormsLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError('');
+    setLoading(true); (formValidation.clear(), setError(''));
     void (async () => {
       try {
         const token = await getAccessToken();
@@ -39,9 +45,9 @@ export function PractitionerClients() {
         if (query) params.set('q', query);
         const response = await fetch(`${apiBaseUrl}/practitioner/clients?${params}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
         const body = await response.json();
-        if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+        if (!response.ok) throw new ApiError(body, response.status);
         if (!controller.signal.aborted) setData(normalizeNumericIds(body.data));
-      } catch (cause) {
+      } catch (cause) { formValidation.capture(cause);
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load your clients.'));
       } finally { if (!controller.signal.aborted) setLoading(false); }
     })();
@@ -50,10 +56,11 @@ export function PractitionerClients() {
   const search = (event: FormEvent) => { event.preventDefault(); setPage(1); setQuery(draft.trim()); setSelected(null); };
   const email = selected && emailHref(selected.email);
   const phone = phoneHrefs(selected?.phone ?? null);
+  useEffect(() => { setShowForms(false); }, [selected?.id]);
   return <Stack spacing={2}>
     <Alert severity="info">{t('This list includes clients you have booked or added yourself. It is not the clinic-wide client directory.')}</Alert>
     <Paper variant="outlined" component="form" onSubmit={search} sx={{ p: 1.5 }}><Stack direction="row" flexWrap="wrap" useFlexGap gap={1} alignItems="center">
-      <TextField size="small" label={t('Search my clients')} value={draft} onChange={event => setDraft(event.target.value)} inputProps={{ maxLength: 190 }} sx={{ flex: '1 1 220px' }} />
+      <TextField name="draft" size="small" label={t('Search my clients')} value={draft} onChange={event => setDraft(event.target.value)} inputProps={{ maxLength: 190 }} sx={{ flex: '1 1 220px' }} />
       <Button type="submit" variant="contained">{t('Search')}</Button>
       <Button startIcon={<RefreshCw size={17} />} disabled={loading} onClick={() => setRefresh(value => value + 1)}>{t('Refresh')}</Button>
     </Stack></Paper>
@@ -66,8 +73,8 @@ export function PractitionerClients() {
       </List>}
     </Paper>
     <Stack direction="row" gap={1} justifyContent="flex-end" alignItems="center"><Button disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}>{t('Previous')}</Button><Typography>{t('Page {{page}}', { page })}</Typography><Button disabled={!data?.has_more || loading} onClick={() => setPage(value => value + 1)}>{t('Next')}</Button></Stack>
-    <Drawer anchor="right" open={selected !== null} onClose={() => setSelected(null)} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 440 }, maxWidth: '100%' } } }}><Stack spacing={2} p={3}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h5">{selected?.display_name}</Typography><Button onClick={() => setSelected(null)}>{t('Close')}</Button></Stack><Divider />
+    <Drawer anchor="right" open={selected !== null} onClose={() => { if (!formsLocked) setSelected(null); }} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 440 }, maxWidth: '100%' } } }}><Stack spacing={2} p={3}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h5">{selected?.display_name}</Typography><Button disabled={formsLocked} onClick={() => setSelected(null)}>{t('Close')}</Button></Stack><Divider />
       {selected && <>
         <Box><Typography variant="caption" color="text.secondary">{t('Email')}</Typography><Typography>{email ? <MuiLink href={email}>{selected.email}</MuiLink> : selected.email}</Typography></Box>
         <Box><Typography variant="caption" color="text.secondary">{t('Phone')}</Typography><Stack direction="row" gap={2}><Typography>{phone ? <MuiLink href={phone.call} aria-label={t('Call client')}>{selected.phone}</MuiLink> : selected.phone || t('Not set')}</Typography>{phone && <MuiLink href={phone.text}>{t('Text client')}</MuiLink>}</Stack></Box>
@@ -76,6 +83,8 @@ export function PractitionerClients() {
         {selected.status === 'active' && <Button component={RouterLink} to={pagePath('practitioner', 'appointments')} state={{ startBooking: true, bookingClient: { id: selected.id, display_name: selected.display_name, email: selected.email, phone: selected.phone } }} variant="contained">{t('Book appointment')}</Button>}
         {selected.recent_appointment_id && <Button component={RouterLink} to={`${pagePath('practitioner', 'appointments')}?appointment_id=${selected.recent_appointment_id}`} variant="outlined">{t('View latest appointment')}</Button>}
       </>}
+      {selected && <><Button disabled={formsLocked} onClick={() => setShowForms(value => !value)}>{t('Client forms')}</Button>{showForms && <ClientForms key={selected.id} clientId={selected.id} onLockedChange={setFormsLocked}/>}</>}
     </Stack></Drawer>
   </Stack>;
 }
+export const PractitionerClients = withFormValidation(PractitionerClientsForm);

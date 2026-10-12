@@ -1,5 +1,6 @@
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Alert, Button, CircularProgress, Divider, Stack, TextField, Typography } from '@mui/material';
+import { Button, CircularProgress, Divider, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../i18n/format';
 
@@ -12,7 +13,8 @@ type Props = {
   request: (path: string, init?: RequestInit) => Promise<unknown>;
 };
 
-export function AppointmentLogisticsNotes({ appointmentId, timezone, enabled, request }: Props) {
+function AppointmentLogisticsNotesForm({ appointmentId, timezone, enabled, request }: Props) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const [result, setResult] = useState<NoteList | null>(null);
   const [note, setNote] = useState('');
@@ -24,14 +26,14 @@ export function AppointmentLogisticsNotes({ appointmentId, timezone, enabled, re
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    setLoading(true); setError(''); setResult(null);
+    setLoading(true); (formValidation.clear(), setError('')); setResult(null);
     void request(`/appointments/${appointmentId}/logistics-notes`, { signal: controller.signal })
       .then(data => {
         if (controller.signal.aborted) return;
         if (!data || typeof data !== 'object' || !('notes' in data) || !Array.isArray(data.notes)) throw new Error(t('Unable to load logistics notes.'));
         setResult(data as NoteList);
       })
-      .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load logistics notes.')); })
+      .catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load logistics notes.')); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [appointmentId, enabled, refresh, request, t]);
@@ -40,12 +42,12 @@ export function AppointmentLogisticsNotes({ appointmentId, timezone, enabled, re
     event.preventDefault();
     const value = note.trim();
     if (!value || value.length > 500 || saving) return;
-    setSaving(true); setError('');
+    setSaving(true); (formValidation.clear(), setError(''));
     try {
       await request(`/appointments/${appointmentId}/logistics-notes`, { method: 'POST', body: JSON.stringify({ note: value }) });
       setNote('');
       setRefresh(current => current + 1);
-    } catch (cause) {
+    } catch (cause) { formValidation.capture(cause);
       setError(cause instanceof Error ? cause.message : t('Unable to save logistics note.'));
     } finally {
       setSaving(false);
@@ -71,8 +73,9 @@ export function AppointmentLogisticsNotes({ appointmentId, timezone, enabled, re
           {result.truncated && <Typography variant="body2" color="text.secondary">{t('Showing the latest 100 logistics notes.')}</Typography>}
         </Stack>)}
     <Stack component="form" onSubmit={event => { void save(event); }} spacing={1}>
-      <TextField multiline minRows={2} maxRows={4} label={t('Add logistics note')} value={note} onChange={event => setNote(event.target.value)} inputProps={{ maxLength: 500 }} helperText={t('Examples: use side entrance; call on arrival; bring portable table.')} fullWidth />
+      <TextField name="note" multiline minRows={2} maxRows={4} label={t('Add logistics note')} value={note} onChange={event => setNote(event.target.value)} inputProps={{ maxLength: 500 }} helperText={t('Examples: use side entrance; call on arrival; bring portable table.')} fullWidth />
       <Button type="submit" variant="outlined" disabled={!note.trim() || saving}>{saving ? t('Saving...') : t('Save note')}</Button>
     </Stack>
   </Stack>;
 }
+export const AppointmentLogisticsNotes = withFormValidation(AppointmentLogisticsNotesForm);

@@ -9,7 +9,8 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { StaffInvitationPage } from '../auth/StaffInvitationPage';
 import { StaffSignIn } from "../auth/StaffSignIn";
 import { UserAccountMenu } from "../auth/UserAccountMenu";
 import { useClinicConfig } from "../config/ClinicConfigProvider";
@@ -102,6 +103,8 @@ export function PortalApp() {
         sx={{ py: { xs: 3, md: 5 }, minHeight: "85vh" }}
       >
         <Routes>
+          {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <Route path="/staff/invitation" element={<StaffInvitationPage/>}/>}
+          {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.invitation') && <Route path="/staff/external" element={<Navigate replace to="/staff/invitation"/>}/>}
           <Route path="/client/*" element={<ClientBookingInformation />} />
           <Route
             path="*"

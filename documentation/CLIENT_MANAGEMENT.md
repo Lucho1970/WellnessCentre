@@ -13,7 +13,13 @@ The Clients page is available to Super Admin, Clinic Admin, and reception staff.
 
 Email is required and must be unique among accounts within the clinic, matching the existing database constraints. Shared family email addresses and client sign-in/invitations require further design. Addresses and mobile-visit destination handling remain in the Phase 4 plan; this checkpoint manages contact profiles.
 
+## Appointment history and practitioner access
+
+Implemented locally on 5 October 2026: **View appointments** and **Practitioner access** from client **Details**, with appointment filters/totals, recorded operational changes, configured practitioner access and existing appointment-detail links. See [Client overview](CLIENT_OVERVIEW.md) for scope, privacy, API contracts, deployment prerequisites and acceptance limits. This is source implementation; it has not been deployed or accepted against hosted MySQL.
+
 ## Deployment
+
+The following packages describe the historical initial client-management release. They do not include the new client overview; use its deployment instructions above for the current source.
 
 Deploy both ZIPs from `release/client-management-2026-09-15`:
 

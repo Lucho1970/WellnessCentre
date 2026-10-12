@@ -34,6 +34,7 @@ import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { bookingSignInKey, customerBookingIntent } from "./bookingIntent";
 import { savedSession } from './session';
 import { BetaFeedbackLink } from "../shared/BetaFeedbackLink";
+import { pendingAppointmentLink } from './appointmentLink';
 
 export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const { config } = useClinicConfig();
@@ -312,7 +313,8 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
               )}
             </Typography>
           )}
-          {!verified && (
+          {pendingAppointmentLink() && (!verified || status?.onboarding_status !== 'linked') && <Alert severity="info" sx={{ my: 2 }}>{t('Sign in with the client account linked to this booking to review the appointment link. The link alone does not grant access or change the appointment.')}</Alert>}
+          {!verified && !pendingAppointmentLink() && (
             <Alert severity="info" sx={{ my: 2 }}>
               {t("Sign in to continue booking. No appointment has been requested or reserved.")}
             </Alert>

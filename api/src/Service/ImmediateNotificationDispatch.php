@@ -25,7 +25,7 @@ final class ImmediateNotificationDispatch
             $sms = filter_var($env('SMS_ENABLED'), FILTER_VALIDATE_BOOL)
                 ? new VoipMsSmsClient($env('VOIPMS_API_USERNAME'), $env('VOIPMS_API_PASSWORD'), $env('VOIPMS_FROM_DID'))
                 : null;
-            $result = (new NotificationWorker($database->connection(), $mailer, $portalUrl, $sms))
+            $result = (new NotificationWorker($database->connection(), $mailer, $portalUrl, $sms, filter_var($env('APPOINTMENT_ACTION_LINKS_ENABLED'), FILTER_VALIDATE_BOOL)))
                 ->run(4, $appointmentId);
             error_log(sprintf(
                 'Wellness immediate notification: sent=%d retry=%d review=%d canceled=%d',

@@ -1,19 +1,21 @@
 DirectoryIndex index.html
 RewriteEngine On
 
-# The neutral host must not keep serving Willow's old PHP API after cutover.
-RewriteRule ^(api(?:/|$)|share-preview(?:-lib)?\.php$) - [R=404,L]
+# The central host exposes only the application administration API; the API rejects clinic routes.
+RewriteRule ^api(?:/|$) - [L]
+RewriteRule ^admin/?$ admin/index.html [L]
+RewriteRule ^share-preview(?:-lib)?\.php$ - [R=404,L]
 
-# Existing Willow appointment, profile, and staff links continue to work.
+# Existing original-clinic links now belong to Livin' Lively.
 # Keep this temporary redirect until previously sent links have aged out.
 RewriteCond %{QUERY_STRING} (^|&)(service_id|practitioner_id|duration_option_id)= [NC]
-RewriteRule ^$ https://willowwellness.copihue.ca/ [R=302,L,NE]
-RewriteRule ^(client|staff|practitioner|admin|services|practitioners|availability|book)(/.*)?$ https://willowwellness.copihue.ca/$1$2 [R=302,L,NE]
+RewriteRule ^$ https://livinlively.copihue.ca/ [R=302,L,NE]
+RewriteRule ^(client|staff|practitioner|services|practitioners|availability|book)(/.*)?$ https://livinlively.copihue.ca/$1$2 [R=302,L,NE]
 
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
-    Header always set Content-Security-Policy "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    Header always set Content-Security-Policy "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src 'self' https://login.microsoftonline.com; connect-src 'self' https://login.microsoftonline.com https://*.msauth.net https://*.msftauth.net; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     <Files "index.html">
         Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
     </Files>

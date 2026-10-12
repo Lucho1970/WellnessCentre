@@ -15,6 +15,7 @@ use Wellness\Http\Response;
 use Wellness\Service\AuditLogger;
 use Wellness\Service\AdminService;
 use Wellness\Service\AddressCoverageService;
+use Wellness\Service\PractitionerWorkLocationService;
 use Wellness\Service\AppointmentLogisticsNotesService;
 use Wellness\Service\AvailabilityService;
 use Wellness\Service\BookingService;
@@ -36,6 +37,7 @@ use function FastRoute\simpleDispatcher;
 final class Api
 {
     private EntraAuthenticator $auth;
+    private ?ClinicContext $clinicContext = null;
     private CatalogService $catalog;
     private AvailabilityService $availability;
     private BookingService $bookings;
@@ -45,6 +47,7 @@ final class Api
     private PractitionerPublicProfileService $publicProfiles;
     private ClientService $clients;
     private AddressCoverageService $addressCoverage;
+    private PractitionerWorkLocationService $workLocations;
     private PractitionerTravelService $practitionerTravel;
     private PractitionerVisitService $practitionerVisits;
     private PractitionerQualificationService $practitionerQualifications;
@@ -56,7 +59,7 @@ final class Api
 
     public function __construct(private readonly Config $config,private readonly Database $database)
     {
-        $audit=new AuditLogger($database);$this->auth=new EntraAuthenticator($config,$database);$this->catalog=new CatalogService($database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
+        $audit=new AuditLogger($database);$this->workLocations=new PractitionerWorkLocationService($database,$audit);$this->auth=new EntraAuthenticator($config,$database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit);$this->admin=new AdminService($database,$audit);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
     }
 
     public function handle(): never
@@ -65,13 +68,44 @@ final class Api
         try{
             $request=Request::capture();$this->cors($request);
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
+            $host=ClinicContext::normalizeHost((string)($request->headers['host']??''));
+            $centralHost=ClinicContext::normalizeHost($this->config->applicationAdminHost);
+            if (str_starts_with($request->path, '/api/v1/application/')) {
+                if ($host!==$centralHost) throw new ApiException(404,'not_found','Route not found.');
+                Response::json(['data'=>$this->applicationRoute($request)],200,$request->correlationId);
+            }
+            if ($host===$centralHost && !in_array($request->path,['/api/v1/health','/api/v1/health/database'],true)) throw new ApiException(404,'not_found','Route not found.');
+            if (!in_array($request->path, ['/api/v1/health', '/api/v1/health/database'], true)) {
+                $this->clinicContext = $this->config->clinicManagementEnabled
+                    ? ClinicContext::resolve($this->config, $this->database, $request)
+                    : ClinicContext::forHost($this->config, (string)($request->headers['host'] ?? ''));
+                $this->catalog = new CatalogService($this->database, $this->clinicContext->clinicId);
+                $this->availability = new AvailabilityService($this->database, $this->clinicContext->clinicId);
+            }
             if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
                 Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
             }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
+                $routes->addRoute('GET','/api/v1/forms/drafts','formDrafts');
+                $routes->addRoute('POST','/api/v1/forms/drafts','saveFormDraft');
+                $routes->addRoute('POST','/api/v1/forms/drafts/import','importFormDraft');
+                $routes->addRoute('GET','/api/v1/forms/drafts/{id:\d+}','formDraftDetail');
+                $routes->addRoute('PATCH','/api/v1/forms/drafts/{id:\d+}','updateFormDraft');
+                $routes->addRoute('POST','/api/v1/forms/source/validate','validateFormSource');
+                $routes->addRoute('GET','/api/v1/forms/templates','formTemplates');
+                $routes->addRoute('POST','/api/v1/forms/templates','publishForm');
+                $routes->addRoute('POST','/api/v1/forms/templates/{id:\d+}/versions','publishFormVersion');
+                $routes->addRoute('GET','/api/v1/forms/templates/{id:\d+}/history','formHistory');
+                $routes->addRoute('GET','/api/v1/forms/tasks/{id:\d+}','formDetail');
+                $routes->addRoute('PATCH','/api/v1/forms/tasks/{id:\d+}','formTransition');
+                $routes->addRoute('GET','/api/v1/clients/{id:\d+}/forms','clientForms');
+                $routes->addRoute('POST','/api/v1/clients/{id:\d+}/forms','assignClientForm');
                 $routes->addRoute('GET','/api/v1/health/database','databaseHealth');
                 $routes->addRoute('GET','/api/v1/site-config','siteConfig');
+                $routes->addRoute('GET','/api/v1/admin/clinics','managedClinics');
+                $routes->addRoute('POST','/api/v1/admin/clinics','createClinic');
+                $routes->addRoute('PATCH','/api/v1/admin/clinics/{id:\\d+}','configureClinic');
                 $routes->addRoute('GET','/api/v1/brand/{type:logo|favicon}','brandAsset');
                 $routes->addRoute('GET','/api/v1/locations','locations');
                 $routes->addRoute('GET','/api/v1/services','services');
@@ -100,6 +134,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions','dashboardWidgetVersions');
                 $routes->addRoute('POST','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions/{version:\d+}/restore','restoreDashboardWidget');
                 $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
+                $routes->addRoute('GET','/api/v1/profile/work-location','myWorkLocation');
+                $routes->addRoute('PUT','/api/v1/profile/work-location','saveMyWorkLocation');
                 $routes->addRoute('GET','/api/v1/profile/avatar','profileAvatar');
                 $routes->addRoute('PUT','/api/v1/profile/avatar','saveProfileAvatar');
                 $routes->addRoute('DELETE','/api/v1/profile/avatar','deleteProfileAvatar');
@@ -119,6 +155,11 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/admin/users/{id:\\d+}/avatar','adminSaveAvatar');
                 $routes->addRoute('GET','/api/v1/admin/users/{id:\\d+}/avatar','adminAvatar');
                 $routes->addRoute('DELETE','/api/v1/admin/users/{id:\\d+}/avatar','adminDeleteAvatar');
+                $routes->addRoute('POST','/api/v1/recurring-series/preview','recurringPreview');
+                $routes->addRoute('POST','/api/v1/recurring-series','recurringCreate');
+                $routes->addRoute('GET','/api/v1/recurring-series/{id:\d+}','recurringView');
+                $routes->addRoute('POST','/api/v1/recurring-series/{id:\d+}/preview','recurringChangePreview');
+                $routes->addRoute('POST','/api/v1/recurring-series/{id:\d+}','recurringChange');
                 $routes->addRoute('GET','/api/v1/appointments','appointments');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}','appointmentDetails');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\\d+}/reassignment-options','appointmentReassignmentOptions');
@@ -145,6 +186,10 @@ final class Api
                 $routes->addRoute('POST','/api/v1/address-coverage/approve','approveAddressCoverage');
                 $routes->addRoute('POST','/api/v1/address-coverage/revoke','revokeAddressCoverage');
                 $routes->addRoute('GET','/api/v1/clients','clients');
+                $routes->addRoute('POST','/api/v1/appointments/{id:\\d+}/action-links/revoke','revokeAppointmentActionLinks');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments','clientAppointments');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments/{appointment:\\d+}/history','clientAppointmentChanges');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/practitioner-access','clientPractitionerAccess');
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
                 $routes->addRoute('PATCH','/api/v1/clients/{id:\\d+}','updateClient');
@@ -166,6 +211,11 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/admin/rooms/{id:\\d+}/practitioners','updateRoomPractitioners');
                 $routes->addRoute('POST','/api/v1/admin/staff','createStaff');
                 $routes->addRoute('GET','/api/v1/admin/staff','adminStaff');
+                $routes->addRoute('GET','/api/v1/admin/staff-invitations','staffInvitations');
+                $routes->addRoute('POST','/api/v1/admin/staff-invitations','createStaffInvitation');
+                $routes->addRoute('POST','/api/v1/admin/staff-invitations/{id:\\d+}/approve','approveStaffInvitation');
+                $routes->addRoute('POST','/api/v1/admin/staff-invitations/{id:\\d+}/revoke','revokeStaffInvitation');
+                $routes->addRoute('POST','/api/v1/staff-invitations/claim','claimStaffInvitation');
                 $routes->addRoute('PATCH','/api/v1/admin/staff/{id:\\d+}','updateStaff');
                 $routes->addRoute('GET','/api/v1/admin/team-profiles','teamProfiles');
                 $routes->addRoute('PUT','/api/v1/admin/team-profiles/{id:\\d+}','updateTeamProfile');
@@ -207,7 +257,15 @@ final class Api
             $route=$dispatcher->dispatch($request->method,$request->path);
             if($route[0]===Dispatcher::NOT_FOUND)throw new ApiException(404,'not_found','Route not found.');
             if($route[0]===Dispatcher::METHOD_NOT_ALLOWED)throw new ApiException(405,'method_not_allowed','Method not allowed.');
+            if (in_array($route[1], ['siteConfig', 'brandAsset', 'locations', 'services', 'publicServices', 'publicService', 'publicPractitioners', 'publicPractitioner', 'practitioners', 'team', 'teamImage', 'availability'], true)) {
+                $this->clinicContext->assertActive($this->database);
+            }
             $data=match($route[1]){
+                'staffInvitations'=>$this->staffInvitations()->list($this->user($request)),
+                'createStaffInvitation'=>$this->staffInvitations()->create($this->user($request),$request->body,$request->correlationId),
+                'approveStaffInvitation'=>$this->staffInvitations()->approve($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'revokeStaffInvitation'=>$this->staffInvitations()->revoke($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'claimStaffInvitation'=>$this->staffInvitationClaim($request),
                 'health'=>['status'=>'ok','time'=>gmdate(DATE_ATOM),'environment'=>$this->config->environment],
                 'databaseHealth'=>$this->databaseHealth(),
                 'siteConfig'=>$this->catalog->siteConfig(),
@@ -239,6 +297,8 @@ final class Api
                 'dashboardWidgetVersions'=>$this->dashboard->versions($this->user($request),(string)$route[2]['id']),
                 'restoreDashboardWidget'=>$this->dashboard->restore($this->user($request),(string)$route[2]['id'],(int)$route[2]['version'],$request->correlationId),
                 'customerMe'=>$this->customerMe($request),
+                'myWorkLocation'=>$this->workLocations->get($this->user($request)),
+                'saveMyWorkLocation'=>$this->workLocations->save($this->user($request),$request->body,$request->correlationId),
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
                 'saveProfileAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId),
                 'deleteProfileAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId),
@@ -258,8 +318,13 @@ final class Api
                 'adminSaveAvatar'=>$this->profiles->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
                 'adminAvatar'=>$this->profiles->avatar($this->user($request),(int)$route[2]['id']),
                 'adminDeleteAvatar'=>$this->profiles->delete($this->user($request),$request->correlationId,(int)$route[2]['id']),
+                'recurringPreview'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($this->user($request),$request->body,$request->correlationId,false),
+                'recurringCreate'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($this->user($request),$request->body,$request->correlationId,true),
+                'recurringView'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->view($this->user($request),(int)$route[2]['id']),
+                'recurringChangePreview'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,false),
+                'recurringChange'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,true),
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
-                'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId) + ['action_links_enabled'=>$this->config->appointmentActionLinksEnabled],
                 'appointmentReassignmentOptions'=>$this->bookings->reassignmentOptions($this->user($request),(int)$route[2]['id']),
                 'appointmentLogisticsNotes'=>$this->appointmentLogisticsNotes->list($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createAppointmentLogisticsNote'=>$this->appointmentLogisticsNotes->create($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
@@ -274,6 +339,20 @@ final class Api
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
                 'practitionerClients'=>$this->clients->practitionerList($this->user($request),$request->query),
+                'formDrafts'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->list($this->user($request),$request->query),
+                'saveFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId),
+                'updateFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'formDraftDetail'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->detail($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'importFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->import($this->user($request),$request->body,$request->correlationId),
+                'validateFormSource'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->validate($this->user($request),$request->body),
+                'formTemplates'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->templates($this->user($request),$request->query),
+                'publishForm'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId),
+                'publishFormVersion'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
+                'formHistory'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->history($this->user($request),(int)$route[2]['id']),
+                'formDetail'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->detail($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'formTransition'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->transition($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'clientForms'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->list($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'assignClientForm'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->assign($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'bookingClientAddress'=>$this->bookings->bookingClientAddress($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'validateAddressCoverage'=>$this->addressCoverage->validate($this->user($request),$request->body),
                 'addressCoverageApproval'=>$this->addressCoverage->approvalStatus($this->user($request),$request->body),
@@ -284,6 +363,10 @@ final class Api
                 'appointmentAvailability'=>$this->bookings->updateAvailability($this->user($request),(int)$route[2]['id'],$request->query),
                 'appointmentCancellationPreview'=>$this->bookings->cancellationPreview($this->user($request),(int)$route[2]['id']),
                 'clients'=>$this->clients->search($this->user($request),$request->query),
+                'revokeAppointmentActionLinks'=>(new \Wellness\Service\AppointmentActionLinks($this->database->connection(),$this->config->appointmentActionLinksEnabled,new AuditLogger($this->database)))->revoke($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'clientAppointments'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointments($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'clientAppointmentChanges'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointmentChanges($this->user($request),(int)$route[2]['id'],(int)$route[2]['appointment'],$request->query,$request->correlationId),
+                'clientPractitionerAccess'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->practitionerAccess($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
                 'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId),
                 'updateClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
@@ -293,6 +376,9 @@ final class Api
                 'issueClientInvitation'=>$this->onboarding()->invite($this->user($request),(int)$route[2]['id'],$request->correlationId,(string)($request->body['delivery']??'manual')),
                 'reviewClientInvitation'=>$this->onboarding()->review($this->user($request),(int)$route[2]['id'],(int)$route[2]['invitation'],$request->body,$request->correlationId),
                 'createLocation'=>$this->admin->createLocation($this->user($request),$request->body,$request->correlationId),
+                'managedClinics'=>throw new ApiException(403,'central_administration_required','Manage clinics from the application administration portal.'),
+                'createClinic'=>throw new ApiException(403,'central_administration_required','Manage clinics from the application administration portal.'),
+                'configureClinic'=>throw new ApiException(403,'central_administration_required','Manage clinics from the application administration portal.'),
                 'adminLocations'=>$this->admin->locations($this->user($request)),
                 'updateLocation'=>$this->admin->updateLocation($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createRoom'=>$this->admin->createRoom($this->user($request),$request->body,$request->correlationId),
@@ -349,14 +435,26 @@ final class Api
         }catch(ApiException $e){Response::json(['error'=>array_filter(['code'=>$e->errorCode,'message'=>$e->getMessage(),'fields'=>$e->fields?:null,'correlation_id'=>$request?->correlationId])],$e->status,$request?->correlationId);}
         catch(Throwable $e){
             // Exception messages/traces can contain SQL contact values or authentication arguments.
-            error_log('API failure '.get_class($e).' correlation_id='.($request?->correlationId ?? 'unavailable'));
+            error_log(self::failureLog($e,$request?->correlationId));
             Response::json(['error'=>['code'=>'internal_error','message'=>'An unexpected error occurred.','correlation_id'=>$request?->correlationId]],500,$request?->correlationId);
         }
+    }
+
+    /** Log classification and source location, never exception messages or payloads. */
+    private static function failureLog(Throwable $error,?string $correlationId): string
+    {
+        $log='API failure '.get_class($error).' correlation_id='.($correlationId ?? 'unavailable');
+        if($error instanceof \JsonException){
+            $source=preg_replace('/[^A-Za-z0-9_.-]/','_',basename($error->getFile()));
+            $log.=' json_error_code='.$error->getCode().' source='.$source.':'.$error->getLine();
+        }
+        return $log;
     }
 
     private function customerMe(Request $request): array
     {
         header('Cache-Control: no-store');
+        $this->clinicContext->assertActive($this->database);
         if ($this->config->customerOnboardingEnabled) {
             $service = $this->onboarding();
             $session = $service->session((new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
@@ -369,13 +467,28 @@ final class Api
     private function onboarding(): CustomerOnboarding
     {
         if (!$this->config->customerOnboardingEnabled) throw new ApiException(503, 'onboarding_unavailable', 'Client onboarding is not enabled.');
-        return new CustomerOnboarding($this->database->connection(), $this->config);
+        return new CustomerOnboarding($this->database->connection(), $this->config, $this->clinicContext?->clinicId);
+    }
+
+    private function applicationRoute(Request $request): array
+    {
+        if (!$this->config->applicationAdminEnabled || !$this->config->clinicManagementEnabled) throw new ApiException(503,'application_admin_unavailable','Application administration is not enabled.');
+        header('Cache-Control: no-store');
+        $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($request->bearerToken());
+        $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
+        $path=substr($request->path,strlen('/api/v1/application/'));
+        if ($request->method==='GET' && $path==='me') return ['id'=>$actor->id,'display_name'=>$actor->displayName,'email'=>$actor->email,'roles'=>['application_admin']];
+        if ($request->method==='GET' && $path==='clinics') return $service->list($actor);
+        if ($request->method==='POST' && $path==='clinics') return $service->create($actor,$request->body,$request->correlationId);
+        if ($request->method==='PATCH' && preg_match('#^clinics/(\d+)$#D',$path,$match)) return $service->configure($actor,(int)$match[1],$request->body,$request->correlationId);
+        throw new ApiException(404,'not_found','Route not found.');
     }
 
     private function customerRoute(Request $r): array
     {
+        $this->clinicContext->assertActive($this->database);
         $route = $r->method . ' ' . substr($r->path, strlen('/api/v1/customer/'));
-        if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled];
+        if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled && ($this->config->clinicManagementEnabled || $this->clinicContext?->clinicId === $this->config->customerClinicId)];
         $service = $this->onboarding();
         if ($route === 'POST auth/challenge') return $service->challenge($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         $token = $r->headers['x-customer-session'] ?? null;
@@ -390,8 +503,21 @@ final class Api
         $identity = $session['identity_id'];
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        $forms=new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database));
+        if($route==='GET forms'){$actor=$bookingActor();return $forms->list($actor,$actor->userId,$r->query,$r->correlationId);}
+        if(preg_match('#^(GET|POST) forms/(\d+)(/submit)?$#',$route,$matches)){
+            if($matches[1]==='GET'&&!isset($matches[3]))return $forms->detail($bookingActor(),(int)$matches[2],$r->correlationId);
+            if($matches[1]==='POST'&&isset($matches[3]))return $forms->submit($bookingActor(),(int)$matches[2],$r->body,$r->correlationId);
+        }
+        if ($route === 'POST recurring-series/preview' || $route === 'POST recurring-series') return (new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($bookingActor(),$r->body,$r->correlationId,$route === 'POST recurring-series');
+        if(preg_match('#^recurring-series/(\d+)(/preview)?$#',substr($r->path,strlen('/api/v1/customer/')),$matches)){
+            $recurring=new \Wellness\Service\RecurringBookingService($this->database,$this->bookings);
+            if($r->method==='GET'&&!isset($matches[2]))return $recurring->view($bookingActor(),(int)$matches[1]);
+            if($r->method==='POST')return $recurring->change($bookingActor(),(int)$matches[1],$r->body,$r->correlationId,!isset($matches[2]));
+        }
+        if ($route === 'POST appointment-links/resolve') return (new \Wellness\Service\AppointmentActionLinks($this->database->connection(),$this->config->appointmentActionLinksEnabled,new AuditLogger($this->database)))->resolve($bookingActor(),$r->body,$r->correlationId);
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/availability$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->updateAvailability($bookingActor(),(int)$matches[1],$r->query);
-        if($r->method==='GET'&&preg_match('#^appointments/(\d+)/calendar$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->customerCalendar($bookingActor(),(int)$matches[1],$this->config->clientPortalUrl);
+        if($r->method==='GET'&&preg_match('#^appointments/(\d+)/calendar$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->customerCalendar($bookingActor(),(int)$matches[1],\Wellness\Service\ClinicPortalUrl::resolve($this->database->connection(),$this->clinicContext->clinicId,$this->config->clientPortalUrl,$this->config->clinicManagementEnabled));
         if($r->method==='GET'&&preg_match('#^appointments/(\d+)/cancellation-preview$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->cancellationPreview($bookingActor(),(int)$matches[1]);
         if($r->method==='PATCH'&&preg_match('#^appointments/(\d+)$#',substr($r->path,strlen('/api/v1/customer/')),$matches))return $this->bookings->update($bookingActor(),(int)$matches[1],$r->body,$r->correlationId);
         return match ($route) {
@@ -433,7 +559,24 @@ final class Api
         Response::image((string)$asset['image_data'],(string)$asset['mime_type'],$hash,$request->correlationId);
     }
 
-    private function user(Request $request): AuthContext{return $this->auth->authenticate($request->bearerToken());}
+    private function user(Request $request): AuthContext
+    {
+        $external = new \Wellness\Auth\ExternalStaffAuthenticator($this->config);
+        $actor = $external->isCandidate($request->bearerToken())
+            ? (new \Wellness\Auth\StaffMembershipResolver($this->database))->resolve($external->verify($request->bearerToken()),$this->clinicContext)
+            : $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
+        $this->clinicContext->assertActive($this->database);
+        return $actor;
+    }
+    private function staffInvitations(): \Wellness\Service\StaffInvitationService
+    {
+        return new \Wellness\Service\StaffInvitationService($this->database,$this->config,new AuditLogger($this->database));
+    }
+    private function staffInvitationClaim(Request $request): array
+    {
+        $this->clinicContext->assertActive($this->database);
+        return $this->staffInvitations()->claim($this->clinicContext->clinicId,(new \Wellness\Auth\ExternalStaffAuthenticator($this->config))->verify($request->bearerToken()),$request->body,$request->correlationId);
+    }
     private function me(AuthContext $user): array{return ['id'=>$user->userId,'clinic_id'=>$user->clinicId,'email'=>$user->email,'display_name'=>$user->displayName,'user_type'=>$user->userType,'roles'=>$user->roles,'permissions'=>$user->permissions];}
 
     private function cors(Request $request): void

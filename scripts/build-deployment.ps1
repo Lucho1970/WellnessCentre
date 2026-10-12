@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$ReleaseName,
-    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
+    [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md','RECURRING_APPOINTMENTS_RELEASE.md','CLIENT_INTAKE_FORMS_RELEASE.md','GOOGLE_PRACTITIONER_ROLLOUT.md','PRIVATE_PRACTITIONER_WORK_LOCATION.md','SEPARATE_CLINIC_PORTALS.md','APPLICATION_ADMINISTRATION.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
 )
 $ErrorActionPreference = 'Stop'
 if ($ReleaseName -notmatch '^[a-zA-Z0-9_-]+$') { throw 'Use letters, digits, underscores, and hyphens for ReleaseName.' }
@@ -20,12 +20,20 @@ foreach ($productionEnv in @((Join-Path $repo 'Frontend/.env.production'),(Join-
     }
 }
 $requiredFrontendSettings = @(
+    'VITE_ENTRA_TENANT_ID',
+    'VITE_ENTRA_API_CLIENT_ID',
+    'VITE_ENTRA_SPA_CLIENT_ID',
     'VITE_CUSTOMER_ENTRA_TENANT_ID',
     'VITE_CUSTOMER_ENTRA_SUBDOMAIN',
     'VITE_CUSTOMER_ENTRA_API_CLIENT_ID',
     'VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID',
     'VITE_GOOGLE_MAPS_BROWSER_API_KEY'
 )
+$staffInvitationFlag = [Environment]::GetEnvironmentVariable('VITE_STAFF_INVITATIONS_ENABLED', 'Process')
+if ([string]::IsNullOrWhiteSpace($staffInvitationFlag)) { $staffInvitationFlag = $productionSettings['VITE_STAFF_INVITATIONS_ENABLED'] }
+if ($staffInvitationFlag -eq 'true') {
+    $requiredFrontendSettings += @('VITE_STAFF_EXTERNAL_TENANT_ID','VITE_STAFF_EXTERNAL_SUBDOMAIN','VITE_STAFF_EXTERNAL_API_CLIENT_ID','VITE_STAFF_EXTERNAL_SPA_CLIENT_ID')
+}
 $resolvedFrontendSettings = @{}
 foreach ($name in $requiredFrontendSettings) {
     $value = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -48,6 +56,11 @@ foreach ($name in $requiredFrontendSettings) {
         if ([System.IO.File]::ReadAllText($script.FullName).Contains($expected)) { $found = $true; break }
     }
     if (-not $found) { throw "Production portal bundle is missing required setting: $name" }
+}
+$centralScripts = Get-ChildItem -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin/assets') -Filter '*.js' -File
+foreach ($name in @('VITE_ENTRA_TENANT_ID','VITE_ENTRA_API_CLIENT_ID','VITE_ENTRA_SPA_CLIENT_ID')) {
+    $expected = $resolvedFrontendSettings[$name]
+    if (-not @($centralScripts | Where-Object { [System.IO.File]::ReadAllText($_.FullName).Contains($expected) }).Count) { throw "Administration build is missing required setting: $name" }
 }
 Copy-Item -LiteralPath (Join-Path $repo 'api/composer.json'),(Join-Path $repo 'api/composer.lock') -Destination $private
 Copy-Item -LiteralPath (Join-Path $repo 'api/src'),(Join-Path $repo 'api/bin') -Destination $private -Recurse
@@ -74,7 +87,13 @@ Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal/.htaccess'),(Jo
 # Both public entry points resolve to the same private application; no backend copy.
 Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $portalStage 'api') -Recurse
 Write-DeploymentZip $portalStage (Join-Path $destination 'wellness-portal.zip')
-Write-DeploymentZip (Join-Path $repo 'hosting/netfirms/portal-landing') (Join-Path $destination 'copihue-portal-landing.zip')
+$centralStage = Join-Path $stage 'central'
+Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-landing') -Destination $centralStage -Recurse
+$adminStage = Join-Path $centralStage 'admin'
+Copy-Item -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin') -Destination $adminStage -Recurse
+Move-Item -LiteralPath (Join-Path $adminStage 'central.html') -Destination (Join-Path $adminStage 'index.html')
+Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $centralStage 'api') -Recurse
+Write-DeploymentZip $centralStage (Join-Path $destination 'copihue-portal-landing.zip')
 Write-DeploymentZip $private (Join-Path $destination 'wellness-api-private.zip')
 Write-DeploymentZip (Join-Path $repo 'api/deploy/netfirms/public') (Join-Path $destination 'wellness-api-public.zip')
 Write-DeploymentZip (Join-Path $repo 'hosting/netfirms/main-domain') (Join-Path $destination 'tuff-tar-mail-bridge.zip')
@@ -82,9 +101,25 @@ Copy-Item -LiteralPath (Join-Path $repo 'api/database/migrations') -Destination 
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/maintenance') -Destination (Join-Path $destination 'sql-maintenance') -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'documentation/PORTAL_HOST_CUTOVER.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'documentation/PRACTITIONER_PERSON_CARD.md') -Destination $destination
+Copy-Item -LiteralPath (Join-Path $repo "documentation/$DeploymentGuide") -Destination $destination -Force
+if ($DeploymentGuide -eq 'RECURRING_APPOINTMENTS_RELEASE.md') {
+    Copy-Item -LiteralPath (Join-Path $repo 'documentation/RECURRING_APPOINTMENTS.md') -Destination $destination
+}
+if ($DeploymentGuide -eq 'CLIENT_INTAKE_FORMS_RELEASE.md') {
+    Copy-Item -LiteralPath (Join-Path $repo 'documentation/CLIENT_INTAKE_FORMS.md') -Destination $destination
+}
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
 $manifest = [ordered]@{ release_name=$ReleaseName; source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-clinic-portal-and-neutral-landing'; deployment_guide=$DeploymentGuide; archives=@() }
+if ($staffInvitationFlag -eq 'true') {
+    $manifest.staff_authentication = [ordered]@{
+        enabled_in_portal=$true
+        tenant_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_TENANT_ID']
+        subdomain=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_SUBDOMAIN']
+        api_client_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_API_CLIENT_ID']
+        spa_client_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_SPA_CLIENT_ID']
+    }
+}
 foreach ($file in Get-ChildItem -LiteralPath $destination -Filter '*.zip') {
     $archive = [System.IO.Compression.ZipFile]::OpenRead($file.FullName)
     try {

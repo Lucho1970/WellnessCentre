@@ -46,7 +46,7 @@ CREATE TABLE availability_rules (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,p
 CREATE TABLE availability_overrides (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,practitioner_id BIGINT UNSIGNED NOT NULL,location_id BIGINT UNSIGNED NOT NULL,starts_at DATETIME NOT NULL,ends_at DATETIME NOT NULL,override_type ENUM('available','blocked') NOT NULL,reason VARCHAR(500),created_by BIGINT UNSIGNED NOT NULL,FOREIGN KEY(practitioner_id) REFERENCES practitioners(id) ON DELETE CASCADE,FOREIGN KEY(location_id) REFERENCES locations(id),FOREIGN KEY(created_by) REFERENCES users(id),CHECK(starts_at<ends_at)) ENGINE=InnoDB;
 CREATE TABLE time_off (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,practitioner_id BIGINT UNSIGNED NOT NULL,location_id BIGINT UNSIGNED,starts_at DATETIME NOT NULL,ends_at DATETIME NOT NULL,reason_type ENUM('vacation','sick','personal','other') NOT NULL,notes VARCHAR(500),created_by BIGINT UNSIGNED NOT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(practitioner_id) REFERENCES practitioners(id) ON DELETE CASCADE,FOREIGN KEY(location_id) REFERENCES locations(id),FOREIGN KEY(created_by) REFERENCES users(id),CHECK(starts_at<ends_at)) ENGINE=InnoDB;
 CREATE TABLE imported_calendar_entries (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,practitioner_id BIGINT UNSIGNED NOT NULL,source VARCHAR(80) NOT NULL,external_id VARCHAR(191),title VARCHAR(190),starts_at DATETIME NOT NULL,ends_at DATETIME NOT NULL,blocks_booking BOOLEAN NOT NULL DEFAULT TRUE,imported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_imported_event(practitioner_id,source,external_id),FOREIGN KEY(practitioner_id) REFERENCES practitioners(id) ON DELETE CASCADE) ENGINE=InnoDB;
-CREATE TABLE recurring_series (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,client_id BIGINT UNSIGNED NOT NULL,practitioner_id BIGINT UNSIGNED NOT NULL,service_id BIGINT UNSIGNED NOT NULL,frequency ENUM('weekly','biweekly','monthly') NOT NULL,interval_count SMALLINT UNSIGNED NOT NULL DEFAULT 1,series_start DATE NOT NULL,series_end DATE,occurrence_limit SMALLINT UNSIGNED,status ENUM('active','completed','canceled') NOT NULL DEFAULT 'active',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(client_id) REFERENCES users(id),FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),FOREIGN KEY(service_id) REFERENCES services(id)) ENGINE=InnoDB;
+CREATE TABLE recurring_series (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,clinic_id BIGINT UNSIGNED NULL,timezone VARCHAR(64) NULL,client_id BIGINT UNSIGNED NOT NULL,practitioner_id BIGINT UNSIGNED NOT NULL,service_id BIGINT UNSIGNED NOT NULL,frequency ENUM('weekly','biweekly','monthly') NOT NULL,interval_count SMALLINT UNSIGNED NOT NULL DEFAULT 1,series_start DATE NOT NULL,series_end DATE,occurrence_limit SMALLINT UNSIGNED,status ENUM('active','completed','canceled') NOT NULL DEFAULT 'active',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(clinic_id) REFERENCES clinics(id),FOREIGN KEY(client_id) REFERENCES users(id),FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),FOREIGN KEY(service_id) REFERENCES services(id)) ENGINE=InnoDB;
 CREATE TABLE appointments (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,clinic_id BIGINT UNSIGNED NOT NULL,location_id BIGINT UNSIGNED NOT NULL,client_id BIGINT UNSIGNED NOT NULL,practitioner_id BIGINT UNSIGNED NOT NULL,service_id BIGINT UNSIGNED NOT NULL,duration_option_id BIGINT UNSIGNED,room_id BIGINT UNSIGNED,recurring_series_id BIGINT UNSIGNED,starts_at DATETIME NOT NULL,ends_at DATETIME NOT NULL,buffer_starts_at DATETIME NOT NULL,buffer_ends_at DATETIME NOT NULL,status ENUM('draft','requested','confirmed','rescheduled','canceled_by_client','canceled_by_clinic','no_show','completed','invoiced','paid') NOT NULL DEFAULT 'draft',source ENUM('public','reception','practitioner','admin','import') NOT NULL,client_notes VARCHAR(1000),idempotency_key VARCHAR(100),version INT UNSIGNED NOT NULL DEFAULT 1,created_by BIGINT UNSIGNED NOT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_appointment_idempotency(clinic_id,idempotency_key),INDEX ix_practitioner_schedule(practitioner_id,buffer_starts_at,buffer_ends_at,status),INDEX ix_room_schedule(room_id,buffer_starts_at,buffer_ends_at,status),INDEX ix_client_schedule(client_id,starts_at,status),FOREIGN KEY(clinic_id) REFERENCES clinics(id),FOREIGN KEY(location_id) REFERENCES locations(id),FOREIGN KEY(client_id) REFERENCES users(id),FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),FOREIGN KEY(service_id) REFERENCES services(id),FOREIGN KEY(duration_option_id) REFERENCES service_duration_options(id),FOREIGN KEY(room_id) REFERENCES rooms(id),FOREIGN KEY(recurring_series_id) REFERENCES recurring_series(id),FOREIGN KEY(created_by) REFERENCES users(id),CHECK(starts_at<ends_at),CHECK(buffer_starts_at<=starts_at AND buffer_ends_at>=ends_at)) ENGINE=InnoDB;
 CREATE TABLE appointment_attendees (appointment_id BIGINT UNSIGNED NOT NULL,user_id BIGINT UNSIGNED NOT NULL,attendee_type ENUM('client','guest','interpreter','guardian') NOT NULL,PRIMARY KEY(appointment_id,user_id),FOREIGN KEY(appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,FOREIGN KEY(user_id) REFERENCES users(id)) ENGINE=InnoDB;
 CREATE TABLE appointment_status_history (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,appointment_id BIGINT UNSIGNED NOT NULL,from_status VARCHAR(40),to_status VARCHAR(40) NOT NULL,actor_user_id BIGINT UNSIGNED,reason VARCHAR(1000),fee_triggered_cents INT UNSIGNED NOT NULL DEFAULT 0,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,FOREIGN KEY(actor_user_id) REFERENCES users(id)) ENGINE=InnoDB;
@@ -121,3 +121,183 @@ ALTER TABLE appointments
  ADD COLUMN cancellation_fee_cents INT UNSIGNED NOT NULL DEFAULT 0,
  ADD COLUMN coverage_confirmed_by BIGINT UNSIGNED NULL,
  ADD COLUMN currency CHAR(3) NOT NULL DEFAULT 'CAD';
+-- Additive foundation only. No backfill and no login cutover.
+-- MySQL 5.7+: reconcile live schema and back up before applying.
+CREATE TABLE product_identities (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ adapter VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ issuer VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ subject VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_product_identity(adapter,issuer,subject)
+) ENGINE=InnoDB;
+
+CREATE TABLE staff_memberships (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ identity_id BIGINT UNSIGNED NOT NULL,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ local_user_id BIGINT UNSIGNED NOT NULL,
+ status ENUM('pending','active','revoked') NOT NULL DEFAULT 'pending',
+ version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_staff_identity_clinic(identity_id,clinic_id),
+ UNIQUE KEY uq_staff_local_user(local_user_id),
+ FOREIGN KEY(identity_id) REFERENCES product_identities(id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(local_user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Existing user_roles/user_permissions remain the authoritative local grants.
+-- No role copying, email linking, customer session changes or invitation grants.
+
+-- Disabled invitation pilot. Back up and rehearse before applying.
+CREATE TABLE staff_invitations (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ invited_by BIGINT UNSIGNED NOT NULL,
+ recipient_email VARCHAR(190) NOT NULL,
+ given_name VARCHAR(100) NOT NULL,
+ family_name VARCHAR(100) NOT NULL,
+ discipline VARCHAR(100) NOT NULL,
+ location_id BIGINT UNSIGNED NOT NULL,
+ existing_user_id BIGINT UNSIGNED NULL,
+ token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+ expires_at DATETIME NOT NULL,
+ revoked_at DATETIME NULL,
+ accepted_at DATETIME NULL,
+ accepted_membership_id BIGINT UNSIGNED NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ INDEX ix_staff_invites(clinic_id,created_at),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(invited_by) REFERENCES users(id),
+ FOREIGN KEY(location_id) REFERENCES locations(id),
+ FOREIGN KEY(existing_user_id) REFERENCES users(id),
+ FOREIGN KEY(accepted_membership_id) REFERENCES staff_memberships(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE staff_invitation_claims (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ invitation_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ issuer VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ subject VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ claimant_name VARCHAR(150) NOT NULL,
+ verification_code CHAR(12) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+ reviewed_by BIGINT UNSIGNED NULL,
+ reviewed_at DATETIME NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(invitation_id) REFERENCES staff_invitations(id),
+ FOREIGN KEY(reviewed_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Apply once, before enabling APPOINTMENT_ACTION_LINKS_ENABLED.
+-- Raw link tokens are never stored. Links are navigation aids requiring client sign-in.
+CREATE TABLE appointment_action_links (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    clinic_id BIGINT UNSIGNED NOT NULL,
+    appointment_id BIGINT UNSIGNED NOT NULL,
+    client_id BIGINT UNSIGNED NOT NULL,
+    appointment_version BIGINT UNSIGNED NOT NULL,
+    notification_event_id BIGINT UNSIGNED NOT NULL,
+    token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_appointment_action_token (token_hash),
+    KEY ix_appointment_action_scope (clinic_id, appointment_id, revoked_at),
+    KEY ix_appointment_action_expiry (expires_at),
+    CONSTRAINT fk_action_link_clinic FOREIGN KEY (clinic_id) REFERENCES clinics(id),
+    CONSTRAINT fk_action_link_appointment FOREIGN KEY (appointment_id) REFERENCES appointments(id),
+    CONSTRAINT fk_action_link_client FOREIGN KEY (client_id) REFERENCES users(id),
+    CONSTRAINT fk_action_link_notification FOREIGN KEY (notification_event_id) REFERENCES notification_events(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE recurring_booking_requests (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    clinic_id BIGINT UNSIGNED NOT NULL,
+    idempotency_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    actor_user_id BIGINT UNSIGNED NOT NULL,
+    request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    result_json JSON NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_recurring_request (clinic_id,idempotency_key),
+    FOREIGN KEY (clinic_id) REFERENCES clinics(id),
+    FOREIGN KEY (actor_user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Apply once before enabling CLIENT_FORMS_ENABLED. Existing foundation rows remain unchanged.
+ALTER TABLE form_templates CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE form_templates ADD COLUMN family_key CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN publication_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN publication_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN created_by BIGINT UNSIGNED NULL,
+    ADD UNIQUE KEY uq_form_family_version (clinic_id,family_key,version),
+    ADD UNIQUE KEY uq_form_publication (clinic_id,publication_key),
+    ADD CONSTRAINT fk_form_author FOREIGN KEY(created_by) REFERENCES users(id);
+CREATE TABLE client_form_tasks (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    clinic_id BIGINT UNSIGNED NOT NULL,
+    client_id BIGINT UNSIGNED NOT NULL,
+    practitioner_id BIGINT UNSIGNED NOT NULL,
+    form_template_id BIGINT UNSIGNED NOT NULL,
+    appointment_id BIGINT UNSIGNED NULL,
+    assigned_by BIGINT UNSIGNED NOT NULL,
+    assignment_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    required BOOLEAN NOT NULL DEFAULT TRUE,
+    status ENUM('pending','submitted','reviewed','revoked') NOT NULL DEFAULT 'pending',
+    version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+    submission_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    submitted_at DATETIME NULL,
+    reviewed_at DATETIME NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    UNIQUE KEY uq_appointment_form (appointment_id,form_template_id),
+    UNIQUE KEY uq_task_submission (submission_id),
+    UNIQUE KEY uq_form_assignment_request (clinic_id,assignment_key),
+    KEY ix_client_forms (clinic_id,client_id,id),
+    FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+    FOREIGN KEY(client_id) REFERENCES users(id),
+    FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),
+    FOREIGN KEY(form_template_id) REFERENCES form_templates(id),
+    FOREIGN KEY(appointment_id) REFERENCES appointments(id),
+    FOREIGN KEY(assigned_by) REFERENCES users(id),
+    FOREIGN KEY(reviewed_by) REFERENCES users(id),
+    FOREIGN KEY(submission_id) REFERENCES form_submissions(id)
+) ENGINE=InnoDB;
+
+-- Private form-author drafts (migration 037).
+-- Apply once after migration 036. Drafts are private to their author and cannot be assigned.
+CREATE TABLE form_template_drafts (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    clinic_id BIGINT UNSIGNED NOT NULL,
+    created_by BIGINT UNSIGNED NOT NULL,
+    creation_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    request_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    payload LONGTEXT NOT NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+    status ENUM('draft','published') NOT NULL DEFAULT 'draft',
+    published_template_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_draft_creation (clinic_id,created_by,creation_key),
+    KEY ix_author_drafts (clinic_id,created_by,status,id),
+    FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+    FOREIGN KEY(created_by) REFERENCES users(id),
+    FOREIGN KEY(published_template_id) REFERENCES form_templates(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Private practitioner addresses; never join this table into public profiles.
+CREATE TABLE practitioner_private_locations (
+    practitioner_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    home_address TEXT NULL,
+    work_address TEXT NULL,
+    work_same_as_home BOOLEAN NOT NULL DEFAULT FALSE,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (practitioner_id) REFERENCES practitioners(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

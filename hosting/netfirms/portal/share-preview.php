@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 use Wellness\Config;
+use Wellness\ClinicContext;
+use Wellness\Http\Request;
 use Wellness\Database;
 use Wellness\Http\ApiException;
 use Wellness\Service\CatalogService;
@@ -26,12 +28,10 @@ if (!$serviceRoute && !$practitionerRoute) {
         require $root . '/vendor/autoload.php';
         Config::loadEnvFile($root . '/.env');
         $config = Config::fromEnvironment();
-        $originParts = parse_url($config->clientPortalUrl);
-        $origin = is_array($originParts) && ($originParts['scheme'] ?? '') === 'https'
-            ? 'https://' . ($originParts['host'] ?? '')
-            : '';
-        if ($origin === 'https://' || $origin === '') throw new RuntimeException('Client portal URL is not configured.');
-        $catalog = new CatalogService(new Database($config));
+        $database = new Database($config);
+        $context = ClinicContext::resolve($config, $database, Request::capture());
+        $origin = 'https://' . $context->host;
+        $catalog = new CatalogService($database, $context->clinicId);
         $site = $catalog->siteConfig();
         if ($serviceRoute) {
             $service = $catalog->publicService($serviceMatch[1]);

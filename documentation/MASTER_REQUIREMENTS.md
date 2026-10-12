@@ -230,7 +230,7 @@ Baseline: source reviewed on 16 September 2026, combining `origin/main` at `9b5f
 | Profile and business setup | Application avatars, profile menu, SuperAdmin configuration/practitioner management | Broader delegated operational permissions, personal email preferences, media hardening verification |
 | Catalogue | Locations, rooms, capabilities, services/durations, assignments, taxes/settings and mobile metadata | Hosted acceptance; practitioner self-service permissions where not yet exposed |
 | Availability | Recurring rules/overrides, buffers, room constraints and server slot calculation | Complete practitioner UI, shared mutation locking, database concurrency/DST acceptance |
-| Staff/practitioner booking | Administrator/reception client and slot selection plus practitioner-scoped own booking, rescheduling and cancellation; transaction/idempotency, optimistic versions, history/audit and scoped lists | End-to-end hosted MySQL verification, full lifecycle/fees/recurrence and notification delivery |
+| Staff/practitioner booking | Administrator/reception client and slot selection plus practitioner-scoped own booking, rescheduling and cancellation; transaction/idempotency, optimistic versions, history/audit and scoped lists | Recurring creation and explicit future-series changes implemented locally (migration 035); end-to-end hosted MySQL races/recurrence acceptance, full lifecycle/fees and notification delivery remain |
 | Client management | Staff search/create/edit/merge; reviewed customer identity links; own profile, saved address and appointment history | Client appointment changes, full history/forms/privacy flows and recovery/shared-account decisions |
 | Public booking | Catalogue/availability browsing, preference handoff and authenticated self-booking through the shared transaction | Hosted race acceptance, client cancellation/rescheduling and delivery of confirmations; never claim a slot is held without a hold |
 | Notifications | Durable event/schema foundation | Sender worker, provider/templates, reminders, delivery/failure handling |
@@ -307,6 +307,8 @@ An independent practitioner, including one working in a portal-only virtual clin
 ## Runtime clinic public website destination
 
 Both deployed frontends load the public website destination from the private PHP `PUBLIC_WEBSITE_URL` setting before initialization, without caching. Changing this setting takes effect on refresh without a frontend rebuild. Both surfaces use same-origin API routing. Portal host, authentication callbacks and asset base paths remain build-time configuration. See [runtime website configuration and deployment](RUNTIME_WEBSITE_CONFIGURATION.md). Local implementation is verified separately from hosted deployment acceptance.
+
+**Phase 7 forms source update (6 October 2026):** `feature/client-intake-forms` implements the first versioned intake/consent workflow: practitioner-owned templates, direct/service-based assignments, own-client submission, status/review, immutable responses and restricted practitioner answer access. Migration 036 and `CLIENT_FORMS_ENABLED` are disabled pending a reviewed hosted pilot. See [Client intake forms](CLIENT_INTAKE_FORMS.md). This does not complete draft/amendment, withdrawal, upload, notes, export or retention requirements, and is not hosted acceptance.
 
 ## MT0 source review and proposed migration architecture
 

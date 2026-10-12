@@ -1,10 +1,12 @@
+import { ApiError } from '../shared/api';
+import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, Chip, Divider, Drawer, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Chip, Divider, Drawer, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { RefreshCw } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { apiBaseUrl, normalizeNumericIds } from '../shared/api';
 import { pagePath } from './access';
 
 type Status = 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | 'canceled' | 'needs_review' | 'resolved';
@@ -15,7 +17,8 @@ const statusLabel: Record<Status, string> = { queued: 'Queued', sending: 'Sendin
 const eventLabel: Record<string, string> = { staff_booking_confirmation: 'Staff booking notice', staff_booking_change: 'Staff change notice', staff_booking_cancellation: 'Staff cancellation notice', staff_booking_reassigned_away: 'Appointment moved off schedule' };
 const time = (value: string | null) => value ? new Date(`${value.replace(' ', 'T')}Z`).toLocaleString() : '—';
 
-export function PractitionerNotifications() {
+function PractitionerNotificationsForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,7 +41,7 @@ export function PractitionerNotifications() {
     setSearchParams(next);
   };
   const load = useCallback(async () => {
-    setLoading(true); setError('');
+    setLoading(true); (formValidation.clear(), setError(''));
     try {
       const token = await getAccessToken();
       const params = new URLSearchParams({ page: String(page) });
@@ -47,9 +50,9 @@ export function PractitionerNotifications() {
       if (period) params.set('period', period);
       const response = await fetch(`${apiBaseUrl}/practitioner/notifications?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+      if (!response.ok) throw new ApiError(body, response.status);
       setData(normalizeNumericIds(body.data));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load your notifications.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load your notifications.')); }
     finally { setLoading(false); }
   }, [getAccessToken, page, status, channel, period, t]);
   useEffect(() => { void load(); }, [load]);
@@ -58,13 +61,13 @@ export function PractitionerNotifications() {
     <Alert severity="info">{t('This is a read-only history of booking notices addressed to you. Provider acceptance does not prove delivery. Clinic administrators handle items that need review.')}</Alert>
     {error && <Alert severity="error" action={<Button onClick={() => void load()}>{t('Try again')}</Button>}>{error}</Alert>}
     <Paper variant="outlined"><Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems={{ sm: 'center' }} p={1.5}>
-      <TextField select size="small" label={t('Status')} value={status} onChange={event => setFilter('status', event.target.value)} sx={{ minWidth: 205 }}>
+      <TextField name="status" select size="small" label={t('Status')} value={status} onChange={event => setFilter('status', event.target.value)} sx={{ minWidth: 205 }}>
         <MenuItem value="">{t('All statuses')}</MenuItem>{statuses.map(item => <MenuItem value={item} key={item}>{t(statusLabel[item])}</MenuItem>)}
       </TextField>
-      <TextField select size="small" label={t('Channel')} value={channel} onChange={event => setFilter('channel', event.target.value)} sx={{ minWidth: 150 }}>
+      <TextField name="channel" select size="small" label={t('Channel')} value={channel} onChange={event => setFilter('channel', event.target.value)} sx={{ minWidth: 150 }}>
         <MenuItem value="">{t('All channels')}</MenuItem><MenuItem value="email">{t('Email')}</MenuItem><MenuItem value="sms">SMS</MenuItem>
       </TextField>
-      <TextField select size="small" label={t('Activity date')} value={period} onChange={event => setFilter('period', event.target.value)} sx={{ minWidth: 170 }}>
+      <TextField name="period" select size="small" label={t('Activity date')} value={period} onChange={event => setFilter('period', event.target.value)} sx={{ minWidth: 170 }}>
         <MenuItem value="">{t('All dates')}</MenuItem><MenuItem value="today">{t('Today')}</MenuItem><MenuItem value="last7">{t('Last 7 days')}</MenuItem>
       </TextField>
       <Button startIcon={<RefreshCw size={17} />} onClick={() => void load()} disabled={loading}>{t('Refresh')}</Button>
@@ -92,3 +95,4 @@ export function PractitionerNotifications() {
     </Stack></Box></Drawer>
   </Stack>;
 }
+export const PractitionerNotifications = withFormValidation(PractitionerNotificationsForm);

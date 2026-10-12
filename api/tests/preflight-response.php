@@ -19,6 +19,7 @@ if (PHP_SAPI === 'cli-server') {
         dbHost: '127.0.0.1', dbPort: 9, dbName: 'unused', dbUser: 'unused', dbPassword: '',
         entraTenantId: 'test-tenant', entraApiClientId: 'test-api',
         entraRequiredScope: 'access_as_user', entraJwksCacheSeconds: 300,
+        clinicHostMap: [$_SERVER['HTTP_HOST'] => 1],
     );
     (new Api($config, new Database($config)))->handle();
 }

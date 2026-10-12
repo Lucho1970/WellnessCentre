@@ -53,7 +53,7 @@ test('unavailable runtime settings stop startup instead of using a stale domain'
   await expect(page.getByRole('link', { name: 'Public website', exact: true })).toHaveCount(0);
 });
 
-test("neutral portal landing links to Willow without claiming generic sign-in", async ({ page }) => {
+test("neutral portal landing separates clinic browsing from application administration", async ({ page }) => {
   const files: Record<string, { contentType: string; path: string }> = {
     "/": { contentType: "text/html", path: "../hosting/netfirms/portal-landing/index.html" },
     "/styles.css": { contentType: "text/css", path: "../hosting/netfirms/portal-landing/styles.css" },
@@ -65,11 +65,27 @@ test("neutral portal landing links to Willow without claiming generic sign-in", 
   });
   await page.goto("https://portal.copihue.ca/");
   await expect(page.getByRole("heading", { name: "Your care starts with the right portal." })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open Willow Wellness Centre/ })).toHaveAttribute("href", "https://willowwellness.copihue.ca/");
-  await expect(page.getByRole("button", { name: /sign in/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Open Willow Wellness Virtual Clinic/ })).toHaveAttribute("href", "https://willowwellness.copihue.ca/");
+  await expect(page.getByRole("link", { name: "Administration sign-in" })).toHaveAttribute("href", "/admin/");
   await page.getByRole("button", { name: "FR" }).click();
   await expect(page.getByRole("heading", { name: "Vos soins commencent par le bon portail." })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+});
+
+test('built central administration starts independently without clinic configuration or records', async ({ page }) => {
+  let clinicRequests = 0;
+  await page.route('https://portal.copihue.ca/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.startsWith('/api/')) { clinicRequests++; return route.fulfill({ status: 404 }); }
+    if (path === '/admin/') return route.fulfill({ contentType: 'text/html', body: readFileSync('dist/application-admin/central.html') });
+    if (path.startsWith('/admin/assets/')) return route.fulfill({ contentType: path.endsWith('.js') ? 'application/javascript' : 'text/css', body: readFileSync(`dist/application-admin/assets/${path.split('/').pop()}`) });
+    return route.fulfill({ status: 404 });
+  });
+  await page.goto('https://portal.copihue.ca/admin/');
+  await expect(page.getByRole('heading', { name: 'Application administration' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create clinic' })).toHaveCount(0);
+  expect(clinicRequests).toBe(0);
 });
 
 test("practitioner hover card shows only explicitly published contact actions", async ({ page }, info) => {

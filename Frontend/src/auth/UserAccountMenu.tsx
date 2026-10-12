@@ -5,6 +5,7 @@ import {
   useState,
   type MouseEvent,
 } from "react";
+import { useStaffProfile } from './useStaffProfile';
 import {
   Avatar,
   Box,
@@ -41,6 +42,7 @@ function initials(name: string) {
 }
 
 export function UserAccountMenu() {
+  const { profile } = useStaffProfile();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const avatarRequest = useRef(0);
@@ -103,7 +105,7 @@ export function UserAccountMenu() {
         {t("Staff sign in")}
       </Button>
     );
-  const name = account?.name ?? account?.username ?? t("Staff member");
+  const name = profile?.display_name || t("Staff member");
   const choose = (page: string) => {
     setAnchor(null);
     navigate(page === "profile" ? "/profile" : "/");
@@ -143,7 +145,7 @@ export function UserAccountMenu() {
         <Box px={2} py={1}>
           <Typography fontWeight={750}>{name}</Typography>
           <Typography variant="body2" color="text.secondary" noWrap>
-            {account?.username}
+            {profile?.email}
           </Typography>
           {error && (
             <Typography variant="caption" color="error">

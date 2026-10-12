@@ -5,7 +5,7 @@ export const surfaceConfig = (portal: boolean) => defineConfig(({ mode, command,
   const url = portal ? env.VITE_PORTAL_URL : env.VITE_PUBLIC_URL;
   const base = command === 'serve' && !isPreview ? '/' : new URL(url || (portal ? '/portal/' : '/'), 'https://build.invalid').pathname.replace(/\/?$/, '/');
   return {
-    plugins: [react()], base,
+    plugins: [react()], base, cacheDir: `node_modules/.vite-${portal ? 'portal' : 'public'}`,
     define: {
       __APP_SURFACE__: JSON.stringify(portal ? 'portal' : 'public'),
       // Each deployed surface uses its own thin PHP entry point on the current host.

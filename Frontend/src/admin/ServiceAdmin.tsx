@@ -1,9 +1,7 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer,
-  FormControlLabel, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText,
-  MenuItem, Paper, Stack, Switch, TextField, Typography,
-} from '@mui/material';
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Switch, Typography } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, Settings2, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
@@ -60,7 +58,8 @@ const fieldLabels: Record<'lead_time_minutes' | 'booking_horizon_days' | 'buffer
   lead_time_minutes: 'Lead time minutes', booking_horizon_days: 'Booking horizon days', buffer_before_minutes: 'Buffer before minutes', buffer_after_minutes: 'Buffer after minutes',
 };
 
-export function ServiceAdmin() {
+function ServiceAdminForm() {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [items, setItems] = useState<Service[]>([]);
@@ -95,7 +94,7 @@ export function ServiceAdmin() {
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
 
   const load = useCallback(async (preferredId?: number | null) => {
-    setBusy(true); setLoadError('');
+    setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
@@ -104,8 +103,8 @@ export function ServiceAdmin() {
         fetch(`${api}/admin/catalogue-settings`, { headers }),
       ]);
       const [body, settingsBody] = await Promise.all([response.json(), settingsResponse.json()]);
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load services.')));
-      if (!settingsResponse.ok) throw new Error(apiErrorMessage(settingsBody, settingsResponse.status, t('Unable to load service categories.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to load services.'));
+      if (!settingsResponse.ok) throw new ApiError(settingsBody, settingsResponse.status, t('Unable to load service categories.'));
       const loadedItems = body.data.map(normalizeService);
       setItems(loadedItems);
       setCategories((settingsBody.data.categories ?? []).map((category: Category) => ({ ...category, id: Number(category.id) })));
@@ -113,7 +112,7 @@ export function ServiceAdmin() {
         const requested = Number(preferredId ?? current ?? 0) || null;
         return loadedItems.some((item: Service) => item.id === requested) ? requested : null;
       });
-    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to load services.')); }
+    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load services.')); }
     finally { setBusy(false); }
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
@@ -128,15 +127,15 @@ export function ServiceAdmin() {
     buffer_before_minutes: String(service.buffer_before_minutes), buffer_after_minutes: String(service.buffer_after_minutes),
     display_order: String(service.display_order), requires_room: Boolean(Number(service.requires_room)), recurrence_allowed: Boolean(Number(service.recurrence_allowed)), active: Boolean(Number(service.active)), published: Boolean(Number(service.published)),
   });
-  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); setPanelError(''); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelMode('details'); setPanelError(''); };
+  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelMode('details'); (formValidation.clear(), setPanelError('')); };
   const startEdit = (service = selected) => {
     if (!service) return;
-    formGuard.markClean(); setSelectedId(service.id); setEditingId(service.id); setForm(serviceForm(service)); setPanelError(''); setPanelMode('edit');
+    formGuard.markClean(); setSelectedId(service.id); setEditingId(service.id); setForm(serviceForm(service)); (formValidation.clear(), setPanelError('')); setPanelMode('edit');
   };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); setEditingId(null); setPanelError('');
+    formGuard.markClean(); setPanelMode(null); setEditingId(null); (formValidation.clear(), setPanelError(''));
   };
   const openAssignments = (service = selected) => { if (service) setAssignmentServiceId(service.id); };
   const closeAssignments = () => {
@@ -147,7 +146,7 @@ export function ServiceAdmin() {
   const removeDuration = (key: string) => field('duration_options', form.duration_options.filter(option => option.key !== key));
 
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setPanelError(''); setSaved('');
+    event.preventDefault(); setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
     try {
       const durationOptions = form.duration_options.map(option => ({ minutes: Number(option.minutes), price_cents: Math.round(Number(option.price) * 100) }));
       const cancellationValue = form.cancellation_fee_type === 'fixed' ? Math.round(Number(form.cancellation_fee_value) * 100) : form.cancellation_fee_type === 'percentage' ? Math.round(Number(form.cancellation_fee_value) * 100) : 0;
@@ -155,11 +154,11 @@ export function ServiceAdmin() {
       const token = await getAccessToken();
       const response = await fetch(editingId ? `${api}/admin/services/${editingId}` : `${api}/admin/services`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save service.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to save service.'));
       const savedId = Number(body.data?.id ?? editingId ?? 0) || null;
       const message = t('{{name}} was {{action}}.', { name: form.name, action: t(editingId ? 'updated' : 'created') });
       formGuard.markClean(); setPanelMode(null); setEditingId(null); await load(savedId); setSaved(message);
-    } catch (cause) { setPanelError(cause instanceof Error ? cause.message : t('Unable to save service.')); }
+    } catch (cause) { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save service.')); }
     finally { setBusy(false); }
   };
 
@@ -171,12 +170,12 @@ export function ServiceAdmin() {
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
         <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
         <Button startIcon={<Settings2 size={17}/>} disabled={!selected} onClick={() => openAssignments()}>{t('Assignments')}</Button>
-        <TextField select size="small" label={t('Filter by category')} value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} sx={{ minWidth: { md: 190 } }}>
+        <TextField name="categoryFilter" select size="small" label={t('Filter by category')} value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} sx={{ minWidth: { md: 190 } }}>
           <MenuItem value="all">{t('All categories')}</MenuItem>
           <MenuItem value="uncategorized">{t('Uncategorized')}</MenuItem>
           {categories.map(category => <MenuItem key={category.id} value={String(category.id)}>{category.name}</MenuItem>)}
         </TextField>
-        <TextField size="small" label={t('Filter services')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
+        <TextField name="query" size="small" label={t('Filter services')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
       </Stack>
       {selected && Boolean(Number(selected.active)) && <Button component={RouterLink} to={pagePath('admin', 'appointments')} state={{ startBooking: true, bookingServiceId: selected.id }} variant="contained" sx={{ mt: 1 }}>{t('Book appointment')}</Button>}
     </Paper>
@@ -218,6 +217,8 @@ export function ServiceAdmin() {
     </Dialog>
   </Stack>;
 }
+export const ServiceAdmin = withFormValidation(ServiceAdminForm);
+
 
 function ServiceDetails({ service, options, money, edit, assignments }: { service: Service; options: DurationOption[]; money: (cents: number) => string; edit: () => void; assignments: () => void }) {
   const { t } = useTranslation();
@@ -246,26 +247,26 @@ function ServiceDetails({ service, options, money, edit, assignments }: { servic
 function ServiceFields({ form, categories, field, changeDuration, removeDuration }: { form: Form; categories: Category[]; field: <K extends keyof Form>(key: K, value: Form[K]) => void; changeDuration: (key: string, property: 'minutes' | 'price', value: string) => void; removeDuration: (key: string) => void }) {
   const { t } = useTranslation();
   return <Grid container spacing={2}>
-    <Grid size={12}><TextField select fullWidth label={t('Category')} value={form.category_id} onChange={event => field('category_id', event.target.value)} helperText={categories.length === 0 ? t('Create service categories in Business settings, or leave this service uncategorized.') : undefined}><MenuItem value="">{t('Uncategorized')}</MenuItem>{categories.map(category => <MenuItem key={category.id} value={String(category.id)}>{category.name}</MenuItem>)}</TextField></Grid>
-    <Grid size={12}><TextField required fullWidth label={t('Service name')} value={form.name} onChange={event => { field('name', event.target.value); if (!form.slug) field('slug', slugify(event.target.value)); }} inputProps={{ maxLength: 150 }}/></Grid>
-    <Grid size={12}><TextField fullWidth label={t('Service name (French)')} value={form.name_fr} onChange={event => field('name_fr', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
-    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Description')} value={form.description} onChange={event => field('description', event.target.value)}/></Grid>
-    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Description (French)')} value={form.description_fr} onChange={event => field('description_fr', event.target.value)}/></Grid>
+    <Grid size={12}><TextField name="category_id" select fullWidth label={t('Category')} value={form.category_id} onChange={event => field('category_id', event.target.value)} helperText={categories.length === 0 ? t('Create service categories in Business settings, or leave this service uncategorized.') : undefined}><MenuItem value="">{t('Uncategorized')}</MenuItem>{categories.map(category => <MenuItem key={category.id} value={String(category.id)}>{category.name}</MenuItem>)}</TextField></Grid>
+    <Grid size={12}><TextField name="name" required fullWidth label={t('Service name')} value={form.name} onChange={event => { field('name', event.target.value); if (!form.slug) field('slug', slugify(event.target.value)); }} inputProps={{ maxLength: 150 }}/></Grid>
+    <Grid size={12}><TextField name="name_fr" fullWidth label={t('Service name (French)')} value={form.name_fr} onChange={event => field('name_fr', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
+    <Grid size={12}><TextField name="description" fullWidth multiline minRows={2} label={t('Description')} value={form.description} onChange={event => field('description', event.target.value)}/></Grid>
+    <Grid size={12}><TextField name="description_fr" fullWidth multiline minRows={2} label={t('Description (French)')} value={form.description_fr} onChange={event => field('description_fr', event.target.value)}/></Grid>
     <Grid size={12}><Typography variant="subtitle1" fontWeight={700}>{t('Duration and price options')}</Typography><Typography variant="body2" color="text.secondary">{t('Prices are explicit for each duration. Appointments keep a snapshot of the selected price.')}</Typography></Grid>
-    {form.duration_options.map((option, index) => <Grid size={12} key={option.key}><Stack direction="row" spacing={1} alignItems="center"><TextField required fullWidth type="number" label={t('Duration {{number}} (minutes)', { number: index + 1 })} value={option.minutes} onChange={event => changeDuration(option.key, 'minutes', event.target.value)} inputProps={{ min: 15, max: 480, step: 15 }}/><TextField required fullWidth type="number" label={t('Price {{number}} (CAD)', { number: index + 1 })} value={option.price} onChange={event => changeDuration(option.key, 'price', event.target.value)} inputProps={{ min: 0, step: .01 }}/><IconButton aria-label={t('Remove duration {{number}}', { number: index + 1 })} disabled={form.duration_options.length === 1} onClick={() => removeDuration(option.key)}><Trash2 size={18}/></IconButton></Stack></Grid>)}
+    {form.duration_options.map((option, index) => <Grid size={12} key={option.key}><Stack direction="row" spacing={1} alignItems="center"><TextField name="minutes" required fullWidth type="number" label={t('Duration {{number}} (minutes)', { number: index + 1 })} value={option.minutes} onChange={event => changeDuration(option.key, 'minutes', event.target.value)} inputProps={{ min: 15, max: 480, step: 15 }}/><TextField name="price" required fullWidth type="number" label={t('Price {{number}} (CAD)', { number: index + 1 })} value={option.price} onChange={event => changeDuration(option.key, 'price', event.target.value)} inputProps={{ min: 0, step: .01 }}/><IconButton aria-label={t('Remove duration {{number}}', { number: index + 1 })} disabled={form.duration_options.length === 1} onClick={() => removeDuration(option.key)}><Trash2 size={18}/></IconButton></Stack></Grid>)}
     <Grid size={12}><Button startIcon={<Plus size={16}/>} onClick={() => field('duration_options', [...form.duration_options, duration()])}>{t('Add duration and price')}</Button></Grid>
-    {(Object.keys(fieldLabels) as (keyof typeof fieldLabels)[]).map(key => <Grid size={{ xs: 6 }} key={key}><TextField required fullWidth type="number" label={t(fieldLabels[key])} value={form[key]} onChange={event => field(key, event.target.value)}/></Grid>)}
+    {(Object.keys(fieldLabels) as (keyof typeof fieldLabels)[]).map(key => <Grid size={{ xs: 6 }} key={key}><TextField name={key} required fullWidth type="number" label={t(fieldLabels[key])} value={form[key]} onChange={event => field(key, event.target.value)}/></Grid>)}
     <Grid size={12}><Divider><Typography variant="overline">{t('Cancellation policy')}</Typography></Divider></Grid>
-    <Grid size={{ xs: 12, sm: 6 }}><TextField required fullWidth type="number" label={t('Cancellation window minutes')} value={form.cancellation_window_minutes} onChange={event => field('cancellation_window_minutes', event.target.value)} inputProps={{ min: 0, max: 525600 }}/></Grid>
-    <Grid size={{ xs: 12, sm: 6 }}><TextField select fullWidth label={t('Cancellation fee type')} value={form.cancellation_fee_type} onChange={event => { const value=event.target.value as Form['cancellation_fee_type']; field('cancellation_fee_type', value); if(value==='none')field('cancellation_fee_value','0'); }}><MenuItem value="none">{t('No fee')}</MenuItem><MenuItem value="fixed">{t('Fixed amount')}</MenuItem><MenuItem value="percentage">{t('Percentage')}</MenuItem></TextField></Grid>
-    {form.cancellation_fee_type !== 'none' && <Grid size={12}><TextField required fullWidth type="number" label={t(form.cancellation_fee_type === 'fixed' ? 'Cancellation fee (CAD)' : 'Cancellation fee (%)')} value={form.cancellation_fee_value} onChange={event => field('cancellation_fee_value', event.target.value)} inputProps={{ min: 0, max: form.cancellation_fee_type === 'percentage' ? 100 : 100000, step: form.cancellation_fee_type === 'percentage' ? .01 : .01 }} helperText={t('This fee applies only when the client cancels inside the configured window. Existing appointments retain the policy accepted when booked.')}/></Grid>}
-    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Preparation instructions')} value={form.preparation_instructions} onChange={event => field('preparation_instructions', event.target.value)}/></Grid>
-    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Preparation instructions (French)')} value={form.preparation_instructions_fr} onChange={event => field('preparation_instructions_fr', event.target.value)}/></Grid>
+    <Grid size={{ xs: 12, sm: 6 }}><TextField name="cancellation_window_minutes" required fullWidth type="number" label={t('Cancellation window minutes')} value={form.cancellation_window_minutes} onChange={event => field('cancellation_window_minutes', event.target.value)} inputProps={{ min: 0, max: 525600 }}/></Grid>
+    <Grid size={{ xs: 12, sm: 6 }}><TextField name="cancellation_fee_type" select fullWidth label={t('Cancellation fee type')} value={form.cancellation_fee_type} onChange={event => { const value=event.target.value as Form['cancellation_fee_type']; field('cancellation_fee_type', value); if(value==='none')field('cancellation_fee_value','0'); }}><MenuItem value="none">{t('No fee')}</MenuItem><MenuItem value="fixed">{t('Fixed amount')}</MenuItem><MenuItem value="percentage">{t('Percentage')}</MenuItem></TextField></Grid>
+    {form.cancellation_fee_type !== 'none' && <Grid size={12}><TextField name="cancellation_fee_value" required fullWidth type="number" label={t(form.cancellation_fee_type === 'fixed' ? 'Cancellation fee (CAD)' : 'Cancellation fee (%)')} value={form.cancellation_fee_value} onChange={event => field('cancellation_fee_value', event.target.value)} inputProps={{ min: 0, max: form.cancellation_fee_type === 'percentage' ? 100 : 100000, step: form.cancellation_fee_type === 'percentage' ? .01 : .01 }} helperText={t('This fee applies only when the client cancels inside the configured window. Existing appointments retain the policy accepted when booked.')}/></Grid>}
+    <Grid size={12}><TextField name="preparation_instructions" fullWidth multiline minRows={2} label={t('Preparation instructions')} value={form.preparation_instructions} onChange={event => field('preparation_instructions', event.target.value)}/></Grid>
+    <Grid size={12}><TextField name="preparation_instructions_fr" fullWidth multiline minRows={2} label={t('Preparation instructions (French)')} value={form.preparation_instructions_fr} onChange={event => field('preparation_instructions_fr', event.target.value)}/></Grid>
     <Grid size={12}><Divider><Typography variant="overline">{t('Public catalogue')}</Typography></Divider></Grid>
-    <Grid size={12}><TextField required fullWidth label={t('Public URL')} value={form.slug} onChange={event => field('slug', slugify(event.target.value))} helperText={t('Lowercase letters, numbers, and hyphens. Changing this URL may break saved links.')} inputProps={{ maxLength: 120 }}/></Grid>
-    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Public summary')} value={form.public_summary} onChange={event => field('public_summary', event.target.value)} inputProps={{ maxLength: 500 }}/></Grid>
-    <Grid size={12}><TextField fullWidth multiline minRows={2} label={t('Public summary (French)')} value={form.public_summary_fr} onChange={event => field('public_summary_fr', event.target.value)} inputProps={{ maxLength: 500 }}/></Grid>
-    <Grid size={{ xs: 12, sm: 6 }}><TextField required fullWidth type="number" label={t('Display order')} value={form.display_order} onChange={event => field('display_order', event.target.value)} inputProps={{ min: 0, max: 65535 }}/></Grid>
-    <Grid size={12}><Stack><FormControlLabel control={<Switch checked={form.published} onChange={event => field('published', event.target.checked)}/>} label={t('Publish in the public catalogue')}/><FormControlLabel control={<Switch checked={form.requires_room} onChange={event => field('requires_room', event.target.checked)}/>} label={t('Requires a room')}/><FormControlLabel control={<Switch checked={form.recurrence_allowed} onChange={event => field('recurrence_allowed', event.target.checked)}/>} label={t('Recurring bookings')}/><FormControlLabel control={<Switch checked={form.active} onChange={event => field('active', event.target.checked)}/>} label={t('Active')}/></Stack></Grid>
+    <Grid size={12}><TextField name="slug" required fullWidth label={t('Public URL')} value={form.slug} onChange={event => field('slug', slugify(event.target.value))} helperText={t('Lowercase letters, numbers, and hyphens. Changing this URL may break saved links.')} inputProps={{ maxLength: 120 }}/></Grid>
+    <Grid size={12}><TextField name="public_summary" fullWidth multiline minRows={2} label={t('Public summary')} value={form.public_summary} onChange={event => field('public_summary', event.target.value)} inputProps={{ maxLength: 500 }}/></Grid>
+    <Grid size={12}><TextField name="public_summary_fr" fullWidth multiline minRows={2} label={t('Public summary (French)')} value={form.public_summary_fr} onChange={event => field('public_summary_fr', event.target.value)} inputProps={{ maxLength: 500 }}/></Grid>
+    <Grid size={{ xs: 12, sm: 6 }}><TextField name="display_order" required fullWidth type="number" label={t('Display order')} value={form.display_order} onChange={event => field('display_order', event.target.value)} inputProps={{ min: 0, max: 65535 }}/></Grid>
+    <Grid size={12}><Stack><FormControlLabel name="published" control={<Switch checked={form.published} onChange={event => field('published', event.target.checked)}/>} label={t('Publish in the public catalogue')}/><FormControlLabel name="requires_room" control={<Switch checked={form.requires_room} onChange={event => field('requires_room', event.target.checked)}/>} label={t('Requires a room')}/><FormControlLabel name="recurrence_allowed" control={<Switch checked={form.recurrence_allowed} onChange={event => field('recurrence_allowed', event.target.checked)}/>} label={t('Recurring bookings')}/><FormControlLabel name="active" control={<Switch checked={form.active} onChange={event => field('active', event.target.checked)}/>} label={t('Active')}/></Stack></Grid>
   </Grid>;
 }

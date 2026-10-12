@@ -2,6 +2,12 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import en from './en';
 import fr from './fr';
+import workLocations from './workLocations';
+import staffInvitationErrors from './staffInvitationErrors';
+import staffProfileMessages from './staffProfileMessages';
+import formValidationMessages from './formValidationMessages';
+import clinics from './clinics';
+import applicationAdmin from './applicationAdmin';
 
 export const supportedLanguages = ['en', 'fr'] as const;
 export type SupportedLanguage = typeof supportedLanguages[number];
@@ -23,7 +29,7 @@ function initialLanguage(): SupportedLanguage {
 }
 
 void i18n.use(initReactI18next).init({
-  resources: { en: { translation: en }, fr: { translation: fr } },
+  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr } } },
   lng: initialLanguage(),
   fallbackLng: 'en',
   supportedLngs: supportedLanguages,

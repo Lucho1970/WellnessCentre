@@ -81,3 +81,7 @@ The requirements in [Master Requirements](MASTER_REQUIREMENTS.md) and architectu
 ## MT0 checkpoint — 5 October 2026
 
 The [local source review and proposed architecture](MT0_IDENTITY_AND_PRACTICE_ARCHITECTURE.md) and [route/module/table inventory](MT0_SOURCE_INVENTORY.md) are recorded. Architecture acceptance is still pending: live schema reconciliation, provider proof-of-concept criteria review, storage/restore decisions and independent-practice access policy must be resolved. The next implementation slice is trusted server-side clinic context while preserving the existing Willow login. No production identity changes or executable migrations were introduced by this checkpoint.
+
+## Clinic provisioning checkpoint — 8 October 2026
+
+`feature/separate-clinic-portals` adds Super Admin clinic creation, exact portal-host registration, explicit administrator memberships, separate client links/sessions per clinic and clinic-specific link destinations. Multiple locations remain within their owning clinic. See [Separate clinic portals](SEPARATE_CLINIC_PORTALS.md) for migration 039, runtime activation and synthetic/hosted acceptance. Existing test records are not moved. This completes the implemented portal provisioning slice, not the entire MT2 inventory, operational restore acceptance or independent-practitioner clinical-sharing policy. A second hosted clinic still requires DNS, identity callbacks, matching deployment and hosted isolation acceptance.

@@ -1,21 +1,26 @@
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
+import { RecurringBooking } from './RecurringBooking';
+import { ManageRecurringSeries } from './ManageRecurringSeries';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, Drawer, FormControlLabel, Grid, IconButton, Link, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
+import { Box, Button, ButtonBase, Checkbox, Chip, CircularProgress, Divider, Drawer, Grid, IconButton, Link, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Step, StepLabel, Stepper, Typography } from '@mui/material';
 import { CalendarClock, CalendarPlus, CalendarX, Eye, RefreshCw, UserRoundCheck, X } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
+import { AppointmentLinkRevocation } from './AppointmentLinkRevocation';
 import { formatCad, formatDateTime } from '../i18n/format';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import { portalLink } from '../shared/urls';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useSearchParams } from 'react-router-dom';
+import { pagePath } from '../portal/access';
 import { PractitionerVisitHistory } from './PractitionerVisitHistory';
 import { PractitionerVisitOutcome } from './PractitionerVisitOutcome';
 import { AppointmentLogisticsNotes } from './AppointmentLogisticsNotes';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
-type Combination = { location_id: number; location_name: string; timezone: string; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
+type Combination = { recurrence_allowed?: number; location_id: number; location_name: string; timezone: string; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type CancellationPreview = { window_minutes: number; deadline: string; inside_fee_window: boolean; fee_cents: number; appointment_total_cents: number; currency: string };
@@ -31,7 +36,7 @@ function phoneHrefs(value?: string | null) {
   const phone = (value ?? '').replace(/[^\d+]/g, '');
   return /^\+?\d{7,15}$/.test(phone) ? { call: `tel:${phone}`, text: `sms:${phone}` } : null;
 }
-type Appointment = { delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
+type Appointment = { recurring_series_id?: number | null; action_links_enabled?: boolean; delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
 type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string, readonly fields: Record<string, unknown> = {}) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
@@ -42,7 +47,8 @@ function unique(rows: Combination[], key: 'location_id' | 'service_id' | 'practi
   return [...new Map(rows.map(row => [String(row[key]), row])).values()];
 }
 
-export function StaffAppointments({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false, canAddClients = false, canApproveOnsiteArea = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean; canAddClients?: boolean; canApproveOnsiteArea?: boolean }) {
+function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleOthers = false, canManageFees = false, canAddClients = false, canApproveOnsiteArea = false }: { canBook: boolean; practitionerMode?: boolean; canScheduleOthers?: boolean; canManageFees?: boolean; canAddClients?: boolean; canApproveOnsiteArea?: boolean }) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [searchParams] = useSearchParams();
@@ -50,6 +56,8 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   const bookingIntent = route.state as { startBooking?: boolean; bookingClient?: Client; bookingServiceId?: number } | null;
   const requestedId = Number(searchParams.get('appointment_id'));
   const linkedId = Number.isSafeInteger(requestedId) && requestedId > 0 ? requestedId : null;
+  const requestedClient = Number(searchParams.get('return_client_id'));
+  const returnClientId = !practitionerMode && Number.isSafeInteger(requestedClient) && requestedClient > 0 ? requestedClient : null;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [view, setView] = useState(() => searchParams.get('view') === 'needs_outcome' ? 'needs_outcome' : searchParams.get('view') === 'past' ? 'past' : 'upcoming');
   const [showCanceled, setShowCanceled] = useState(() => { try { return localStorage.getItem('wellness.staff.showCanceledAppointments') === 'true'; } catch { return false; } });
@@ -67,6 +75,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   const [detailsBusy, setDetailsBusy] = useState(false);
   const [detailsError, setDetailsError] = useState('');
   const [managing, setManaging] = useState<{ appointment: Appointment; action: 'reschedule' | 'cancel' } | null>(null);
+  const [seriesManaging, setSeriesManaging] = useState<number | null>(null);
   const [reassigning, setReassigning] = useState<Appointment | null>(null);
   const selected = selectedId === linkedId && focusedAppointment?.id === selectedId ? focusedAppointment : appointments.find(item => item.id === selectedId) ?? null;
   const clientEmailHref = emailHref(detailsRecord?.client_email);
@@ -86,50 +95,54 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
   useEffect(() => {
     if (linkedId === null) return;
     let active = true;
-    setSelectedId(linkedId); setLinkedError('');
+    setSelectedId(linkedId); (formValidation.clear(), setLinkedError(''));
     void request(`/appointments/${linkedId}${practitionerMode ? '?scope=practitioner' : ''}`)
       .then(data => { if (active) { setFocusedAppointment(data); setSelectedId(linkedId); setDetailsOpen(true); } })
-      .catch(error => { if (active) setLinkedError(error instanceof Error ? error.message : t('Unable to load appointment.')); });
+      .catch(error => { formValidation.capture(error); if (active) setLinkedError(error instanceof Error ? error.message : t('Unable to load appointment.')); });
     return () => { active = false; };
   }, [linkedId, practitionerMode, refresh, request, t]);
   useEffect(() => {
-    if (!detailsOpen || selectedId === null) { setDetailsRecord(null); setDetailsBusy(false); setDetailsError(''); return; }
-    if (focusedAppointment?.id === selectedId) { setDetailsRecord(focusedAppointment); setDetailsBusy(false); setDetailsError(''); return; }
+    if (!detailsOpen || selectedId === null) { setDetailsRecord(null); setDetailsBusy(false); (formValidation.clear(), setDetailsError('')); return; }
+    if (focusedAppointment?.id === selectedId) { setDetailsRecord(focusedAppointment); setDetailsBusy(false); (formValidation.clear(), setDetailsError('')); return; }
     const controller = new AbortController();
-    setDetailsRecord(null); setDetailsBusy(true); setDetailsError('');
+    setDetailsRecord(null); setDetailsBusy(true); (formValidation.clear(), setDetailsError(''));
     void request(`/appointments/${selectedId}${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) setDetailsRecord(data); })
-      .catch(error => { if (!controller.signal.aborted) setDetailsError(error instanceof Error ? error.message : t('Unable to load appointment.')); })
+      .catch(error => { formValidation.capture(error); if (!controller.signal.aborted) setDetailsError(error instanceof Error ? error.message : t('Unable to load appointment.')); })
       .finally(() => { if (!controller.signal.aborted) setDetailsBusy(false); });
     return () => controller.abort();
   }, [detailsOpen, selectedId, focusedAppointment, practitionerMode, request, t]);
   useEffect(() => {
-    const controller = new AbortController(); setListBusy(true); setListError('');
+    const controller = new AbortController(); setListBusy(true); (formValidation.clear(), setListError(''));
     void request(`/appointments?view=${view}&page=${page}&show_canceled=${showCanceled ? '1' : '0'}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) { setAppointments(data); setSelectedId(current => data.some((item: Appointment) => item.id === current) || current === linkedId ? current : null); } })
-      .catch(error => { if (!controller.signal.aborted) setListError(error.message); })
+      .catch(error => { formValidation.capture(error); if (!controller.signal.aborted) setListError(error.message); })
       .finally(() => { if (!controller.signal.aborted) setListBusy(false); });
     return () => controller.abort();
   }, [request, view, page, showCanceled, refresh, practitionerMode, linkedId]);
   const startChange = (action: 'reschedule' | 'cancel') => { if (!selected || !canChangeSelected) return; setCreating(false); setDetailsOpen(false); setManaging({ appointment: selected, action }); };
   return <Stack spacing={2}>
+    {returnClientId !== null && <Button component={RouterLink} to={`${pagePath('admin', 'clients')}?client_id=${returnClientId}`} sx={{ alignSelf: 'flex-start' }}>{t('Back to client history')}</Button>}
     <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Appointment actions')} spacing={1.5}>
       <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} sx={{ '& .MuiButton-root': { flexShrink: 0, whiteSpace: 'nowrap' } }}>
         {canBook && <Button variant="contained" startIcon={<CalendarPlus size={17}/>} disabled={creating} onClick={() => { setCreating(true); setNotice(''); }}>{t('Book appointment')}</Button>}
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={() => setDetailsOpen(true)}>{t('More details')}</Button>
         {canBook && <><Button startIcon={<CalendarClock size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" startIcon={<CalendarX size={17}/>} disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button></>}
+        {canBook && selected?.recurring_series_id && <Button disabled={!canChangeSelected} onClick={() => { setManaging(null); setDetailsOpen(false); setSeriesManaging(Number(selected.recurring_series_id)); }}>{t('Manage future series')}</Button>}
         {!practitionerMode && canManageFees && <Button startIcon={<UserRoundCheck size={17}/>} disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}
       </Stack>
       <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} alignItems="center">
-        <TextField select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); setSelectedId(null); setDetailsOpen(false); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="needs_outcome">{t('Needs visit outcome')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
-        <FormControlLabel sx={{ ml: 0, mr: 1 }} control={<Checkbox checked={showCanceled} onChange={event => { const checked = event.target.checked; setShowCanceled(checked); try { localStorage.setItem('wellness.staff.showCanceledAppointments', String(checked)); } catch { /* Browsers may disable storage. */ } setPage(1); setSelectedId(null); setDetailsOpen(false); }} />} label={t('Show canceled appointments')} />
+        <TextField name="view" select size="small" label={t('Show')} value={view} onChange={event => { setView(event.target.value); setPage(1); setSelectedId(null); setDetailsOpen(false); }} sx={{ minWidth: 170 }}><MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="needs_outcome">{t('Needs visit outcome')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem></TextField>
+        <FormControlLabel name="showCanceled" sx={{ ml: 0, mr: 1 }} control={<Checkbox checked={showCanceled} onChange={event => { const checked = event.target.checked; setShowCanceled(checked); try { localStorage.setItem('wellness.staff.showCanceledAppointments', String(checked)); } catch { /* Browsers may disable storage. */ } setPage(1); setSelectedId(null); setDetailsOpen(false); }} />} label={t('Show canceled appointments')} />
         <Button startIcon={<RefreshCw size={16}/>} disabled={listBusy} onClick={() => setRefresh(value => value + 1)} sx={{ flexShrink: 0 }}>{t('Refresh')}</Button>
       </Stack>
     </Stack></Paper>
+    {selected?.recurring_series_id && <Alert severity="info">{t('This appointment belongs to a recurring series. Ordinary reschedule and cancel actions change only this appointment.')}</Alert>}
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
     {linkedError && <Alert severity="error">{linkedError}</Alert>}
-    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} canApproveOnsiteArea={canApproveOnsiteArea} initialClient={bookingIntent?.bookingClient} initialServiceId={bookingIntent?.bookingServiceId} cancel={() => setCreating(false)} complete={id => { setCreating(false); setNotice(t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
+    {creating && <BookingForm request={request} practitionerMode={practitionerMode} canScheduleOthers={canScheduleOthers} canAddClients={canAddClients} canApproveOnsiteArea={canApproveOnsiteArea} initialClient={bookingIntent?.bookingClient} initialServiceId={bookingIntent?.bookingServiceId} cancel={() => setCreating(false)} complete={(id, message) => { setCreating(false); setNotice(message ?? t('Appointment #{{id}} confirmed. A confirmation email is being sent.', { id })); setView('upcoming'); setPage(1); setRefresh(value => value + 1); }} />}
     {managing && <ManageAppointment key={`${managing.appointment.id}-${managing.action}`} appointment={managing.appointment} initialAction={managing.action} request={request} canAssessFees={!practitionerMode || canManageFees} canManageFees={canManageFees} close={() => setManaging(null)} complete={message => { setManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
+    {seriesManaging !== null && <ManageRecurringSeries id={seriesManaging} request={request} close={() => setSeriesManaging(null)} complete={message => { setSeriesManaging(null); setNotice(message); setRefresh(value => value + 1); }} />}
     {reassigning && <ReassignAppointment key={reassigning.id} appointment={reassigning} request={request} close={() => setReassigning(null)} complete={() => { setReassigning(null); setSelectedId(null); setFocusedAppointment(null); setNotice(t('Appointment #{{id}} was assigned to a new practitioner.', { id: reassigning.id })); setRefresh(value => value + 1); }} />}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Appointments')}</Typography><Typography color="text.secondary">{t('Select an appointment to view details or enable actions. Times are shown in each clinic location’s timezone.')}</Typography></Box>
@@ -137,7 +150,7 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
       {listBusy ? <Box sx={{ p: 3 }}><CircularProgress aria-label={t('Loading appointments')} /></Box> : !listError && <Stack>
         <List disablePadding aria-label={t('Appointments')}>
           {appointments.map(item => <ListItemButton key={item.id} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} divider sx={{ py: 1.75, px: 2.5 }}>
-            <ListItemText primary={<Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={750}>{item.client_name} · {item.service_name}</Typography><Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>} secondary={<Stack><Typography variant="body2" color="text.secondary">{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography><Typography variant="body2" color="text.secondary">{item.practitioner_name} · {item.location_name} · #{item.id}</Typography></Stack>} />
+            <ListItemText primary={<Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={750}>{item.client_name} · {item.service_name}</Typography>{item.recurring_series_id && <Chip size="small" label={t('Recurring series #{{id}}', { id: item.recurring_series_id })} />}<Chip size="small" label={t(item.status.replaceAll('_', ' '))} variant="outlined" /></Stack>} secondary={<Stack><Typography variant="body2" color="text.secondary">{displayTime(item.starts_at, item.timezone, i18n.resolvedLanguage, true)} – {displayTime(item.ends_at, item.timezone, i18n.resolvedLanguage, true)}</Typography><Typography variant="body2" color="text.secondary">{item.practitioner_name} · {item.location_name} · #{item.id}</Typography></Stack>} />
           </ListItemButton>)}
           {appointments.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography color="text.secondary">{t('No appointments in this view.')}</Typography></Box>}
         </List>
@@ -161,14 +174,18 @@ export function StaffAppointments({ canBook, practitionerMode = false, canSchedu
         {detailsRecord && <AppointmentLogisticsNotes key={selected.id} appointmentId={selected.id} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && <PractitionerVisitHistory appointmentId={selected.id} serviceName={selected.service_name} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && detailsRecord && <PractitionerVisitOutcome appointment={detailsRecord} request={request} onChanged={message => { setNotice(message); setDetailsOpen(false); setRefresh(value => value + 1); }} />}
+        {!practitionerMode && canManageFees && detailsRecord?.action_links_enabled && <AppointmentLinkRevocation key={detailsRecord.id} appointmentId={detailsRecord.id} request={request}/>}
         {canBook && <Stack direction="row" gap={1}><Button disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button>{!practitionerMode && canManageFees && <Button disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}</Stack>}
       </Stack></>}
     </Drawer>
   </Stack>;
 }
+export const StaffAppointments = withFormValidation(StaffAppointmentsForm);
+
 
 type ReassignmentCandidate = { practitioner_id: number; practitioner_name: string };
-function ReassignAppointment({ appointment, request, close, complete }: { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; close: () => void; complete: () => void }) {
+function ReassignAppointmentValidated({ appointment, request, close, complete }: { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; close: () => void; complete: () => void }) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const [candidates, setCandidates] = useState<ReassignmentCandidate[]>([]);
   const [practitionerId, setPractitionerId] = useState('');
@@ -181,18 +198,18 @@ function ReassignAppointment({ appointment, request, close, complete }: { appoin
     let active = true;
     void request(`/appointments/${appointment.id}/reassignment-options`)
       .then(data => { if (active) setCandidates(data as ReassignmentCandidate[]); })
-      .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : t('Unable to load practitioners.')); })
+      .catch(cause => { formValidation.capture(cause); if (active) setError(cause instanceof Error ? cause.message : t('Unable to load practitioners.')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [appointment.id, request, t]);
   const closeSafely = () => { if (!saving && (!(practitionerId || reason.trim()) || window.confirm(t('Discard your unsaved changes?')))) close(); };
   const submit = async () => {
     if (!practitionerId || !reason.trim()) return;
-    setSaving(true); setError('');
+    setSaving(true); (formValidation.clear(), setError(''));
     try {
       await request(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reassign', version: Number(appointment.version), practitioner_id: Number(practitionerId), reason: reason.trim() }) });
       complete();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to change the practitioner.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to change the practitioner.')); }
     finally { setSaving(false); }
   };
   return <Drawer anchor="right" open onClose={closeSafely} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 560 }, maxWidth: '100%' } } }}>
@@ -202,15 +219,18 @@ function ReassignAppointment({ appointment, request, close, complete }: { appoin
       <Typography>{displayTime(appointment.starts_at, appointment.timezone, i18n.resolvedLanguage, true)} · {appointment.location_name}</Typography>
       <Alert severity="info">{t('Only practitioners available for this in-clinic appointment at the same time, room, and price are shown. The client and both practitioners will be notified.')}</Alert>
       {error && <Alert severity="error">{error}</Alert>}
-      {loading ? <CircularProgress aria-label={t('Loading practitioners')} /> : candidates.length === 0 ? <Alert severity="warning">{t('No other practitioner can take this appointment without changing its time or price.')}</Alert> : <TextField select required label={t('New practitioner')} value={practitionerId} disabled={saving} onChange={event => setPractitionerId(event.target.value)}>{candidates.map(candidate => <MenuItem key={candidate.practitioner_id} value={String(candidate.practitioner_id)}>{candidate.practitioner_name}</MenuItem>)}</TextField>}
-      <TextField required label={t('Reason for reassignment')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} disabled={saving} onChange={event => setReason(event.target.value)} />
+      {loading ? <CircularProgress aria-label={t('Loading practitioners')} /> : candidates.length === 0 ? <Alert severity="warning">{t('No other practitioner can take this appointment without changing its time or price.')}</Alert> : <TextField name="practitioner_id" select required label={t('New practitioner')} value={practitionerId} disabled={saving} onChange={event => setPractitionerId(event.target.value)}>{candidates.map(candidate => <MenuItem key={candidate.practitioner_id} value={String(candidate.practitioner_id)}>{candidate.practitioner_name}</MenuItem>)}</TextField>}
+      <TextField name="reason" required label={t('Reason for reassignment')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} disabled={saving} onChange={event => setReason(event.target.value)} />
       <Stack direction="row" gap={2}><Button disabled={saving} onClick={closeSafely}>{t('Cancel')}</Button><Button variant="contained" disabled={loading || saving || !practitionerId || !reason.trim()} onClick={() => void submit()}>{t(saving ? 'Saving…' : 'Confirm practitioner change')}</Button></Stack>
     </Stack>
   </Drawer>;
 }
+const ReassignAppointment = withFormValidation(ReassignAppointmentValidated);
+
 
 type ManageProps = { appointment: Appointment; initialAction: 'reschedule' | 'cancel'; request: (path: string, init?: RequestInit) => Promise<any>; canAssessFees: boolean; canManageFees: boolean; close: () => void; complete: (message: string) => void };
-function ManageAppointment({ appointment, initialAction, request, canAssessFees, canManageFees, close, complete }: ManageProps) {
+function ManageAppointmentValidated({ appointment, initialAction, request, canAssessFees, canManageFees, close, complete }: ManageProps) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const appointmentDate = new Intl.DateTimeFormat('en-CA', { timeZone: appointment.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(`${appointment.starts_at.replace(' ', 'T')}Z`));
   const action = initialAction;
@@ -234,28 +254,28 @@ function ManageAppointment({ appointment, initialAction, request, canAssessFees,
     let active = true;
     void request(`/appointments/${appointment.id}/cancellation-preview`).then(preview => {
       if (active) { setCancellation(preview); setAdjustedFee((Number(preview.fee_cents)/100).toFixed(2)); }
-    }).catch(cause => { if (active) setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }).finally(() => { if (active) setBusy(false); });
+    }).catch(cause => { formValidation.capture(cause); if (active) setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [appointment.id, initialAction, request, t]);
   const loadSlots = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError(''); setSlots([]); setSlot(null); setSearched(false);
+    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setSlots([]); setSlot(null); setSearched(false);
     try {
       const data = await request(`/appointments/${appointment.id}/availability?date_from=${date}&date_to=${date}`);
       const currentStart=new Date(`${appointment.starts_at.replace(' ', 'T')}Z`).getTime();
       setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(appointment.duration_option_id) && new Date(item.starts_at).getTime() !== currentStart)); setSearched(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
   const submit = async () => {
     if (action === 'reschedule' && (!slot || (needsRoom && !room))) return;
-    setBusy(true); setError('');
+    setBusy(true); (formValidation.clear(), setError(''));
     try {
       const body = action === 'cancel'
         ? { action, version: Number(appointment.version), reason, apply_cancellation_fee: clientRequested, ...(clientRequested && canManageFees && cancellation && Math.round(Number(adjustedFee)*100) !== Number(cancellation.fee_cents) ? { adjusted_fee_cents: Math.round(Number(adjustedFee)*100) } : {}) }
         : { action, version: Number(appointment.version), starts_at: slot!.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), reason };
       await request(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify(body) });
       complete(t(action === 'cancel' ? 'Appointment #{{id}} was canceled.' : 'Appointment #{{id}} was rescheduled.', { id: appointment.id }));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to change the appointment.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to change the appointment.')); }
     finally { setBusy(false); }
   };
   return <Drawer anchor="right" open onClose={closeSafely} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
@@ -267,27 +287,30 @@ function ManageAppointment({ appointment, initialAction, request, canAssessFees,
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
     {action === 'reschedule' && <Stack spacing={2}>
       <Typography>{t('Choose a new available time. The client, service, location, delivery mode, duration, and price remain unchanged.')}</Typography>
-      <Stack component="form" direction={{ xs: 'column', sm: 'row' }} gap={2} onSubmit={loadSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(appointment.timezone) }} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(null); setSearched(false); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
+      <Stack component="form" direction={{ xs: 'column', sm: 'row' }} gap={2} onSubmit={loadSlots}><TextField name="date" required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(appointment.timezone) }} onChange={event => { setDate(event.target.value); setSlots([]); setSlot(null); setSearched(false); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
       {searched && slots.length === 0 && <Alert severity="info">{t('No bookable times on this day. Try another day or check working hours and room assignments.')}</Alert>}
       <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, appointment.timezone, i18n.resolvedLanguage)}</Button>)}</Stack>
-      {slot && needsRoom && <TextField select required label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(id => <MenuItem key={id} value={String(id)}>{id === Number(appointment.room_id) && appointment.room_name ? appointment.room_name : t('Room {{number}}', { number: id })}</MenuItem>)}</TextField>}
-      <TextField label={t('Reason or note (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
+      {slot && needsRoom && <TextField name="room_id" select required label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(id => <MenuItem key={id} value={String(id)}>{id === Number(appointment.room_id) && appointment.room_name ? appointment.room_name : t('Room {{number}}', { number: id })}</MenuItem>)}</TextField>}
+      <TextField name="reason" label={t('Reason or note (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
       <Stack direction="row" gap={2}><Button disabled={busy} onClick={closeSafely}>{t('Cancel')}</Button><Button variant="contained" disabled={busy || !slot || (needsRoom && !room)} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm reschedule')}</Button></Stack>
     </Stack>}
     {action === 'cancel' && <Stack spacing={2}>
       <Alert severity="warning">{t('Canceling releases the time and room. The appointment remains in history.')}</Alert>
-      {canAssessFees && <FormControlLabel control={<Checkbox checked={clientRequested} onChange={event => setClientRequested(event.target.checked)}/>} label={t('This cancellation was requested by the client')}/>}
+      {canAssessFees && <FormControlLabel name="client_requested" control={<Checkbox checked={clientRequested} onChange={event => setClientRequested(event.target.checked)}/>} label={t('This cancellation was requested by the client')}/>}
       {cancellation && <Alert severity={clientRequested && cancellation.fee_cents > 0 ? 'warning' : 'info'}>{clientRequested ? (cancellation.fee_cents > 0 ? t('The calculated policy fee is {{fee}}.', { fee: formatCad(cancellation.fee_cents, i18n.resolvedLanguage) }) : t('No cancellation fee applies.')) : t('Clinic-initiated cancellations do not assess a client fee.')}</Alert>}
-      {clientRequested && canManageFees && cancellation && cancellation.fee_cents > 0 && <TextField required type="number" label={t('Assessed cancellation fee (CAD)')} value={adjustedFee} onChange={event => setAdjustedFee(event.target.value)} inputProps={{ min: 0, max: cancellation.fee_cents/100, step: .01 }} helperText={t('Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.')}/>}
-      <TextField label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
+      {clientRequested && canManageFees && cancellation && cancellation.fee_cents > 0 && <TextField name="adjusted_fee_cents" required type="number" label={t('Assessed cancellation fee (CAD)')} value={adjustedFee} onChange={event => setAdjustedFee(event.target.value)} inputProps={{ min: 0, max: cancellation.fee_cents/100, step: .01 }} helperText={t('Reducing or waiving the calculated fee requires a reason and is recorded in the audit history.')}/>}
+      <TextField name="reason" label={t('Cancellation reason (optional)')} value={reason} multiline minRows={2} inputProps={{ maxLength: 1000 }} onChange={event => setReason(event.target.value)} />
       <Stack direction="row" gap={2}><Button disabled={busy} onClick={closeSafely}>{t('Back')}</Button><Button color="error" variant="contained" disabled={busy || !cancellation || Boolean(clientRequested && canManageFees && Math.round(Number(adjustedFee)*100) !== Number(cancellation.fee_cents) && !reason.trim())} onClick={() => void submit()}>{t(busy ? 'Saving…' : 'Confirm cancellation')}</Button></Stack>
     </Stack>}
     </Stack>
   </Drawer>;
 }
+const ManageAppointment = withFormValidation(ManageAppointmentValidated);
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; initialClient?: Client; initialServiceId?: number; cancel: () => void; complete: (id: number) => void };
-function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClients, canApproveOnsiteArea, initialClient, initialServiceId, cancel, complete }: FormProps) {
+
+type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; initialClient?: Client; initialServiceId?: number; cancel: () => void; complete: (id: number, message?: string) => void };
+function BookingFormValidated({ request, practitionerMode, canScheduleOthers, canAddClients, canApproveOnsiteArea, initialClient, initialServiceId, cancel, complete }: FormProps) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
   const [options, setOptions] = useState<Combination[]>([]);
@@ -356,7 +379,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
   useEffect(() => {
     const controller = new AbortController();
     void request(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); setPreferredLocation(data.default_location_id ? String(data.default_location_id) : ''); } })
-      .catch(cause => { if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [request]);
   useEffect(() => {
@@ -380,7 +403,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
   }, [initialServiceId, options, service]);
   useEffect(() => {
     const term = clientQuery.trim();
-    setClients([]); setClientMore(false); setClientError(''); setClientSearched(false);
+    setClients([]); setClientMore(false); (formValidation.clear(), setClientError('')); setClientSearched(false);
     if (client || (term.length < 2 && !clientBirthdate)) { setClientBusy(false); return; }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
@@ -388,7 +411,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
       const params=new URLSearchParams();if(term.length>=2)params.set('q',term);if(clientBirthdate)params.set('date_of_birth',clientBirthdate);if(practitionerMode)params.set('scope','practitioner');
       void request(`/booking-clients?${params.toString()}`, { signal: controller.signal })
         .then(data => { if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); setClientSearched(true); } })
-        .catch(cause => { if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : t('Unable to search clients.')); })
+        .catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : t('Unable to search clients.')); })
         .finally(() => { if (!controller.signal.aborted) setClientBusy(false); });
     }, term.length >= 2 ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
@@ -412,14 +435,14 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
       .finally(() => { if (!controller.signal.aborted) setApprovalLoading(false); });
     return () => controller.abort();
   }, [request,client?.id,mode,location,service,practitioner,destination.address_line1,destination.address_line2,destination.city,destination.province,destination.postal_code,destination.country,addressComplete,options]);
-  const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); setError(''); };
+  const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); (formValidation.clear(), setError('')); };
   const createClient = async (event: FormEvent) => {
-    event.preventDefault(); setNewClientBusy(true); setNewClientError(''); setDuplicateClients([]);
+    event.preventDefault(); setNewClientBusy(true); (formValidation.clear(), setNewClientError('')); setDuplicateClients([]);
     try {
       const created: Client = await request('/clients', { method: 'POST', body: JSON.stringify({ ...newClient, preferred_contact: 'email', status: 'active' }) });
       setClient(created); setCreatedClientId(Number(created.id)); setAddingClient(false); setClientQuery(''); setClientBirthdate(''); setClients([]);
       setInvitationStatus(''); setInvitationLink('');
-    } catch (cause) {
+    } catch (cause) { formValidation.capture(cause);
       if (cause instanceof RequestError && cause.code === 'possible_duplicate' && Array.isArray(cause.fields.candidates)) setDuplicateClients(cause.fields.candidates as Client[]);
       setNewClientError(cause instanceof Error ? cause.message : t('Unable to create the client.'));
     } finally { setNewClientBusy(false); }
@@ -431,7 +454,7 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
       const result = await request(`/clients/${client.id}/invitations`, { method: 'POST', body: JSON.stringify({ delivery: 'email' }) });
       if (result.delivery === 'email_accepted') setInvitationStatus(t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.'));
       else { setInvitationStatus(t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.')); setInvitationLink(`${portalLink('client/invite')}#token=${result.token}`); }
-    } catch (cause) { setInvitationStatus(cause instanceof Error ? cause.message : t('Unable to send the invitation.')); }
+    } catch (cause) { formValidation.capture(cause); setInvitationStatus(cause instanceof Error ? cause.message : t('Unable to send the invitation.')); }
     finally { setInvitationBusy(false); }
   };
   const findSlots = async (event: FormEvent) => {
@@ -439,52 +462,52 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
     try {
       const data = await request(`/availability?location_id=${location}&service_id=${service}&practitioner_id=${practitioner}&delivery_mode=${mode}&date_from=${date}&date_to=${date}`);
       setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(duration))); setSearched(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
   const validateCoverage = async () => {
     if (!selected || !addressComplete) return;
-    setCoverageBusy(true); setCoverage(null); setError(''); clearSlots();
+    setCoverageBusy(true); setCoverage(null); (formValidation.clear(), setError('')); clearSlots();
     try {
       const result = await request('/address-coverage/validate', { method: 'POST', body: JSON.stringify({ location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
       setDestination(result.destination); setCoverage(result);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to validate this address.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to validate this address.')); }
     finally { setCoverageBusy(false); }
   };
   const approveCoverage = async () => {
     if (!client || !coverage || !selected || !canApproveOnsiteArea || !window.confirm(t('I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?'))) return;
-    setApprovalBusy(true); setError('');
+    setApprovalBusy(true); (formValidation.clear(), setError(''));
     try {
       await request('/address-coverage/approve', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination, address_validation_token:coverage.token }) });
       approvalLookup.current?.abort();
       setAreaApproved(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save the On-Site approval.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to save the On-Site approval.')); }
     finally { setApprovalBusy(false); }
   };
   const revokeCoverage = async () => {
     if (!client || !selected || !canApproveOnsiteArea || !window.confirm(t('Remove this On-Site approval? Future bookings will require a new distance check.'))) return;
-    setApprovalBusy(true); setError('');
+    setApprovalBusy(true); (formValidation.clear(), setError(''));
     try {
       await request('/address-coverage/revoke', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
       approvalLookup.current?.abort();
       setAreaApproved(false); setCoverage(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to remove the On-Site approval.')); }
+    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to remove the On-Site approval.')); }
     finally { setApprovalBusy(false); }
   };
   const confirm = async () => {
     if (sending.current || !client || !selected || !slot) return;
-    sending.current = true; setBusy(true); setError('');
+    sending.current = true; setBusy(true); (formValidation.clear(), setError(''));
     const payload = pendingRef.current ?? { delivery_mode:mode, ...(mode==='mobile'?{destination,...(!areaApproved&&coverage?{address_validation_token:coverage.token}:{})}:{}), quoted_base_price_cents:Number(selected.base_price_cents),quoted_mobile_fee_cents:mobileFee, client_id: Number(client.id), location_id: Number(location), service_id: Number(service), practitioner_id: Number(practitioner), duration_option_id: Number(duration), starts_at: slot.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), idempotency_key: crypto.randomUUID() };
     pendingRef.current = payload; setPending(payload);
     try { const result = await request('/appointments', { method: 'POST', body: JSON.stringify(payload) }); pendingRef.current = null; setPending(null); complete(result.id); }
-    catch (cause) {
+    catch (cause) { formValidation.capture(cause);
       const rejected = cause instanceof RequestError && cause.status >= 400 && cause.status < 500 && cause.code !== 'invalid_response';
       const coverageRejected = cause instanceof RequestError && ['coverage_validation_required','invalid_coverage_validation','coverage_validation_mismatch','coverage_validation_expired'].includes(cause.code);
       if (rejected) { pendingRef.current = null; setPending(null); setStep(coverageRejected ? 0 : 1); if (coverageRejected) { setCoverage(null); setAreaApproved(false); } clearSlots(); }
       setError(cause instanceof Error ? cause.message : t('Unable to confirm appointment.'));
     } finally { sending.current = false; setBusy(false); }
   };
-  const comboSelect = (label: string, value: string, rows: Combination[], key: 'location_id' | 'service_id' | 'practitioner_id' | 'duration_option_id', name: (row: Combination) => string, change: (value: string) => void, clearLabel?: string) => <TextField required fullWidth select label={label} value={value} onChange={event => change(event.target.value)}>{clearLabel && <MenuItem value="">{clearLabel}</MenuItem>}{unique(rows, key).map(row => <MenuItem key={row[key]} value={String(row[key])}>{name(row)}</MenuItem>)}</TextField>;
+  const comboSelect = (label: string, value: string, rows: Combination[], key: 'location_id' | 'service_id' | 'practitioner_id' | 'duration_option_id', name: (row: Combination) => string, change: (value: string) => void, clearLabel?: string) => <TextField name="value" required fullWidth select label={label} value={value} onChange={event => change(event.target.value)}>{clearLabel && <MenuItem value="">{clearLabel}</MenuItem>}{unique(rows, key).map(row => <MenuItem key={row[key]} value={String(row[key])}>{name(row)}</MenuItem>)}</TextField>;
   return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
     <Typography variant="h5" mb={2}>{t('New appointment')}</Typography>
     <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>{['Client and care', 'Available time', 'Review and confirm'].map(label => <Step key={label}><StepLabel>{t(label)}</StepLabel></Step>)}</Stepper>
@@ -492,8 +515,8 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
     {loading ? <CircularProgress aria-label={t('Loading booking options')} /> : options.length === 0 ? <Alert severity="info">{t('No booking combinations are configured. Check active services, durations, practitioners, and location assignments in administration.')}</Alert> : <>
       {step === 0 && <Stack spacing={3}>
         {!client && <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="date" label={t('Birthdate (optional)')} value={clientBirthdate} InputLabelProps={{ shrink: true }} onChange={event=>{setClient(null);setClientBirthdate(event.target.value);}} helperText={t('Use an exact birthdate to narrow the search first.')} /></Grid>
-          <Grid size={{ xs: 12, sm: 8 }}><TextField fullWidth label={t('Find an active client')} value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => { setClient(null); setClientQuery(event.target.value); }} helperText={t(clientBirthdate ? 'Optionally enter at least 2 characters to narrow the birthdate matches.' : clientQuery.trim().length < 2 ? 'Enter at least 2 characters from the client’s name, email, or phone.' : 'Matching active clients appear automatically.')} /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}><TextField name="clientBirthdate" fullWidth type="date" label={t('Birthdate (optional)')} value={clientBirthdate} InputLabelProps={{ shrink: true }} onChange={event=>{setClient(null);setClientBirthdate(event.target.value);}} helperText={t('Use an exact birthdate to narrow the search first.')} /></Grid>
+          <Grid size={{ xs: 12, sm: 8 }}><TextField name="clientQuery" fullWidth label={t('Find an active client')} value={clientQuery} inputProps={{ maxLength: 190 }} onChange={event => { setClient(null); setClientQuery(event.target.value); }} helperText={t(clientBirthdate ? 'Optionally enter at least 2 characters to narrow the birthdate matches.' : clientQuery.trim().length < 2 ? 'Enter at least 2 characters from the client’s name, email, or phone.' : 'Matching active clients appear automatically.')} /></Grid>
         </Grid>}
         {clientBusy && <Stack direction="row" spacing={1} alignItems="center" role="status"><CircularProgress size={20} /><Typography>{t('Searching active clients…')}</Typography></Stack>}
         {clientError && <Alert severity="error">{clientError}</Alert>}
@@ -506,15 +529,15 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
           {clientMore && <Alert severity="info">{t('Showing the first 25 matches. Continue typing to narrow the results.')}</Alert>}
         </Stack>}
         {!client && canAddClients && <Box>
-          <Button variant="outlined" onClick={() => { setAddingClient(value => !value); setNewClientError(''); setDuplicateClients([]); }}>{t(addingClient ? 'Cancel new client' : 'Add new client')}</Button>
+          <Button variant="outlined" onClick={() => { setAddingClient(value => !value); (formValidation.clear(), setNewClientError('')); setDuplicateClients([]); }}>{t(addingClient ? 'Cancel new client' : 'Add new client')}</Button>
           {addingClient && <Stack component="form" onSubmit={event => void createClient(event)} spacing={2} sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Alert severity="info">{t('Search for an existing client before creating a record. Saving a record does not link a sign-in account.')}</Alert>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth required label={t('First name')} value={newClient.given_name} inputProps={{ maxLength: 100 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, given_name: event.target.value }))} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth required label={t('Last name')} value={newClient.family_name} inputProps={{ maxLength: 100 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, family_name: event.target.value }))} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth required type="email" label={t('Email')} value={newClient.email} inputProps={{ maxLength: 190 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, email: event.target.value }))} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth type="tel" label={t('Phone')} value={newClient.phone} inputProps={{ maxLength: 40 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, phone: event.target.value }))} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth type="date" label={t('Date of birth (optional)')} value={newClient.date_of_birth} InputLabelProps={{ shrink: true }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, date_of_birth: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField name="given_name" fullWidth required label={t('First name')} value={newClient.given_name} inputProps={{ maxLength: 100 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, given_name: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField name="family_name" fullWidth required label={t('Last name')} value={newClient.family_name} inputProps={{ maxLength: 100 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, family_name: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField name="email" fullWidth required type="email" label={t('Email')} value={newClient.email} inputProps={{ maxLength: 190 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, email: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField name="phone" fullWidth type="tel" label={t('Phone')} value={newClient.phone} inputProps={{ maxLength: 40 }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, phone: event.target.value }))} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField name="date_of_birth" fullWidth type="date" label={t('Date of birth (optional)')} value={newClient.date_of_birth} InputLabelProps={{ shrink: true }} disabled={newClientBusy} onChange={event => setNewClient(value => ({ ...value, date_of_birth: event.target.value }))} /></Grid>
             </Grid>
             {newClientError && <Alert severity="error">{newClientError}</Alert>}
             {duplicateClients.length > 0 && <Alert severity="warning">{t('Possible duplicate client. Select an existing match from search or ask clinic staff to review before creating another record.')}{duplicateClients.map(candidate => <Typography key={candidate.id} variant="body2">{candidate.display_name} — {candidate.email}</Typography>)}</Alert>}
@@ -528,15 +551,15 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
           <Typography variant="body2">{t('This new client can be booked now. A portal invitation does not grant access to records until identity review is approved.')}</Typography>
           <Button variant="outlined" disabled={invitationBusy} onClick={() => void sendInvitation()}>{t(invitationBusy ? 'Sending invitation…' : 'Send portal invitation email')}</Button>
           {invitationStatus && <Alert severity={invitationLink ? 'warning' : 'info'}>{invitationStatus}</Alert>}
-          {invitationLink && <><TextField fullWidth label={t('Private invitation link — shown only now')} value={invitationLink} slotProps={{ input: { readOnly: true } }} /><Button onClick={() => void navigator.clipboard.writeText(invitationLink)}>{t('Copy invitation link')}</Button></>}
+          {invitationLink && <><TextField name="invitationLink" fullWidth label={t('Private invitation link — shown only now')} value={invitationLink} slotProps={{ input: { readOnly: true } }} /><Button onClick={() => void navigator.clipboard.writeText(invitationLink)}>{t('Copy invitation link')}</Button></>}
         </Stack>}</Paper>}
-        <TextField select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);setAreaApproved(false);clearSlots();}}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
+        <TextField name="delivery_mode" select label={t('Visit type')} value={mode} onChange={event=>{setMode(event.target.value as 'clinic'|'mobile');setLocation('');setService('');setPractitioner('');setDuration('');setCoverage(null);setAreaApproved(false);clearSlots();}}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         {eligibleOptions.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Base location / service area'), location, eligibleOptions, 'location_id', row => row.location_name, value => { setLocation(value); setService(''); setPractitioner(''); setDuration(''); setDate(''); setCoverage(null); setAreaApproved(false); clearSlots(); })}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Service'), service, serviceRows, 'service_id', row => row.service_name, value => { setService(value); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); }, t('Clear service'))}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{practitionerLocked
-            ? <TextField fullWidth label={t('Practitioner')} value={assignedPractitioner?.practitioner_name ?? ''} InputProps={{ readOnly: true }} helperText={t('Appointments booked in your practitioner workspace are assigned to you.')} />
+            ? <TextField name="practitioner_name" fullWidth label={t('Practitioner')} value={assignedPractitioner?.practitioner_name ?? ''} InputProps={{ readOnly: true }} helperText={t('Appointments booked in your practitioner workspace are assigned to you.')} />
             : comboSelect(t('Practitioner'), practitioner, practitionerRows, 'practitioner_id', row => row.practitioner_name, value => { setPractitioner(value); setDuration(''); setCoverage(null); setAreaApproved(false); clearSlots(); }, t('Clear practitioner'))}</Grid>
           <Grid size={{ xs: 12, sm: 6 }}>{comboSelect(t('Duration'), duration, durationRows, 'duration_option_id', row => t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:money(Number(row.base_price_cents))}), value => { setDuration(value); clearSlots(); })}</Grid>
         </Grid>
@@ -546,16 +569,16 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
           {clientAddressState==='custom'&&<Alert severity="info">{t('Visit address changes apply only to this appointment and do not update the client profile.')}</Alert>}
           {clientAddressState==='missing'&&<Alert severity="info">{t('This client has no saved service address. Find an address with Google or enter it manually.')}</Alert>}
           {clientAddressState==='error'&&<Alert severity="warning">{t('The saved client address could not be loaded. Find an address with Google or enter it manually.')}</Alert>}
-          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates the address and calculates driving distance from the selected base location. The address must be within the configured On-Site service area.')}</Alert>{approvalLoading&&<Alert severity="info">{t('Checking for a saved service-area approval…')}</Alert>}{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. No new distance check is needed.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||approvalLoading||areaApproved||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}{coverage&&client&&canApproveOnsiteArea&&!areaApproved&&<Button variant="outlined" disabled={approvalBusy} onClick={()=>void approveCoverage()}>{t(approvalBusy?'Saving approval…':'Approve this address for future On-Site bookings')}</Button>}{areaApproved&&canApproveOnsiteArea&&<Button variant="text" color="warning" disabled={approvalBusy} onClick={()=>void revokeCoverage()}>{t(approvalBusy?'Removing approval…':'Remove On-Site approval')}</Button>}</Stack>}
+          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates the visit address and calculates driving distance from the practitioner’s starting location, or the clinic base when no private work location is configured.')}</Alert>{approvalLoading&&<Alert severity="info">{t('Checking for a saved service-area approval…')}</Alert>}{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. No new distance check is needed.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||approvalLoading||areaApproved||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}{coverage&&client&&canApproveOnsiteArea&&!areaApproved&&<Button variant="outlined" disabled={approvalBusy} onClick={()=>void approveCoverage()}>{t(approvalBusy?'Saving approval…':'Approve this address for future On-Site bookings')}</Button>}{areaApproved&&canApproveOnsiteArea&&<Button variant="text" color="warning" disabled={approvalBusy} onClick={()=>void revokeCoverage()}>{t(approvalBusy?'Removing approval…':'Remove On-Site approval')}</Button>}</Stack>}
         {mode==='mobile' && coverage && client && canApproveOnsiteArea && !areaApproved && <Typography variant="body2" color="text.secondary">{t('A distance check alone is not saved for future bookings. Approve this address once to reuse it.')}</Typography>}
         <Button variant="contained" disabled={!client || !selected || !addressReady || approvalLoading} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
       </Stack>}
       {step === 1 && <Stack spacing={2}>
         <Typography>{t('Availability in {{timezone}}. Choose a day to see current openings.',{timezone})}</Typography>
-        <Stack component="form" direction="row" gap={2} onSubmit={findSlots}><TextField required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(timezone) }} onChange={event => { setDate(event.target.value); clearSlots(); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
+        <Stack component="form" direction="row" gap={2} onSubmit={findSlots}><TextField name="date" required type="date" label={t('Appointment date')} value={date} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ min: today(timezone) }} onChange={event => { setDate(event.target.value); clearSlots(); }} /><Button type="submit" variant="outlined" disabled={busy || !date}>{t(busy ? 'Searching…' : 'Find times')}</Button></Stack>
         {searched && slots.length === 0 && <Alert severity="info">{t('No bookable times on this day. Try another day or check working hours and room assignments.')}</Alert>}
         <Stack direction="row" flexWrap="wrap" gap={1}>{slots.map(item => <Button key={item.starts_at} variant={slot?.starts_at === item.starts_at ? 'contained' : 'outlined'} onClick={() => { setSlot(item); setRoom(item.available_room_ids.length === 1 ? String(item.available_room_ids[0]) : ''); }}>{displayTime(item.starts_at, timezone, i18n.resolvedLanguage)}</Button>)}</Stack>
-        {slot && needsRoom && <TextField select required fullWidth label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(roomId => <MenuItem key={roomId} value={String(roomId)}>{rooms.find(item => Number(item.id) === Number(roomId))?.name ?? `Room ${roomId}`}</MenuItem>)}</TextField>}
+        {slot && needsRoom && <TextField name="room_id" select required fullWidth label={t('Available room')} value={room} onChange={event => setRoom(event.target.value)}>{slot.available_room_ids.map(roomId => <MenuItem key={roomId} value={String(roomId)}>{rooms.find(item => Number(item.id) === Number(roomId))?.name ?? `Room ${roomId}`}</MenuItem>)}</TextField>}
         <Button variant="contained" disabled={!slot || busy || (needsRoom && !room)} onClick={() => setStep(2)}>{t('Review appointment')}</Button>
       </Stack>}
       {step === 2 && selected && slot && client && <Stack spacing={2}>
@@ -565,9 +588,10 @@ function BookingForm({ request, practitionerMode, canScheduleOthers, canAddClien
         <Typography>{t('Treatment: {{treatment}} · On-Site surcharge: {{mobile}} · Subtotal: {{subtotal}} CAD',{treatment:money(Number(selected.base_price_cents)),mobile:money(mobileFee),subtotal:money(Number(selected.base_price_cents)+mobileFee)})}</Typography><Alert severity="info">{t('Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.')}</Alert>
         <Divider /><Typography color="text.secondary">{t('Availability is checked again when you confirm. A confirmation email will be sent to the client.')}</Typography>
         {pending && !busy && <Alert severity="warning">{t('Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.')}</Alert>}
-        <Button variant="contained" disabled={busy} onClick={() => void confirm()}>{t(busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment')}</Button>
+        {Number(selected.recurrence_allowed) && !pending ? <RecurringBooking payload={{ delivery_mode:mode, ...(mode==='mobile'?{destination,...(!areaApproved&&coverage?{address_validation_token:coverage.token}:{})}:{}), quoted_base_price_cents:Number(selected.base_price_cents), quoted_mobile_fee_cents:mobileFee, client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), duration_option_id:Number(duration), starts_at:slot.starts_at, ...(needsRoom?{room_id:Number(room)}:{}) }} request={request} setBusy={setBusy} complete={complete} single={<Button variant="contained" disabled={busy} onClick={() => void confirm()}>{t(busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment')}</Button>} /> : <Button variant="contained" disabled={busy} onClick={() => void confirm()}>{t(busy ? 'Confirming…' : pending ? 'Retry confirmation' : 'Confirm appointment')}</Button>}
       </Stack>}
     </>}
     <Stack direction="row" justifyContent="space-between" mt={3}><Button disabled={busy || Boolean(pending)} onClick={cancel}>{t('Cancel')}</Button>{step > 0 && <Button disabled={busy || Boolean(pending)} onClick={() => setStep(value => value - 1)}>{t('Back')}</Button>}</Stack>
   </Paper>;
 }
+const BookingForm = withFormValidation(BookingFormValidated);

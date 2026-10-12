@@ -8,6 +8,9 @@ Start with these two authoritative documents:
 - [System Design](SYSTEM_DESIGN.md): public/portal architecture, identity and account linking, API/data boundaries, transactions, deployment, migrations and testing.
 - [MT0 architecture and inventory](MT0_IDENTITY_AND_PRACTICE_ARCHITECTURE.md): source findings, additive data model, practitioner invitation journey and migration sequencing.
 - [Multi tenant development path](MULTI_TENANT_DEVELOPMENT_PATH.md): provider-neutral login, application-owned clinic membership, isolation gates and sequencing before a second clinic.
+- [Practitioner invitation pilot](PRACTITIONER_INVITATIONS.md): disabled staff registration, manual invitations, administrator approval, dedicated External ID apps and rollout checks.
+- [Client overview](CLIENT_OVERVIEW.md): appointment history, saved changes, configured practitioner access, role/clinic boundaries and deployment acceptance.
+- [Appointment action links](APPOINTMENT_ACTION_LINKS.md): sign-in-required email links, expiry/revocation, cancellation fee acknowledgement, migration and activation checks.
 - [Portal host cutover](PORTAL_HOST_CUTOVER.md): move Willow to `willowwellness.copihue.ca` and deploy a neutral landing page at `portal.copihue.ca`.
 - [Runtime website configuration](RUNTIME_WEBSITE_CONFIGURATION.md): live public website destination, temporary .com cutover, deployment order and checks.
 - [Practitioner external link plan](PRACTITIONER_EXTERNAL_LINK_PLAN.md): optional website/social-page links for independent practitioners and portal-only virtual clinics; local implementation and pending hosted acceptance.
@@ -18,8 +21,11 @@ Start with these two authoritative documents:
 - [Dashboard widgets](DASHBOARD_WIDGETS.md): governed widget registry, authorized data projections, per-workspace personalization, delivery sequence and acceptance criteria.
 - [Limited testing readiness](PILOT_TEST_READINESS.md): hosted acceptance gates, safe pilot journeys, feedback capture and current scope limits.
 - [Temporary hosted test suite](HOSTED_TEST_SUITE.md): Netfirms upload layout, private PHP checks, one protected results page and required cleanup.
+- [Client intake and consent forms](CLIENT_INTAKE_FORMS.md): versioned questionnaires, client assignments/submissions, restricted practitioner answers and migration 036 pilot acceptance.
 
 ## Supporting records and historical sources
+
+- [12 October development checkpoint](GIT_CHECKPOINT_2026-10-12.md): integration baseline, validation evidence, coordinated release and the next forms slice.
 
 - [Public/portal separation checkpoint](PORTAL_SEPARATION.md): build outputs, routes, preserved permissions, subdomain deployment steps and acceptance checks.
 - [Portal treatment catalogue](PORTAL_CATALOGUE.md): configurable bilingual welcome text, category navigation, public practitioner previews, booking entry points and migration 028.

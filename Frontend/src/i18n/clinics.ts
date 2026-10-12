@@ -1,0 +1,28 @@
+export default {
+  en: {
+    'Public website URL (optional)': 'Public website URL (optional)',
+    'Clinics': 'Clinics', 'Separate clinics and their portal hosts': 'Separate clinics and their portal hosts',
+    'Create clinic': 'Create clinic', 'Edit clinic': 'Edit clinic', 'Clinic name': 'Clinic name', 'Portal hostname': 'Portal hostname',
+    'First location name': 'First location name', 'Manage locations': 'Manage locations', 'Open clinic portal': 'Open clinic portal',
+    'Portal host not configured': 'Portal host not configured', '{{count}} locations in this clinic': '{{count}} locations in this clinic',
+    'Clinic settings saved.': 'Clinic settings saved.',
+    'Clinic created. Configure its portal host before opening it.': 'Clinic created. Configure its portal host before opening it.',
+    'Unable to load clinics.': 'Unable to load clinics.', 'Unable to save clinic.': 'Unable to save clinic.',
+    'Clinics have separate records and portal hosts. Locations belong to one clinic; manage them from that clinic portal.': 'Clinics have separate records and portal hosts. Locations belong to one clinic; manage them from that clinic portal.',
+    'Hostname only, for example livinlively.copihue.ca. Configure DNS, HTTPS and identity-provider redirect URLs separately.': 'Hostname only, for example livinlively.copihue.ca. Configure DNS, HTTPS and identity-provider redirect URLs separately.',
+    'A new clinic starts empty with one location. Your administrator identity receives separate access; existing clients, practitioners and services are not copied.': 'A new clinic starts empty with one location. Your administrator identity receives separate access; existing clients, practitioners and services are not copied.',
+  },
+  fr: {
+    'Public website URL (optional)': 'URL du site public (facultative)',
+    'Clinics': 'Cliniques', 'Separate clinics and their portal hosts': 'Cliniques distinctes et domaines des portails',
+    'Create clinic': 'Créer une clinique', 'Edit clinic': 'Modifier la clinique', 'Clinic name': 'Nom de la clinique', 'Portal hostname': 'Domaine du portail',
+    'First location name': 'Nom du premier emplacement', 'Manage locations': 'Gérer les emplacements', 'Open clinic portal': 'Ouvrir le portail de la clinique',
+    'Portal host not configured': 'Domaine du portail non configuré', '{{count}} locations in this clinic': '{{count}} emplacements dans cette clinique',
+    'Clinic settings saved.': 'Paramètres de la clinique enregistrés.',
+    'Clinic created. Configure its portal host before opening it.': 'Clinique créée. Configurez le domaine de son portail avant de l’ouvrir.',
+    'Unable to load clinics.': 'Impossible de charger les cliniques.', 'Unable to save clinic.': 'Impossible d’enregistrer la clinique.',
+    'Clinics have separate records and portal hosts. Locations belong to one clinic; manage them from that clinic portal.': 'Chaque clinique possède ses propres dossiers et domaine de portail. Les emplacements appartiennent à une seule clinique et se gèrent dans son portail.',
+    'Hostname only, for example livinlively.copihue.ca. Configure DNS, HTTPS and identity-provider redirect URLs separately.': 'Domaine uniquement, par exemple livinlively.copihue.ca. Configurez séparément le DNS, HTTPS et les URL de redirection du fournisseur d’identité.',
+    'A new clinic starts empty with one location. Your administrator identity receives separate access; existing clients, practitioners and services are not copied.': 'Une nouvelle clinique commence vide avec un emplacement. Votre identité d’administrateur reçoit un accès distinct; les clients, praticiens et services existants ne sont pas copiés.',
+  },
+};

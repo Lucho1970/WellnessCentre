@@ -1,5 +1,7 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, Chip, Divider, FormControlLabel, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, Chip, Divider, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { Pencil, Plus, Save, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
@@ -33,7 +35,8 @@ const locationAssignment = (item: LocationLink): LocationLink => ({
   active: Number(item.active),
 });
 
-export function ServiceAssignments({ initialServiceId, lockService = false, onDirtyChange }: { initialServiceId?: number; lockService?: boolean; onDirtyChange?: (dirty: boolean) => void }) {
+function ServiceAssignmentsForm({ initialServiceId, lockService = false, onDirtyChange }: { initialServiceId?: number; lockService?: boolean; onDirtyChange?: (dirty: boolean) => void }) {
+  const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [services, setServices] = useState<Named[]>([]);
@@ -85,7 +88,7 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
         setService(selectedServiceId ? String(selectedServiceId) : '');
         setSelectedPeople(loadedLinks.filter((item: Link) => item.service_id === selectedServiceId && Boolean(item.active)));
         setSelectedLocations(loadedLocationLinks.filter((item: LocationLink) => item.service_id === selectedServiceId && Boolean(item.active)).map((item: LocationLink) => item.location_id));
-      } catch (cause) {
+      } catch (cause) { formValidation.capture(cause);
         setError(cause instanceof Error ? cause.message : t('Unable to load assignments.'));
       } finally {
         setBusy(false);
@@ -108,11 +111,11 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
     setSelectedPeople(links.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))));
     setSelectedLocations(locationLinks.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))).map((item) => item.location_id));
   };
-  const cancelEdit = () => { resetSelections(); setEditing(false); setError(''); };
+  const cancelEdit = () => { resetSelections(); setEditing(false); (formValidation.clear(), setError('')); };
 
   const save = async () => {
     setBusy(true);
-    setError('');
+    (formValidation.clear(), setError(''));
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/services/${service}/assignments`, {
@@ -121,12 +124,12 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
         body: JSON.stringify({ location_ids: selectedLocations, practitioners: selectedPeople }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save assignments.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to save assignments.'));
       setLinks((current) => [...current.filter((link) => link.service_id !== Number(service)), ...selectedPeople]);
       setLocationLinks((current) => [...current.filter((link) => link.service_id !== Number(service)), ...selectedLocations.map((location_id) => ({ service_id: Number(service), location_id, active: 1 }))]);
       setMessage(t('Service assignments saved.'));
       setEditing(false);
-    } catch (cause) {
+    } catch (cause) { formValidation.capture(cause);
       setError(cause instanceof Error ? cause.message : t('Unable to save assignments.'));
     } finally {
       setBusy(false);
@@ -139,7 +142,7 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
         <Box><Typography variant="h5">{t('Current assignments')}</Typography><Typography color="text.secondary">{t('These locations and practitioners determine where and how this service can be booked.')}</Typography></Box>
         {!editing && <Button variant="contained" startIcon={(savedLocations.length || savedPeople.length) ? <Pencil size={17}/> : <Plus size={17}/>} onClick={() => { setMessage(''); setEditing(true); }}>{t((savedLocations.length || savedPeople.length) ? 'Edit assignments' : 'Add assignment')}</Button>}
       </Stack>
-      <TextField select fullWidth label={t('Service')} value={service} disabled={lockService} onChange={(event) => setService(event.target.value)}>
+      <TextField name="service" select fullWidth label={t('Service')} value={service} disabled={lockService} onChange={(event) => setService(event.target.value)}>
         {services.map((item) => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}
       </TextField>
       {!editing ? <AssignmentSummary locations={locations} people={people} locationIds={savedLocations} links={savedPeople} money={(cents) => formatCad(cents, i18n.resolvedLanguage)} /> : <>
@@ -149,7 +152,7 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
         <Typography fontWeight={700} mt={2}>{t('Practitioners')}</Typography>
         <Stack spacing={1}>{people.map((person) => {
           const link = selectedPeople.find((item) => item.practitioner_id === person.practitioner_id);
-          return <Paper variant="outlined" key={person.practitioner_id} sx={{ p: 1.5 }}><FormControlLabel control={<Checkbox checked={Boolean(link)} onChange={(event) => togglePerson(person.practitioner_id, event.target.checked)} />} label={person.display_name}/>{link && <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} ml={4}><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_clinic))} onChange={(event) => update(person.practitioner_id, 'offers_clinic', event.target.checked ? 1 : 0)} />} label={t('Clinic visits')}/><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_mobile))} onChange={(event) => update(person.practitioner_id, 'offers_mobile', event.target.checked ? 1 : 0)} />} label={t('On-Site visits')}/>{Boolean(Number(link.offers_mobile)) && <><TextField required size="small" type="number" label={t('Driving coverage radius (km)')} value={link.mobile_radius_km ?? ''} inputProps={{ min: 1, max: 500, step: 1 }} onChange={(event) => update(person.practitioner_id, 'mobile_radius_km', event.target.value === '' ? null : Number(event.target.value))}/><TextField size="small" type="number" label={t('Travel minutes each way')} value={link.travel_buffer_minutes} inputProps={{ step: 15 }} onChange={(event) => update(person.practitioner_id, 'travel_buffer_minutes', Number(event.target.value))}/><TextField size="small" type="number" label={t('On-Site fee CAD')} value={link.mobile_fee_cents / 100} onChange={(event) => update(person.practitioner_id, 'mobile_fee_cents', Math.round(Number(event.target.value) * 100))}/></>}</Stack>}</Paper>;
+          return <Paper variant="outlined" key={person.practitioner_id} sx={{ p: 1.5 }}><FormControlLabel control={<Checkbox checked={Boolean(link)} onChange={(event) => togglePerson(person.practitioner_id, event.target.checked)} />} label={person.display_name}/>{link && <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} ml={4}><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_clinic))} onChange={(event) => update(person.practitioner_id, 'offers_clinic', event.target.checked ? 1 : 0)} />} label={t('Clinic visits')}/><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_mobile))} onChange={(event) => update(person.practitioner_id, 'offers_mobile', event.target.checked ? 1 : 0)} />} label={t('On-Site visits')}/>{Boolean(Number(link.offers_mobile)) && <><TextField name="mobile_radius_km" required size="small" type="number" label={t('Driving coverage radius (km)')} value={link.mobile_radius_km ?? ''} inputProps={{ min: 1, max: 500, step: 1 }} onChange={(event) => update(person.practitioner_id, 'mobile_radius_km', event.target.value === '' ? null : Number(event.target.value))}/><TextField name="travel_buffer_minutes" size="small" type="number" label={t('Travel minutes each way')} value={link.travel_buffer_minutes} inputProps={{ step: 15 }} onChange={(event) => update(person.practitioner_id, 'travel_buffer_minutes', Number(event.target.value))}/><TextField size="small" type="number" label={t('On-Site fee CAD')} value={link.mobile_fee_cents / 100} onChange={(event) => update(person.practitioner_id, 'mobile_fee_cents', Math.round(Number(event.target.value) * 100))}/></>}</Stack>}</Paper>;
         })}</Stack>
       </>}
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
@@ -158,6 +161,8 @@ export function ServiceAssignments({ initialServiceId, lockService = false, onDi
     </Paper>
   );
 }
+export const ServiceAssignments = withFormValidation(ServiceAssignmentsForm);
+
 
 function AssignmentSummary({ locations, people, locationIds, links, money }: { locations: Named[]; people: Practitioner[]; locationIds: number[]; links: Link[]; money: (cents: number) => string }) {
   const { t } = useTranslation();

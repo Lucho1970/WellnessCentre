@@ -1,9 +1,11 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, Chip, Divider, Drawer, FormControlLabel, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, Paper, Stack, Switch, TextField, Typography } from '@mui/material';
+import { Box, Button, Chip, Divider, Drawer, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, Paper, Stack, Switch, Typography } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, X } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
-import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { normalizeNumericIds } from '../shared/api';
 import { AddressEntry } from '../shared/AddressEntry';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 
@@ -15,7 +17,8 @@ const blank = (): Form => ({ name: '', timezone: 'America/Toronto', address_line
 const locationForm = (item: Location): Form => ({ name: item.name, timezone: item.timezone, address_line1: item.address_line1 ?? '', address_line2: item.address_line2 ?? '', city: item.city ?? '', province: item.province ?? '', postal_code: item.postal_code ?? '', phone: item.phone ?? '', is_bookable: Boolean(Number(item.is_bookable)) });
 const address = (item: Location) => [item.address_line1, item.address_line2, item.city, item.province, item.postal_code].filter(Boolean).join(', ');
 
-export function LocationAdmin() {
+function LocationAdminForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [items, setItems] = useState<Location[]>([]);
@@ -36,42 +39,42 @@ export function LocationAdmin() {
   }, [items, query]);
 
   const load = useCallback(async (preferredId?: number | null) => {
-    setBusy(true); setLoadError('');
+    setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/locations`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to load locations.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to load locations.'));
       const loaded = normalizeNumericIds<Location[]>(body.data);
       setItems(loaded);
       setSelectedId(current => {
         const requested = Number(preferredId ?? current ?? 0) || null;
         return loaded.some(item => item.id === requested) ? requested : null;
       });
-    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to load locations.')); }
+    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load locations.')); }
     finally { setBusy(false); }
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
-  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); setPanelError(''); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelError(''); setPanelMode('details'); };
-  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(locationForm(item)); setPanelError(''); setPanelMode('edit'); };
+  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
+  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(locationForm(item)); (formValidation.clear(), setPanelError('')); setPanelMode('edit'); };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); setEditingId(null); setPanelError('');
+    formGuard.markClean(); setPanelMode(null); setEditingId(null); (formValidation.clear(), setPanelError(''));
   };
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setPanelError(''); setSaved('');
+    event.preventDefault(); setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
     try {
       const token = await getAccessToken();
       const response = await fetch(editingId ? `${api}/admin/locations/${editingId}` : `${api}/admin/locations`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save location.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to save location.'));
       const savedId = Number(body.data?.id ?? editingId ?? 0) || null;
       const message = t('{{name}} was {{action}}.', { name: form.name, action: t(editingId ? 'updated' : 'created') });
       formGuard.markClean(); setPanelMode(null); setEditingId(null); await load(savedId); setSaved(message);
-    } catch (cause) { setPanelError(cause instanceof Error ? cause.message : t('Unable to save location.')); }
+    } catch (cause) { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save location.')); }
     finally { setBusy(false); }
   };
 
@@ -81,7 +84,7 @@ export function LocationAdmin() {
       <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
       <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
       <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
-      <TextField size="small" label={t('Filter locations')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
+      <TextField name="query" size="small" label={t('Filter locations')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
     </Stack></Paper>
     {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}
     {loadError && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>{t('Retry')}</Button>}>{loadError}</Alert>}
@@ -104,6 +107,8 @@ export function LocationAdmin() {
     </Drawer>
   </Stack>;
 }
+export const LocationAdmin = withFormValidation(LocationAdminForm);
+
 
 function LocationDetails({ item, edit }: { item: Location; edit: () => void }) {
   const { t } = useTranslation();
@@ -114,10 +119,10 @@ function LocationDetails({ item, edit }: { item: Location; edit: () => void }) {
 function LocationFields({ form, field, busy, addressChange }: { form: Form; field: <K extends keyof Form>(key: K, value: Form[K]) => void; busy: boolean; addressChange: (value: Pick<Form, 'address_line1' | 'address_line2' | 'city' | 'province' | 'postal_code'>) => void }) {
   const { t } = useTranslation();
   return <Grid container spacing={2}>
-    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Location name')} value={form.name} onChange={event => field('name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
-    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Timezone')} value={form.timezone} onChange={event => field('timezone', event.target.value)} helperText={t('IANA timezone, for example America/Toronto')}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="name" required fullWidth label={t('Location name')} value={form.name} onChange={event => field('name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="timezone" required fullWidth label={t('Timezone')} value={form.timezone} onChange={event => field('timezone', event.target.value)} helperText={t('IANA timezone, for example America/Toronto')}/></Grid>
     <Grid size={12}><AddressEntry disabled={busy} value={{ address_line1: form.address_line1, address_line2: form.address_line2, city: form.city, province: form.province, postal_code: form.postal_code, country: 'Canada' }} onChange={value => addressChange({ address_line1: value.address_line1, address_line2: value.address_line2, city: value.city, province: value.province, postal_code: value.postal_code })}/></Grid>
-    <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label={t('Phone')} value={form.phone} onChange={event => field('phone', event.target.value)}/></Grid>
-    <Grid size={{ xs: 12, md: 6 }}><FormControlLabel control={<Switch checked={form.is_bookable} onChange={event => field('is_bookable', event.target.checked)}/>} label={t('Accepting bookings at this location')}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="phone" fullWidth label={t('Phone')} value={form.phone} onChange={event => field('phone', event.target.value)}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><FormControlLabel name="is_bookable" control={<Switch checked={form.is_bookable} onChange={event => field('is_bookable', event.target.checked)}/>} label={t('Accepting bookings at this location')}/></Grid>
   </Grid>;
 }

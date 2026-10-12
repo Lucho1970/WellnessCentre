@@ -5,8 +5,10 @@ import { ClientApp } from './ClientApp';
 import { customerConfigured, customerHome, customerInstance, selectCustomerAccount } from './auth';
 import { finishCustomerLogin } from './session';
 import { bookingSignInKey, captureCustomerBookingIntent, customerBookingIntent } from './bookingIntent';
+import { captureAppointmentLink } from './appointmentLink';
 
 export async function bootstrap() {
+  captureAppointmentLink(customerHome);
   if (window.location.pathname === `${import.meta.env.BASE_URL}client` && new URLSearchParams(window.location.search).get('return') === 'browse') {
     sessionStorage.setItem('wellness.customer.return-to-browse.v1', 'pending');
     window.history.replaceState(null, '', customerHome);

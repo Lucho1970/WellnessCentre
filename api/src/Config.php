@@ -31,6 +31,18 @@ final readonly class Config
         public string $addressValidationSigningKey = '',
         public int $addressValidationTokenTtlSeconds = 900,
         public string $clientPortalUrl = '',
+        public array $clinicHostMap = [],
+        public bool $staffMembershipPilotEnabled = false,
+        public array $staffMembershipPilotUserIds = [],
+        public bool $staffInvitationsEnabled = false,
+        public string $staffExternalTenantId = '',
+        public string $staffExternalSubdomain = '',
+        public string $staffExternalApiClientId = '',
+        public string $staffExternalSpaClientId = '',
+        public bool $appointmentActionLinksEnabled = false,
+        public bool $clinicManagementEnabled = false,
+        public bool $applicationAdminEnabled = false,
+        public string $applicationAdminHost = 'portal.copihue.ca',
     ) {}
 
     public static function fromEnvironment(): self
@@ -66,7 +78,34 @@ final readonly class Config
             $value('ADDRESS_VALIDATION_SIGNING_KEY'),
             max(60, min(3600, (int)$value('ADDRESS_VALIDATION_TOKEN_TTL_SECONDS', '900'))),
             $value('CLIENT_PORTAL_URL'),
+            self::hostMap($value('CLINIC_HOST_MAP', '{}')),
+            filter_var($value('STAFF_MEMBERSHIP_PILOT_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            self::pilotUserIds($value('STAFF_MEMBERSHIP_PILOT_USER_IDS', '')),
+            filter_var($value('STAFF_INVITATIONS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            $value('STAFF_EXTERNAL_TENANT_ID'),
+            $value('STAFF_EXTERNAL_SUBDOMAIN'),
+            $value('STAFF_EXTERNAL_API_CLIENT_ID'),
+            $value('STAFF_EXTERNAL_SPA_CLIENT_ID'),
+            filter_var($value('APPOINTMENT_ACTION_LINKS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            filter_var($value('CLINIC_MANAGEMENT_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            filter_var($value('APPLICATION_ADMIN_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            $value('APPLICATION_ADMIN_HOST', 'portal.copihue.ca'),
         );
+    }
+
+    private static function hostMap(string $json): array
+    {
+        $map = json_decode($json, false, 512, JSON_THROW_ON_ERROR);
+        if (!$map instanceof \stdClass) throw new RuntimeException('CLINIC_HOST_MAP must be a JSON object.');
+        return (array)$map;
+    }
+
+    private static function pilotUserIds(string $value): array
+    {
+        if (trim($value) === '') return [];
+        $ids = array_map('trim', explode(',', $value));
+        foreach ($ids as $id) if (!preg_match('/^[1-9][0-9]*$/D', $id) || strlen($id) > 18) throw new RuntimeException('Invalid staff pilot user IDs.');
+        return array_values(array_unique(array_map('intval', $ids)));
     }
 
     public static function loadEnvFile(string $path): void

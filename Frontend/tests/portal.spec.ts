@@ -9,6 +9,25 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+test('clinic super admin cannot open central clinic management in a clinic portal', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.goto(`${portalHost}/admin/clinics`);
+  await expect(page.getByText('You do not have permission to access this page.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Clinics', exact: true })).toHaveCount(0);
+});
+
+test('administrator revokes existing appointment links only after confirmation',async({page})=>{
+  await fixtures(page,['super_admin']);
+  const appointment={id:41,client_name:'Test Client',service_name:'Massage',practitioner_name:'Practitioner',location_name:'Main',timezone:'America/Toronto',room_id:null,room_name:null,duration_option_id:1,starts_at:'2099-10-01 14:00:00',ends_at:'2099-10-01 15:00:00',status:'confirmed',version:1,delivery_mode:'clinic',destination_snapshot:null,travel_buffer_minutes:0,base_price_cents:10000,mobile_fee_cents:0,action_links_enabled:true};
+  let revocations=0;
+  await page.route('**/api/v1/appointments?**',route=>route.fulfill({json:{data:[appointment]}}));
+  await page.route('**/api/v1/appointments/41',route=>route.fulfill({json:{data:appointment}}));
+  await page.route('**/api/v1/appointments/41/logistics-notes',route=>route.fulfill({json:{data:{notes:[],truncated:false}}}));
+  await page.route('**/api/v1/appointments/41/action-links/revoke',route=>{revocations++;expect(route.request().method()).toBe('POST');return route.fulfill({json:{data:{revoked:true}}});});
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await page.getByRole('button',{name:'Revoke existing email links'}).click();expect(revocations).toBe(0);
+  await page.getByRole('button',{name:'Confirm link revocation'}).click();await expect(page.getByText('Existing appointment email links were revoked.')).toBeVisible();expect(revocations).toBe(1);
+});
 test.beforeEach(({ page }) => {
   const list: string[] = [];
   errors.set(page, list);
@@ -123,7 +142,8 @@ async function fixtures(
         email: "clinic@example.test",
         phone: "905-555-0100",
       };
-    if (path === "/auth/me") data = { roles: roles ?? [], permissions };
+    if (path === "/auth/me") data = { id:1, display_name:"Test Staff", email:"staff@example.test", roles: roles ?? [], permissions };
+    if (path === "/profile/work-location") data = {home_address:null,work_address:null,work_same_as_home:false,version:0};
     if (path === "/profile/avatar") data = { image_base64: null };
     if (path === "/profile/public-card") data = { public_name: "Test Practitioner", booking_name: "Test", summary: "", summary_fr: "", public_website_url: "", public_contact_email: "", public_contact_phone: "", public_contact_sms: false, slug: "test-practitioner", published: true };
     if (path === "/profile/notifications") data = { work_email: "staff@example.test", email_enabled: false, email_destination: "work", personal_email: null, personal_email_verified: false, mobile_phone: null, sms_requested: false, sms_delivery_active: false };
@@ -1225,14 +1245,16 @@ test("appointment client finder filters by exact birthdate and debounced contact
     page.getByRole("button", { name: "Select Test Client" }),
   ).toBeVisible();
   expect(searches).toEqual([{ q: "", dateOfBirth: "1980-05-06" }]);
+  await page.clock.install();
   await search.fill("Te");
-  await page.waitForTimeout(100);
+  await page.clock.fastForward(100);
   expect(searches).toHaveLength(1);
   await search.fill("Test");
+  await page.clock.fastForward(400);
   await expect(
     page.getByRole("button", { name: "Select Test Client" }),
   ).toBeVisible();
-  expect(searches).toEqual([
+  await expect.poll(() => searches).toEqual([
     { q: "", dateOfBirth: "1980-05-06" },
     { q: "Test", dateOfBirth: "1980-05-06" },
   ]);
@@ -1256,6 +1278,9 @@ test("role policies preserve current access without broadening permissions", () 
   expect(pagesFor(["clinic_admin"], "admin")).not.toContain("staff");
   expect(pagesFor(["clinic_admin"], "admin")).toContain("notifications");
   expect(pagesFor(["reception"], "admin")).not.toContain("notifications");
+  expect(pagesFor(["reception"], "admin")).not.toContain("forms");
+  expect(pagesFor(["accountant"], "admin")).not.toContain("forms");
+  expect(pagesFor(["clinic_admin"], "admin")).toContain("forms");
   expect(pagesFor(["practitioner"], "admin")).toEqual([]);
   expect(pagesFor(["super_admin"], "admin")).toContain("business");
   expect(pageAt("/admin/notifications", "admin")).toBe("notifications");
@@ -1264,6 +1289,7 @@ test("role policies preserve current access without broadening permissions", () 
     "schedule_calendar",
     "appointments",
     "clients",
+    "forms",
     "my_notifications",
     "calendar",
     "profile",
@@ -3243,6 +3269,8 @@ test("availability is practitioner-first with selectable hours, changes, and tim
 });
 
 test("time off previews booked appointments before save and retains a follow-up list", async ({ page }) => {
+  // Keep this fixture's appointment in the future without freezing network/UI timers.
+  await page.clock.setFixedTime(new Date('2026-10-01T12:00:00Z'));
   await fixtures(page, ["super_admin"]);
   const affected = { id: "71", starts_at: "2026-10-06 14:00:00", ends_at: "2026-10-06 15:00:00", status: "confirmed", client_name: "Test Client", service_name: "Massage", location_name: "Holland Landing", timezone: "America/Toronto" };
   const existing = { id: "42", practitioner_id: "8", location_id: "1", practitioner_name: "Esther Vanderpoel", location_name: "Holland Landing", starts_at: "2026-10-05 13:00:00", ends_at: "2026-10-09 21:00:00", type: "vacation", reason: null, kind: "time_off", affected_appointment_count: "1" };
@@ -3321,6 +3349,78 @@ test("practitioner manages only their own availability at assigned locations", a
   await expect.poll(() => created).toMatchObject({ practitioner_id: 8, location_id: 1 });
 });
 
+for (const role of ['super_admin', 'practitioner']) {
+  test(`${role} adds consecutive hours without reopening the panel and confirms unsaved close`, async ({ page }) => {
+    await fixtures(page, [role]);
+    const person = { practitioner_id: 8, display_name: 'Esther', location_id: 1, active: 1 };
+    const location = { id: 1, name: 'Holland Landing', timezone: 'America/Toronto' };
+    const created: Record<string, unknown>[] = [];
+    const rules: Record<string, unknown>[] = [];
+    let failedOnce = false;
+    await page.route('**/api/v1/admin/practitioners', route => route.fulfill({ json: { data: [person] } }));
+    await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [location] } }));
+    await page.route('**/api/v1/practitioner/availability-context', route => route.fulfill({ json: { data: { practitioners: [person], locations: [location], can_manage: true } } }));
+    await page.route('**/api/v1/admin/schedule-exceptions', route => route.fulfill({ json: { data: [] } }));
+    await page.route('**/api/v1/admin/availability-rules', route => {
+      if (route.request().method() === 'POST') {
+        const payload = route.request().postDataJSON();
+        if (payload.weekday === 2 && !failedOnce) {
+          failedOnce = true;
+          return route.fulfill({ status: 422, json: { error: { code: 'validation_error', fields: { end_time: 'These hours overlap another rule.' } } } });
+        }
+        created.push(payload);
+        rules.push({ ...payload, id: created.length, practitioner_name: 'Esther', location_name: location.name, active: 1 });
+        return route.fulfill({ json: { data: { id: created.length } } });
+      }
+      return route.fulfill({ json: { data: rules } });
+    });
+    await page.goto(`${portalHost}/${role === 'super_admin' ? 'admin' : 'practitioner'}/availability`);
+    if (role === 'super_admin') await page.getByRole('button', { name: /Esther.*0 hour rules/ }).click();
+    await page.getByRole('button', { name: 'Add hours', exact: true }).click();
+    const panel = page.locator('.MuiDrawer-paper');
+    await panel.getByLabel('Starts').fill('10:00');
+    await panel.getByLabel('Ends').fill('16:00');
+    await panel.getByLabel('Valid from').fill('2026-10-08');
+    await panel.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await expect(panel.getByRole('status')).toHaveText('Working hours added.');
+    await expect(panel.getByLabel('Starts')).toHaveValue('10:00');
+    await expect(panel.getByLabel('Ends')).toHaveValue('16:00');
+    await expect(panel.getByLabel('Valid from')).toHaveValue('2026-10-08');
+    await panel.getByLabel('Day', { exact: true }).click();
+    await page.getByRole('option', { name: 'Tuesday', exact: true }).click();
+    await expect(panel.getByRole('status')).toHaveCount(0);
+    await panel.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await expect(panel.getByText('These hours overlap another rule.')).toBeVisible();
+    await expect(panel.getByLabel('Ends')).toHaveValue('16:00');
+    page.once('dialog', async dialog => {
+      expect(dialog.message()).toBe('Discard your unsaved changes?');
+      await dialog.dismiss();
+    });
+    await panel.getByRole('button', { name: 'Close', exact: true }).last().click();
+    await expect(panel.getByLabel('Day', { exact: true })).toContainText('Tuesday');
+    await panel.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await expect(panel.getByRole('status')).toHaveText('Working hours added.');
+    expect(created).toEqual([
+      expect.objectContaining({ weekday: 1, start_time: '10:00', end_time: '16:00', valid_from: '2026-10-08', location_id: 1, practitioner_id: 8 }),
+      expect.objectContaining({ weekday: 2, start_time: '10:00', end_time: '16:00', valid_from: '2026-10-08', location_id: 1, practitioner_id: 8 }),
+    ]);
+    let prompts = 0;
+    const unexpectedPrompt = async (dialog: import('@playwright/test').Dialog) => { prompts++; await dialog.dismiss(); };
+    page.on('dialog', unexpectedPrompt);
+    await panel.getByRole('button', { name: 'Close', exact: true }).last().click();
+    await expect(panel).toHaveCount(0);
+    expect(prompts).toBe(0);
+    page.off('dialog', unexpectedPrompt);
+    await expect(page.getByRole('button', { name: /Tuesday.*10:00–16:00/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Add hours', exact: true }).click();
+    await panel.getByLabel('Ends').fill('18:00');
+    page.once('dialog', dialog => dialog.accept());
+    await panel.getByRole('button', { name: 'Close panel' }).click();
+    await expect(panel).toHaveCount(0);
+    expect(created).toHaveLength(2);
+  });
+}
+
 test("clinic-managed practitioner availability is read-only", async ({ page }) => {
   await fixtures(page, ["practitioner"]);
   await page.route("**/api/v1/practitioner/availability-context", route => route.fulfill({ json: { data: {
@@ -3357,4 +3457,198 @@ test('practitioner saves and clears their public website URL', async ({ page }) 
   await page.getByRole('button', { name: 'Save public card', exact: true }).click();
   await expect(page.getByText('Public card saved.', { exact: true })).toBeVisible();
   expect(card.public_website_url).toBe('');
+});
+
+
+test("private work location stays linked to home and can be changed to a separate office", async ({ page }) => {
+  await fixtures(page, ["practitioner"]);
+  const home = {address_line1:"12 Private Street",address_line2:"",city:"Toronto",province:"Ontario",postal_code:"M2M 2M2",country:"Canada"};
+  let settings = {home_address:home,work_address:null as typeof home|null,work_same_as_home:true,version:1};
+  const saves: typeof settings[] = [];
+  await page.route("**/api/v1/profile/work-location", route => {
+    if(route.request().method()==="PUT") { const body=route.request().postDataJSON(); saves.push(body); settings={...body,version:settings.version+1}; }
+    return route.fulfill({json:{data:settings}});
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  const homeSection=page.getByRole("region",{name:"Home address",exact:true});
+  const workSection=page.getByRole("region",{name:"Work location",exact:true});
+  await expect(page.getByRole("checkbox",{name:"Same as home address"})).toBeChecked();
+  await expect(workSection.getByRole("textbox",{name:"Street address"})).toHaveCount(0);
+  await homeSection.getByRole("textbox",{name:"Street address"}).fill("14 Private Street");
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  await expect(page.getByText("Work location saved. Previous coverage checks must be renewed.")).toBeVisible();
+  expect(saves[0]).toMatchObject({home_address:{address_line1:"14 Private Street"},work_address:null,work_same_as_home:true,version:1});
+  await page.reload();
+  await expect(homeSection.getByRole("textbox",{name:"Street address"})).toHaveValue("14 Private Street");
+  await page.getByRole("checkbox",{name:"Same as home address"}).uncheck();
+  await workSection.getByRole("textbox",{name:"Street address"}).fill("99 Office Street");
+  await workSection.getByRole("textbox",{name:"City",exact:true}).fill("Toronto");
+  await workSection.getByRole("textbox",{name:"Province / region"}).fill("Ontario");
+  await workSection.getByRole("textbox",{name:"Postal code"}).fill("M3M 3M3");
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  await expect(page.getByText("Work location saved. Previous coverage checks must be renewed.")).toBeVisible();
+  expect(saves[1]).toMatchObject({home_address:{address_line1:"14 Private Street"},work_address:{address_line1:"99 Office Street"},work_same_as_home:false,version:2});
+});
+
+test("same as home requires a complete home address and failed saves retain edits", async ({ page }) => {
+  await fixtures(page,["practitioner"]);
+  let attempted=0;
+  await page.route("**/api/v1/profile/work-location", route=>{
+    if(route.request().method()==="PUT") {attempted++;return route.fulfill({status:409,json:{error:{code:"work_location_changed",message:"Settings changed",correlation_id:"location-test"}}});}
+    return route.fulfill({json:{data:{home_address:null,work_address:null,work_same_as_home:false,version:0}}});
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole("checkbox",{name:"Same as home address"}).check();
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  expect(attempted).toBe(0);
+  const home=page.getByRole("region",{name:"Home address",exact:true});
+  await home.getByRole("textbox",{name:"Street address"}).fill("12 Private Street");
+  await home.getByRole("textbox",{name:"City",exact:true}).fill("Toronto");
+  await home.getByRole("textbox",{name:"Province / region"}).fill("Ontario");
+  await home.getByRole("textbox",{name:"Postal code"}).fill("M2M 2M2");
+  await page.getByRole("button",{name:"Save work location",exact:true}).click();
+  await expect(page.getByText(/Reference: location-test/)).toBeVisible();
+  expect(attempted).toBe(1);
+  await expect(home.getByRole("textbox",{name:"Street address"})).toHaveValue("12 Private Street");
+});
+
+
+test("invited practitioner profile and menu use approved local identity instead of generated Entra claims", async ({page}) => {
+  await fixtures(page,["practitioner"]);
+  await page.route("**/src/auth/AuthProvider.tsx",route=>route.fulfill({contentType:"application/javascript",body:`
+    const account={homeAccountId:'external-profile',name:'unknown',username:'generated-id@tenant.onmicrosoft.com'};
+    const auth={account,configured:true,isAuthenticated:true,signIn:async()=>{},signOut:async()=>{},getAccessToken:async()=>'test-only-token'};
+    export const msalInstance={initialize:async()=>{},handleRedirectPromise:async()=>null,getActiveAccount:()=>account,getAllAccounts:()=>[account],setActiveAccount:()=>{}};
+    export const StaffAuthProvider=({children})=>children; export const selectStaffAccount=()=>account;export const useStaffAuth=()=>auth;
+  `}));
+  await page.route("**/api/v1/auth/me",route=>route.fulfill({json:{data:{id:23,clinic_id:1,display_name:"Approved Practitioner",email:"practitioner@example.test",roles:["practitioner"],permissions:[]}}}));
+  await page.goto(`${portalHost}/practitioner/profile`);
+  const card=page.getByRole('heading',{name:'Account profile',exact:true}).locator('..');
+  await expect(card.getByText('Approved Practitioner',{exact:true})).toBeVisible();
+  await expect(card.getByText('practitioner@example.test',{exact:true})).toBeVisible();
+  await expect(card.getByText('AP',{exact:true})).toBeVisible();
+  await expect(page.getByText('unknown',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('generated-id@tenant.onmicrosoft.com',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Open account menu for Approved Practitioner'}).click();
+  await expect(page.getByRole('menu').getByText('Approved Practitioner',{exact:true})).toBeVisible();
+  await expect(page.getByRole('menu').getByText('practitioner@example.test',{exact:true})).toBeVisible();
+});
+
+async function teamValidationFixture(page: Page) {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/team-profiles', route => route.fulfill({json:{data:[{
+    user_id:7,given_name:'New',display_name:'New Practitioner',status:'active',practitioner_id:3,
+    slug:'new-practitioner',section:'practitioner',public_name:'New Practitioner',booking_name:'New',
+    public_title:'Practitioner',published:0,show_booking_action:0,has_image:0,
+  }]}}));
+  await page.goto(`${portalHost}/admin/team`);
+  await expect(page.getByRole('button',{name:'Save team profile'})).toBeEnabled();
+}
+
+test('team phone error is inline, focused, scrolled and cleared on correction without losing edits', async ({page}) => {
+  await teamValidationFixture(page);
+  let attempts=0;
+  await page.route('**/api/v1/admin/team-profiles/7', route => {
+    attempts++;
+    return attempts < 3 ? route.fulfill({status:422,json:{error:{code:'validation_error',message:'Use an international public phone number, for example +12892975234.',fields:{public_contact_phone:'Use + and 8 to 15 digits'},correlation_id:'team-phone-test'}}}) : route.fulfill({json:{data:{user_id:7,published:false}}});
+  });
+  const phone=page.getByRole('textbox',{name:'Public contact phone',exact:true});
+  await phone.fill('2892975234');
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  await expect(phone).toHaveAttribute('aria-invalid','true');
+  await expect(phone).toHaveAccessibleDescription('Use + and 8 to 15 digits');
+  await expect(phone).toBeFocused();
+  await expect(phone).toBeInViewport();
+  await expect(phone).toHaveValue('2892975234');
+  await expect(page.getByText(/Reference: team-phone-test/)).toBeAttached();
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  await expect.poll(()=>attempts).toBe(2);
+  await expect(phone).toBeFocused();
+  await phone.fill('+12892975234');
+  await expect(phone).toBeFocused();
+  await expect(phone).toHaveAttribute('aria-invalid','false');
+  await expect(phone).toHaveAccessibleDescription('Use international format, for example +12892975234.');
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  await expect(page.getByText('Public team profile saved.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Use + and 8 to 15 digits',{exact:true})).toHaveCount(0);
+});
+
+test('multiple team field errors focus visual order and checkbox errors appear below the control', async ({page}) => {
+  await teamValidationFixture(page);
+  await page.route('**/api/v1/admin/team-profiles/7',route=>route.fulfill({status:422,json:{error:{code:'validation_error',message:'Check contact details.',fields:{public_contact_phone:'Use + and 8 to 15 digits',public_contact_email:'Invalid email',public_contact_sms:'Phone required'},correlation_id:'team-multiple'}}}));
+  await page.getByRole('textbox',{name:'Public contact phone',exact:true}).fill('invalid');
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  const email=page.getByRole('textbox',{name:'Public contact email',exact:true});
+  await expect(email).toHaveAccessibleDescription('Invalid email');
+  await expect(email).toBeFocused();
+  await expect(email).toBeInViewport();
+  await expect(page.getByText('Phone required',{exact:true})).toBeAttached();
+  await email.fill('valid@example.test');
+  await expect(email).toHaveAttribute('aria-invalid','false');
+  await expect(page.getByRole('textbox',{name:'Public contact phone',exact:true})).toHaveAttribute('aria-invalid','true');
+});
+
+test('unmapped validation fields remain visible and focused as a form-level error', async ({page}) => {
+  await teamValidationFixture(page);
+  await page.route('**/api/v1/admin/team-profiles/7',route=>route.fulfill({status:422,json:{error:{code:'validation_error',message:'Check the profile.',fields:{future_field:'Review this setting'},correlation_id:'team-unknown'}}}));
+  await page.getByRole('button',{name:'Save team profile'}).click();
+  const alert=page.getByRole('alert').filter({hasText:'future_field: Review this setting'});
+  await expect(alert).toBeFocused();
+  await expect(alert).toBeInViewport();
+  await expect(page.getByRole('textbox',{name:'Preferred public name',exact:true})).toHaveValue('New Practitioner');
+});
+
+test('public card uses shared field errors and preserves unsaved biography', async ({page}) => {
+  await fixtures(page,['practitioner']);
+  await page.route('**/api/v1/profile/public-card',route=>route.request().method()==='PUT' ? route.fulfill({status:422,json:{error:{code:'validation_error',message:'Use an international public phone number, for example +12892975234.',fields:{public_contact_phone:'Use + and 8 to 15 digits'},correlation_id:'self-card-phone'}}}) : route.fulfill({json:{data:{public_name:'Test Practitioner',booking_name:'Test',summary:'',summary_fr:'',slug:'test',published:false}}}));
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole('textbox',{name:'Biography (English)',exact:true}).fill('Unsaved biography');
+  await page.getByRole('textbox',{name:'Public contact phone',exact:true}).fill('2892975234');
+  await page.getByRole('button',{name:'Save public card',exact:true}).click();
+  const phone=page.getByRole('textbox',{name:'Public contact phone',exact:true});
+  await expect(phone).toHaveAccessibleDescription('Use + and 8 to 15 digits');
+  await expect(phone).toBeFocused();
+  await expect(phone).toBeInViewport();
+  await expect(page.getByRole('textbox',{name:'Biography (English)',exact:true})).toHaveValue('Unsaved biography');
+});
+
+test('field errors and unmapped errors stay inside the active location drawer', async ({page}) => {
+  await fixtures(page,['super_admin']);
+  let attempts=0;
+  await page.route('**/api/v1/admin/locations',route=> {
+    if(route.request().method()==='GET') return route.fulfill({json:{data:[]}});
+    attempts++;
+    return route.fulfill({status:422,json:{error:{code:'validation_error',message:'Review this location.',fields:attempts===1?{timezone:'Invalid timezone'}:{future_setting:'Review this setting'},correlation_id:'location-validation'}}});
+  });
+  await page.goto(`${portalHost}/admin/locations`);
+  await page.getByRole('button',{name:'New location',exact:true}).first().click();
+  await page.getByRole('textbox',{name:'Location name',exact:true}).fill('Test location');
+  await page.getByRole('button',{name:'Add location',exact:true}).last().click();
+  const timezone=page.getByRole('textbox',{name:'Timezone',exact:true});
+  await expect(timezone).toHaveAccessibleDescription('Invalid timezone');
+  await expect(timezone).toBeFocused();
+  await expect(timezone).toBeInViewport();
+  await page.getByRole('button',{name:'Add location',exact:true}).last().click();
+  const summary=page.getByRole('alert').filter({hasText:'future_setting: Review this setting'});
+  await expect(summary).toBeFocused();
+  await expect(summary).toBeInViewport();
+  await expect(page.getByRole('textbox',{name:'Location name',exact:true})).toHaveValue('Test location');
+  page.once('dialog', dialog => void dialog.accept());
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(page.getByText('future_setting: Review this setting',{exact:true})).toHaveCount(0);
+});
+
+test('French mobile field errors stay accessible with reduced motion', async ({page}) => {
+  await page.setViewportSize({width:390,height:650});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.addInitScript(()=>localStorage.setItem('wellness.language','fr'));
+  await fixtures(page,['practitioner']);
+  await page.route('**/api/v1/profile/public-card',route=>route.request().method()==='PUT' ? route.fulfill({status:422,json:{error:{code:'validation_error',message:'Use an international public phone number, for example +12892975234.',fields:{public_contact_phone:'Use + and 8 to 15 digits'},correlation_id:'fr-phone'}}}) : route.fulfill({json:{data:{public_name:'Test',booking_name:'Test',summary:'',summary_fr:'',slug:'test',published:false}}}));
+  await page.goto(`${portalHost}/practitioner/profile`);
+  const phone=page.locator('input[name="public_contact_phone"]');
+  await phone.fill('123');
+  await page.getByRole('button',{name:'Enregistrer la fiche publique',exact:true}).click();
+  await expect(phone).toHaveAccessibleDescription('Utilisez + suivi de 8 à 15 chiffres');
+  await expect(phone).toBeFocused();
+  await expect(phone).toBeInViewport();
 });

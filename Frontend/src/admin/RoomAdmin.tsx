@@ -1,9 +1,11 @@
+import { ApiError } from '../shared/api';
+import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, FormControlLabel, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Switch, TextField, Typography } from '@mui/material';
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Switch, Typography } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, Settings2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
+import { normalizeNumericIds } from '../shared/api';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { RoomCapabilities } from './RoomCapabilities';
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
@@ -14,7 +16,8 @@ type PanelMode = 'details' | 'new' | 'edit' | null;
 const blank = (locationId = ''): Form => ({ location_id: locationId, name: '', room_type: 'Treatment room', equipment_notes: '', turnover_minutes: '0', is_bookable: true });
 const roomForm = (item: Room): Form => ({ location_id: String(item.location_id), name: item.name, room_type: item.room_type ?? '', equipment_notes: item.equipment_notes ?? '', turnover_minutes: String(item.turnover_minutes), is_bookable: Boolean(Number(item.is_bookable)) });
 
-export function RoomAdmin() {
+function RoomAdminForm() {
+  const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [locations, setLocations] = useState<Location[]>([]);
@@ -38,37 +41,37 @@ export function RoomAdmin() {
   }, [items, query]);
 
   const load = useCallback(async (preferredId?: number | null) => {
-    setBusy(true); setLoadError('');
+    setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken(); const headers = { Authorization: `Bearer ${token}` };
       const [locationResponse, roomResponse] = await Promise.all([fetch(`${api}/admin/locations`, { headers }), fetch(`${api}/admin/rooms`, { headers })]);
       const [locationBody, roomBody] = await Promise.all([locationResponse.json(), roomResponse.json()]);
-      if (!locationResponse.ok) throw new Error(apiErrorMessage(locationBody, locationResponse.status, t('Unable to load locations.')));
-      if (!roomResponse.ok) throw new Error(apiErrorMessage(roomBody, roomResponse.status, t('Unable to load rooms.')));
+      if (!locationResponse.ok) throw new ApiError(locationBody, locationResponse.status, t('Unable to load locations.'));
+      if (!roomResponse.ok) throw new ApiError(roomBody, roomResponse.status, t('Unable to load rooms.'));
       const loadedLocations = normalizeNumericIds<Location[]>(locationBody.data); const loadedItems = normalizeNumericIds<Room[]>(roomBody.data);
       setLocations(loadedLocations); setItems(loadedItems); setForm(current => ({ ...current, location_id: current.location_id || String(loadedLocations[0]?.id ?? '') }));
       setSelectedId(current => { const requested = Number(preferredId ?? current ?? 0) || null; return loadedItems.some(item => item.id === requested) ? requested : null; });
-    } catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Unable to load rooms.')); }
+    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load rooms.')); }
     finally { setBusy(false); }
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
-  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank(String(locations[0]?.id ?? ''))); setPanelError(''); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelError(''); setPanelMode('details'); };
-  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(roomForm(item)); setPanelError(''); setPanelMode('edit'); };
-  const closePanel = () => { if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; formGuard.markClean(); setPanelMode(null); setEditingId(null); setPanelError(''); };
+  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank(String(locations[0]?.id ?? ''))); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
+  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(roomForm(item)); (formValidation.clear(), setPanelError('')); setPanelMode('edit'); };
+  const closePanel = () => { if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; formGuard.markClean(); setPanelMode(null); setEditingId(null); (formValidation.clear(), setPanelError('')); };
   const closeCapabilities = () => { if (capabilitiesDirty && !window.confirm(t('Discard your unsaved changes?'))) return; setCapabilitiesDirty(false); setCapabilitiesOpen(false); };
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setPanelError(''); setSaved('');
+    event.preventDefault(); setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
     try {
       const token = await getAccessToken(); const payload = { ...form, location_id: Number(form.location_id), turnover_minutes: Number(form.turnover_minutes) };
       const response = await fetch(editingId ? `${api}/admin/rooms/${editingId}` : `${api}/admin/rooms`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status, t('Unable to save room.')));
+      if (!response.ok) throw new ApiError(body, response.status, t('Unable to save room.'));
       const savedId = Number(body.data?.id ?? editingId ?? 0) || null; const message = t('{{name}} was {{action}}.', { name: form.name, action: t(editingId ? 'updated' : 'created') });
       formGuard.markClean(); setPanelMode(null); setEditingId(null); await load(savedId); setSaved(message);
-    } catch (cause) { setPanelError(cause instanceof Error ? cause.message : t('Unable to save room.')); }
+    } catch (cause) { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save room.')); }
     finally { setBusy(false); }
   };
 
@@ -78,7 +81,7 @@ export function RoomAdmin() {
       <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
       <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button><Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
       <Button startIcon={<Settings2 size={17}/>} onClick={() => setCapabilitiesOpen(true)}>{t('Capabilities')}</Button>
-      <TextField size="small" label={t('Filter rooms')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
+      <TextField name="query" size="small" label={t('Filter rooms')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
     </Stack></Paper>
     {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}{loadError && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>{t('Retry')}</Button>}>{loadError}</Alert>}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
@@ -95,6 +98,8 @@ export function RoomAdmin() {
     <Dialog open={capabilitiesOpen} onClose={closeCapabilities} fullWidth maxWidth="lg"><DialogTitle>{t('Room capabilities')}</DialogTitle><DialogContent dividers><RoomCapabilities onDirtyChange={setCapabilitiesDirty}/></DialogContent><DialogActions><Button onClick={closeCapabilities}>{t('Close')}</Button></DialogActions></Dialog>
   </Stack>;
 }
+export const RoomAdmin = withFormValidation(RoomAdminForm);
+
 
 function RoomDetails({ item, edit }: { item: Room; edit: () => void }) {
   const { t } = useTranslation(); const rows = [[t('Status'), t(Boolean(Number(item.is_bookable)) ? 'Bookable' : 'Not bookable')], [t('Location'), item.location_name], [t('Room type'), item.room_type || t('General')], [t('Turnover time'), t('{{minutes}} minutes', { minutes: item.turnover_minutes })], [t('Equipment and room notes'), item.equipment_notes || t('Not set')]];
@@ -103,11 +108,11 @@ function RoomDetails({ item, edit }: { item: Room; edit: () => void }) {
 
 function RoomFields({ form, locations, field }: { form: Form; locations: Location[]; field: <K extends keyof Form>(key: K, value: Form[K]) => void }) {
   const { t } = useTranslation(); return <Grid container spacing={2}>
-    <Grid size={{ xs: 12, md: 6 }}><TextField required select fullWidth label={t('Location')} value={form.location_id} onChange={event => field('location_id', event.target.value)}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField></Grid>
-    <Grid size={{ xs: 12, md: 6 }}><TextField required fullWidth label={t('Room name')} value={form.name} onChange={event => field('name', event.target.value)}/></Grid>
-    <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label={t('Room type')} value={form.room_type} onChange={event => field('room_type', event.target.value)}/></Grid>
-    <Grid size={{ xs: 12, md: 6 }}><TextField required type="number" fullWidth label={t('Turnover time (minutes)')} value={form.turnover_minutes} onChange={event => field('turnover_minutes', event.target.value)} inputProps={{ min: 0, max: 240, step: 5 }}/></Grid>
-    <Grid size={12}><TextField multiline minRows={2} fullWidth label={t('Equipment and room notes')} value={form.equipment_notes} onChange={event => field('equipment_notes', event.target.value)}/></Grid>
-    <Grid size={12}><FormControlLabel control={<Switch checked={form.is_bookable} onChange={event => field('is_bookable', event.target.checked)}/>} label={t('Available for booking')}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="location_id" required select fullWidth label={t('Location')} value={form.location_id} onChange={event => field('location_id', event.target.value)}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="name" required fullWidth label={t('Room name')} value={form.name} onChange={event => field('name', event.target.value)}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="room_type" fullWidth label={t('Room type')} value={form.room_type} onChange={event => field('room_type', event.target.value)}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="turnover_minutes" required type="number" fullWidth label={t('Turnover time (minutes)')} value={form.turnover_minutes} onChange={event => field('turnover_minutes', event.target.value)} inputProps={{ min: 0, max: 240, step: 5 }}/></Grid>
+    <Grid size={12}><TextField name="equipment_notes" multiline minRows={2} fullWidth label={t('Equipment and room notes')} value={form.equipment_notes} onChange={event => field('equipment_notes', event.target.value)}/></Grid>
+    <Grid size={12}><FormControlLabel name="is_bookable" control={<Switch checked={form.is_bookable} onChange={event => field('is_bookable', event.target.checked)}/>} label={t('Available for booking')}/></Grid>
   </Grid>;
 }
