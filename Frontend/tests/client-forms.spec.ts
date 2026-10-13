@@ -307,3 +307,87 @@ test('answer types use friendly translated English labels', async ({ page }) => 
   }
   await expect(page.getByRole('option', { name: 'Answer type: text', exact: true })).toHaveCount(0);
 });
+
+async function openAnswers(page: Page) {
+  await page.goto(`${host}/client`);
+  await page.getByRole('button', { name: 'My forms', exact: true }).click();
+  await page.getByRole('button', { name: 'Complete form', exact: true }).click();
+}
+
+test('client answer draft saves partial answers without consent and resumes after reload', async ({ page }) => {
+  await fixture(page); let draft: any = null, version = 1; const saves: any[] = [], submissions: unknown[] = [];
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, version, definition, answers: null, answer_changes_enabled: true, draft } } }));
+  await page.route('**/api/v1/customer/forms/19/draft', route => { const body = route.request().postDataJSON(); saves.push(body); draft = { answers: body.answers, updated_at: '2026-10-13 12:00:00' }; version++; return route.fulfill({ json: { data: { id: 19, status: 'pending', version } } }); });
+  await page.route('**/api/v1/customer/forms/19/submit', route => { submissions.push(route.request().postDataJSON()); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
+  await openAnswers(page); await page.getByLabel('Synthetic answer').fill('Partial draft');
+  await page.getByRole('button', { name: 'Save answer draft', exact: true }).click();
+  await expect(page.getByText('Answer draft saved. It has not been submitted.')).toBeVisible();
+  expect(saves[0].answers).toEqual({ q1: 'Partial draft' }); expect(saves[0].confirmed).toBeUndefined(); expect(submissions).toHaveLength(0);
+  await expect(page.getByRole('button', { name: 'My appointments', exact: true })).toBeEnabled();
+  await openAnswers(page); await expect(page.getByLabel('Synthetic answer')).toHaveValue('Partial draft');
+  await expect(page.getByText('Your saved answer draft has been loaded.')).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' })).not.toBeChecked();
+  await page.getByRole('combobox', { name: 'Synthetic yes/no' }).click(); await page.getByRole('option', { name: 'No', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Synthetic consent', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check();
+  await page.getByRole('button', { name: 'Submit form', exact: true }).click();
+  await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(submissions[0]).toMatchObject({ version: 2, confirmed: true });
+});
+
+test('uncertain client answer draft locks navigation and retries the identical save key', async ({ page }) => {
+  await fixture(page); const bodies: any[] = [];
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition, answers: null, answer_changes_enabled: true } } }));
+  await page.route('**/api/v1/customer/forms/19/draft', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { message: 'Retry draft' } } } : { json: { data: { id: 19, status: 'pending', version: 2 } } }); });
+  await openAnswers(page); await page.getByLabel('Synthetic answer').fill('Partial draft');
+  await page.getByRole('button', { name: 'Save answer draft', exact: true }).click();
+  await expect(page.getByLabel('Synthetic answer')).toBeDisabled(); await expect(page.getByRole('button', { name: 'My profile', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Reload form', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Retry draft save', exact: true }).click();
+  await expect(page.getByText('Answer draft saved. It has not been submitted.')).toBeVisible(); expect(bodies[1]).toEqual(bodies[0]);
+  expect(bodies[0].idempotency_key).toMatch(/^[a-f0-9-]{36}$/);
+});
+
+test('stale client draft keeps edits until explicit reload of the newer saved version', async ({ page }) => {
+  await fixture(page); let loaded = 0;
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, version: ++loaded, definition, answers: null, answer_changes_enabled: true, draft: loaded > 1 ? { answers: { q1: 'Other tab saved' }, updated_at: '2026-10-13 12:00:00' } : null } } }));
+  await page.route('**/api/v1/customer/forms/19/draft', route => route.fulfill({ status: 409, json: { error: { code: 'form_changed', message: 'The form changed. Reload it before saving.' } } }));
+  await openAnswers(page); await page.getByLabel('Synthetic answer').fill('Unsaved local edit'); await page.getByRole('button', { name: 'Save answer draft', exact: true }).click();
+  await expect(page.getByText('The form changed. Reload it before saving.')).toBeVisible(); await expect(page.getByLabel('Synthetic answer')).toHaveValue('Unsaved local edit');
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Reload form', exact: true }).click();
+  await expect(page.getByLabel('Synthetic answer')).toHaveValue('Other tab saved');
+});
+
+test('client amendment requires a reason, preserves consent and retries the same correction', async ({ page }) => {
+  await fixture(page); const bodies: any[] = [];
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, status: 'reviewed', version: 4, definition, answers: { q1: 'Original answer', yes: false, consent: true }, answer_changes_enabled: true, amendments: [] } } }));
+  await page.route('**/api/v1/customer/forms/19/amendments', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { message: 'Retry amendment' } } } : { json: { data: { id: 19, status: 'submitted', version: 5, amendment_id: 31 } } }); });
+  await openAnswers(page); await page.getByRole('button', { name: 'Amend answers', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Synthetic consent', exact: true })).toBeDisabled();
+  await page.getByLabel('Synthetic answer').fill('Corrected answer'); await page.getByLabel('Reason for amendment').fill('Corrected test information');
+  await page.getByRole('checkbox', { name: 'I reviewed these changes and confirm the amendment.' }).check();
+  await page.getByRole('button', { name: 'Submit amendment', exact: true }).click(); await expect(page.getByLabel('Reason for amendment')).toBeDisabled();
+  await page.getByRole('button', { name: 'Retry confirmation', exact: true }).click();
+  await expect(page.getByText('Amendment saved. The original submission is preserved.')).toBeVisible(); expect(bodies[1]).toEqual(bodies[0]);
+  expect(bodies[0]).toMatchObject({ version: 4, confirmed: true, reason: 'Corrected test information', answers: { q1: 'Corrected answer', yes: false, consent: true } });
+});
+
+test('assigned practitioner sees original answers and dated amendment history', async ({ page }) => {
+  await fixture(page, 'practitioner');
+  await page.route('**/api/v1/forms/tasks/19', route => route.fulfill({ json: { data: { ...task, status: 'submitted', version: 5, definition, answers: { q1: 'Current correction', yes: false, consent: true }, original_answers: { q1: 'Original answer', yes: false, consent: true }, amendments: [{ id: 31, answers: { q1: 'Current correction', yes: false, consent: true }, reason: 'Correction history reason', created_at: '2026-10-13 12:00:00', reviewed_at: null }] } } }));
+  await page.goto(`${host}/practitioner/clients`); await page.getByRole('button', { name: /Test Client/ }).click(); await page.getByRole('button', { name: 'Client forms', exact: true }).click(); await page.getByRole('button', { name: 'View form', exact: true }).click();
+  await expect(page.getByLabel('Synthetic answer')).toHaveValue('Current correction'); await expect(page.getByLabel('Synthetic answer')).toBeDisabled();
+  await expect(page.getByText('Original submission', { exact: true })).toBeVisible(); await expect(page.getByText(/Synthetic answer: Original answer/)).toBeVisible();
+  await expect(page.getByText('Amendment 1', { exact: true })).toBeVisible(); await expect(page.getByText('Correction history reason')).toBeVisible(); await expect(page.getByText(/Awaiting practitioner review/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save answer draft', exact: true })).toHaveCount(0);
+});
+
+test('French mobile client answer draft stays private until explicit submission', async ({ page }) => {
+  await fixture(page); await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition, answers: null, answer_changes_enabled: true } } }));
+  await page.route('**/api/v1/customer/forms/19/draft', route => route.fulfill({ json: { data: { id: 19, status: 'pending', version: 2 } } }));
+  await page.goto(`${host}/client`); await page.getByRole('button', { name: 'Language and region', exact: true }).click(); await page.getByRole('button', { name: /Français \(Canada\)/ }).click();
+  await page.getByRole('button', { name: 'Mes formulaires', exact: true }).click(); await page.getByRole('button', { name: 'Remplir le formulaire', exact: true }).click();
+  await page.getByLabel('Réponse fictive').fill('Réponse partielle'); await page.getByRole('button', { name: 'Enregistrer le brouillon de réponses', exact: true }).click();
+  await expect(page.getByText('Brouillon de réponses enregistré. Il n’a pas été soumis.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

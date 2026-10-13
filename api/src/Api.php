@@ -505,9 +505,9 @@ final class Api
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
         $forms=new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database));
         if($route==='GET forms'){$actor=$bookingActor();return $forms->list($actor,$actor->userId,$r->query,$r->correlationId);}
-        if(preg_match('#^(GET|POST) forms/(\d+)(/submit)?$#',$route,$matches)){
+        if(preg_match('#^(GET|POST) forms/(\d+)(/(submit|draft|amendments))?$#',$route,$matches)){
             if($matches[1]==='GET'&&!isset($matches[3]))return $forms->detail($bookingActor(),(int)$matches[2],$r->correlationId);
-            if($matches[1]==='POST'&&isset($matches[3]))return $forms->submit($bookingActor(),(int)$matches[2],$r->body,$r->correlationId);
+            if($matches[1]==='POST'&&isset($matches[4]))return $matches[4]==='submit'?$forms->submit($bookingActor(),(int)$matches[2],$r->body,$r->correlationId):$forms->saveAnswers($bookingActor(),(int)$matches[2],$r->body,$r->correlationId,$matches[4]==='amendments');
         }
         if ($route === 'POST recurring-series/preview' || $route === 'POST recurring-series') return (new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->create($bookingActor(),$r->body,$r->correlationId,$route === 'POST recurring-series');
         if(preg_match('#^recurring-series/(\d+)(/preview)?$#',substr($r->path,strlen('/api/v1/customer/')),$matches)){
