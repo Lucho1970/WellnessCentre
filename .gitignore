@@ -15,6 +15,13 @@ Frontend/vite.portal.config.d.ts
 Frontend/.npm-install.log
 Frontend/.npm-install.error.log
 
+# Wellnexa public website
+Wellnexa/node_modules/
+Wellnexa/dist/
+Wellnexa/*.tsbuildinfo
+Wellnexa/.env*
+!Wellnexa/.env.example
+
 # Environment and editor files
 .env
 Frontend/.env
