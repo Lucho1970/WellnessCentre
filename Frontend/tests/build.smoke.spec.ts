@@ -65,11 +65,12 @@ test("neutral portal landing separates clinic browsing from application administ
   });
   await page.goto("https://portal.copihue.ca/");
   await expect(page.getByRole("heading", { name: "Your care starts with the right portal." })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open Willow Wellness Virtual Clinic/ })).toHaveAttribute("href", "https://willowwellness.copihue.ca/");
+  await expect(page.getByRole("link", { name: /Open Wellnexa/ })).toHaveAttribute("href", "https://willowwellness.copihue.ca/");
   await expect(page.getByRole("link", { name: "Administration sign-in" })).toHaveAttribute("href", "/admin/");
   await page.getByRole("button", { name: "FR" }).click();
   await expect(page.getByRole("heading", { name: "Vos soins commencent par le bon portail." })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+  await expect(page.getByRole("link", { name: /Ouvrir Wellnexa/ })).toHaveAttribute("href", "https://willowwellness.copihue.ca/?lang=fr");
 });
 
 test('built central administration starts independently without clinic configuration or records', async ({ page }) => {
