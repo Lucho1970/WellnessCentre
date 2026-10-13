@@ -10,9 +10,9 @@ export function formToday() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type)?.value).join('-');
 }
-export function typedAnswer(question: Question, value: FormAnswer | undefined): string | boolean | string[] | undefined {
+export function typedAnswer(question: Question, value: FormAnswer | undefined, draft = false): string | boolean | string[] | undefined {
   if (value === undefined || value === '' || (typeof value === 'object' && !Array.isArray(value) && value.number.trim() === '')) {
-    if (question.required) throw new Error('Check the form questions and required answers.');
+    if (question.required && !draft) throw new Error('Check the form questions and required answers.');
     return undefined;
   }
   if (question.type === 'single_choice') {
@@ -20,7 +20,7 @@ export function typedAnswer(question: Question, value: FormAnswer | undefined): 
     return value;
   }
   if (question.type === 'multiple_choice') {
-    if (!Array.isArray(value) || value.some(id => !question.options?.some(option => option.id === id)) || new Set(value).size !== value.length || (question.required && !value.length)) throw new Error('Select at least one valid option.');
+    if (!Array.isArray(value) || value.some(id => !question.options?.some(option => option.id === id)) || new Set(value).size !== value.length || (question.required && !draft && !value.length)) throw new Error('Select at least one valid option.');
     return value.length ? [...value].sort() : undefined;
   }
   if (question.type === 'phone') {

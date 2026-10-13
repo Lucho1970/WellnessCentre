@@ -103,6 +103,7 @@ final class ClientFormsService
         if($actor->userType!=='client'&&$this->ownPractitioner($actor)!==(int)$row['practitioner_id'])throw new ApiException(403,'forbidden','Only the client and assigned practitioner may read answers.');
         $row['definition']=json_decode($row['definition'],true,32,JSON_THROW_ON_ERROR);$row['answers']=null;
         if($row['submission_id']){$s=$this->database->connection()->prepare('SELECT CAST(response_data AS BINARY) response_data FROM form_submissions WHERE id=? AND client_id=? AND form_template_id=?');$s->execute([$row['submission_id'],$row['client_id'],$row['form_template_id']]);$response=$s->fetchColumn();if($response===false)throw new ApiException(409,'form_changed','The form changed. Reload it.');$row['answers']=json_decode($response,true,32,JSON_THROW_ON_ERROR);}
+        $row=(new ClientFormAnswersService($this->database->connection()))->decorate($row,$actor->userType==='client');
         $this->audit->write($actor->clinicId,$actor,$cid,'form.answers.view','client_form_task',$id);return $row;
     }
     public function assign(AuthContext $actor,int $clientId,array $body,string $cid): array {
@@ -122,16 +123,24 @@ final class ClientFormsService
             $s=$pdo->prepare("INSERT INTO form_submissions(form_template_id,appointment_id,client_id,response_data,status,submitted_at) VALUES(?,?,?,?,'submitted',UTC_TIMESTAMP())");$s->execute([$row['form_template_id'],$row['appointment_id'],$actor->userId,json_encode($answers,JSON_THROW_ON_ERROR)]);$submission=(int)$pdo->lastInsertId();
             $pdo->prepare("UPDATE client_form_tasks SET submission_id=?,status='submitted',submitted_at=UTC_TIMESTAMP(),version=version+1 WHERE id=?")->execute([$submission,$id]);
             if(array_filter($definition['questions'],static fn($q)=>$q['type']==='consent'))$pdo->prepare("INSERT INTO consent_records(client_id,purpose_code,policy_version,status,evidence,recorded_at) VALUES(?,?,?,'granted',?,UTC_TIMESTAMP())")->execute([$actor->userId,'form-'.$row['form_template_id'],(string)$row['template_version'],json_encode(['task_id'=>$id,'submission_id'=>$submission],JSON_THROW_ON_ERROR)]);
+            (new ClientFormAnswersService($pdo))->clearDraft($id);
             $this->audit->write($actor->clinicId,$actor,$cid,'form.submit','client_form_task',$id);$pdo->commit();return ['id'=>$id,'status'=>'submitted'];
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
     public function transition(AuthContext $actor,int $id,array $body,string $cid): array {
         $this->guard($actor);if($actor->userType!=='staff')throw new ApiException(403,'forbidden','Staff access is required.');$pdo=$this->database->connection();
         try{$pdo->beginTransaction();$row=$this->task($actor,$id,true);$action=$body['action']??'';if(!is_int($body['version']??null)||$body['version']!==(int)$row['version'])throw new ApiException(409,'form_changed','The form changed. Reload it.');
-            if($action==='review'&&$row['status']==='submitted'&&$this->ownPractitioner($actor)===(int)$row['practitioner_id']){$pdo->prepare("UPDATE client_form_tasks SET status='reviewed',reviewed_by=?,reviewed_at=UTC_TIMESTAMP(),version=version+1 WHERE id=?")->execute([$actor->userId,$id]);$pdo->prepare("UPDATE form_submissions SET status='reviewed',reviewed_by=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?")->execute([$actor->userId,$row['submission_id']]);}
-            elseif($action==='revoke'&&$row['status']==='pending')$pdo->prepare("UPDATE client_form_tasks SET status='revoked',version=version+1 WHERE id=?")->execute([$id]);
+            if($action==='review'&&$row['status']==='submitted'&&$this->ownPractitioner($actor)===(int)$row['practitioner_id']){$pdo->prepare("UPDATE client_form_tasks SET status='reviewed',reviewed_by=?,reviewed_at=UTC_TIMESTAMP(),version=version+1 WHERE id=?")->execute([$actor->userId,$id]);if(!(new ClientFormAnswersService($pdo))->reviewLatest($id,$actor->userId))$pdo->prepare("UPDATE form_submissions SET status='reviewed',reviewed_by=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?")->execute([$actor->userId,$row['submission_id']]);}
+            elseif($action==='revoke'&&$row['status']==='pending'){$pdo->prepare("UPDATE client_form_tasks SET status='revoked',version=version+1 WHERE id=?")->execute([$id]);(new ClientFormAnswersService($pdo))->clearDraft($id);}
             else throw new ApiException(403,'forbidden','This form action is not permitted.');
             $this->audit->write($actor->clinicId,$actor,$cid,'form.'.$action,'client_form_task',$id);$pdo->commit();return ['id'=>$id];
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    }
+    public function saveAnswers(AuthContext $actor,int $id,array $body,string $cid,bool $amend=false): array {
+        $this->guard($actor);if($actor->userType!=='client')throw new ApiException(403,'forbidden','Client access is required.');
+        $pdo=$this->database->connection();
+        try{$pdo->beginTransaction();$row=$this->task($actor,$id,true);$result=(new ClientFormAnswersService($pdo))->write($actor,$row,$body,$amend);
+            $this->audit->write($actor->clinicId,$actor,$cid,$amend?'form.amend':'form.answer_draft.save','client_form_task',$id);$pdo->commit();return $result;
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
     /** Called inside the shared booking transaction; preview/series rollbacks include these tasks. */
