@@ -1,9 +1,17 @@
-:root { font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #173d3a; background: #faf8f2; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; --green: #176b62; --ink: #173d3a; --muted: #50625e; --border: #d9e1d9; }
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--graphite); background: var(--cloud-white);
+  font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
+  --turquoise: #3cc7c4; --violet: #7a4dff; --deep-teal: #0f4c5c;
+  --soft-gold: #f4d57e; --mint-glow: #a8f2d6; --cloud-white: #f8f9fa; --graphite: #2e2e2e;
+  --ink: var(--deep-teal); --muted: var(--graphite); --border: #cbdcde;
+  --surface: #ffffff; --focus: var(--violet);
+}
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-a { color: var(--green); }
+a { color: var(--deep-teal); }
 a:hover { text-decoration: underline; }
-a:focus-visible { outline: 3px solid #b65d30; outline-offset: 5px; }
+a:focus-visible { outline: 3px solid var(--focus); outline-offset: 5px; }
 .skip-link { position: fixed; left: 1rem; top: 1rem; padding: .75rem 1rem; background: white; z-index: 10; transform: translateY(-200%); }
 .skip-link:focus { transform: translateY(0); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
