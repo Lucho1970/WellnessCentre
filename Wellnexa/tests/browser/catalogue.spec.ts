@@ -12,6 +12,11 @@ test('published catalogue displays public cards and clinic-specific booking link
   await expect(page.getByRole('link', { name: 'Find an appointment' })).toHaveAttribute('href', 'https://wellnexa.copihue.ca/?practitioner_id=7')
   await expect(page.getByText(/Private clinical note|Private home address/)).toHaveCount(0)
   expect(requests.every(url => new URL(url).search === '')).toBe(true)
+  await page.screenshot({ path: 'test-results/wellnexa-theme-desktop.png', fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole('link', { name: /Visit the clinic portal/ })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: 'test-results/wellnexa-theme-mobile.png', fullPage: true })
 })
 test('empty published lists show truthful empty states', async ({ page }) => {
   await page.route('**/api/public/**', route => route.fulfill({ json: { data: [] } }))
