@@ -1,5 +1,13 @@
 # Intake and consent forms release
 
+## Client answer changes (migration 041)
+
+For a reviewed release containing `feature/client-form-answer-drafts`, upload matching private API and portal builds. No domain, DNS, SSL or authentication callback change is required. Reconcile the existing migration state, back up the database, and apply **041_client_form_answers.sql** once after 036; do not reapply earlier form migrations. Keep `CLIENT_FORM_ANSWERS_ENABLED=false` until synthetic acceptance passes, then enable it alongside the existing forms flag. Form-author draft enablement is independent.
+
+Verify client save/resume with missing required answers and unchecked consent; drafts remain invisible to the practitioner and create no consent record. Test final submission using the saved revision, another tab's stale revision, retries after uncertain saves, amendment reason/confirmation, unchanged original response/consent evidence, chronological history and new practitioner review. Deny another client, another clinic, unrelated practitioners and admin/reception answer access. Include supervised client merge and French/mobile journeys. See [Client intake forms](CLIENT_INTAKE_FORMS.md) for API and storage details.
+
+To stop new draft/amendment writes, disable `CLIENT_FORM_ANSWERS_ENABLED` while retaining the upgraded API/portal readers. Authorized history and saved drafts remain readable after the migration. Do not drop these tables or restore an old reader that conceals corrections. Real clinical-content/privacy review and hosted acceptance remain required before real response collection.
+
 This package contains the matching intake forms API and portal implementation. Packaging does not merge the branch or deploy it. See `manifest.json` for the exact source revision, build time and archive hashes, and `CLIENT_INTAKE_FORMS.md` for permissions and synthetic acceptance checks.
 
 The sections release also contains Date, Phone number and Email answer types, optional no-future-date restrictions, and ordered sections with bilingual titles/descriptions. No additional SQL is required after migration 036. Upload both required archives, including the private API's updated `vendor` dependencies, before publishing these field types or sections. Earlier packages do not contain these additions.

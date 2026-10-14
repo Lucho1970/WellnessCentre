@@ -10,13 +10,15 @@ use Wellness\Http\ApiException;
 
 final class AdminService
 {
-    public function __construct(private readonly Database $database,private readonly AuditLogger $audit) {}
+    public function __construct(private readonly Database $database,private readonly AuditLogger $audit,private readonly bool $globalPractitionersEnabled=false) {}
 
     public function practitioners(AuthContext $actor): array
     {
         $this->superAdmin($actor);
         $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.given_name,u.family_name,u.display_name,t.booking_name AS preferred_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,MIN(pl.location_id) AS location_id,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=u.clinic_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.given_name,u.family_name,u.display_name,t.booking_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY COALESCE(t.booking_name,u.display_name)");
-        $statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
+        $statement->execute(['clinic'=>$actor->clinicId]);$items=$statement->fetchAll();
+        if($this->globalPractitionersEnabled){$q=$this->database->connection()->prepare('SELECT practitioner_id FROM global_practitioner_clinics WHERE clinic_id=?');$q->execute([$actor->clinicId]);$registered=array_map('intval',$q->fetchAll(\PDO::FETCH_COLUMN));foreach($items as &$item)$item['global_registered']=in_array((int)$item['practitioner_id'],$registered,true);}
+        return $items;
     }
 
     public function onboardPractitioner(AuthContext $actor,array $body,string $correlationId): array
@@ -62,6 +64,13 @@ final class AdminService
         $pdo=$this->database->connection();
         try{$pdo->beginTransaction();
             $find=$pdo->prepare('SELECT p.user_id FROM practitioners p JOIN users u ON u.id=p.user_id WHERE p.id=:practitioner AND u.clinic_id=:clinic FOR UPDATE');$find->execute(['practitioner'=>$practitionerId,'clinic'=>$actor->clinicId]);$userId=$find->fetchColumn();if(!$userId)throw new ApiException(404,'practitioner_not_found','Practitioner not found.');
+            if($this->globalPractitionersEnabled){
+                $global=$pdo->prepare('SELECT a.status,p.discipline,p.credentials FROM global_practitioner_clinics a JOIN practitioners p ON p.id=a.practitioner_id WHERE a.practitioner_id=?');$global->execute([$practitionerId]);$registered=$global->fetch();
+                if($registered){
+                    if($registered['status']!=='active')throw new ApiException(409,'assignment_removed','This clinic assignment was removed centrally.');
+                    if($discipline!==$registered['discipline']||$credentials!==$registered['credentials'])throw new ApiException(403,'credential_owner_required','Only the practitioner can choose the credentials and discipline shared with this clinic.');
+                }
+            }
             $duplicate=$pdo->prepare('SELECT 1 FROM users WHERE clinic_id=:clinic AND email=:email AND id<>:user');$duplicate->execute(['clinic'=>$actor->clinicId,'email'=>$email,'user'=>(int)$userId]);if($duplicate->fetchColumn())throw new ApiException(409,'email_already_exists','A user with this email already exists in the clinic.');
             $statement=$pdo->prepare('UPDATE users SET given_name=:given,family_name=:family,display_name=:name,email=:email,status=:status WHERE id=:user');$statement->execute(['given'=>$givenName,'family'=>$familyName,'name'=>$displayName,'email'=>$email,'status'=>$status,'user'=>(int)$userId]);
             $statement=$pdo->prepare('UPDATE practitioners SET discipline=:discipline,credentials=:credentials,booking_mode=:mode,active=:active WHERE id=:practitioner');$statement->execute(['discipline'=>$discipline,'credentials'=>$credentials,'mode'=>$bookingMode,'active'=>$active?1:0,'practitioner'=>$practitionerId]);

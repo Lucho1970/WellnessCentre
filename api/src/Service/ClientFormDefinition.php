@@ -60,25 +60,26 @@ final class ClientFormDefinition
         if(strlen(json_encode($result,JSON_THROW_ON_ERROR))>55000)self::invalid();
         return $result;
     }
-    public static function answers(array $definition,mixed $input): array {
+    public static function answers(array $definition,mixed $input,bool $draft=false): array {
         if(!is_array($input)||array_diff(array_keys($input),array_column($definition['questions'],'id')))self::invalid();
         $result=[];
         foreach($definition['questions'] as $q){
             $value=$input[$q['id']]??null;
-            if($value===null){if($q['required'])self::invalid();continue;}
-            if(in_array($q['type'],['date','phone','email'],true)&&$value===''){if($q['required'])self::invalid();continue;}
+            $required=$q['required']&&!$draft;
+            if($value===null){if($required)self::invalid();continue;}
+            if(in_array($q['type'],['date','phone','email'],true)&&$value===''){if($required)self::invalid();continue;}
             if($q['type']==='single_choice'){
-                if($value===''&&!$q['required'])continue;
+                if($value===''&&!$required)continue;
                 if(!is_string($value)||!in_array($value,array_column($q['options'],'id'),true))self::invalid();
             }
             elseif($q['type']==='multiple_choice'){
                 if(!is_array($value)||!array_is_list($value)||count($value)>count($q['options']))self::invalid();
                 foreach($value as $optionId)if(!is_string($optionId)||!in_array($optionId,array_column($q['options'],'id'),true))self::invalid();
-                if(count(array_unique($value))!==count($value)||($q['required']&&!count($value)))self::invalid();
+                if(count(array_unique($value))!==count($value)||($required&&!count($value)))self::invalid();
                 if(!$value)continue;
                 sort($value,SORT_STRING);
             }
-            elseif($q['type']==='text')$value=self::text($value,2000,$q['required']);
+            elseif($q['type']==='text')$value=self::text($value,2000,$required);
             elseif($q['type']==='date'){
                 if(!is_string($value)||!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D',$value,$parts)||!checkdate((int)$parts[2],(int)$parts[3],(int)$parts[1]))self::invalid();
                 $today=(new \DateTimeImmutable('now',new \DateTimeZone('America/Toronto')))->format('Y-m-d');
@@ -95,7 +96,7 @@ final class ClientFormDefinition
                 if(!$util->isValidNumber($number)||$number->hasExtension())self::invalid();
                 $value=$util->format($number,PhoneNumberFormat::E164);
             }
-            elseif(!is_bool($value)||($q['type']==='consent'&&$value!==true))self::invalid();
+            elseif(!is_bool($value)||(!$draft&&$q['type']==='consent'&&$value!==true))self::invalid();
             $result[$q['id']]=$value;
         }
         ksort($result);return $result;

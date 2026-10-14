@@ -4,6 +4,8 @@ Implemented on `feature/separate-clinic-portals`.
 
 **Administration update:** clinic creation and hostname registration now move to the central authenticated `portal.copihue.ca/admin/` area. The clinic-local Super Admin management steps below describe the previous checkpoint; use [Application administration](APPLICATION_ADMINISTRATION.md) for migration 040, explicit global grants and current deployment. Clinic data/location isolation remains unchanged.
 
+**Working name update, 13 October 2026:** the virtual clinic is now **Wellnexa — Virtual Wellness Collective**. The purchased domain `wellnexa.ca` awaits hosting/SSL setup; current portal links continue to use `willowwellness.copihue.ca`. The historical setup examples below do not authorize a new domain cutover or duplicate clinic creation.
+
 A clinic owns its services, staff/client accounts, appointments, forms, branding and locations. A location is an address or service area inside one clinic. Creating a second location does not create another clinic. Clinics may each have multiple locations, and names may repeat across clinics.
 
 ## Administration

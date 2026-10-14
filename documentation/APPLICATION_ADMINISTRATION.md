@@ -43,7 +43,9 @@ UPDATE application_administrators SET status='revoked' WHERE id=EXPLICIT_APPLICA
 3. Deploy the expanded `copihue-portal-landing.zip` at the existing `portal.copihue.ca` document root. It includes the public landing files, `admin/index.html`, administration assets and thin `api` entries. Its document root must be at the same level as clinic portal roots so the entries resolve the shared `/wellness-api`. Replace the landing `.htaccess`, which previously redirected `/admin` to Willow and rejected APIs.
 4. Add `https://portal.copihue.ca/admin/` as a SPA redirect URI in the existing workforce portal registration (application ID `d5c68a6f-cde5-40f5-843f-eac5a3160065`). The central build returns and logs out to `/admin/`; it ignores the clinic redirect setting and never uses the invited practitioner provider.
 5. Set `APPLICATION_ADMIN_ENABLED=true`, `APPLICATION_ADMIN_HOST=portal.copihue.ca` and `CLINIC_MANAGEMENT_ENABLED=true` in the shared private `.env`.
-6. Sign in centrally, register existing clinic 1 as Livin' Lively at `livinlively.copihue.ca`, remove any obsolete Willow-to-1 fallback alias, and create Willow Wellness Virtual Clinic at `willowwellness.copihue.ca`. Records remain in their existing clinics. Existing clinic hosts and callbacks remain separate configuration.
+6. Sign in centrally, register existing clinic 1 as Livin' Lively at `livinlively.copihue.ca`, remove any obsolete Willow-to-1 fallback alias, and create **Wellnexa — Virtual Wellness Collective** at `willowwellness.copihue.ca`. Records remain in their existing clinics. Existing clinic hosts and callbacks remain separate configuration. If the virtual clinic already exists, edit that clinic's name rather than creating a duplicate.
+
+**Working brand decision, 13 October 2026:** use **Wellnexa** as the primary brand and **Virtual Wellness Collective** as its descriptive line. The owner purchased `wellnexa.ca`; hosting and SSL remain pending. Keep existing portal hosts, API routing, website destinations and identity callbacks until a separately prepared domain cutover is accepted. The neutral landing now displays the working name while its links retain the existing host. Clinic portal names come from clinic-scoped business settings; deploying the landing alone does not rename a hosted clinic record. Historical Willow references and synthetic test fixtures may retain the former name.
 
 The shared `.env` remains infrastructure configuration. Clinic business settings remain clinic-scoped database records. This slice provides central clinic registration, not an editor exposing global secrets or every future clinic override.
 
@@ -62,3 +64,5 @@ $env:OPENSSL_CONF = 'C:/Program Files/Git/usr/ssl/openssl.cnf'
 ```
 
 Run these sequentially. Adjust the runtime/configuration paths for the local installation. Synthetic databases and server logs remain under ignored `.tmp` for inspection; the runner does not read private `.env` or connect to hosted data.
+
+Global practitioner registration, importing existing profiles, clinic assignments and practitioner-owned credential sharing are described in [GLOBAL_PRACTITIONERS.md](GLOBAL_PRACTITIONERS.md). This extension requires migration 042 and does not give clinic staff a global administration grant.

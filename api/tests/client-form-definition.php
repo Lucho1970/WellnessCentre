@@ -9,6 +9,11 @@ $denies=function(callable $action)use($assert){try{$action();}catch(ApiException
 $q=['id'=>'health','label'=>'Synthetic question','label_fr'=>'Question fictive','type'=>'text','required'=>true];
 $definition=['instructions'=>'Synthetic only','questions'=>[$q,['id'=>'yes','label'=>'Yes/no','type'=>'yes_no','required'=>true],['id'=>'agree','label'=>'Synthetic consent','type'=>'consent','required'=>true]]];
 $validated=ClientFormDefinition::definition($definition,'consent');
+$assert(ClientFormDefinition::answers($validated,[],true)===[]);
+$assert(ClientFormDefinition::answers($validated,['health'=>' Partial ','agree'=>false],true)===['agree'=>false,'health'=>'Partial']);
+$denies(fn()=>ClientFormDefinition::answers($validated,['other'=>'secret'],true));
+$denies(fn()=>ClientFormDefinition::answers($validated,['agree'=>'false'],true));
+$denies(fn()=>ClientFormDefinition::answers($validated,['health'=>str_repeat('a',2001)],true));
 $assert(ClientFormDefinition::answers($validated,['health'=>' Test ','yes'=>false,'agree'=>true])===['agree'=>true,'health'=>'Test','yes'=>false]);
 foreach([null,[],['questions'=>[]],['questions'=>array_fill(0,31,$q)],['questions'=>[$q,$q]],['questions'=>[array_replace($q,['id'=>'<script>'])]],['questions'=>[array_replace($q,['type'=>'html'])]],['questions'=>[array_replace($q,['required'=>1])]],['questions'=>[array_replace($q,['label'=>''])]],['questions'=>[array_replace($q,['label'=>str_repeat('a',501)])]],['questions'=>[$q],'unknown'=>'value']] as $invalid)$denies(fn()=>ClientFormDefinition::definition($invalid,'intake'));
 $denies(fn()=>ClientFormDefinition::definition(['questions'=>[$q]],'consent'));

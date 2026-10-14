@@ -12,7 +12,7 @@ use Wellness\Http\ApiException;
 
 final class AvailabilityService
 {
-    public function __construct(private readonly Database $database, private readonly ?int $publicClinicId = null) {}
+    public function __construct(private readonly Database $database, private readonly ?int $publicClinicId = null,private readonly bool $lockBusyTimes=false) {}
 
     public function publicSearch(array $query): array
     {
@@ -100,12 +100,12 @@ final class AvailabilityService
     {
         $pdo=$this->database->connection();$params=['p'=>$practitionerId,'l'=>$locationId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];
         $queries=[
-            "SELECT 1 FROM appointments WHERE practitioner_id=:p AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start".($excludeAppointmentId!==null?' AND id<>:exclude':'')." LIMIT 1",
-            "SELECT 1 FROM time_off WHERE practitioner_id=:p AND starts_at<:end AND ends_at>:start LIMIT 1",
+            "SELECT 1 FROM appointments WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start".($excludeAppointmentId!==null?' AND id<>:exclude':'')." LIMIT 1",
+            "SELECT 1 FROM time_off WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND starts_at<:end AND ends_at>:start LIMIT 1",
             "SELECT 1 FROM availability_overrides WHERE practitioner_id=:p AND location_id=:l AND override_type='blocked' AND starts_at<:end AND ends_at>:start LIMIT 1",
-            "SELECT 1 FROM imported_calendar_entries WHERE practitioner_id=:p AND blocks_booking=1 AND starts_at<:end AND ends_at>:start LIMIT 1",
+            "SELECT 1 FROM imported_calendar_entries WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND blocks_booking=1 AND starts_at<:end AND ends_at>:start LIMIT 1",
         ];
-        foreach($queries as $sql){$statement=$pdo->prepare($sql);$used=str_contains($sql,'location_id')?$params:array_diff_key($params,['l'=>true]);if(str_contains($sql,':exclude'))$used['exclude']=$excludeAppointmentId;$statement->execute($used);if($statement->fetchColumn())return true;} return false;
+        foreach($queries as $sql){$statement=$pdo->prepare($sql.($this->lockBusyTimes?' FOR UPDATE':''));$used=str_contains($sql,'location_id')?$params:array_diff_key($params,['l'=>true]);if(str_contains($sql,':identity_p'))$used['identity_p']=$practitionerId;if(str_contains($sql,':exclude'))$used['exclude']=$excludeAppointmentId;$statement->execute($used);if($statement->fetchColumn())return true;} return false;
     }
 
     private function date(string $value,string $field): DateTimeImmutable

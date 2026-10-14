@@ -30,6 +30,7 @@ $schema=file_get_contents(dirname(__DIR__,2).'/database/schema.sql');$pdo->exec(
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/005_customer_onboarding.sql'));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/039_separate_clinic_portals.sql'));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/040_application_administration.sql'));
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/042_global_practitioners.sql'));
 $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Willow Virtual'); INSERT INTO locations(clinic_id,name) VALUES(1,'Willow Virtual');
  INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(1,1,'admin@example.test','Operator','staff','active');
  INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='super_admin';
@@ -99,6 +100,10 @@ try {
     for($attempt=0;$attempt<30;$attempt++){if($request('portal.test','/api/v1/health')[0])break;usleep(100000);}
     $check($request('portal.test','/api/v1/application/me',$token)[0]===200);
     $check($request('portal.test','/api/v1/application/me')[0]===401);
+    $check($request('portal.test','/api/v1/application/practitioners',$token)[0]===200);
+    $check($request('portal.test','/api/v1/application/practitioners')[0]===401);
+    $check($request('livin.test','/api/v1/application/practitioners',$token)[0]===404);
+    $check($request('portal.test','/api/v1/profile/global-credentials',$token)[0]===404);
     $check($request('livin.test','/api/v1/application/clinics',$token)[0]===404);
     $check($request('untrusted.test','/api/v1/application/clinics',$token)[0]===404);
     $check($request('portal.test','/api/v1/clients',$token)[0]===404);

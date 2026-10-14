@@ -11,6 +11,43 @@ async function authentication(page: Page, signedIn = true) {
   ` }));
 }
 
+test('central directory imports an existing practitioner and assigns a second clinic without credentials', async ({ page }) => {
+  await authentication(page);
+  await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));
+  const people: { id: number; display_name: string; email: string; clinics: { clinic_id: number; clinic_name: string; status: string; version: number }[] }[] = [];
+  await page.route('**/api/v1/application/clinics', route => route.fulfill({ json: { data: { items: [{ id: 1, name: 'Livin Lively', status: 'active', portal_host: 'livin.test', location_count: 1 }, { id: 2, name: 'Wellnexa', status: 'active', portal_host: 'wellnexa.test', location_count: 1 }] } } }));
+  await page.route('**/api/v1/application/practitioners', route => route.fulfill({ json: { data: { items: people } } }));
+  await page.route('**/api/v1/application/practitioners/import-candidates', route => route.fulfill({ json: { data: { items: people.length ? [] : [{ practitioner_id: 7, display_name: 'Dual Practitioner', email: 'person@example.test', clinic_name: 'Livin Lively' }] } } }));
+  await page.route('**/api/v1/application/practitioners/import', route => {
+    expect(route.request().postDataJSON()).toEqual({ practitioner_id: 7 });
+    people.push({ id: 9, display_name: 'Dual Practitioner', email: 'person@example.test', clinics: [{ clinic_id: 1, clinic_name: 'Livin Lively', status: 'active', version: 1 }] });
+    return route.fulfill({ json: { data: { id: 9 } } });
+  });
+  await page.route('**/api/v1/application/clinics/2/locations', route => route.fulfill({ json: { data: { items: [{ id: 21, name: 'Virtual Clinic' }] } } }));
+  await page.route('**/api/v1/application/practitioners/9/clinics', route => {
+    expect(route.request().postDataJSON()).toEqual({ clinic_id: 2, location_id: 21 });
+    people[0].clinics.push({ clinic_id: 2, clinic_name: 'Wellnexa', status: 'active', version: 1 });
+    return route.fulfill({ json: { data: { practitioner_id: 17 } } });
+  });
+  await page.goto('http://localhost:5185/admin/');
+  await page.getByRole('tab', { name: 'Global practitioners' }).click();
+  await page.getByRole('combobox', { name: 'Existing clinic practitioner' }).click();
+  await page.getByRole('option', { name: /Dual Practitioner/ }).click();
+  await page.getByRole('button', { name: 'Import practitioner', exact: true }).click();
+  await expect(page.getByText('Practitioner imported. Existing clinic records are preserved.')).toBeVisible();
+  await page.getByRole('button', { name: 'Assign a clinic' }).click();
+  await page.getByRole('combobox', { name: 'Clinic', exact: true }).click();
+  await expect(page.getByRole('option', { name: 'Livin Lively' })).toHaveCount(0);
+  await page.getByRole('option', { name: 'Wellnexa' }).click();
+  await page.getByRole('combobox', { name: 'Location', exact: true }).click();
+  await page.getByRole('option', { name: 'Virtual Clinic' }).click();
+  await page.getByRole('button', { name: 'Assign practitioner', exact: true }).click();
+  await expect(page.getByText('Clinic assigned. Credentials remain private until the practitioner shares them.')).toBeVisible();
+  await expect(page.getByText('Wellnexa · Assigned')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('anonymous administration exposes sign-in but no clinic records', async ({ page }) => {
   await authentication(page, false);
   let requests = 0; await page.route('**/api/v1/**', route => { requests++; return route.fulfill({ status: 401 }); });
