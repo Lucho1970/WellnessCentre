@@ -66,8 +66,9 @@ final class BookingService
             if(isset($body['quoted_base_price_cents'])&&((int)$body['quoted_base_price_cents']!==$terms['base']||(int)($body['quoted_mobile_fee_cents']??0)!==$terms['fee']))throw new ApiException(409,'price_changed','Pricing changed. Close and reopen booking to review the current price.');
             if($terms['requires_room']&&!isset($body['room_id']))throw new ApiException(422,'validation_error','room_id is required for this service.',['room_id'=>'Required']);
             if(!$terms['requires_room']&&isset($body['room_id']))throw new ApiException(422,'validation_error','This service does not use a room.');
+            PractitionerSchedule::lock($pdo,(int)$body['practitioner_id']);
             $localDate=$startsUtc->setTimezone(new DateTimeZone($timezone))->format('Y-m-d');
-            $availability=(new AvailabilityService($this->database))->search(['delivery_mode'=>$mode,'service_id'=>$body['service_id'],'practitioner_id'=>$body['practitioner_id'],'location_id'=>$body['location_id'],'date_from'=>$localDate,'date_to'=>$localDate]);
+            $availability=(new AvailabilityService($this->database,lockBusyTimes:true))->search(['delivery_mode'=>$mode,'service_id'=>$body['service_id'],'practitioner_id'=>$body['practitioner_id'],'location_id'=>$body['location_id'],'date_from'=>$localDate,'date_to'=>$localDate]);
             $matched=false;
             foreach($availability['availability'] as $slot){
                 if($slot['duration_option_id']===(int)$body['duration_option_id']&&(new DateTimeImmutable($slot['starts_at']))->getTimestamp()===$startsUtc->getTimestamp()){
@@ -79,7 +80,7 @@ final class BookingService
             $now=new DateTimeImmutable('now',new DateTimeZone('UTC'));if($startsUtc<$now->modify('+'.$rule['lead_time_minutes'].' minutes')||$startsUtc>$now->modify('+'.$rule['booking_horizon_days'].' days'))throw new ApiException(422,'outside_booking_window','The requested time is outside the allowed booking window.');
             $endsUtc=$startsUtc->modify('+'.$rule['duration_minutes'].' minutes');$bufferStart=$startsUtc->modify('-'.((int)$rule['buffer_before_minutes']+$terms['travel']).' minutes');$bufferEnd=$endsUtc->modify('+'.((int)$rule['buffer_after_minutes']+$terms['travel']).' minutes');
             $params=['p'=>(int)$body['practitioner_id'],'start'=>$bufferStart->format('Y-m-d H:i:s'),'end'=>$bufferEnd->format('Y-m-d H:i:s')];
-            $conflict=$pdo->prepare("SELECT id FROM appointments WHERE practitioner_id=:p AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start FOR UPDATE");$conflict->execute($params);if($conflict->fetch())throw new ApiException(409,'schedule_conflict','The practitioner is no longer available.');
+            $conflict=$pdo->prepare("SELECT id FROM appointments WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start FOR UPDATE");$conflict->execute($params+['identity_p'=>(int)$body['practitioner_id']]);if($conflict->fetch())throw new ApiException(409,'schedule_conflict','The practitioner is no longer available.');
             if(isset($body['room_id'])){$room=$pdo->prepare("SELECT id FROM appointments WHERE room_id=:room AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start FOR UPDATE");$room->execute(['room'=>(int)$body['room_id'],'start'=>$params['start'],'end'=>$params['end']]);if($room->fetch())throw new ApiException(409,'room_conflict','The room is no longer available.');}
             $insert=$pdo->prepare("INSERT INTO appointments(clinic_id,location_id,client_id,practitioner_id,service_id,duration_option_id,room_id,starts_at,ends_at,buffer_starts_at,buffer_ends_at,status,source,idempotency_key,created_by,cancellation_window_minutes,cancellation_fee_type,cancellation_fee_value) VALUES(:clinic,:location,:client,:p,:service,:duration,:room,:starts,:ends,:buffer_start,:buffer_end,'confirmed',:source,:key,:creator,:cancel_window,:fee_type,:fee_value)");
             $insert->execute(['clinic'=>$actor->clinicId,'location'=>(int)$body['location_id'],'client'=>$clientId,'p'=>(int)$body['practitioner_id'],'service'=>(int)$body['service_id'],'duration'=>(int)$body['duration_option_id'],'room'=>isset($body['room_id'])?(int)$body['room_id']:null,'starts'=>$startsUtc->format('Y-m-d H:i:s'),'ends'=>$endsUtc->format('Y-m-d H:i:s'),'buffer_start'=>$params['start'],'buffer_end'=>$params['end'],'source'=>$actor->userType==='client'?'public':($actor->hasAnyRole('super_admin','clinic_admin')?'admin':($actor->hasAnyRole('reception')?'reception':'practitioner')),'key'=>$body['idempotency_key'],'creator'=>$actor->userId,'cancel_window'=>(int)$rule['cancellation_window_minutes'],'fee_type'=>$rule['cancellation_fee_type'],'fee_value'=>(int)$rule['cancellation_fee_value']]);
@@ -214,6 +215,7 @@ final class BookingService
         if($participate&&!$pdo->inTransaction())throw new \LogicException('A series transaction is required.');
         try{
             if(!$participate)$pdo->beginTransaction();$lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $previewAppointment=$this->appointment($actor,$id,false);PractitionerSchedule::lock($pdo,(int)$previewAppointment['practitioner_id']);
             $appointment=$this->appointment($actor,$id,true);$this->assertManage($actor,$appointment);
             if((int)$appointment['version']!==$version){
                 $canceledStatus=$actor->userType==='client'?'canceled_by_client':'canceled_by_clinic';
@@ -246,7 +248,7 @@ final class BookingService
                 $this->history($id,$from,$canceledStatus,$actor->userId,$reason,$fee);$event='booking_cancellation';$audit='appointment.cancel';
             }else{
                 $location=$pdo->prepare('SELECT timezone FROM locations WHERE id=:id AND clinic_id=:clinic AND is_bookable=1');$location->execute(['id'=>$appointment['location_id'],'clinic'=>$actor->clinicId]);$timezone=$location->fetchColumn();if(!$timezone)throw new ApiException(422,'invalid_location','The appointment location is unavailable.');
-                $date=$requested->setTimezone(new DateTimeZone($timezone))->format('Y-m-d');$availability=(new AvailabilityService($this->database))->search(['delivery_mode'=>$appointment['delivery_mode'],'service_id'=>$appointment['service_id'],'practitioner_id'=>$appointment['practitioner_id'],'location_id'=>$appointment['location_id'],'date_from'=>$date,'date_to'=>$date],$id);
+                $date=$requested->setTimezone(new DateTimeZone($timezone))->format('Y-m-d');$availability=(new AvailabilityService($this->database,lockBusyTimes:true))->search(['delivery_mode'=>$appointment['delivery_mode'],'service_id'=>$appointment['service_id'],'practitioner_id'=>$appointment['practitioner_id'],'location_id'=>$appointment['location_id'],'date_from'=>$date,'date_to'=>$date],$id);
                 $slot=null;foreach($availability['availability'] as $candidate)if((int)$candidate['duration_option_id']===(int)$appointment['duration_option_id']&&(new DateTimeImmutable($candidate['starts_at']))->getTimestamp()===$requested->getTimestamp()){$slot=$candidate;break;}
                 if(!$slot)throw new ApiException(409,'schedule_conflict','The requested time is no longer bookable. Refresh availability and choose another time.');
                 $roomId=array_key_exists('room_id',$body)&&$body['room_id']!==null?(int)$body['room_id']:null;
@@ -318,6 +320,7 @@ final class BookingService
             $pdo->beginTransaction();
             $lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);
             if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $previewAppointment=$this->appointment($actor,$id,false);PractitionerSchedule::lock($pdo,(int)$previewAppointment['practitioner_id'],$newPractitionerId);
             $appointment=$this->appointment($actor,$id,true);
             if((int)$appointment['version']!==$version){
                 if((int)$appointment['version']===$version+1&&(int)$appointment['practitioner_id']===$newPractitionerId){
@@ -330,7 +333,7 @@ final class BookingService
             $this->assertReassignable($appointment);
             if((int)$appointment['practitioner_id']===$newPractitionerId)throw new ApiException(422,'practitioner_unchanged','Choose a different practitioner.');
             $chosen=null;
-            foreach($this->reassignmentCandidates($actor,$appointment) as $candidate)if((int)$candidate['practitioner_id']===$newPractitionerId){$chosen=$candidate;break;}
+            foreach($this->reassignmentCandidates($actor,$appointment,$newPractitionerId,true) as $candidate)if((int)$candidate['practitioner_id']===$newPractitionerId){$chosen=$candidate;break;}
             if($chosen===null)throw new ApiException(409,'reassignment_unavailable','That practitioner cannot take this appointment at the current time, room, and price. Refresh the choices.');
             $statement=$pdo->prepare('UPDATE appointments SET practitioner_id=:practitioner,version=version+1 WHERE id=:id AND clinic_id=:clinic AND version=:version');
             $statement->execute(['practitioner'=>$newPractitionerId,'id'=>$id,'clinic'=>$actor->clinicId,'version'=>$version]);
@@ -357,19 +360,20 @@ final class BookingService
         if($appointment['base_price_cents']===null)throw new ApiException(422,'reassignment_unsupported','The appointment needs a saved price before practitioner reassignment.');
     }
 
-    private function reassignmentCandidates(AuthContext $actor,array $appointment): array
+    private function reassignmentCandidates(AuthContext $actor,array $appointment,?int $onlyPractitioner=null,bool $lockBusyTimes=false): array
     {
         $pdo=$this->database->connection();
         $query=$pdo->prepare("SELECT p.id practitioner_id,u.display_name practitioner_name,COALESCE(ps.price_override_cents,d.price_cents,s.price_cents) base_price_cents,s.requires_room,s.buffer_before_minutes,s.buffer_after_minutes,l.timezone FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.id=:duration AND d.active=1 JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1 AND ps.offers_clinic=1 JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1 JOIN users u ON u.id=p.user_id AND u.clinic_id=s.clinic_id AND u.status='active' JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=:location_pl AND pl.active=1 JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=:location_sl AND sl.active=1 JOIN locations l ON l.id=:location_l AND l.clinic_id=s.clinic_id AND l.is_bookable=1 WHERE s.id=:service AND s.clinic_id=:clinic AND s.active=1 AND p.id<>:old ORDER BY u.display_name,p.id LIMIT 100");
         $query->execute(['duration'=>$appointment['duration_option_id'],'location_pl'=>$appointment['location_id'],'location_sl'=>$appointment['location_id'],'location_l'=>$appointment['location_id'],'service'=>$appointment['service_id'],'clinic'=>$actor->clinicId,'old'=>$appointment['practitioner_id']]);
         $result=[];$start=strtotime((string)$appointment['starts_at'].' UTC');$end=strtotime((string)$appointment['ends_at'].' UTC');
         foreach($query->fetchAll() as $row){
+            if($onlyPractitioner!==null && (int)$row['practitioner_id']!==$onlyPractitioner)continue;
             if((int)$row['base_price_cents']!==(int)$appointment['base_price_cents'])continue;
             if((bool)$row['requires_room']!==($appointment['room_id']!==null))continue;
             if($start-strtotime((string)$appointment['buffer_starts_at'].' UTC')!==(int)$row['buffer_before_minutes']*60)continue;
             if(strtotime((string)$appointment['buffer_ends_at'].' UTC')-$end!==(int)$row['buffer_after_minutes']*60)continue;
             $date=(new DateTimeImmutable((string)$appointment['starts_at'],new DateTimeZone('UTC')))->setTimezone(new DateTimeZone((string)$row['timezone']))->format('Y-m-d');
-            $availability=(new AvailabilityService($this->database))->search(['delivery_mode'=>'clinic','service_id'=>$appointment['service_id'],'practitioner_id'=>$row['practitioner_id'],'location_id'=>$appointment['location_id'],'date_from'=>$date,'date_to'=>$date],(int)$appointment['id'],false,true);
+            $availability=(new AvailabilityService($this->database,lockBusyTimes:$lockBusyTimes))->search(['delivery_mode'=>'clinic','service_id'=>$appointment['service_id'],'practitioner_id'=>$row['practitioner_id'],'location_id'=>$appointment['location_id'],'date_from'=>$date,'date_to'=>$date],(int)$appointment['id'],false,true);
             foreach($availability['availability'] as $slot){
                 if((int)$slot['duration_option_id']!==(int)$appointment['duration_option_id']||strtotime((string)$slot['starts_at'])!==$start||strtotime((string)$slot['ends_at'])!==$end)continue;
                 if($appointment['room_id']!==null&&!in_array((int)$appointment['room_id'],$slot['available_room_ids'],true))continue;

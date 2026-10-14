@@ -62,3 +62,5 @@ $env:OPENSSL_CONF = 'C:/Program Files/Git/usr/ssl/openssl.cnf'
 ```
 
 Run these sequentially. Adjust the runtime/configuration paths for the local installation. Synthetic databases and server logs remain under ignored `.tmp` for inspection; the runner does not read private `.env` or connect to hosted data.
+
+Global practitioner registration, importing existing profiles, clinic assignments and practitioner-owned credential sharing are described in [GLOBAL_PRACTITIONERS.md](GLOBAL_PRACTITIONERS.md). This extension requires migration 042 and does not give clinic staff a global administration grant.

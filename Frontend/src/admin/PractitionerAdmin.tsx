@@ -12,7 +12,7 @@ import { PractitionerQualifications } from '../profile/PractitionerQualification
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const tenantId = import.meta.env.VITE_ENTRA_TENANT_ID ?? '';
 type Location = { id: number; name: string };
-type Practitioner = { practitioner_id: number; user_id: number; given_name: string | null; family_name: string | null; display_name: string; preferred_name: string | null; email: string; status: string; discipline: string; credentials: string | null; booking_mode: string; active: number | boolean; location_id: number | null; locations: string | null };
+type Practitioner = { practitioner_id: number; user_id: number; given_name: string | null; family_name: string | null; display_name: string; preferred_name: string | null; email: string; status: string; discipline: string; credentials: string | null; booking_mode: string; active: number | boolean; location_id: number | null; locations: string | null; global_registered?: boolean };
 type NewForm = { tenant_id: string; object_id: string; email: string; given_name: string; family_name: string; display_name: string; location_id: string; discipline: string; credentials: string; booking_mode: string };
 type EditForm = { practitioner_id: number; email: string; given_name: string; family_name: string; display_name: string; location_id: string; discipline: string; credentials: string; booking_mode: string; status: string; active: boolean };
 type PanelMode = 'details' | 'new' | 'edit' | null;
@@ -37,6 +37,7 @@ function PractitionerAdminForm() {
   const [loadError, setLoadError] = useState('');
   const [panelError, setPanelError] = useState('');
   const [saved, setSaved] = useState('');
+  const [central, setCentral] = useState<{ central_enabled: boolean; url: string } | null>(null);
   const formGuard = useUnsavedForm();
   const selected = items.find(item => item.practitioner_id === selectedId) ?? null;
   const filteredItems = useMemo(() => {
@@ -60,10 +61,11 @@ function PractitionerAdminForm() {
     finally { setLoading(false); }
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { let cancelled=false; void getAccessToken().then(token => fetch(`${api}/admin/practitioner-directory-options`,{headers:{Authorization:`Bearer ${token}`}})).then(response => response.ok?response.json():null).then(body=>{if(!cancelled && body?.data?.central_enabled===true && typeof body.data.url==='string')setCentral(body.data);}).catch(()=>{});return()=>{cancelled=true;}; },[getAccessToken]);
 
   const setAddField = <K extends keyof NewForm>(key: K, value: NewForm[K]) => setAddForm(current => ({ ...current, [key]: value }));
   const setEditField = <K extends keyof EditForm>(key: K, value: EditForm[K]) => setEditing(current => current ? { ...current, [key]: value } : null);
-  const startNew = () => { formGuard.markClean(); setAddForm(newForm(String(locations[0]?.id ?? ''))); setEditing(null); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
+  const startNew = () => { if(central?.central_enabled)return; formGuard.markClean(); setAddForm(newForm(String(locations[0]?.id ?? ''))); setEditing(null); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
   const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
   const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.practitioner_id); setEditing(editForm(item, String(locations[0]?.id ?? ''))); (formValidation.clear(), setPanelError('')); setPanelMode('edit'); };
   const closePanel = () => { if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; formGuard.markClean(); setPanelMode(null); setEditing(null); (formValidation.clear(), setPanelError('')); };
@@ -95,7 +97,7 @@ function PractitionerAdminForm() {
 
   return <Stack spacing={2}>
     <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Practitioner actions')} direction={{ xs: 'column', md: 'row' }} gap={1} alignItems={{ md: 'center' }}>
-      <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew} disabled={locations.length === 0}>{t('New practitioner')}</Button>
+      <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew} disabled={central?.central_enabled || locations.length === 0}>{t('New practitioner')}</Button>
       <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
       <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button><Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
       <TextField name="query" size="small" label={t('Filter practitioners')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 270 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
@@ -104,14 +106,15 @@ function PractitionerAdminForm() {
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Practitioners')}</Typography><Typography color="text.secondary">{t('Select a practitioner to view details or enable actions.')}</Typography></Box>
       <List disablePadding aria-label={t('Practitioners')}>{filteredItems.map(item => <ListItemButton key={item.practitioner_id} selected={selectedId === item.practitioner_id} onClick={() => setSelectedId(item.practitioner_id)} divider sx={{ py: 1.75, px: 2.5 }}><ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{item.preferred_name || item.display_name}</Typography>{item.preferred_name && <Typography variant="body2" color="text.secondary">({item.display_name})</Typography>}<Chip size="small" color={available(item) ? 'success' : 'default'} label={t(available(item) ? 'Active' : 'Inactive')}/></Stack>} secondary={`${item.credentials || item.discipline} · ${item.locations || t('No active location')} · ${t(item.booking_mode === 'practitioner_managed' ? 'Practitioner managed' : 'Clinic managed')}`}/></ListItemButton>)}
-        {!loading && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching practitioners' : 'No practitioners yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different name, email, discipline, or location.' : locations.length ? 'Link the first practitioner after creating their Microsoft Entra account.' : 'Create a location before adding practitioners.')}</Typography>{!query && locations.length > 0 && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New practitioner')}</Button>}</Box>}
+        {!loading && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching practitioners' : 'No practitioners yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different name, email, discipline, or location.' : locations.length ? 'Link the first practitioner after creating their Microsoft Entra account.' : 'Create a location before adding practitioners.')}</Typography>{!query && locations.length > 0 && <Button variant="contained" startIcon={<Plus size={17}/>} disabled={central?.central_enabled} onClick={startNew}>{t('New practitioner')}</Button>}</Box>}
       </List>
     </Paper>
+    {central?.central_enabled && <Alert severity="info" action={<Button href={central.url}>{t('Open Application Administration')}</Button>}>{t('Register and assign practitioners centrally. Each practitioner chooses the credentials shared with this clinic.')}</Alert>}
     <Drawer anchor="right" open={panelMode !== null} onClose={closePanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 660 }, maxWidth: '100%' } } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'details' ? 'Practitioner details' : panelMode === 'edit' ? 'Edit practitioner' : 'New practitioner')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Link a practitioner') : selected?.display_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={closePanel}><X/></IconButton></Stack>
       {panelMode === 'details' && selected && <PractitionerDetails item={selected} edit={() => startEdit(selected)}/>}
       {panelMode === 'new' && <Box component="form" onSubmit={create} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}><Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Alert severity="info" sx={{ mb: 3 }}>{t('Create the Microsoft Entra account and assign its Wellness Practitioner app role first, then link that identity here.')} {t('Use the immutable Entra Object ID, not an email address, as the identity key.')}</Alert><NewPractitionerFields form={addForm} locations={locations} field={setAddField}/>{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box><PanelActions close={closePanel} busy={saving} submitLabel={saving ? t('Adding…') : t('Add practitioner')}/></Box>}
-      {panelMode === 'edit' && editing && <Box component="form" onSubmit={saveEdit} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}><Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><EditPractitionerFields form={editing} locations={locations} field={setEditField}/>{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box><PanelActions close={closePanel} busy={saving} submitLabel={saving ? t('Saving…') : t('Save changes')}/></Box>}
+      {panelMode === 'edit' && editing && <Box component="form" onSubmit={saveEdit} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}><Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><EditPractitionerFields form={editing} locations={locations} field={setEditField} lockedCredentials={selected?.global_registered}/>{panelError && <Alert severity="error" sx={{ mt: 2 }}>{panelError}</Alert>}</Box><PanelActions close={closePanel} busy={saving} submitLabel={saving ? t('Saving…') : t('Save changes')}/></Box>}
     </Drawer>
   </Stack>;
 }
@@ -121,7 +124,7 @@ export const PractitionerAdmin = withFormValidation(PractitionerAdminForm);
 function PractitionerDetails({ item, edit }: { item: Practitioner; edit: () => void }) {
   const { t } = useTranslation();
   const rows = [[t('First name'), item.given_name || t('Not set')], [t('Last name'), item.family_name || t('Not set')], [t('Preferred public name'), item.preferred_name || t('Not set')], [t('Internal display name'), item.display_name], [t('Account status'), t(item.status === 'active' ? 'Active' : 'Inactive')], [t('Practitioner availability'), t(Boolean(Number(item.active)) ? 'Available' : 'Unavailable')], [t('Discipline'), item.discipline], [t('Credentials'), item.credentials || t('Not set')], [t('Clinic location'), item.locations || t('No active location')], [t('Booking management'), t(item.booking_mode === 'practitioner_managed' ? 'Practitioner managed' : 'Clinic managed')], [t('Microsoft sign-in email'), item.email]];
-  return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><PractitionerQualifications key={item.practitioner_id} practitionerId={item.practitioner_id} admin /></Stack>;
+  return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><PractitionerQualifications key={item.practitioner_id} practitionerId={item.practitioner_id} admin globalRegistered={item.global_registered} /></Stack>;
 }
 
 function NewPractitionerFields({ form, locations, field }: { form: NewForm; locations: Location[]; field: <K extends keyof NewForm>(key: K, value: NewForm[K]) => void }) {
@@ -132,10 +135,10 @@ function NewPractitionerFields({ form, locations, field }: { form: NewForm; loca
   </Grid>;
 }
 
-function EditPractitionerFields({ form, locations, field }: { form: EditForm; locations: Location[]; field: <K extends keyof EditForm>(key: K, value: EditForm[K]) => void }) {
+function EditPractitionerFields({ form, locations, field, lockedCredentials }: { lockedCredentials?: boolean; form: EditForm; locations: Location[]; field: <K extends keyof EditForm>(key: K, value: EditForm[K]) => void }) {
   const { t } = useTranslation(); return <Grid container spacing={2}>
     <NameFields form={form} field={field}/><Grid size={{ xs: 12, md: 6 }}><TextField name="email" required fullWidth type="email" label={t('Email')} value={form.email} onChange={event => field('email', event.target.value)} helperText={t('Changing this does not change the Microsoft Entra account.')} inputProps={{ maxLength: 190 }}/></Grid>
-    <PractitionerProfessionalFields form={form} locations={locations} field={field}/>
+    <PractitionerProfessionalFields form={form} locations={locations} field={field} lockedCredentials={lockedCredentials}/>
     <Grid size={{ xs: 12, md: 6 }}><TextField name="status" required select fullWidth label={t('Account status')} value={form.status} onChange={event => field('status', event.target.value)}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem></TextField></Grid><Grid size={{ xs: 12, md: 6 }}><FormControlLabel name="active" control={<Switch checked={form.active} onChange={event => field('active', event.target.checked)}/>} label={t('Available as a practitioner')}/></Grid>
   </Grid>;
 }
@@ -148,9 +151,9 @@ function NameFields<T extends Pick<NewForm, 'given_name' | 'family_name' | 'disp
   </>;
 }
 
-function PractitionerProfessionalFields<T extends Pick<NewForm, 'discipline' | 'credentials' | 'location_id' | 'booking_mode'>>({ form, locations, field }: { form: T; locations: Location[]; field: <K extends keyof T>(key: K, value: T[K]) => void }) {
+function PractitionerProfessionalFields<T extends Pick<NewForm, 'discipline' | 'credentials' | 'location_id' | 'booking_mode'>>({ form, locations, field, lockedCredentials }: { lockedCredentials?: boolean; form: T; locations: Location[]; field: <K extends keyof T>(key: K, value: T[K]) => void }) {
   const { t } = useTranslation(); return <>
-    <Grid size={{ xs: 12, md: 6 }}><TextField name="discipline" required fullWidth label={t('Discipline')} value={form.discipline} onChange={event => field('discipline', event.target.value as T['discipline'])} inputProps={{ maxLength: 100 }}/></Grid><Grid size={{ xs: 12, md: 6 }}><TextField name="credentials" fullWidth label={t('Credentials')} value={form.credentials} onChange={event => field('credentials', event.target.value as T['credentials'])} inputProps={{ maxLength: 500 }}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField disabled={lockedCredentials} name="discipline" required fullWidth label={t('Discipline')} value={form.discipline} onChange={event => field('discipline', event.target.value as T['discipline'])} inputProps={{ maxLength: 100 }}/></Grid><Grid size={{ xs: 12, md: 6 }}><TextField disabled={lockedCredentials} name="credentials" fullWidth label={t('Credentials')} value={form.credentials} onChange={event => field('credentials', event.target.value as T['credentials'])} inputProps={{ maxLength: 500 }}/></Grid>
     <Grid size={{ xs: 12, md: 6 }}><TextField name="location_id" required select fullWidth label={t('Clinic location')} value={form.location_id} onChange={event => field('location_id', event.target.value as T['location_id'])}>{locations.map(location => <MenuItem key={location.id} value={String(location.id)}>{location.name}</MenuItem>)}</TextField></Grid><Grid size={{ xs: 12, md: 6 }}><TextField name="booking_mode" required select fullWidth label={t('Booking management')} value={form.booking_mode} onChange={event => field('booking_mode', event.target.value as T['booking_mode'])}><MenuItem value="practitioner_managed">{t('Practitioner managed')}</MenuItem><MenuItem value="clinic_managed">{t('Clinic managed')}</MenuItem></TextField></Grid>
   </>;
 }

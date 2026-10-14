@@ -9,6 +9,47 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+test('clinic administrators use central assignment and cannot edit practitioner-owned credentials', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/practitioner-directory-options', route => route.fulfill({ json: { data: { central_enabled: true, url: 'https://portal.example.test/admin/' } } }));
+  await page.route('**/api/v1/admin/practitioners', route => route.fulfill({ json: { data: [{ practitioner_id: 7, user_id: 17, given_name: 'Dual', family_name: 'Practitioner', display_name: 'Dual Practitioner', email: 'person@example.test', preferred_name: null, status: 'active', discipline: 'Registered Massage Therapist', credentials: 'RMT', booking_mode: 'practitioner_managed', active: 1, location_id: 1, locations: 'Holland Landing', global_registered: true }] } }));
+  await page.goto(`${portalHost}/admin/practitioners`);
+  await expect(page.getByRole('link', { name: 'Open Application Administration' })).toHaveAttribute('href', 'https://portal.example.test/admin/');
+  await expect(page.getByRole('button', { name: 'New practitioner', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: /Dual Practitioner.*RMT/ }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Submit for review', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close panel' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Credentials', exact: true })).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: 'Discipline', exact: true })).toBeDisabled();
+});
+test('practitioner controls global credential sharing independently in the current clinic', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  const credentials = [{ id: 1, name: 'Registered Massage Therapist', issuer: 'Massage board', issued_on: '2025-01-01', expires_on: '2099-12-31', shared_here: 1 }, { id: 2, name: 'Holistic Nutritionist', issuer: 'Nutrition board', issued_on: '2025-01-01', expires_on: null, shared_here: 0 }];
+  await page.route('**/api/v1/profile/global-credentials', route => route.fulfill({ json: { data: { items: credentials, clinic_id: 1 } } }));
+  const changes: object[] = [];
+  await page.route('**/api/v1/profile/global-credentials/*/sharing', route => {
+    expect(route.request().method()).toBe('PUT');
+    const id = Number(route.request().url().split('/').at(-2));
+    const body = route.request().postDataJSON(); changes.push(body);
+    expect(Object.keys(body)).toEqual(['shared']);
+    credentials.find(item => item.id === id)!.shared_here = body.shared ? 1 : 0;
+    return route.fulfill({ json: { data: { shared: body.shared } } });
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  const massage = page.getByRole('switch', { name: 'Share Registered Massage Therapist with this clinic' });
+  const nutrition = page.getByRole('switch', { name: 'Share Holistic Nutritionist with this clinic' });
+  await expect(massage).toBeChecked(); await expect(nutrition).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Submit for review', exact: true })).toHaveCount(0);
+  await nutrition.click();
+  await expect(page.getByText('Credential shared with this clinic for review.')).toBeVisible();
+  await expect(massage).toBeChecked();
+  await massage.click();
+  await expect(page.getByText('Credential sharing withdrawn from this clinic.')).toBeVisible();
+  await expect(nutrition).toBeChecked();
+  expect(changes).toEqual([{ shared: true }, { shared: false }]);
+});
 test('clinic super admin cannot open central clinic management in a clinic portal', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   await page.goto(`${portalHost}/admin/clinics`);

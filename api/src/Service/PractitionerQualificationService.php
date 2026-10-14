@@ -12,7 +12,7 @@ use Wellness\Http\ApiException;
 
 final class PractitionerQualificationService
 {
-    public function __construct(private readonly Database $database, private readonly AuditLogger $audit) {}
+    public function __construct(private readonly Database $database, private readonly AuditLogger $audit,private readonly bool $globalPractitionersEnabled=false) {}
 
     public function types(AuthContext $actor): array
     {
@@ -63,6 +63,7 @@ final class PractitionerQualificationService
     public function submit(AuthContext $actor, array $body, string $cid, ?int $practitionerId = null): array
     {
         $id = $this->practitionerId($actor, $practitionerId);
+        if($this->globalPractitionersEnabled){$q=$this->database->connection()->prepare('SELECT 1 FROM global_practitioner_clinics WHERE practitioner_id=?');$q->execute([$id]);if($q->fetchColumn())throw new ApiException(403,'credential_owner_required','The practitioner must submit credentials from My global credentials and choose to share them with this clinic.');}
         $typeId = filter_var($body['qualification_type_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $issuer = is_string($body['issuer'] ?? null) ? trim($body['issuer']) : '';
         $issuedOn = $this->date($body['issued_on'] ?? null);
