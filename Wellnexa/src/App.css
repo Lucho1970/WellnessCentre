@@ -1,0 +1,29 @@
+.site-shell { width: min(1100px, calc(100% - 3rem)); margin: 0 auto; min-height: 100svh; display: flex; flex-direction: column; }
+.site-header, .site-footer { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
+.site-header { padding: 2rem 0; border-bottom: 1px solid var(--border); }
+.brand { display: inline-flex; align-items: center; gap: .75rem; font-size: 1.4rem; font-weight: 700; text-decoration: none; color: var(--ink); }
+.brand-mark { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; background: var(--green); color: white; font-size: 1.1rem; }
+.portal-link { font-size: .95rem; font-weight: 600; }
+main { flex: 1; }
+.welcome { max-width: 760px; padding: clamp(4rem, 10vw, 8rem) 0; }
+.eyebrow { color: var(--green); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: .8rem; }
+h1 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(3rem, 8vw, 5.5rem); line-height: 1.08; letter-spacing: -.04em; margin: 1.5rem 0; font-weight: 400; }
+h1 span { color: var(--green); }
+.introduction { font-size: clamp(1.15rem, 3vw, 1.5rem); }
+.status { max-width: 560px; color: var(--muted); line-height: 1.8; margin: 1rem 0 2rem; }
+.button-link { display: inline-flex; align-items: center; gap: .75rem; padding: .9rem 1.25rem; border-radius: .5rem; background: var(--green); color: white; font-weight: 600; text-decoration: none; }
+.button-link:hover { background: #125349; }
+.site-footer { padding: 1.5rem 0; border-top: 1px solid var(--border); color: var(--muted); font-size: .85rem; }
+.catalogue-section { padding: 2.5rem 0 4rem; border-top: 1px solid var(--border); }
+.catalogue-section h2 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2rem, 5vw, 3rem); font-weight: 400; margin: 1rem 0 2rem; }
+.catalogue-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 1.25rem; }
+.catalogue-card { padding: 1.5rem; border: 1px solid var(--border); border-radius: .75rem; background: #fffefa; min-width: 0; overflow-wrap: anywhere; }
+.catalogue-card h3 { font-size: 1.3rem; margin: 0 0 .75rem; }
+.card-eyebrow { color: var(--green); font-weight: 600; margin: 0 0 .75rem; }
+.card-summary { color: var(--muted); line-height: 1.7; white-space: pre-wrap; }
+.service-options, .practitioner-services { font-size: .9rem; line-height: 1.7; }
+.card-link { display: inline-block; margin-top: .75rem; font-weight: 600; }
+.catalogue-feedback, .catalogue-empty { padding: 1rem; border: 1px solid var(--border); border-radius: .5rem; line-height: 1.7; }
+.catalogue-feedback button { background: var(--green); color: white; padding: .6rem 1rem; border: 0; border-radius: .3rem; font: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid #b65d30; outline-offset: 5px; }
+@media (max-width: 480px) { .site-shell { width: calc(100% - 2rem); } .site-header { padding: 1.25rem 0; } .brand { font-size: 1.2rem; } .portal-link { font-size: .8rem; } .site-footer { align-items: flex-start; flex-direction: column; gap: .4rem; } }
