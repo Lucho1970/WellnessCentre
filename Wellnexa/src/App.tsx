@@ -1,5 +1,6 @@
 import { site } from './config/site'
 import './App.css'
+import { PublicCatalogue } from './catalogue/PublicCatalogue'
 
 function App() {
   return (
@@ -17,9 +18,10 @@ function App() {
           <p className="eyebrow">{site.descriptor}</p>
           <h1 id="welcome-title">Welcome to <span>{site.name}.</span></h1>
           <p className="introduction">A new space for connected wellness.</p>
-          <p className="status">Our public website is taking shape. Soon, you can get to know the collective, explore services, and find the care that feels right for you.</p>
+          <p className="status">Get to know the collective, explore our published services, and find the care that feels right for you.</p>
           <a className="button-link" href={site.portalUrl}>Visit the clinic portal <span aria-hidden="true">↗</span></a>
         </section>
+        <PublicCatalogue />
       </main>
       <footer className="site-footer"><span>{site.name}</span><span>{site.descriptor}</span></footer>
     </div>

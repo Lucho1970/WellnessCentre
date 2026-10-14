@@ -30,7 +30,7 @@ The preview uses `http://localhost:5176`. The build runs TypeScript checks befor
 - `vite.config.ts`: development and preview configuration.
 - `package-lock.json`: reproducible dependency versions.
 
-The app has its own package and lockfile within the shared solution repository. Existing portal/public frontend and PHP dependencies are managed separately. No API calls, authentication, fabricated practitioner/service records or routing framework have been added to this initial scaffold. English/French content, real catalogue integration and the public site pages can be added as the next development slices.
+The app has its own package and lockfile within the shared solution repository. Existing portal/public frontend and PHP dependencies are managed separately. The website reads published service and practitioner information from the Wellnexa portal's public endpoints; it does not authenticate clients or read clinical records. English/French site controls and additional public pages remain follow-up slices.
 
 ## Public configuration
 
@@ -44,4 +44,19 @@ Edit `VITE_PORTAL_URL` and restart the dev server or rebuild. All `VITE_` settin
 
 ## Hosting later
 
-For Netfirms, upload the **contents** of `dist/` to the document root assigned to `wellnexa.ca`. Do not upload the source folder or `node_modules`. Adding this scaffold does not change DNS, SSL, clinic host registration, provider callbacks or current deployment scripts. Configure hosting/SSL and verify the portal destination before publishing. If client-side page routing is added later, include the corresponding server fallback rules in that development slice.
+For Netfirms, upload the **contents** of `dist/` to the document root assigned to `wellnexa.ca`, including `api/` and its hidden `.htaccess`. Do not upload the source folder or `node_modules`. No database migration, private `.env`, clinic hostname alias or provider callback change is required for this public catalogue integration. PHP with cURL and Apache rewrite support must be enabled; these are already used by the existing Netfirms portal. If client-side page routing is added later, include the corresponding server fallback rules in that development slice.
+
+## Public catalogue integration
+
+The browser calls same-origin `/api/public/services` and `/api/public/practitioners`. On Netfirms, `api/.htaccess` routes them to a read-only PHP bridge that fetches only the corresponding `/api/v1/public/` endpoints at `wellnexa.copihue.ca`. The bridge forwards no incoming cookies, authorization or query parameters, follows no redirects, verifies HTTPS, bounds response size/time, and projects an explicit set of public presentation fields. It cannot proxy appointments, client details, forms or staff APIs. Vite proxies the same two paths during development; no CORS changes or browser API keys are needed.
+
+Only active/published records selected by the existing portal API are shown. Changes appear on the next page load or retry; responses are not cached. The current clinic has empty lists until services and practitioner public profiles are published in its portal. Loading, verified-empty and unavailable states are distinct, and errors do not replace real data with fabricated profiles. Booking links keep the service slug and permitted practitioner identifier.
+
+The bridge and Vite proxy deliberately use a fixed clinic host. Changing `VITE_PORTAL_URL` changes links only; a host cutover must update the reviewed bridge/proxy targets to the same clinic. There is no request-controlled upstream URL or client-selected clinic ID.
+
+```powershell
+php Wellnexa/tests/catalogue.php
+npm --prefix Wellnexa run test:browser
+```
+
+Browser tests use synthetic published cards and failure/empty fixtures. On Windows they use installed Microsoft Edge; other systems need `npx playwright install chromium` from `Wellnexa/`. Production acceptance: after upload, verify both same-origin API URLs return JSON, publish a controlled public profile/service and confirm the website and booking links, then unpublish it and verify removal on refresh. The existing portal remains the source of truth; no hosted writes are performed by local tests.
