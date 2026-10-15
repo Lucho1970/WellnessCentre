@@ -10,6 +10,7 @@
     "ext-openssl": "*",
     "ext-pdo": "*",
     "ext-pdo_mysql": "*",
+    "dompdf/dompdf": "~3.1",
     "firebase/php-jwt": "^7.1",
     "giggsey/libphonenumber-for-php": "^9.0",
     "nikic/fast-route": "^1.3"

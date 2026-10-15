@@ -9,6 +9,59 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+test('clinic template and service credentials feed a manual session receipt', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'clinic', destination_snapshot: null, travel_buffer_minutes: 0, base_price_cents: 10000, mobile_fee_cents: 0 };
+  const context: any = { enabled: true, can_edit_template: true, template: null, profile: null, template_version: 0, profile_version: 0, appointment: { ...appointment, base_cents: 10000, travel_cents: 0 }, items: [] };
+  let issued: any;
+  await page.route('**/api/v1/appointments?**', route => route.fulfill({ json: { data: [appointment] } }));
+  await page.route('**/api/v1/appointments/41', route => route.fulfill({ json: { data: appointment } }));
+  await page.route('**/api/v1/appointments/41/logistics-notes', route => route.fulfill({ json: { data: { notes: [], truncated: false } } }));
+  await page.route('**/api/v1/receipts/template', route => { context.template = route.request().postDataJSON(); context.template_version = 1; return route.fulfill({ json: { data: { version: 1 } } }); });
+  await page.route('**/api/v1/appointments/41/receipt-profile', route => { context.profile = route.request().postDataJSON(); context.profile_version = 1; return route.fulfill({ json: { data: { version: 1 } } }); });
+  await page.route('**/api/v1/appointments/41/receipt', route => {
+    if (route.request().method() === 'POST') {
+      issued = route.request().postDataJSON();
+      context.items = [{ id: 5, number: 'R-TEST', appointment_id: 41, status: 'issued', service_name: 'Massage', practitioner_name: 'Practitioner', total_cents: 11300 }];
+      context.appointment.status = 'paid';
+      return route.fulfill({ json: { data: context.items[0] } });
+    }
+    return route.fulfill({ json: { data: context } });
+  });
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await expect(page.getByText('Save the clinic template and practitioner service details before issuing a receipt.')).toBeVisible();
+  await page.getByRole('button', { name: 'Clinic receipt template', exact: true }).click();
+  await page.getByLabel('Receipt issuer name').fill('Wellnexa');
+  await page.getByLabel('Receipt business address').fill('123 Test Street, Toronto');
+  await page.getByLabel('Receipt contact details').fill('clinic@example.test');
+  await page.getByRole('button', { name: 'Save clinic receipt template' }).click();
+  await page.getByRole('button', { name: 'Practitioner receipt details', exact: true }).click();
+  await page.getByLabel('Professional designation').fill('Registered Massage Therapist');
+  await page.getByLabel('Registration number if applicable').fill('TEST123');
+  await page.getByRole('button', { name: 'Save practitioner receipt details' }).click();
+  await page.getByLabel('Tax amount CAD').fill('13.00');
+  await page.getByLabel('Amount received CAD').fill('100.00');
+  await page.getByLabel('I confirm the issuer, service credentials, tax and full payment received are correct.').check();
+  await expect(page.getByRole('button', { name: 'Record payment and issue receipt' })).toBeDisabled();
+  await page.getByLabel('Amount received CAD').fill('113.00');
+  await page.getByLabel('Payment date').fill('2026-01-02');
+  await page.getByRole('button', { name: 'Record payment and issue receipt' }).click();
+  await expect(page.getByText('Receipt issued and available in the client portal.')).toBeVisible();
+  expect(issued).toMatchObject({ amount_cents: 11300, tax_cents: 1300, template_version: 1, profile_version: 1, confirmed: true });
+  expect(issued.issuer_name).toBeUndefined(); // Issuer and professional details come from server settings.
+  await expect(page.getByRole('button', { name: 'Download receipt PDF' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('session-receipt-issued.png'), fullPage: true });
+  let voids = 0;
+  await page.route('**/api/v1/receipts/5/void', route => { voids++; expect(route.request().postDataJSON()).toMatchObject({ kind: 'recording_error', confirmed: true }); context.items[0].status = 'void'; context.appointment.status = 'completed'; context.appointment.version = 3; return route.fulfill({ json: { data: { void: true } } }); });
+  await page.getByRole('button', { name: 'Void receipt', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Confirm void', exact: true })).toBeDisabled();
+  await page.getByLabel('Correction reason').fill('Payment entered by mistake');
+  await page.getByLabel('I confirm this is a recording correction or that the full refund has already been made.').check();
+  await page.getByRole('button', { name: 'Confirm void', exact: true }).click();
+  await expect(page.getByText('Voided receipt', { exact: true })).toBeVisible();
+  expect(voids).toBe(1);
+  await expect(page.getByRole('button', { name: 'Download receipt PDF' })).toHaveCount(0);
+});
 test('clinic administrators use central assignment and cannot edit practitioner-owned credentials', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   await page.route('**/api/v1/admin/practitioner-directory-options', route => route.fulfill({ json: { data: { central_enabled: true, url: 'https://portal.example.test/admin/' } } }));

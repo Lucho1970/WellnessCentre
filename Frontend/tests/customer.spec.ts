@@ -6,6 +6,27 @@ import {
 } from "../src/customer/providerRouting";
 import type { AccountInfo } from "@azure/msal-browser";
 
+test('clients retrieve receipt PDFs and see voided receipts on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, true);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: 'linked', capabilities: ['own_appointments'], session: { idle_expires_at: Date.now() / 1000 + 1800, absolute_expires_at: Date.now() / 1000 + 28800 } } } }));
+  await page.route('**/api/v1/customer/appointments?**', route => route.fulfill({ json: { data: { items: [] } } }));
+  await page.route('**/api/v1/customer/receipts?**', route => route.fulfill({ json: { data: { enabled: true, has_more: false, items: [{ id: 5, number: 'R-TEST', appointment_id: 41, status: 'issued', service_name: 'Massage', practitioner_name: 'Practitioner', total_cents: 11300 }, { id: 4, number: 'R-VOID', appointment_id: 40, status: 'void', service_name: 'Massage', practitioner_name: 'Practitioner', total_cents: 11300 }] } } }));
+  await page.route('**/api/v1/customer/receipts/5/pdf', route => {
+    expect(route.request().headers().authorization).toBe('Bearer customer-test-token');
+    return route.fulfill({ json: { data: { filename: 'R-TEST.pdf', pdf_base64: Buffer.from('%PDF-1.4\nSynthetic receipt download').toString('base64') } } });
+  });
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button', { name: 'My receipts', exact: true }).click();
+  await expect(page.getByText('Voided receipt', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download receipt PDF' })).toHaveCount(1);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download receipt PDF' }).click();
+  expect((await download).suggestedFilename()).toBe('R-TEST.pdf');
+  await expect(page.getByRole('button', { name: 'Void receipt', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('client-receipts-mobile.png'), fullPage: true });
+});
+
 async function fixture(page: Page, signedIn = false, callbackFails = false) {
   // Only Playwright intercepts this module; no production bypass or fake tokens.
   await page.route("**/src/customer/auth.ts", (route) =>

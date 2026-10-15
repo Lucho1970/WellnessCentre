@@ -87,6 +87,12 @@ final class Api
             }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\d+}/receipt','sessionReceiptContext');
+                $routes->addRoute('PUT','/api/v1/receipts/template','saveReceiptTemplate');
+                $routes->addRoute('PUT','/api/v1/appointments/{id:\d+}/receipt-profile','saveReceiptProfile');
+                $routes->addRoute('POST','/api/v1/appointments/{id:\d+}/receipt','issueSessionReceipt');
+                $routes->addRoute('GET','/api/v1/receipts/{id:\d+}/pdf','sessionReceiptPdf');
+                $routes->addRoute('POST','/api/v1/receipts/{id:\d+}/void','voidSessionReceipt');
                 $routes->addRoute('GET','/api/v1/forms/drafts','formDrafts');
                 $routes->addRoute('POST','/api/v1/forms/drafts','saveFormDraft');
                 $routes->addRoute('POST','/api/v1/forms/drafts/import','importFormDraft');
@@ -265,6 +271,12 @@ final class Api
                 $this->clinicContext->assertActive($this->database);
             }
             $data=match($route[1]){
+                'sessionReceiptContext'=>$this->receipts()->context($this->user($request),(int)$route[2]['id']),
+                'saveReceiptTemplate'=>$this->receipts()->saveTemplate($this->user($request),$request->body,$request->correlationId),
+                'saveReceiptProfile'=>$this->receipts()->saveProfile($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'issueSessionReceipt'=>$this->receipts()->issue($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'sessionReceiptPdf'=>$this->receipts()->pdf($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'voidSessionReceipt'=>$this->receipts()->void($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'staffInvitations'=>$this->staffInvitations()->list($this->user($request)),
                 'createStaffInvitation'=>$this->staffInvitations()->create($this->user($request),$request->body,$request->correlationId),
                 'approveStaffInvitation'=>$this->staffInvitations()->approve($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
@@ -532,6 +544,8 @@ final class Api
         $identity = $session['identity_id'];
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        if($route==='GET receipts')return $this->receipts()->list($bookingActor(),$r->query);
+        if(preg_match('#^GET receipts/(\d+)/pdf$#',$route,$receiptMatch))return $this->receipts()->pdf($bookingActor(),(int)$receiptMatch[1],$r->correlationId);
         $forms=new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database));
         if($route==='GET forms'){$actor=$bookingActor();return $forms->list($actor,$actor->userId,$r->query,$r->correlationId);}
         if(preg_match('#^(GET|POST) forms/(\d+)(/(submit|draft|amendments))?$#',$route,$matches)){
@@ -563,6 +577,11 @@ final class Api
             'POST appointments' => $this->bookings->createForCustomer($bookingActor(), $r->body, $r->correlationId),
             default => throw new ApiException(404, 'not_found', 'Route not found.'),
         };
+    }
+
+    private function receipts(): \Wellness\Service\SessionReceiptService
+    {
+        return new \Wellness\Service\SessionReceiptService($this->database,new AuditLogger($this->database));
     }
 
     private function databaseHealth(): array

@@ -25,6 +25,8 @@ Acceptance must cover guessed conversation IDs, participant removal, wrong-clini
 
 ## Official receipts for benefits reimbursement
 
+Implementation follow-up: the clinic owns the shared template and issuer fields; practitioners maintain clinic/service-specific professional names, designations, registration and optional logos. The [first manual payment and portal receipt workflow](SESSION_RECEIPTS.md) is implemented behind a default-off flag, pending hosted acceptance. The remaining broader roadmap below is not a claim of completed billing or insurer integration.
+
 Produce an official PDF receipt from recorded services and payments. Candidate fields include a unique receipt number, issuer/business details, client name, actual treating practitioner, applicable professional designation and registration, service date/type/duration, itemized charge, applicable taxes, payment date/method, amount paid and any remaining balance. These are product requirements to validate with the relevant professions and insurers, not a legal or insurer-approved universal template.
 
 Snapshot the credentials applicable to the rendered service; do not pull an unrelated global credential or change historical receipts after a profile edit. Reissues, corrections, voids and refunds retain their links and audit history. An invoice or unpaid balance must never be presented as a paid receipt. Reimbursement remains subject to the client's coverage and insurer decision; direct claims submission is a separate integration.

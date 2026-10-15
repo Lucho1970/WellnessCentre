@@ -1,0 +1,57 @@
+-- Apply once after the existing invoice/payment foundations. Default-off feature.
+CREATE TABLE receipt_templates (
+ clinic_id BIGINT UNSIGNED PRIMARY KEY,
+ version INT UNSIGNED NOT NULL DEFAULT 1,
+ settings JSON NOT NULL,
+ updated_by BIGINT UNSIGNED NOT NULL,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE practitioner_receipt_profiles (
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ practitioner_id BIGINT UNSIGNED NOT NULL,
+ service_id BIGINT UNSIGNED NOT NULL,
+ version INT UNSIGNED NOT NULL DEFAULT 1,
+ settings JSON NOT NULL,
+ updated_by BIGINT UNSIGNED NOT NULL,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(clinic_id,practitioner_id,service_id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),
+ FOREIGN KEY(service_id) REFERENCES services(id),
+ FOREIGN KEY(updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE session_receipts (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ appointment_id BIGINT UNSIGNED NOT NULL,
+ client_id BIGINT UNSIGNED NOT NULL,
+ practitioner_id BIGINT UNSIGNED NOT NULL,
+ invoice_id BIGINT UNSIGNED NOT NULL,
+ payment_id BIGINT UNSIGNED NOT NULL,
+ receipt_number VARCHAR(40) NOT NULL,
+ request_key VARCHAR(100) NOT NULL,
+ request_hash CHAR(64) NOT NULL,
+ snapshot JSON NOT NULL,
+ pdf_data MEDIUMBLOB NOT NULL,
+ status ENUM('issued','void') NOT NULL DEFAULT 'issued',
+ active_appointment_id BIGINT UNSIGNED GENERATED ALWAYS AS (CASE WHEN status='issued' THEN appointment_id ELSE NULL END) STORED,
+ issued_by BIGINT UNSIGNED NOT NULL,
+ issued_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ voided_by BIGINT UNSIGNED NULL,
+ voided_at DATETIME NULL,
+ void_reason VARCHAR(500) NULL,
+ UNIQUE KEY uq_session_receipt_active(clinic_id,active_appointment_id),
+ UNIQUE KEY uq_session_receipt_request(clinic_id,request_key),
+ UNIQUE KEY uq_session_receipt_number(receipt_number),
+ INDEX ix_session_receipt_client(clinic_id,client_id,id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(appointment_id) REFERENCES appointments(id),
+ FOREIGN KEY(client_id) REFERENCES users(id),
+ FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),
+ FOREIGN KEY(invoice_id) REFERENCES invoices(id),
+ FOREIGN KEY(payment_id) REFERENCES payments(id),
+ FOREIGN KEY(issued_by) REFERENCES users(id),
+ FOREIGN KEY(voided_by) REFERENCES users(id)
+) ENGINE=InnoDB;

@@ -17,6 +17,7 @@ import { pagePath } from '../portal/access';
 import { PractitionerVisitHistory } from './PractitionerVisitHistory';
 import { PractitionerVisitOutcome } from './PractitionerVisitOutcome';
 import { AppointmentLogisticsNotes } from './AppointmentLogisticsNotes';
+import { SessionReceipt } from '../receipts/SessionReceipts';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
@@ -74,6 +75,9 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
   const [detailsRecord, setDetailsRecord] = useState<Appointment | null>(null);
   const [detailsBusy, setDetailsBusy] = useState(false);
   const [detailsError, setDetailsError] = useState('');
+  const [receiptState, setReceiptState] = useState({ busy: false, dirty: false });
+  const updateReceiptState = useCallback((next: { busy: boolean; dirty: boolean }) => setReceiptState(current => current.busy === next.busy && current.dirty === next.dirty ? current : next), []);
+  const closeReceiptPanel = () => { if (!receiptState.busy && (!receiptState.dirty || window.confirm(t('Discard your unsaved changes?')))) setDetailsOpen(false); };
   const [managing, setManaging] = useState<{ appointment: Appointment; action: 'reschedule' | 'cancel' } | null>(null);
   const [seriesManaging, setSeriesManaging] = useState<number | null>(null);
   const [reassigning, setReassigning] = useState<Appointment | null>(null);
@@ -157,8 +161,8 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2 }}><Button disabled={page === 1} onClick={() => { setPage(value => value - 1); setSelectedId(null); setDetailsOpen(false); }}>{t('Previous')}</Button><Typography>{t('Page {{page}}',{page})}</Typography><Button disabled={appointments.length < 50} onClick={() => { setPage(value => value + 1); setSelectedId(null); setDetailsOpen(false); }}>{t('Next')}</Button></Stack>
       </Stack>}
     </Paper>
-    <Drawer anchor="right" open={detailsOpen && Boolean(selected)} onClose={() => setDetailsOpen(false)} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
-      {selected && <><Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t('Appointment details')}</Typography><Typography variant="h5">{selected.client_name} · {selected.service_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={() => setDetailsOpen(false)}><X/></IconButton></Stack><Stack spacing={2} sx={{ p: 3, overflowY: 'auto' }}>
+    <Drawer anchor="right" open={detailsOpen && Boolean(selected)} onClose={closeReceiptPanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
+      {selected && <><Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t('Appointment details')}</Typography><Typography variant="h5">{selected.client_name} · {selected.service_name}</Typography></Box><IconButton aria-label={t('Close panel')} disabled={receiptState.busy} onClick={closeReceiptPanel}><X/></IconButton></Stack><Stack spacing={2} sx={{ p: 3, overflowY: 'auto' }}>
         {[[t('Status'), t(selected.status.replaceAll('_', ' '))], [t('Starts'), displayTime(selected.starts_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Ends'), displayTime(selected.ends_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Practitioner'), selected.practitioner_name], [t('Location'), selected.location_name], [t('Room'), selected.room_name || t('Not set')], [t('Visit type'), t(selected.delivery_mode === 'mobile' ? 'On-Site (client location)' : 'In clinic')], [t('Appointment ID'), String(selected.id)]].map(([label, value]) => <Box key={label}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}
         <Divider />
         <Typography variant="h6">{t('Client contact')}</Typography>
@@ -174,6 +178,7 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
         {detailsRecord && <AppointmentLogisticsNotes key={selected.id} appointmentId={selected.id} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && <PractitionerVisitHistory appointmentId={selected.id} serviceName={selected.service_name} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && detailsRecord && <PractitionerVisitOutcome appointment={detailsRecord} request={request} onChanged={message => { setNotice(message); setDetailsOpen(false); setRefresh(value => value + 1); }} />}
+        {(practitionerMode || canManageFees) && detailsRecord && <SessionReceipt key={selected.id} appointmentId={selected.id} request={request} onStateChange={updateReceiptState} onStatusChange={(status, version) => { const update = (row: Appointment | null) => row?.id === selected.id ? { ...row, status, version } : row; setDetailsRecord(update); setFocusedAppointment(update); setAppointments(rows => rows.map(row => update(row)!)); }} />}
         {!practitionerMode && canManageFees && detailsRecord?.action_links_enabled && <AppointmentLinkRevocation key={detailsRecord.id} appointmentId={detailsRecord.id} request={request}/>}
         {canBook && <Stack direction="row" gap={1}><Button disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button>{!practitionerMode && canManageFees && <Button disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}</Stack>}
       </Stack></>}

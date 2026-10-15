@@ -254,6 +254,8 @@ final class ClientService
         $tables=['appointments','recurring_series','waitlist_entries','form_submissions','practitioner_client_notes','invoices','consent_records','data_export_requests','client_link_invitations'];
         // Preserve form ownership even if the pilot was disabled after collecting submissions.
         if($this->database->connection()->query("SHOW TABLES LIKE 'client_form_tasks'")->fetchColumn())$tables[]='client_form_tasks';
+        // Move access with a reviewed client merge, without rewriting issued receipt snapshots.
+        if($this->database->connection()->query("SHOW TABLES LIKE 'session_receipts'")->fetchColumn())$tables[]='session_receipts';
         return $tables;
     }
 
