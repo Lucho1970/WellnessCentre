@@ -2708,6 +2708,26 @@ test("super admin saves clinic-scoped portal colours and font", async ({ page })
   await expect(page.getByText('Portal theme saved.')).toBeVisible();
 });
 
+test('Wellnexa preset saves through existing clinic settings and restores the full palette', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 } } } }));
+  let primary = '#176b62', secondary = '#d8754c';
+  await page.route('**/api/v1/site-config', route => route.fulfill({ json: { data: { name: 'Wellnexa', theme_primary_color: primary, theme_secondary_color: secondary, theme_font_family: 'Inter' } } }));
+  await page.route('**/api/v1/admin/clinic/portal-theme', route => {
+    expect(route.request().method()).toBe('PUT');
+    expect(route.request().postDataJSON()).toEqual({ primary_color: '#0f4c5c', secondary_color: '#7a4dff', font_family: 'Inter' });
+    primary = '#0f4c5c'; secondary = '#7a4dff';
+    return route.fulfill({ json: { data: {} } });
+  });
+  await page.goto(`${portalHost}/admin/settings`);
+  await page.getByRole('button', { name: 'Use Wellnexa palette' }).click();
+  await page.getByRole('button', { name: 'Save portal appearance' }).click();
+  await expect(page.getByText('Portal theme saved.')).toBeVisible();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(248, 249, 250)');
+  await page.reload();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(248, 249, 250)');
+});
+
 test("clinic welcome and category translations can be edited without rebuilding", async ({page}) => {
   await fixtures(page,['super_admin']);
   await page.route('**/api/v1/admin/catalogue-settings',route=>route.fulfill({json:{data:{categories:[{id:3,name:'Massage',name_fr:null,description:null,description_fr:null}],taxes:[],settings:null}}}));
