@@ -30,8 +30,9 @@ SET @seed_version_id = NULL;
 SET @seed_valid_admin = NULL;
 START TRANSACTION;
 -- Lock the selected active administrator; no administrator or permissions are created.
-SELECT id INTO @seed_valid_admin FROM application_administrators
- WHERE id=@seed_admin_id AND status='active' FOR UPDATE;
+-- SET avoids phpMyAdmin appending a display LIMIT after FOR UPDATE.
+SET @seed_valid_admin = (SELECT id FROM application_administrators
+ WHERE id=@seed_admin_id AND status='active' FOR UPDATE);
 SET @seed_reset_insert_id = LAST_INSERT_ID(0);
 INSERT INTO form_library_entries(scope,created_by_admin_id,creation_key,creation_actor,creation_hash)
  SELECT 'global',@seed_valid_admin,'massage-therapy-intake-v1','seed:starter-library',@seed_hash
@@ -39,12 +40,12 @@ INSERT INTO form_library_entries(scope,created_by_admin_id,creation_key,creation
  -- Leave the existing ID unchanged and clear the insert marker on a duplicate.
  ON DUPLICATE KEY UPDATE id=id+LAST_INSERT_ID(0);
 SET @seed_created = (LAST_INSERT_ID()<>0);
-SELECT id INTO @seed_entry_id FROM form_library_entries
- WHERE creation_actor='seed:starter-library' AND creation_key='massage-therapy-intake-v1' FOR UPDATE;
+SET @seed_entry_id = (SELECT id FROM form_library_entries
+ WHERE creation_actor='seed:starter-library' AND creation_key='massage-therapy-intake-v1' FOR UPDATE);
 INSERT INTO form_library_versions(entry_id,version,name,description,form_type,definition,request_key,request_hash)
  SELECT @seed_entry_id,1,@seed_name,@seed_description,'intake',@seed_definition,'massage-therapy-intake-v1',@seed_hash
  WHERE @seed_created=1 AND @seed_valid_admin IS NOT NULL;
-SELECT id INTO @seed_version_id FROM form_library_versions WHERE entry_id=@seed_entry_id AND version=1;
+SET @seed_version_id = (SELECT id FROM form_library_versions WHERE entry_id=@seed_entry_id AND version=1);
 INSERT INTO form_library_events(version_id,actor_admin_id,action,correlation_id,metadata)
  SELECT @seed_version_id,@seed_valid_admin,'submit','seed:massage-therapy-intake-v1','{"source":"massage-therapy-intake.json","seed_version":1}'
  WHERE @seed_created=1 AND @seed_valid_admin IS NOT NULL;

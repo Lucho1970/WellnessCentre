@@ -13,12 +13,15 @@ $assert(!array_filter($validated['questions'],fn($q)=>$q['required']||$q['label_
 $import=$draftService->import($clinician,['document'=>$document,'owner_practitioner_id'=>3,'idempotency_key'=>'massage-json-import'],'seed-test');
 $assert($draftService->detail($clinician,$import['id'],'seed-test')['payload']['definition']===$validated,'JSON imports through the actual private draft workflow');
 $source=file_get_contents($root.'/api/database/templates/seed-massage-therapy-intake.sql');
+$assert(!preg_match('/^SELECT .* INTO /m',$source),'Seed avoids top-level SELECT INTO statements rewritten by phpMyAdmin');
 $runSeed=function(?int $adminId=null)use($pdo,$source):array {
     $sql=$source;
     if ($adminId!==null) $sql=preg_replace('/^SET @seed_admin_id = .*;$/m','SET @seed_admin_id = '.$adminId.';',$sql,1);
     $result=[];
     foreach(explode(';',preg_replace('/^--.*$/m','',$sql)) as $statement) {
         if(trim($statement)==='')continue;
+        // Reproduce phpMyAdmin's display limit on every top-level SELECT.
+        if(preg_match('/^\s*SELECT\b/i',$statement)) $statement.=' LIMIT 0, 25';
         $query=$pdo->query($statement);
         if($query->columnCount()>0) $result=$query->fetchAll();
         $query->closeCursor();
