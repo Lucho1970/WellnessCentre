@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Starter form templates](../api/database/templates/README.md): bilingual massage intake JSON and repeatable SQL submission to the global library.
+
 - [Form library](FORM_LIBRARY_RELEASE.md): approved global/clinic templates, previews, independent drafts and editing controls; migration 045 and deployment.
 
 - [Practitioner travel settings](PRACTITIONER_TRAVEL_SETTINGS_RELEASE.md): edit own clinic-local travel thresholds, fees and buffers; API patch and shared portal deployment.
