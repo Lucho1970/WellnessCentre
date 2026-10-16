@@ -57,3 +57,11 @@ Remove retired hostname entries from hosted routing, CORS, and identity-provider
 5. When backend changes are included, complete the feature-specific hosted acceptance checks. Local builds and browser fixtures do not prove hosted database or identity-provider acceptance.
 
 To roll back the shared frontend, restore its previous index, routing files and matching assets together. All clinic portals roll back together. Preserve the release manifest and backup.
+
+## Local validation — 16 October 2026
+
+Source revision `a9346ff` passed all PowerShell script parse checks, PHP syntax checks for the two updated deployment comments, the complete frontend build (public, clinic portal and application administration), and eight focused browser regressions covering public links, same-host booking and sign-in handoff. Existing bundle-size notices remain non-blocking.
+
+The full release builder, portal-only builder and hosted test-kit builder were exercised locally. Archive integrity, SHA-256 hashes, source revisions, destination mappings, required routing/API files, private-file exclusion and the thin API relative paths were checked. Full release frontend artifacts contain no retired clinic hostname. Invalid non-root portal URL overrides were rejected before packaging. Generated validation packages stay ignored under `deployments/`; they were not uploaded. The receipt/distance-fee wrappers were syntax-checked and updated to consume the full builder's common archive name and report only their included API/portal destinations.
+
+Private environment files, hosted mappings, provider registrations, database records and previous release archives were not modified. Hosted authenticated journeys and database acceptance remain separate from these local checks.
