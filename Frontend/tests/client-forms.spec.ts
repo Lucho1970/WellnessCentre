@@ -7,6 +7,23 @@ async function libraryFixture(page: Page, admin = false) {
   await page.route('**/api/v1/forms/library?**', route => route.fulfill({ json: { data: { items: [libraryItem], has_more: false, can_review: admin, max_questions: 100 } } }));
   await page.route('**/api/v1/forms/library/91', route => route.fulfill({ json: { data: libraryItem } }));
 }
+test('an existing working form can be submitted to a clinic library without publishing it', async ({ page }) => {
+  await libraryFixture(page); let submitted: any; let publications = 0;
+  await page.route('**/api/v1/forms/library', route => { submitted = route.request().postDataJSON(); return route.fulfill({ json: { data: { ...libraryItem, status: 'pending' } } }); });
+  await page.route('**/api/v1/forms/templates', route => { publications++; return route.fulfill({ json: { data: { id: 99 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create form', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Form name', exact: true }).fill('My working form');
+  await page.getByRole('textbox', { name: 'Question (English)', exact: true }).fill('A working question');
+  await page.getByRole('button', { name: 'Submit to library', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('textbox', { name: 'Form name', exact: true })).toHaveValue('My working form');
+  await dialog.getByRole('textbox', { name: 'Template description', exact: true }).fill('Clinic reusable starter');
+  await dialog.getByRole('combobox', { name: /^Submit to library/ }).click(); await page.getByRole('option', { name: 'Clinic library', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Submit for approval', exact: true }).click();
+  await expect(dialog).toHaveCount(0); expect(submitted.scope).toBe('clinic'); expect(submitted.definition.questions[0].label).toBe('A working question');
+  expect(submitted).not.toHaveProperty('service_ids'); expect(publications).toBe(0);
+  await expect(page.getByRole('textbox', { name: 'Form name', exact: true })).toHaveValue('My working form');
+});
 test('form library preview fits French mobile screens', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await libraryFixture(page);
   await page.goto(`${host}/practitioner/forms?lang=fr`);
