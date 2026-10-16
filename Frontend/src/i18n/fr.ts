@@ -1,4 +1,5 @@
 const fr: Record<string, string> = {
+  "Time off applies only to this clinic. Add it separately in each clinic where you want to be unavailable.": "Les congés s’appliquent uniquement à cette clinique. Ajoutez-les séparément dans chaque clinique où vous souhaitez être indisponible.",
   "Client answer drafts and amendments are not enabled.": "Les brouillons et corrections de réponses ne sont pas activés.",
   "A save key is required.": "Une clé d’enregistrement est requise.",
   "Check the form version.": "Vérifiez la version du formulaire.",

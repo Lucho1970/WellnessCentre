@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$MariaDbDirectory,
     [string]$PhpExecutable = 'php',
     [ValidateRange(1024, 65535)][int]$Port = 13317,
-    [ValidateSet('recurring-bookings.php','client-forms.php','client-form-answers.php','staff-identity-migration.php','staff-invitations.php','practitioner-work-location.php','separate-clinics.php','application-administration.php','global-practitioners.php','session-receipts.php','session-receipt-deployment.php','onsite-distance-fees.php')][string]$IntegrationTest = 'recurring-bookings.php'
+    [ValidateSet('recurring-bookings.php','client-forms.php','client-form-answers.php','staff-identity-migration.php','staff-invitations.php','practitioner-work-location.php','separate-clinics.php','application-administration.php','global-practitioners.php','session-receipts.php','session-receipt-deployment.php','onsite-distance-fees.php','clinic-time-off.php')][string]$IntegrationTest = 'recurring-bookings.php'
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -24,6 +24,7 @@ $prefix = switch ($IntegrationTest) {
     'separate-clinics.php' { 'CLINIC_TEST' }
     'application-administration.php' { 'CLINIC_TEST' }
     'global-practitioners.php' { 'CLINIC_TEST' }
+    'clinic-time-off.php' { 'CLINIC_TEST' }
     default { 'RECURRING_TEST' }
 }
 $names = @("${prefix}_ALLOW_CREATE", "${prefix}_PORT", "${prefix}_USER", "${prefix}_PASSWORD")

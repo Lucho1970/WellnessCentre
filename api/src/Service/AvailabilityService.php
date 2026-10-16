@@ -101,7 +101,9 @@ final class AvailabilityService
         $pdo=$this->database->connection();$params=['p'=>$practitionerId,'l'=>$locationId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];
         $queries=[
             "SELECT 1 FROM appointments WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start".($excludeAppointmentId!==null?' AND id<>:exclude':'')." LIMIT 1",
-            "SELECT 1 FROM time_off WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND starts_at<:end AND ends_at>:start LIMIT 1",
+            // Time off belongs to the clinic's local practitioner record.
+            // Actual appointments still block this identity across clinics.
+            "SELECT 1 FROM time_off WHERE practitioner_id=:p AND starts_at<:end AND ends_at>:start LIMIT 1",
             "SELECT 1 FROM availability_overrides WHERE practitioner_id=:p AND location_id=:l AND override_type='blocked' AND starts_at<:end AND ends_at>:start LIMIT 1",
             "SELECT 1 FROM imported_calendar_entries WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND blocks_booking=1 AND starts_at<:end AND ends_at>:start LIMIT 1",
         ];

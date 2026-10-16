@@ -3449,6 +3449,7 @@ test("time off previews booked appointments before save and retains a follow-up 
   await page.goto(`${portalHost}/admin/availability`);
   await page.getByRole("button", { name: /Esther.*1 time off/ }).click();
   await page.getByRole("button", { name: "Add time off", exact: true }).first().click();
+  await expect(page.getByText("Time off applies only to this clinic. Add it separately in each clinic where you want to be unavailable.")).toBeVisible();
   await page.getByLabel("Starts").fill("2026-10-06T09:00");
   await page.getByLabel("Ends").fill("2026-10-06T17:00");
   await page.getByRole("button", { name: "Review affected appointments" }).click();

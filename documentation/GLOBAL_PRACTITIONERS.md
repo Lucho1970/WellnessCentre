@@ -27,7 +27,7 @@ Assigning another clinic leaves the source assignment active. To transfer exclus
 
 Removed assignments can be explicitly restored by selecting that clinic again; the current assignment version is required. The original local user/practitioner IDs are reused. Inactive identities/users and conflicting membership states require separate review. Restoring does not publish the card or restore credential sharing automatically.
 
-Appointments, time off and blocking imported calendar entries for the same identity block availability across its local practitioner records. Booking, rescheduling and reassignment use shared identity locks and current busy-time reads. Only a busy/not-busy result crosses clinic boundaries; calendars and client details remain clinic scoped. Location-specific availability overrides remain local. This change does not provide a consolidated calendar or automated travel planning between clinics.
+Appointments and blocking imported calendar entries for the same identity block availability across its local practitioner records. Time off applies only to the clinic where it is recorded, across that clinic's locations. Practitioners record time off separately in every clinic where they want to be unavailable. Existing time-off records stay in their originating clinic and are not copied or deleted. Booking, rescheduling and reassignment use shared identity locks and current busy-time reads. Only a busy/not-busy result crosses clinic boundaries; calendars and client details remain clinic scoped. Location-specific availability overrides remain local. This change does not provide a consolidated calendar or automated travel planning between clinics.
 
 ## Deployment and validation
 

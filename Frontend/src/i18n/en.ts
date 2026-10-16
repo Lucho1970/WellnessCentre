@@ -1,4 +1,5 @@
 const en = {
+  "Time off applies only to this clinic. Add it separately in each clinic where you want to be unavailable.": "Time off applies only to this clinic. Add it separately in each clinic where you want to be unavailable.",
   "Client answer drafts and amendments are not enabled.": "Client answer drafts and amendments are not enabled.",
   "A save key is required.": "A save key is required.",
   "Check the form version.": "Check the form version.",
