@@ -9,6 +9,30 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+test('session travel fee can be waived before issuing a receipt', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'mobile', destination_snapshot: null, travel_buffer_minutes: 30, base_price_cents: 10000, mobile_fee_cents: 1500 };
+  let waived = false;
+  await page.route('**/api/v1/appointments?**', route => route.fulfill({ json: { data: [appointment] } }));
+  await page.route('**/api/v1/appointments/41', route => route.fulfill({ json: { data: appointment } }));
+  await page.route('**/api/v1/appointments/41/logistics-notes', route => route.fulfill({ json: { data: { notes: [], truncated: false } } }));
+  await page.route('**/api/v1/appointments/41/travel-fee', route => route.fulfill({ json: { data: { version: waived ? 2 : 1, fee_cents: waived ? 0 : 1500, assessed_fee_cents: 1500, waived, reason: waived ? 'Nearby repeat client' : null, can_waive: !waived } } }));
+  await page.route('**/api/v1/appointments/41/travel-fee/waive', route => {
+    expect(route.request().postDataJSON()).toEqual({ version: 1, reason: 'Nearby repeat client' });
+    waived = true;
+    return route.fulfill({ json: { data: { version: 2, fee_cents: 0, assessed_fee_cents: 1500, waived: true, reason: 'Nearby repeat client', can_waive: false } } });
+  });
+  await page.route('**/api/v1/appointments/41/receipt', route => route.fulfill({ json: { data: { enabled: true, can_edit_template: true, template: null, profile: null, template_version: 0, profile_version: 0, appointment: { ...appointment, version: waived ? 2 : 1, base_cents: 10000, travel_cents: waived ? 0 : 1500 }, items: [] } } }));
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await expect(page.getByText('Travel fee for this session: $15.00 CAD')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Waive travel fee for this session' })).toBeDisabled();
+  await page.getByLabel('Reason for waiving travel fee').fill('Nearby repeat client');
+  await page.getByRole('button', { name: 'Waive travel fee for this session' }).click();
+  await expect(page.getByText(/Travel fee waived for this session/)).toBeVisible();
+  await expect(page.getByText('Travel fee for this session: $0.00 CAD')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Waive travel fee for this session' })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('travel-fee-waived.png'), fullPage: true });
+});
 test('clinic template and service credentials feed a manual session receipt', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'clinic', destination_snapshot: null, travel_buffer_minutes: 0, base_price_cents: 10000, mobile_fee_cents: 0 };
@@ -535,11 +559,14 @@ test("services use a list-first command bar and selected services can be assigne
   await page
     .getByRole("checkbox", { name: "Test location", exact: true })
     .check();
+  await page.getByRole('spinbutton', { name: 'Maximum driving distance (km)' }).fill('50');
+  await page.getByRole('spinbutton', { name: 'Free travel distance (km)' }).fill('20');
+  await page.getByRole('spinbutton', { name: 'Flat extra travel fee CAD' }).fill('15');
   await page.getByRole("button", { name: "Save assignments" }).click();
   await expect(page.getByText("Service assignments saved.")).toBeVisible();
   expect(savedAssignment).toMatchObject({
     location_ids: [1],
-    practitioners: [{ practitioner_id: 3, service_id: 3 }],
+    practitioners: [{ practitioner_id: 3, service_id: 3, mobile_radius_km: 50, mobile_free_radius_km: 20, mobile_fee_cents: 1500 }],
   });
 });
 
@@ -2762,8 +2789,12 @@ test("guest catalogue groups multilingual treatments and links public practition
   await page.screenshot({path:'test-results/portal-catalogue-category.png'});
   await expect(page.getByText('60 min — $120.00')).toBeVisible();
   await expect(page.getByText('90 min — $160.00')).toBeVisible();
-  await page.getByRole('link',{name:'Esther'}).hover();
-  await expect(page.getByText('Experienced practitioner.')).toBeVisible();
+  // Category scrolling can move the card away from the pointer during the tooltip delay.
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await page.getByRole('link',{name:'Esther'}).hover();
+    await expect(page.getByText('Experienced practitioner.')).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 10000 });
   await page.getByRole('link',{name:'Esther'}).click();
   await expect(page).toHaveURL(`${portalHost}/practitioners/esther`);
   await expect(page.getByRole('heading',{name:'Esther'})).toBeVisible();

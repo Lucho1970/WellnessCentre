@@ -642,7 +642,7 @@ test("invitation fragment is removed and acceptance remains pending until manual
   await expect.poll(() => reads).toBeGreaterThan(before);
 });
 
-test("linked client books only for the signed-in client through the customer API", async ({
+for (const quotedFee of [0, 1500]) test(`linked client reviews distance fee ${quotedFee} before confirming`, async ({
   page,
 }) => {
   await fixture(page, true);
@@ -673,6 +673,7 @@ test("linked client books only for the signed-in client through the customer API
       confirmations++;
       const body = route.request().postDataJSON();
       expect(body.client_id).toBeUndefined();
+      expect(body.quoted_mobile_fee_cents).toBe(quotedFee);
       expect(body.service_id).toBe(4);
       expect(body.practitioner_id).toBe(7);
       expect(body.delivery_mode).toBe("mobile");
@@ -702,6 +703,7 @@ test("linked client books only for the signed-in client through the customer API
               offers_clinic: 0,
               travel_buffer_minutes: 20,
               mobile_fee_cents: 1500,
+              mobile_free_radius_km: 20,
               base_price_cents: 12000,
               practitioner_id: 7,
               practitioner_name: "Esther Vanderpoel",
@@ -744,6 +746,7 @@ test("linked client books only for the signed-in client through the customer API
           covered: true,
           radius_km: 25,
           token: "coverage-proof",
+          mobile_fee_cents: quotedFee,
         },
       },
     }),
@@ -781,6 +784,7 @@ test("linked client books only for the signed-in client through the customer API
     .getByRole("button", { name: "Validate address and coverage" })
     .click();
   await expect(page.getByText("Your address is within the practitioner’s On-Site service area.")).toBeVisible();
+  await expect(page.getByText(`Travel fee for this address: $${(quotedFee/100).toFixed(2)} CAD`)).toBeVisible();
   await page.getByRole("button", { name: "Find a time" }).click();
   await page.getByLabel("Appointment date").fill("2099-10-01");
   await page.getByRole("button", { name: "Find times" }).click();

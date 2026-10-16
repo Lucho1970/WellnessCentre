@@ -56,6 +56,8 @@ final class AddressCoverageService
             'destination_hash' => self::destinationHash($destination),
             'origin_hash' => $this->originFingerprint($rule),
             'radius_meters' => $radiusMeters,
+            'distance_quote' => $this->sealDistance($distanceMeters),
+            'fee_policy' => OnsiteFee::fingerprint($rule),
             'iat' => time(),
             'exp' => time() + $this->config->addressValidationTokenTtlSeconds,
         ];
@@ -63,6 +65,7 @@ final class AddressCoverageService
         return [
             ...($actor->userType === 'staff' ? ['distance_km' => round($distanceMeters / 1000, 1)] : []),
             'covered' => true,
+            'mobile_fee_cents' => OnsiteFee::quote($rule, $distanceMeters),
             'destination' => $destination,
             'radius_km' => round($radius, 1),
             'token' => $this->sign($proof),
@@ -80,6 +83,9 @@ final class AddressCoverageService
         $proof = $this->verifyToken($actor, $body, $destination, $token);
         $rule = $this->rule($actor, $body);
         if (($proof['origin_hash'] ?? null) !== $this->originFingerprint($rule) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
+        if (isset($rule['mobile_free_radius_km']) && ($proof['fee_policy'] ?? null) !== OnsiteFee::fingerprint($rule)) throw new ApiException(422, 'coverage_validation_mismatch', 'Travel pricing changed. Validate the address again.');
+        $proof['distance_meters'] = isset($proof['distance_quote']) ? $this->openDistance($proof['distance_quote']) : null;
+        OnsiteFee::quote($rule, $proof['distance_meters']);
         return $proof;
     }
 
@@ -92,7 +98,7 @@ final class AddressCoverageService
         $origin = $this->origin($rule);
         $statement = $this->database->connection()->prepare('SELECT 1 FROM onsite_area_approvals WHERE clinic_id=:clinic AND client_id=:client AND location_id=:location AND practitioner_id=:practitioner AND service_id=:service AND destination_hash=:destination AND origin_hash=:origin AND radius_km=:radius LIMIT 1');
         $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => $this->originFingerprint($rule), 'radius' => (int)$rule['mobile_radius_km']]);
-        return ['approved' => (bool)$statement->fetchColumn()];
+        return ['approved' => (bool)$statement->fetchColumn() && !isset($rule['mobile_free_radius_km'])];
     }
 
     public function approve(AuthContext $actor, array $body, string $correlationId): array
@@ -112,7 +118,7 @@ final class AddressCoverageService
         $statement = $this->database->connection()->prepare('INSERT INTO onsite_area_approvals(clinic_id,client_id,location_id,practitioner_id,service_id,destination_hash,origin_hash,radius_km,approved_by) VALUES(:clinic,:client,:location,:practitioner,:service,:destination,:origin,:radius,:staff) ON DUPLICATE KEY UPDATE approved_by=VALUES(approved_by),approved_at=UTC_TIMESTAMP()');
         $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => $this->originFingerprint($rule), 'radius' => (int)$rule['mobile_radius_km'], 'staff' => $actor->userId]);
         (new AuditLogger($this->database))->write($actor->clinicId, $actor, $correlationId, 'onsite_area.approve', 'client', $clientId, 'success', ['location_id' => (int)$body['location_id'], 'practitioner_id' => (int)$body['practitioner_id'], 'service_id' => (int)$body['service_id']]);
-        return ['approved' => true];
+        return ['approved' => !isset($rule['mobile_free_radius_km'])];
     }
 
     public function revoke(AuthContext $actor, array $body, string $correlationId): array
@@ -156,9 +162,26 @@ final class AddressCoverageService
         return $proof;
     }
 
+    // Keep distance from a private starting location opaque in client-held signed tokens.
+    private function sealDistance(int $meters): string
+    {
+        $nonce = random_bytes(12);
+        $cipher = openssl_encrypt((string)$meters, 'aes-256-gcm', hash('sha256', $this->config->addressValidationSigningKey, true), OPENSSL_RAW_DATA, $nonce, $tag);
+        if ($cipher === false) throw new \RuntimeException('Unable to secure distance quote.');
+        return base64_encode($nonce.$tag.$cipher);
+    }
+
+    private function openDistance(string $quote): int
+    {
+        $bytes = base64_decode($quote, true);
+        $value = is_string($bytes) && strlen($bytes)>28 ? openssl_decrypt(substr($bytes,28), 'aes-256-gcm', hash('sha256', $this->config->addressValidationSigningKey, true), OPENSSL_RAW_DATA, substr($bytes,0,12), substr($bytes,12,16)) : false;
+        if (!is_string($value) || !ctype_digit($value)) throw new ApiException(422, 'invalid_coverage_validation', 'Validate the address again.');
+        return (int)$value;
+    }
+
     private function rule(AuthContext $actor, array $body): array
     {
-        $sql = "SELECT p.id practitioner_id,ps.mobile_radius_km,l.address_line1,l.address_line2,l.city,l.province,l.postal_code,p.user_id,p.booking_mode
+        $sql = "SELECT p.id practitioner_id,ps.mobile_radius_km,ps.mobile_free_radius_km,ps.mobile_fee_cents,l.address_line1,l.address_line2,l.city,l.province,l.postal_code,p.user_id,p.booking_mode
                   FROM practitioner_services ps
                   JOIN services s ON s.id=ps.service_id AND s.clinic_id=:clinic AND s.active=1
                   JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=:location AND sl.active=1

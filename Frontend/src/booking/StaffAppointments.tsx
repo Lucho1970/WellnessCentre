@@ -17,16 +17,17 @@ import { pagePath } from '../portal/access';
 import { PractitionerVisitHistory } from './PractitionerVisitHistory';
 import { PractitionerVisitOutcome } from './PractitionerVisitOutcome';
 import { AppointmentLogisticsNotes } from './AppointmentLogisticsNotes';
+import { OnsiteFeeWaiver } from './OnsiteFeeWaiver';
 import { SessionReceipt } from '../receipts/SessionReceipts';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Client = { id: number; display_name: string; email: string; phone: string | null };
-type Combination = { recurrence_allowed?: number; location_id: number; location_name: string; timezone: string; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
+type Combination = { recurrence_allowed?: number; location_id: number; location_name: string; timezone: string; mobile_free_radius_km?: number | null; service_id: number; service_name: string; requires_room: number; offers_mobile: number; offers_clinic: number; travel_buffer_minutes: number; mobile_fee_cents: number; mobile_radius_km: number | null; base_price_cents: number; practitioner_id: number; practitioner_name: string; duration_option_id: number; duration_minutes: number };
 type Room = { id: number; name: string; location_id: number };
 type Slot = { duration_option_id: number; starts_at: string; ends_at: string; available_room_ids: number[] };
 type CancellationPreview = { window_minutes: number; deadline: string; inside_fee_window: boolean; fee_cents: number; appointment_total_cents: number; currency: string };
 type Destination = AddressValue & { instructions: string };
-type CoverageValidation = { destination: Destination; distance_km: number; radius_km: number; token: string; expires_at: string };
+type CoverageValidation = { mobile_fee_cents?: number; destination: Destination; distance_km: number; radius_km: number; token: string; expires_at: string };
 const emptyDestination = (): Destination => ({address_line1:'',address_line2:'',city:'',province:'Ontario',postal_code:'',country:'Canada',instructions:''});
 function addressText(value: string | Destination | null, unavailable: string) { if(!value)return ''; try { const address=typeof value==='string'?JSON.parse(value):value; return [address.address_line1,address.address_line2,address.city,address.province,address.postal_code,address.country,address.instructions].filter(Boolean).join(', '); } catch { return unavailable; } }
 function emailHref(value?: string | null) {
@@ -38,7 +39,7 @@ function phoneHrefs(value?: string | null) {
   return /^\+?\d{7,15}$/.test(phone) ? { call: `tel:${phone}`, text: `sms:${phone}` } : null;
 }
 type Appointment = { recurring_series_id?: number | null; action_links_enabled?: boolean; delivery_mode: 'clinic'|'mobile'; destination_snapshot: string | Destination | null; travel_buffer_minutes: number; base_price_cents: number | null; mobile_fee_cents: number; id: number; client_name: string; client_email?: string; client_phone?: string | null; client_preferred_contact?: string | null; service_name: string; practitioner_name: string; location_name: string; timezone: string; room_id: number | null; room_name: string | null; duration_option_id: number; starts_at: string; ends_at: string; status: string; version: number };
-type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
+type Payload = { delivery_mode: 'clinic'|'mobile'; destination?: Destination; address_validation_token?: string; quoted_base_price_cents: number; quoted_mobile_fee_cents: number; client_id: number; location_id: number; mobile_free_radius_km?: number | null; service_id: number; practitioner_id: number; duration_option_id: number; starts_at: string; room_id?: number; idempotency_key: string };
 class RequestError extends Error { constructor(message: string, readonly status: number, readonly code: string, readonly fields: Record<string, unknown> = {}) { super(message); } }
 function displayTime(value: string, zone: string, language?: string, database = false) {
   return formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, language, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
@@ -75,17 +76,19 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
   const [detailsRecord, setDetailsRecord] = useState<Appointment | null>(null);
   const [detailsBusy, setDetailsBusy] = useState(false);
   const [detailsError, setDetailsError] = useState('');
+  const [feeBusy, setFeeBusy] = useState(false);
+  const [receiptRefresh, setReceiptRefresh] = useState(0);
   const [receiptState, setReceiptState] = useState({ busy: false, dirty: false });
   const updateReceiptState = useCallback((next: { busy: boolean; dirty: boolean }) => setReceiptState(current => current.busy === next.busy && current.dirty === next.dirty ? current : next), []);
-  const closeReceiptPanel = () => { if (!receiptState.busy && (!receiptState.dirty || window.confirm(t('Discard your unsaved changes?')))) setDetailsOpen(false); };
+  const closeReceiptPanel = () => { if (!feeBusy && !receiptState.busy && (!receiptState.dirty || window.confirm(t('Discard your unsaved changes?')))) setDetailsOpen(false); };
   const [managing, setManaging] = useState<{ appointment: Appointment; action: 'reschedule' | 'cancel' } | null>(null);
   const [seriesManaging, setSeriesManaging] = useState<number | null>(null);
   const [reassigning, setReassigning] = useState<Appointment | null>(null);
   const selected = selectedId === linkedId && focusedAppointment?.id === selectedId ? focusedAppointment : appointments.find(item => item.id === selectedId) ?? null;
   const clientEmailHref = emailHref(detailsRecord?.client_email);
   const clientPhoneHrefs = phoneHrefs(detailsRecord?.client_phone);
-  const canChangeSelected = Boolean(!creating && canBook && selected && ['requested','confirmed','rescheduled'].includes(selected.status) && new Date(`${selected.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now());
-  const canReassignSelected = Boolean(!practitionerMode && canManageFees && selected?.delivery_mode === 'clinic' && selected.base_price_cents !== null && ['requested','confirmed','rescheduled'].includes(selected.status) && new Date(`${selected.starts_at.replace(' ', 'T')}Z`).getTime() > Date.now());
+  const canChangeSelected = Boolean(!feeBusy && !receiptState.busy && !creating && canBook && selected && ['requested','confirmed','rescheduled'].includes(selected.status) && new Date(`${selected.ends_at.replace(' ', 'T')}Z`).getTime() > Date.now());
+  const canReassignSelected = Boolean(!feeBusy && !receiptState.busy && !practitionerMode && canManageFees && selected?.delivery_mode === 'clinic' && selected.base_price_cents !== null && ['requested','confirmed','rescheduled'].includes(selected.status) && new Date(`${selected.starts_at.replace(' ', 'T')}Z`).getTime() > Date.now());
   useEffect(() => { if (detailsOpen && !selected) setDetailsOpen(false); }, [detailsOpen, selected]);
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
@@ -162,7 +165,7 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
       </Stack>}
     </Paper>
     <Drawer anchor="right" open={detailsOpen && Boolean(selected)} onClose={closeReceiptPanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
-      {selected && <><Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t('Appointment details')}</Typography><Typography variant="h5">{selected.client_name} · {selected.service_name}</Typography></Box><IconButton aria-label={t('Close panel')} disabled={receiptState.busy} onClick={closeReceiptPanel}><X/></IconButton></Stack><Stack spacing={2} sx={{ p: 3, overflowY: 'auto' }}>
+      {selected && <><Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t('Appointment details')}</Typography><Typography variant="h5">{selected.client_name} · {selected.service_name}</Typography></Box><IconButton aria-label={t('Close panel')} disabled={feeBusy || receiptState.busy} onClick={closeReceiptPanel}><X/></IconButton></Stack><Stack spacing={2} sx={{ p: 3, overflowY: 'auto' }}>
         {[[t('Status'), t(selected.status.replaceAll('_', ' '))], [t('Starts'), displayTime(selected.starts_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Ends'), displayTime(selected.ends_at, selected.timezone, i18n.resolvedLanguage, true)], [t('Practitioner'), selected.practitioner_name], [t('Location'), selected.location_name], [t('Room'), selected.room_name || t('Not set')], [t('Visit type'), t(selected.delivery_mode === 'mobile' ? 'On-Site (client location)' : 'In clinic')], [t('Appointment ID'), String(selected.id)]].map(([label, value]) => <Box key={label}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}
         <Divider />
         <Typography variant="h6">{t('Client contact')}</Typography>
@@ -178,7 +181,8 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
         {detailsRecord && <AppointmentLogisticsNotes key={selected.id} appointmentId={selected.id} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && <PractitionerVisitHistory appointmentId={selected.id} serviceName={selected.service_name} timezone={selected.timezone} enabled={detailsOpen} request={request} />}
         {practitionerMode && detailsRecord && <PractitionerVisitOutcome appointment={detailsRecord} request={request} onChanged={message => { setNotice(message); setDetailsOpen(false); setRefresh(value => value + 1); }} />}
-        {(practitionerMode || canManageFees) && detailsRecord && <SessionReceipt key={selected.id} appointmentId={selected.id} request={request} onStateChange={updateReceiptState} onStatusChange={(status, version) => { const update = (row: Appointment | null) => row?.id === selected.id ? { ...row, status, version } : row; setDetailsRecord(update); setFocusedAppointment(update); setAppointments(rows => rows.map(row => update(row)!)); }} />}
+        {(practitionerMode || canManageFees) && detailsRecord?.delivery_mode === 'mobile' && !receiptState.busy && !receiptState.dirty && <OnsiteFeeWaiver key={`${selected.id}-${detailsRecord.version}`} appointmentId={selected.id} request={request} onBusyChange={setFeeBusy} changed={version => { const update = (row: Appointment | null) => row?.id === selected.id ? { ...row, mobile_fee_cents: 0, version } : row; setDetailsRecord(update); setFocusedAppointment(update); setAppointments(rows => rows.map(row => update(row)!)); setReceiptRefresh(value => value + 1); }} />}
+        {!feeBusy && (practitionerMode || canManageFees) && detailsRecord && <SessionReceipt key={`${selected.id}-${receiptRefresh}`} appointmentId={selected.id} request={request} onStateChange={updateReceiptState} onStatusChange={(status, version) => { const update = (row: Appointment | null) => row?.id === selected.id ? { ...row, status, version } : row; setDetailsRecord(update); setFocusedAppointment(update); setAppointments(rows => rows.map(row => update(row)!)); }} />}
         {!practitionerMode && canManageFees && detailsRecord?.action_links_enabled && <AppointmentLinkRevocation key={detailsRecord.id} appointmentId={detailsRecord.id} request={request}/>}
         {canBook && <Stack direction="row" gap={1}><Button disabled={!canChangeSelected} onClick={() => startChange('reschedule')}>{t('Reschedule')}</Button><Button color="error" disabled={!canChangeSelected} onClick={() => startChange('cancel')}>{t('Cancel appointment')}</Button>{!practitionerMode && canManageFees && <Button disabled={!canReassignSelected} onClick={() => { setDetailsOpen(false); setReassigning(selected); }}>{t('Change practitioner')}</Button>}</Stack>}
       </Stack></>}
@@ -369,7 +373,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   const selected = eligibleOptions.find(row => String(row.location_id) === location && String(row.service_id) === service && String(row.practitioner_id) === practitioner && String(row.duration_option_id) === duration);
   const timezone = options.find(row => String(row.location_id) === location)?.timezone ?? 'America/Toronto';
   const needsRoom=mode==='clinic'&&Boolean(Number(selected?.requires_room));
-  const mobileFee=mode==='mobile'?Number(selected?.mobile_fee_cents??0):0;
+  const mobileFee=mode==='mobile'?Number(coverage?.mobile_fee_cents??selected?.mobile_fee_cents??0):0;
   const locationRows = eligibleOptions.filter(row => String(row.location_id) === location);
   const serviceRows = locationRows.filter(row => !practitioner || String(row.practitioner_id) === practitioner);
   const practitionerRows = locationRows.filter(row => !service || String(row.service_id) === service);
@@ -436,7 +440,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
     approvalLookup.current = controller;
     setApprovalLoading(true);
     void request('/address-coverage/approval', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }), signal:controller.signal })
-      .then(result => { if (!controller.signal.aborted) setAreaApproved(Boolean(result.approved)); }).catch(() => {})
+      .then(result => { if (!controller.signal.aborted) setAreaApproved(Boolean(result.approved) && selected?.mobile_free_radius_km == null); }).catch(() => {})
       .finally(() => { if (!controller.signal.aborted) setApprovalLoading(false); });
     return () => controller.abort();
   }, [request,client?.id,mode,location,service,practitioner,destination.address_line1,destination.address_line2,destination.city,destination.province,destination.postal_code,destination.country,addressComplete,options]);
@@ -574,7 +578,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
           {clientAddressState==='custom'&&<Alert severity="info">{t('Visit address changes apply only to this appointment and do not update the client profile.')}</Alert>}
           {clientAddressState==='missing'&&<Alert severity="info">{t('This client has no saved service address. Find an address with Google or enter it manually.')}</Alert>}
           {clientAddressState==='error'&&<Alert severity="warning">{t('The saved client address could not be loaded. Find an address with Google or enter it manually.')}</Alert>}
-          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates the visit address and calculates driving distance from the practitioner’s starting location, or the clinic base when no private work location is configured.')}</Alert>{approvalLoading&&<Alert severity="info">{t('Checking for a saved service-area approval…')}</Alert>}{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. No new distance check is needed.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||approvalLoading||areaApproved||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}{coverage&&client&&canApproveOnsiteArea&&!areaApproved&&<Button variant="outlined" disabled={approvalBusy} onClick={()=>void approveCoverage()}>{t(approvalBusy?'Saving approval…':'Approve this address for future On-Site bookings')}</Button>}{areaApproved&&canApproveOnsiteArea&&<Button variant="text" color="warning" disabled={approvalBusy} onClick={()=>void revokeCoverage()}>{t(approvalBusy?'Removing approval…':'Remove On-Site approval')}</Button>}</Stack>}
+          <AddressEntry required showInstructions disabled={coverageBusy||clientAddressState==='loading'} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setClientAddressState('custom');setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates the visit address and calculates driving distance from the practitioner’s starting location, or the clinic base when no private work location is configured.')}</Alert>{approvalLoading&&<Alert severity="info">{t('Checking for a saved service-area approval…')}</Alert>}{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. No new distance check is needed.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy||approvalLoading||areaApproved||clientAddressState==='loading'} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="info">{t('Travel fee for this address: {{fee}} CAD', { fee: money(mobileFee) })}</Alert>}{coverage&&<Alert severity="success">{t('Address confirmed: {{distance}} km driving distance ({{radius}} km limit).',{distance:coverage.distance_km,radius:coverage.radius_km})}</Alert>}{coverage&&client&&canApproveOnsiteArea&&selected?.mobile_free_radius_km==null&&!areaApproved&&<Button variant="outlined" disabled={approvalBusy} onClick={()=>void approveCoverage()}>{t(approvalBusy?'Saving approval…':'Approve this address for future On-Site bookings')}</Button>}{areaApproved&&canApproveOnsiteArea&&<Button variant="text" color="warning" disabled={approvalBusy} onClick={()=>void revokeCoverage()}>{t(approvalBusy?'Removing approval…':'Remove On-Site approval')}</Button>}</Stack>}
         {mode==='mobile' && coverage && client && canApproveOnsiteArea && !areaApproved && <Typography variant="body2" color="text.secondary">{t('A distance check alone is not saved for future bookings. Approve this address once to reuse it.')}</Typography>}
         <Button variant="contained" disabled={!client || !selected || !addressReady || approvalLoading} onClick={() => { setDate(date || today(timezone)); setStep(1); }}>{t('Find a time')}</Button>
       </Stack>}

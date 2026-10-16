@@ -19,6 +19,7 @@ $offset=strpos($schema,'CREATE TABLE recurring_booking_requests');if($offset===f
 $schema=substr($schema,0,$offset);$schema=str_replace('CREATE TABLE recurring_series (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,clinic_id BIGINT UNSIGNED NULL,timezone VARCHAR(64) NULL,','CREATE TABLE recurring_series (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,',$schema);
 $schema=preg_replace_callback('/CREATE TABLE recurring_series .*?ENGINE=InnoDB;/s',static fn($match)=>str_replace('FOREIGN KEY(clinic_id) REFERENCES clinics(id),','',$match[0]),$schema);
 $pdo->exec($schema);
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/044_onsite_distance_fees.sql'));
 $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Synthetic A'),(2,'Synthetic B');
  INSERT INTO locations(id,clinic_id,name,timezone) VALUES(1,1,'Main','America/Toronto');
  INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(1,1,'admin@example.test','Admin','staff','active'),(2,1,'practitioner@example.test','Practitioner','staff','active'),(8,1,'client@example.test','Client','client','active'),(9,1,'other@example.test','Other','client','active'),(10,2,'other-clinic@example.test','Other clinic','client','active');

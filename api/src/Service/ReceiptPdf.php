@@ -22,7 +22,7 @@ final class ReceiptPdf
             $value=$receipt[$key];if(str_ends_with($key,'_cents'))$value=$money((int)$value);
             $html.='<tr><td>'.$e($labels[12+$i]).'</td><td>'.$e($value).'</td></tr>';
         }
-        $html.='</table><p class="note">'.$e($fr?'Paiement enregistré manuellement. Le remboursement dépend de votre couverture et de la décision de votre assureur.':'Payment recorded manually. Reimbursement depends on your coverage and your insurer’s decision.').'</p></body></html>';
+        $html.='</table>'.(!empty($receipt['travel_fee_waived'])?'<p>'.$e($fr?'Frais de déplacement annulés pour cette séance.':'Travel fee waived for this session.').'</p>':'').'<p class="note">'.$e($fr?'Paiement enregistré manuellement. Le remboursement dépend de votre couverture et de la décision de votre assureur.':'Payment recorded manually. Reimbursement depends on your coverage and your insurer’s decision.').'</p></body></html>';
         $options=new Options(['defaultFont'=>'DejaVu Sans','isRemoteEnabled'=>false,'isPhpEnabled'=>false,'isJavascriptEnabled'=>false]);
         $pdf=new Dompdf($options);$pdf->setPaper('letter');$pdf->loadHtml($html,'UTF-8');$pdf->render();
         return $pdf->output();

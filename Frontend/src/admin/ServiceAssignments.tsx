@@ -12,7 +12,7 @@ import { formatCad } from '../i18n/format';
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Named = { id: number; name: string };
 type Practitioner = { practitioner_id: number; display_name: string };
-type Link = { practitioner_id: number; service_id: number; active: number; offers_mobile: number; offers_clinic: number; mobile_radius_km: number | null; travel_buffer_minutes: number; mobile_fee_cents: number };
+type Link = { practitioner_id: number; service_id: number; active: number; offers_mobile: number; offers_clinic: number; mobile_radius_km: number | null; mobile_free_radius_km: number | null; travel_buffer_minutes: number; mobile_fee_cents: number };
 type LocationLink = { service_id: number; location_id: number; active: number };
 
 const named = (item: Named): Named => ({ ...item, id: Number(item.id) });
@@ -25,6 +25,7 @@ const assignment = (item: Link): Link => ({
   offers_mobile: Number(item.offers_mobile),
   offers_clinic: Number(item.offers_clinic),
   mobile_radius_km: item.mobile_radius_km === null ? null : Number(item.mobile_radius_km),
+  mobile_free_radius_km: item.mobile_free_radius_km == null ? null : Number(item.mobile_free_radius_km),
   travel_buffer_minutes: Number(item.travel_buffer_minutes),
   mobile_fee_cents: Number(item.mobile_fee_cents),
 });
@@ -103,7 +104,7 @@ function ServiceAssignmentsForm({ initialServiceId, lockService = false, onDirty
   }, [service, links, locationLinks]);
 
   const togglePerson = (id: number, selected: boolean) => setSelectedPeople((current) => selected
-    ? [...current, { practitioner_id: id, service_id: Number(service), active: 1, offers_mobile: 1, offers_clinic: 0, mobile_radius_km: null, travel_buffer_minutes: 0, mobile_fee_cents: 0 }]
+    ? [...current, { practitioner_id: id, service_id: Number(service), active: 1, offers_mobile: 1, offers_clinic: 0, mobile_radius_km: null, mobile_free_radius_km: 0, travel_buffer_minutes: 0, mobile_fee_cents: 0 }]
     : current.filter((item) => item.practitioner_id !== id));
 
   const update = (id: number, key: keyof Link, value: number | null) => setSelectedPeople((current) => current.map((item) => item.practitioner_id === id ? { ...item, [key]: value } : item));
@@ -152,7 +153,7 @@ function ServiceAssignmentsForm({ initialServiceId, lockService = false, onDirty
         <Typography fontWeight={700} mt={2}>{t('Practitioners')}</Typography>
         <Stack spacing={1}>{people.map((person) => {
           const link = selectedPeople.find((item) => item.practitioner_id === person.practitioner_id);
-          return <Paper variant="outlined" key={person.practitioner_id} sx={{ p: 1.5 }}><FormControlLabel control={<Checkbox checked={Boolean(link)} onChange={(event) => togglePerson(person.practitioner_id, event.target.checked)} />} label={person.display_name}/>{link && <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} ml={4}><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_clinic))} onChange={(event) => update(person.practitioner_id, 'offers_clinic', event.target.checked ? 1 : 0)} />} label={t('Clinic visits')}/><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_mobile))} onChange={(event) => update(person.practitioner_id, 'offers_mobile', event.target.checked ? 1 : 0)} />} label={t('On-Site visits')}/>{Boolean(Number(link.offers_mobile)) && <><TextField name="mobile_radius_km" required size="small" type="number" label={t('Driving coverage radius (km)')} value={link.mobile_radius_km ?? ''} inputProps={{ min: 1, max: 500, step: 1 }} onChange={(event) => update(person.practitioner_id, 'mobile_radius_km', event.target.value === '' ? null : Number(event.target.value))}/><TextField name="travel_buffer_minutes" size="small" type="number" label={t('Travel minutes each way')} value={link.travel_buffer_minutes} inputProps={{ step: 15 }} onChange={(event) => update(person.practitioner_id, 'travel_buffer_minutes', Number(event.target.value))}/><TextField size="small" type="number" label={t('On-Site fee CAD')} value={link.mobile_fee_cents / 100} onChange={(event) => update(person.practitioner_id, 'mobile_fee_cents', Math.round(Number(event.target.value) * 100))}/></>}</Stack>}</Paper>;
+          return <Paper variant="outlined" key={person.practitioner_id} sx={{ p: 1.5 }}><FormControlLabel control={<Checkbox checked={Boolean(link)} onChange={(event) => togglePerson(person.practitioner_id, event.target.checked)} />} label={person.display_name}/>{link && <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} ml={4} useFlexGap flexWrap="wrap" sx={{ '& .MuiTextField-root': { minWidth: 160, flex: '1 1 180px' } }}><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_clinic))} onChange={(event) => update(person.practitioner_id, 'offers_clinic', event.target.checked ? 1 : 0)} />} label={t('Clinic visits')}/><FormControlLabel control={<Checkbox checked={Boolean(Number(link.offers_mobile))} onChange={(event) => update(person.practitioner_id, 'offers_mobile', event.target.checked ? 1 : 0)} />} label={t('On-Site visits')}/>{Boolean(Number(link.offers_mobile)) && <><TextField name="mobile_radius_km" required size="small" type="number" label={t('Maximum driving distance (km)')} value={link.mobile_radius_km ?? ''} inputProps={{ min: 1, max: 500, step: 1 }} onChange={(event) => update(person.practitioner_id, 'mobile_radius_km', event.target.value === '' ? null : Number(event.target.value))}/><TextField name="mobile_free_radius_km" size="small" type="number" label={t('Free travel distance (km)')} helperText={t('Blank keeps the existing flat fee at all distances.')} value={link.mobile_free_radius_km ?? ''} inputProps={{ min: 0, max: link.mobile_radius_km ?? 500, step: 1 }} onChange={event => update(person.practitioner_id, 'mobile_free_radius_km', event.target.value === '' ? null : Number(event.target.value))}/><TextField name="travel_buffer_minutes" size="small" type="number" label={t('Travel minutes each way')} value={link.travel_buffer_minutes} inputProps={{ step: 15 }} onChange={(event) => update(person.practitioner_id, 'travel_buffer_minutes', Number(event.target.value))}/><TextField size="small" type="number" label={t('Flat extra travel fee CAD')} value={link.mobile_fee_cents / 100} onChange={(event) => update(person.practitioner_id, 'mobile_fee_cents', Math.round(Number(event.target.value) * 100))}/></>}</Stack>}</Paper>;
         })}</Stack>
       </>}
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
@@ -173,7 +174,7 @@ function AssignmentSummary({ locations, people, locationIds, links, money }: { l
     <Box><Typography fontWeight={700} mb={1}>{t('Practitioners')}</Typography><Stack spacing={1}>{links.map(link => {
       const name = people.find(person => person.practitioner_id === link.practitioner_id)?.display_name ?? t('Unknown practitioner');
       const modes = [Boolean(Number(link.offers_clinic)) ? t('Clinic visits') : '', Boolean(Number(link.offers_mobile)) ? t('On-Site visits') : ''].filter(Boolean);
-      return <Paper key={link.practitioner_id} variant="outlined" sx={{ p: 2 }}><Typography fontWeight={700}>{name}</Typography><Stack direction="row" flexWrap="wrap" gap={1} my={1}>{modes.map(mode => <Chip key={mode} size="small" color="primary" variant="outlined" label={mode}/>)}</Stack>{Boolean(Number(link.offers_mobile)) && <Typography variant="body2" color="text.secondary">{t('{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee', { radius: link.mobile_radius_km ?? t('Not set'), minutes: link.travel_buffer_minutes, fee: money(Number(link.mobile_fee_cents)) })}</Typography>}</Paper>;
+      return <Paper key={link.practitioner_id} variant="outlined" sx={{ p: 2 }}><Typography fontWeight={700}>{name}</Typography><Stack direction="row" flexWrap="wrap" gap={1} my={1}>{modes.map(mode => <Chip key={mode} size="small" color="primary" variant="outlined" label={mode}/>)}</Stack>{link.mobile_free_radius_km != null && <Typography>{t('Free travel up to {{distance}} km.', { distance: link.mobile_free_radius_km })}</Typography>}{Boolean(Number(link.offers_mobile)) && <Typography variant="body2" color="text.secondary">{t('{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee', { radius: link.mobile_radius_km ?? t('Not set'), minutes: link.travel_buffer_minutes, fee: money(Number(link.mobile_fee_cents)) })}</Typography>}</Paper>;
     })}{!links.length && <Typography color="text.secondary">{t('No practitioners assigned.')}</Typography>}</Stack></Box>
   </Stack>;
 }

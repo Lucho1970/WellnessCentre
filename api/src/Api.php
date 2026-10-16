@@ -87,6 +87,8 @@ final class Api
             }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\d+}/travel-fee','travelFeeContext');
+                $routes->addRoute('POST','/api/v1/appointments/{id:\d+}/travel-fee/waive','waiveTravelFee');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\d+}/receipt','sessionReceiptContext');
                 $routes->addRoute('PUT','/api/v1/receipts/template','saveReceiptTemplate');
                 $routes->addRoute('PUT','/api/v1/appointments/{id:\d+}/receipt-profile','saveReceiptProfile');
@@ -271,6 +273,8 @@ final class Api
                 $this->clinicContext->assertActive($this->database);
             }
             $data=match($route[1]){
+                'travelFeeContext'=>(new \Wellness\Service\OnsiteFeeService($this->database))->context($this->user($request),(int)$route[2]['id']),
+                'waiveTravelFee'=>(new \Wellness\Service\OnsiteFeeService($this->database))->waive($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'sessionReceiptContext'=>$this->receipts()->context($this->user($request),(int)$route[2]['id']),
                 'saveReceiptTemplate'=>$this->receipts()->saveTemplate($this->user($request),$request->body,$request->correlationId),
                 'saveReceiptProfile'=>$this->receipts()->saveProfile($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),

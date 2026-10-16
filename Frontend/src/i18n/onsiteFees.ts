@@ -1,0 +1,31 @@
+const en = {
+  'Maximum driving distance (km)': 'Maximum driving distance (km)',
+  'Free travel distance (km)': 'Free travel distance (km)',
+  'Blank keeps the existing flat fee at all distances.': 'Blank keeps the existing flat fee at all distances.',
+  'Flat extra travel fee CAD': 'Flat extra travel fee CAD',
+  'Free travel up to {{distance}} km.': 'Free travel up to {{distance}} km.',
+  'Travel fee for this address: {{fee}} CAD': 'Travel fee for this address: {{fee}} CAD',
+  'Session travel fee': 'Session travel fee',
+  'Travel fee for this session: {{fee}} CAD': 'Travel fee for this session: {{fee}} CAD',
+  'Travel fee waived for this session.': 'Travel fee waived for this session.',
+  'Reason for waiving travel fee': 'Reason for waiving travel fee',
+  'Waive travel fee for this session': 'Waive travel fee for this session',
+  'This removes only this session’s travel fee before payment. Other sessions keep their saved fees.': 'This removes only this session’s travel fee before payment. Other sessions keep their saved fees.',
+  'Unable to waive travel fee.': 'Unable to waive travel fee.',
+};
+const fr: Record<keyof typeof en, string> = {
+  'Maximum driving distance (km)': 'Distance routière maximale (km)',
+  'Free travel distance (km)': 'Distance de déplacement gratuite (km)',
+  'Blank keeps the existing flat fee at all distances.': 'Laisser vide conserve les frais fixes actuels à toutes les distances.',
+  'Flat extra travel fee CAD': 'Supplément fixe de déplacement CAD',
+  'Free travel up to {{distance}} km.': 'Déplacement gratuit jusqu’à {{distance}} km.',
+  'Travel fee for this address: {{fee}} CAD': 'Frais de déplacement à cette adresse : {{fee}} CAD',
+  'Session travel fee': 'Frais de déplacement de la séance',
+  'Travel fee for this session: {{fee}} CAD': 'Frais de déplacement de cette séance : {{fee}} CAD',
+  'Travel fee waived for this session.': 'Frais de déplacement annulés pour cette séance.',
+  'Reason for waiving travel fee': 'Motif de l’annulation des frais de déplacement',
+  'Waive travel fee for this session': 'Annuler les frais de déplacement pour cette séance',
+  'This removes only this session’s travel fee before payment. Other sessions keep their saved fees.': 'Cette action retire uniquement les frais de déplacement de cette séance avant paiement. Les autres séances conservent leurs frais enregistrés.',
+  'Unable to waive travel fee.': 'Impossible d’annuler les frais de déplacement.',
+};
+export default { en, fr };

@@ -19,6 +19,7 @@ $schema = file_get_contents(dirname(__DIR__, 2) . '/database/schema.sql');
 $schema = substr($schema, 0, strpos($schema, '-- Private practitioner addresses;'));
 $pdo->exec(preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m', '', $schema));
 $pdo->exec(file_get_contents(dirname(__DIR__, 2) . '/database/migrations/038_practitioner_private_locations.sql'));
+$pdo->exec(file_get_contents(dirname(__DIR__, 2) . '/database/migrations/044_onsite_distance_fees.sql'));
 $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Test A'),(2,'Test B');
  INSERT INTO locations(id,clinic_id,name,address_line1,city,province,postal_code) VALUES(1,1,'Public clinic','1 Public Street','Toronto','Ontario','M1M 1M1');
  INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(1,1,'p@example.test','P','staff','active'),(2,1,'client@example.test','C','client','active'),(3,2,'other@example.test','Other','staff','active');
