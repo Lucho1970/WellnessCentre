@@ -9,7 +9,7 @@ function wellnexaCatalogueProjection(string $resource, array $rows): array
     }
     $fields = $resource === 'services'
         ? ['slug', 'name', 'name_fr', 'public_summary', 'public_summary_fr', 'category', 'category_fr', 'durations']
-        : ['slug', 'public_name', 'public_title', 'public_title_fr', 'summary', 'summary_fr', 'discipline', 'credentials', 'booking_practitioner_id', 'services'];
+        : ['slug', 'public_name', 'public_title', 'public_title_fr', 'summary', 'summary_fr', 'discipline', 'credentials', 'booking_practitioner_id', 'services', 'has_image', 'image_version'];
     $result = [];
     foreach ($rows as $row) {
         if (!is_array($row) || !is_string($row['slug'] ?? null) || !preg_match('/^[a-z0-9][a-z0-9-]{0,119}$/D', $row['slug'])) {
@@ -17,7 +17,7 @@ function wellnexaCatalogueProjection(string $resource, array $rows): array
         }
         $item = array_intersect_key($row, array_flip($fields));
         foreach ($item as $key => $value) {
-            if (!in_array($key, ['durations', 'services', 'booking_practitioner_id'], true) && $value !== null && !is_string($value)) {
+            if (!in_array($key, ['durations', 'services', 'booking_practitioner_id', 'has_image'], true) && $value !== null && !is_string($value)) {
                 throw new RuntimeException('Invalid public text field.');
             }
         }
@@ -33,6 +33,9 @@ function wellnexaCatalogueProjection(string $resource, array $rows): array
                 return ['minutes' => $minutes, 'price_cents' => $price];
             }, $item['durations']);
         } else {
+            $hasImage = $item['has_image'] ?? false;
+            if (!in_array($hasImage, [true, false, 0, 1, '0', '1'], true)) throw new RuntimeException('Invalid public photo flag.');
+            $item['has_image'] = (bool)$hasImage;
             $id = $item['booking_practitioner_id'] ?? null;
             if ($id !== null) {
                 $id = filter_var($id, FILTER_VALIDATE_INT);

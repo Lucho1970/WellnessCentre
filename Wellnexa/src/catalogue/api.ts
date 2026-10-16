@@ -5,6 +5,7 @@ export type PublicService = {
 export type PublicPractitioner = {
   slug: string; public_name: string; public_title: string | null; summary: string | null;
   discipline: string | null; credentials: string | null; booking_practitioner_id: number | null;
+  has_image: boolean; image_version: string | null;
   services: { slug: string; name: string }[];
 }
 type Row = Record<string, unknown>
@@ -48,7 +49,9 @@ export async function fetchCatalogue(resource: 'services' | 'practitioners', sig
       return { slug: slug(item.slug), name: text(item.name, true)!, public_summary: text(item.public_summary), category: text(item.category), durations: item.durations.map(value => { const duration = row(value); return { minutes: number(duration.minutes, 1), price_cents: number(duration.price_cents, 0) } }) }
     }
     if (!Array.isArray(item.services)) throw new Error('Invalid practitioner services')
-    return { slug: slug(item.slug), public_name: text(item.public_name, true)!, public_title: text(item.public_title), summary: text(item.summary), discipline: text(item.discipline), credentials: text(item.credentials), booking_practitioner_id: item.booking_practitioner_id == null ? null : number(item.booking_practitioner_id, 1), services: item.services.map(value => { const service = row(value); return { slug: slug(service.slug), name: text(service.name, true)! } }) }
+    const hasImage = item.has_image ?? false
+    if (![true, false, 0, 1, '0', '1'].includes(hasImage as boolean | number | string)) throw new Error('Invalid practitioner photo flag')
+    return { slug: slug(item.slug), public_name: text(item.public_name, true)!, public_title: text(item.public_title), summary: text(item.summary), discipline: text(item.discipline), credentials: text(item.credentials), has_image: hasImage === true || hasImage === 1 || hasImage === '1', image_version: text(item.image_version), booking_practitioner_id: item.booking_practitioner_id == null ? null : number(item.booking_practitioner_id, 1), services: item.services.map(value => { const service = row(value); return { slug: slug(service.slug), name: text(service.name, true)! } }) }
   })
   } finally { clearTimeout(timeout); signal.removeEventListener('abort', abort) }
 }

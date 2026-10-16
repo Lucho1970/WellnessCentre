@@ -54,6 +54,8 @@ Only active/published records selected by the existing portal API are shown. Cha
 
 The bridge and Vite proxy deliberately use a fixed clinic host. Changing `VITE_PORTAL_URL` changes links only; a host cutover must update the reviewed bridge/proxy targets to the same clinic. There is no request-controlled upstream URL or client-selected clinic ID.
 
+Published practitioner cards display the profile photo already uploaded in the portal. The bridge includes only the public `has_image` and `image_version` fields; the browser loads photos from the fixed clinic's public `/api/v1/team/{slug}/image` endpoint. The version refreshes cached photos after an upload. No private photo URLs or account details are exposed. Cards show initials when no photo is published or an image cannot load. Upload the full website build, including `api/catalogue-lib.php`, when deploying this change; no database or portal API update is required.
+
 ```powershell
 php Wellnexa/tests/catalogue.php
 npm --prefix Wellnexa run test:browser

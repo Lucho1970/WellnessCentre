@@ -23,6 +23,8 @@ h1 span { color: var(--violet); }
 .card-summary { color: var(--muted); line-height: 1.7; white-space: pre-wrap; }
 .service-options, .practitioner-services { font-size: .9rem; line-height: 1.7; }
 .card-link { display: inline-block; margin-top: .75rem; font-weight: 600; }
+.practitioner-photo { width: 128px; height: 128px; margin-bottom: 1.25rem; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--mint-glow); color: var(--deep-teal); border: 3px solid var(--turquoise); font-size: 2rem; font-weight: 600; }
+.practitioner-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .catalogue-feedback, .catalogue-empty { padding: 1rem; border: 1px solid var(--border); border-radius: .5rem; line-height: 1.7; }
 .catalogue-feedback button { background: var(--turquoise); color: var(--graphite); padding: .6rem 1rem; border: 0; border-radius: .3rem; font: inherit; cursor: pointer; }
 button:focus-visible { outline: 3px solid var(--focus); outline-offset: 5px; }

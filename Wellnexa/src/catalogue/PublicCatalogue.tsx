@@ -15,6 +15,16 @@ function CatalogueFeedback({ loading, error, empty, label, onRetry }: { loading:
   if (empty) return <p className="catalogue-empty">{label === 'services' ? 'Services' : 'Practitioner profiles'} will appear here as they are published.</p>
   return null
 }
+function PractitionerPhoto({ person }: { person: PublicPractitioner }) {
+  const [failed, setFailed] = useState(false)
+  const initials = person.public_name.trim().split(/\s+/u).slice(0, 2).map(name => Array.from(name)[0]).join('').toLocaleUpperCase('en-CA')
+  // Same fixed public clinic as the catalogue bridge; never accept an image URL from profile data.
+  const image = new URL(`https://wellnexa.copihue.ca/api/v1/team/${encodeURIComponent(person.slug)}/image`)
+  if (person.image_version) image.searchParams.set('v', person.image_version)
+  return <div className="practitioner-photo">{person.has_image && !failed
+    ? <img src={image.href} alt={`${person.public_name} — practitioner portrait`} width={128} height={128} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)}/>
+    : <span aria-hidden="true">{initials}</span>}</div>
+}
 export function PublicCatalogue() {
   const [state, setState] = useState<CatalogueState>(initial)
   const [reload, setReload] = useState(0)
@@ -44,6 +54,7 @@ export function PublicCatalogue() {
       <p className="eyebrow">Get to know the collective</p><h2 id="practitioners-title">Our practitioners</h2>
       <CatalogueFeedback label="practitioners" loading={!state.practitioners && !state.practitionerError} error={state.practitionerError} empty={state.practitioners?.length === 0} onRetry={retry}/>
       <div className="catalogue-grid">{state.practitioners?.map(person => <article className="catalogue-card" key={person.slug}>
+        <PractitionerPhoto key={person.image_version ?? 'no-photo'} person={person}/>
         <h3>{person.public_name}</h3>{(person.public_title || person.discipline) && <p className="card-eyebrow">{person.public_title || person.discipline}</p>}
         {person.credentials && <p>{person.credentials}</p>}{person.summary && <p className="card-summary">{person.summary}</p>}
         {person.services.length > 0 && <ul className="practitioner-services">{person.services.map(service => <li key={service.slug}><a href={portalLink(`services/${encodeURIComponent(service.slug)}/book`, person.booking_practitioner_id ?? undefined)}>{service.name}</a></li>)}</ul>}
