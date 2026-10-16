@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Form library](FORM_LIBRARY_RELEASE.md): approved global/clinic templates, previews, independent drafts and editing controls; migration 045 and deployment.
+
 - [Practitioner travel settings](PRACTITIONER_TRAVEL_SETTINGS_RELEASE.md): edit own clinic-local travel thresholds, fees and buffers; API patch and shared portal deployment.
 
 This folder contains the living technical and delivery documentation for the Wellness Centre scheduling platform.

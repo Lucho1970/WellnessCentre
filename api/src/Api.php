@@ -101,6 +101,11 @@ final class Api
                 $routes->addRoute('GET','/api/v1/forms/drafts/{id:\d+}','formDraftDetail');
                 $routes->addRoute('PATCH','/api/v1/forms/drafts/{id:\d+}','updateFormDraft');
                 $routes->addRoute('POST','/api/v1/forms/source/validate','validateFormSource');
+                $routes->addRoute('GET','/api/v1/forms/library','formLibrary');
+                $routes->addRoute('POST','/api/v1/forms/library','submitLibraryForm');
+                $routes->addRoute('GET','/api/v1/forms/library/{id:\\d+}','libraryFormDetail');
+                $routes->addRoute('POST','/api/v1/forms/library/{id:\\d+}/review','reviewLibraryForm');
+                $routes->addRoute('POST','/api/v1/forms/library/{id:\\d+}/copy','copyLibraryForm');
                 $routes->addRoute('GET','/api/v1/forms/templates','formTemplates');
                 $routes->addRoute('POST','/api/v1/forms/templates','publishForm');
                 $routes->addRoute('POST','/api/v1/forms/templates/{id:\d+}/versions','publishFormVersion');
@@ -369,6 +374,11 @@ final class Api
                 'formDraftDetail'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->detail($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'importFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->import($this->user($request),$request->body,$request->correlationId),
                 'validateFormSource'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->validate($this->user($request),$request->body),
+                'formLibrary'=>(new \Wellness\Service\FormLibraryService($this->database))->list($this->user($request),$request->query),
+                'submitLibraryForm'=>(new \Wellness\Service\FormLibraryService($this->database))->submit($this->user($request),$request->body,$request->correlationId),
+                'libraryFormDetail'=>(new \Wellness\Service\FormLibraryService($this->database))->detail($this->user($request),(int)$route[2]['id']),
+                'reviewLibraryForm'=>(new \Wellness\Service\FormLibraryService($this->database))->review($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'copyLibraryForm'=>(new \Wellness\Service\FormLibraryService($this->database))->copy($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'formTemplates'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->templates($this->user($request),$request->query),
                 'publishForm'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId),
                 'publishFormVersion'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
@@ -505,6 +515,11 @@ final class Api
         $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($request->bearerToken());
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        $library=new \Wellness\Service\FormLibraryService($this->database);
+        if($request->method==='GET'&&$path==='form-library')return $library->list($actor,$request->query);
+        if($request->method==='POST'&&$path==='form-library')return $library->submit($actor,$request->body,$request->correlationId);
+        if($request->method==='GET'&&preg_match('#^form-library/(\d+)$#D',$path,$m))return $library->detail($actor,(int)$m[1]);
+        if($request->method==='POST'&&preg_match('#^form-library/(\d+)/review$#D',$path,$m))return $library->review($actor,(int)$m[1],$request->body,$request->correlationId);
         if ($request->method==='GET' && $path==='me') return ['id'=>$actor->id,'display_name'=>$actor->displayName,'email'=>$actor->email,'roles'=>['application_admin']];
         if ($request->method==='GET' && $path==='clinics') return $service->list($actor);
         if ($request->method==='POST' && $path==='clinics') return $service->create($actor,$request->body,$request->correlationId);

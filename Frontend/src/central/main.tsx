@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { StaffAuthProvider, msalInstance, selectStaffAccount, useStaffAuth } from '../auth/AuthProvider';
 import { UnsavedChangesProvider } from '../shared/UnsavedChanges';
 import { ClinicAdmin } from '../admin/ClinicAdmin';
+import { FormLibrary } from '../forms/FormLibrary';
 import { GlobalPractitionerAdmin } from '../admin/GlobalPractitionerAdmin';
 import { apiRequest } from '../shared/api';
 import '../i18n';
@@ -31,7 +32,7 @@ function Administration() {
       <Button onClick={() => { void auth.signOut().catch(() => setError(t('Unable to sign out. Please try again.'))); }}>{t('SignOut')}</Button>
       {state === 'checking' && <Typography role="status">{t('Checking application access…')}</Typography>}
       {state === 'denied' && <Alert severity="error">{t('Application administration access could not be confirmed. Contact the application owner or try again.')}</Alert>}
-      {state === 'allowed' && <><Tabs value={section} onChange={(_, value: number) => setSection(value)} aria-label={t('Application administration')}><Tab label={t('Clinics')}/><Tab label={t('Global practitioners')}/></Tabs>{section === 0 ? <ClinicAdmin/> : <GlobalPractitionerAdmin/>}</>}
+      {state === 'allowed' && <><Tabs variant="scrollable" scrollButtons="auto" value={section} onChange={(_, value: number) => setSection(value)} aria-label={t('Application administration')}><Tab label={t('Clinics')}/><Tab label={t('Global practitioners')}/><Tab label={t('Form library')}/></Tabs>{section === 0 ? <ClinicAdmin/> : section === 1 ? <GlobalPractitionerAdmin/> : <FormLibrary central/>}</>}
     </>}
   </Stack>;
 }

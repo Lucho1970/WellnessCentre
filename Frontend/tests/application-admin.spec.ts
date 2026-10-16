@@ -1,4 +1,24 @@
 import { test, expect, type Page } from '@playwright/test';
+test('platform form library creates a template and approves its immutable version', async ({ page }) => {
+  await authentication(page);
+  await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));
+  await page.route('**/api/v1/application/clinics', route => route.fulfill({ json: { data: { items: [] } } }));
+  const item = { id: 51, entry_id: 7, name: 'Global starter', description: 'Shared reusable form', scope: 'global', version: 1, revision: 1, form_type: 'intake', status: 'pending', review_note: '', can_review: true, can_revise: true, can_retire: false, can_use: false, definition: { instructions: '', instructions_fr: '', questions: [{ id: 'q1', label: 'Example question', label_fr: '', type: 'text', required: true }] } };
+  let submitted = false, approved = false;
+  await page.route('**/api/v1/application/form-library?**', route => route.fulfill({ json: { data: { items: submitted ? [{ ...item, status: approved ? 'approved' : 'pending', can_review: !approved }] : [], can_review: true, has_more: false, max_questions: 100 } } }));
+  await page.route('**/api/v1/application/form-library', route => { expect(route.request().postDataJSON()).toMatchObject({ scope: 'global', name: item.name, description: item.description }); submitted = true; return route.fulfill({ json: { data: item } }); });
+  await page.route('**/api/v1/application/form-library/51', route => route.fulfill({ json: { data: item } }));
+  await page.route('**/api/v1/application/form-library/51/review', route => { expect(route.request().postDataJSON()).toEqual({ action: 'approve', revision: 1, review_note: '' }); approved = true; return route.fulfill({ json: { data: { ...item, status: 'approved' } } }); });
+  await page.goto('http://localhost:5185/admin/'); await page.getByRole('tab', { name: 'Form library', exact: true }).click();
+  await page.getByRole('button', { name: 'Create library template', exact: true }).click();
+  const editor = page.getByRole('dialog');
+  await editor.getByRole('textbox', { name: 'Form name', exact: true }).fill(item.name); await editor.getByRole('textbox', { name: 'Template description', exact: true }).fill(item.description); await editor.getByRole('textbox', { name: 'Question (English)', exact: true }).fill('Example question');
+  await editor.getByRole('button', { name: 'Submit for approval', exact: true }).click(); await expect(page.getByText('Template submitted for approval.')).toBeVisible();
+  await page.getByRole('combobox', { name: /^Library view/ }).click(); await page.getByRole('option', { name: 'Awaiting approval', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview template', exact: true }).click(); await page.getByRole('button', { name: 'Approve template', exact: true }).click();
+  await expect(page.getByText('Library review saved.')).toBeVisible(); expect(approved).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('global-form-library.png'), fullPage: true });
+});
 
 async function authentication(page: Page, signedIn = true) {
   await page.route('**/src/auth/AuthProvider.tsx', route => route.fulfill({ contentType: 'application/javascript', body: `
