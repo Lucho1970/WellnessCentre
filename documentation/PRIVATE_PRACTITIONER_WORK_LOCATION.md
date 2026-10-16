@@ -14,7 +14,7 @@ Google receives the starting and destination addresses server-side for validatio
 
 1. Back up the database and current application files.
 2. Apply **only migration 038**, `api/database/migrations/038_practitioner_private_locations.sql`, once through phpMyAdmin. Do not rerun the complete schema or older migrations.
-3. Generate a matching new release, then deploy the private API ZIP into the existing private `/wellness-api`, preserving `.env` and `var`, and the portal ZIP into Willow's actual document root. The portal includes the public API entry files. Existing release ZIPs do not contain this feature. No new environment flag is required.
+3. Generate a matching new release, then deploy the private API ZIP into the existing private `/wellness-api`, preserving `.env` and `var`, and the portal ZIP into Livin’ Lively's actual document root. The portal includes the public API entry files. Existing release ZIPs do not contain this feature. No new environment flag is required.
 4. As a practitioner, save home plus Same as home, refresh and confirm it persists. Change home and recheck On-Site coverage. Uncheck it, save another starting address and confirm routing uses that address.
 5. As a client, confirm eligible/out-of-area results omit the private origin and exact distance, including token contents. Confirm an old coverage approval no longer works after the practitioner saves their origin. Check another account cannot access the private settings.
 

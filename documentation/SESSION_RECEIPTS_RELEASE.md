@@ -1,5 +1,7 @@
 # Receipt workflow deployment for Netfirms
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 This release includes the receipt workflow and the previously deployed Wellnexa theme. It updates the shared private API and the Wellnexa clinic portal. The standalone website at **wellnexa.ca** does not need an update.
 
 ## Where the ZIP contents go
@@ -9,9 +11,9 @@ Extract the outer `wellnexa-receipts-package.zip` on your computer. It contains 
 | Upload ZIP | Extract its contents into the existing hosted folder |
 | --- | --- |
 | `wellness-api-private.zip` | `/wellness-api/`, outside `public_html`. This is the same shared private API folder used by the current portals. |
-| `wellnexa-portal.zip` | `/public_html/wellnexa-portal/`, the document root serving `https://wellnexa.copihue.ca/`. If Netfirms displays a different document-root path for this domain, use that existing root. |
+| `wellness-common-portal.zip` | `/public_html/wellness-common-portal/`, shared by both clinic hosts. Extract contents once, including hidden `.htaccess` and `api/`; do not nest another folder. |
 
-Upload the **contents**, without nesting another `wellness-api` or `wellnexa-portal` folder. Include the portal's hidden `.htaccess` and its `api` directory. The private package includes the PDF library and fonts under `vendor`, so Composer is not required on Netfirms. If your current layout differs, retain the existing public API bootstrap's path to the existing private API instead of moving the application.
+Upload the **contents**, without nesting another `wellness-api` or `wellness-common-portal` folder. Include the portal's hidden `.htaccess` and its `api` directory. The private package includes the PDF library and fonts under `vendor`, so Composer is not required on Netfirms. If your current layout differs, retain the existing public API bootstrap's path to the existing private API instead of moving the application.
 
 Preserve `/wellness-api/.env`, existing uploads and other private runtime files. The ZIP contains no `.env`. Keep old hashed portal assets for the initial pilot so cached tabs and rollback remain usable. The shared API update also serves Livin Lively, but its portal files do not need to be replaced to try this workflow in Wellnexa. Do not upload this portal ZIP to the wellnexa.ca marketing website or replace the neutral central-admin site.
 
@@ -36,7 +38,7 @@ Keep SQL files on your computer; they do not belong in a public website director
 ## Upload and enable
 
 1. Extract `wellness-api-private.zip` into the existing private API folder, including **both `src` and `vendor`**. Preserve the production `.env`. Expect `composer.json`, `composer.lock`, `src`, `bin` and `vendor` directly under `/wellness-api/`.
-2. Extract `wellnexa-portal.zip` into the existing Wellnexa portal document root. Expect `index.html`, `assets`, `.htaccess` and `api` directly in that root. Keep existing permissions consistent with the working deployment, normally directories `755` and files `644`.
+2. Extract `wellness-common-portal.zip` into `/public_html/wellness-common-portal/` once for all clinic hosts. Expect `index.html`, `assets`, `.htaccess` and `api` directly in that root. Keep existing permissions consistent with the working deployment, normally directories `755` and files `644`.
 3. Check [API health](https://wellnexa.copihue.ca/api/v1/health) and [database health](https://wellnexa.copihue.ca/api/v1/health/database). Both should return JSON with `data.status` equal to `ok`. These checks confirm basic access, not receipt configuration or PDF readiness.
 4. After the SQL and files are in place, change the existing private `.env` line to:
 

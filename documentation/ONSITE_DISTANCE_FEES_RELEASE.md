@@ -1,5 +1,7 @@
 # On-Site distance fees deployment
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 This release adds two driving-distance thresholds per practitioner/service assignment, a flat extra fee, address-specific quotes before confirmation, and an audited waiver per session before billing. It includes the existing Wellnexa portal theme and receipt workflow. The standalone wellnexa.ca website does not need an upload.
 
 ## Before uploading
@@ -15,9 +17,9 @@ This release adds two driving-distance thresholds per practitioner/service assig
 | ZIP | Destination | Action |
 | --- | --- | --- |
 | wellness-api-private.zip | Existing private `wellness-api/` directory above public_html | Extract contents directly here; replace src, bin, vendor and composer files. Preserve the existing private .env. |
-| wellnexa-portal.zip | Existing document root serving wellnexa.copihue.ca (currently `public_html/wellnexa-portal/`) | Extract contents directly here, including hidden .htaccess and api files. Avoid an extra enclosing folder. |
+| wellness-common-portal.zip | `/public_html/wellness-common-portal/`, shared by both clinic hosts. Extract contents once, including hidden `.htaccess` and `api/`; do not nest another folder. |
 
-The private API is shared by the clinic portals. Apply the database migration before replacing it. The portal ZIP is clinic-host aware and can also update another portal document root if desired; it does not contain a clinic-specific database or login identity. Existing portals with NULL free thresholds keep their existing flat-fee bookings. Refresh the browser after upload; reset PHP OPcache through hosting if it retains old PHP files.
+The private API is shared by the clinic portals. Apply the database migration before replacing it. The portal ZIP is clinic-host aware and updates all clinic hosts sharing this directory; it does not contain a clinic-specific database or login identity. Existing portals with NULL free thresholds keep their existing flat-fee bookings. Refresh the browser after upload; reset PHP OPcache through hosting if it retains old PHP files.
 
 No new .env flag is needed. Keep the existing Google Address Validation/Routes configuration and ADDRESS_VALIDATION_SIGNING_KEY; OpenSSL with AES-256-GCM is required (normally already available for authentication). Keep SESSION_RECEIPTS_ENABLED=true to test receipt issuance. The package includes PDF dependencies; existing PHP DOM/mbstring requirements and GD for PNG logos still apply.
 

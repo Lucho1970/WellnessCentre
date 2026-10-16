@@ -1,10 +1,17 @@
 param(
     [Parameter(Mandatory=$true)][string]$ReleaseName,
+    [string]$PublicUrl = 'https://livinlively.ca/',
+    [string]$PortalUrl = 'https://livinlively.copihue.ca/',
     [ValidateSet('PORTAL_HOST_CUTOVER.md','PRACTITIONER_PERSON_CARD.md','CLIENT_OVERVIEW_RELEASE.md','APPOINTMENT_ACTION_LINKS_RELEASE.md','RECURRING_APPOINTMENTS_RELEASE.md','CLIENT_INTAKE_FORMS_RELEASE.md','GOOGLE_PRACTITIONER_ROLLOUT.md','PRIVATE_PRACTITIONER_WORK_LOCATION.md','SEPARATE_CLINIC_PORTALS.md','APPLICATION_ADMINISTRATION.md','GLOBAL_PRACTITIONERS.md','SESSION_RECEIPTS_RELEASE.md','ONSITE_DISTANCE_FEES_RELEASE.md')][string]$DeploymentGuide = 'PORTAL_HOST_CUTOVER.md'
 )
 $ErrorActionPreference = 'Stop'
 if ($ReleaseName -notmatch '^[a-zA-Z0-9_-]+$') { throw 'Use letters, digits, underscores, and hyphens for ReleaseName.' }
 $repo = Split-Path $PSScriptRoot -Parent
+if (@(git -C $repo status --porcelain --untracked-files=no).Count) { throw 'Commit tracked source before packaging.' }
+foreach ($url in @($PublicUrl,$PortalUrl)) {
+    $parsed = $null
+    if (-not [Uri]::TryCreate($url,[UriKind]::Absolute,[ref]$parsed) -or $parsed.Scheme -ne 'https' -or $parsed.AbsolutePath -ne '/' -or $parsed.Query -or $parsed.Fragment -or $parsed.UserInfo) { throw 'Deployment URLs must be HTTPS origins with a root path.' }
+}
 $destination = Join-Path $repo "deployments/$ReleaseName"
 if (Test-Path -LiteralPath $destination) { throw "Release already exists: $destination" }
 $stage = Join-Path $repo ('.tmp/deployment-' + [guid]::NewGuid().ToString('N'))
@@ -42,11 +49,17 @@ foreach ($name in $requiredFrontendSettings) {
     $resolvedFrontendSettings[$name] = $value
 }
 $previousReleaseName = [Environment]::GetEnvironmentVariable('VITE_RELEASE_NAME', 'Process')
+$previousPublicUrl = [Environment]::GetEnvironmentVariable('VITE_PUBLIC_URL', 'Process')
+$previousPortalUrl = [Environment]::GetEnvironmentVariable('VITE_PORTAL_URL', 'Process')
 [Environment]::SetEnvironmentVariable('VITE_RELEASE_NAME', $ReleaseName, 'Process')
+[Environment]::SetEnvironmentVariable('VITE_PUBLIC_URL', $PublicUrl, 'Process')
+[Environment]::SetEnvironmentVariable('VITE_PORTAL_URL', $PortalUrl, 'Process')
 Push-Location (Join-Path $repo 'Frontend')
 try { npm run build; if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed' } } finally {
     Pop-Location
     [Environment]::SetEnvironmentVariable('VITE_RELEASE_NAME', $previousReleaseName, 'Process')
+    [Environment]::SetEnvironmentVariable('VITE_PUBLIC_URL', $previousPublicUrl, 'Process')
+    [Environment]::SetEnvironmentVariable('VITE_PORTAL_URL', $previousPortalUrl, 'Process')
 }
 $portalScripts = Get-ChildItem -LiteralPath (Join-Path $repo 'Frontend/dist/portal/assets') -Filter '*.js' -File
 foreach ($name in $requiredFrontendSettings) {
@@ -86,7 +99,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'Frontend/dist/portal') -Destination $po
 Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal/.htaccess'),(Join-Path $repo 'hosting/netfirms/portal/share-preview.php'),(Join-Path $repo 'hosting/netfirms/portal/share-preview-lib.php') -Destination $portalStage -Force
 # Both public entry points resolve to the same private application; no backend copy.
 Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $portalStage 'api') -Recurse
-Write-DeploymentZip $portalStage (Join-Path $destination 'wellness-portal.zip')
+Write-DeploymentZip $portalStage (Join-Path $destination 'wellness-common-portal.zip')
 $centralStage = Join-Path $stage 'central'
 Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-landing') -Destination $centralStage -Recurse
 $adminStage = Join-Path $centralStage 'admin'
@@ -99,6 +112,7 @@ Write-DeploymentZip (Join-Path $repo 'api/deploy/netfirms/public') (Join-Path $d
 Write-DeploymentZip (Join-Path $repo 'hosting/netfirms/main-domain') (Join-Path $destination 'tuff-tar-mail-bridge.zip')
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/migrations') -Destination (Join-Path $destination 'sql-updates') -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/maintenance') -Destination (Join-Path $destination 'sql-maintenance') -Recurse
+Copy-Item -LiteralPath (Join-Path $repo 'documentation/DEPLOYMENT_LAYOUT.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'documentation/PORTAL_HOST_CUTOVER.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'documentation/PRACTITIONER_PERSON_CARD.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo "documentation/$DeploymentGuide") -Destination $destination -Force
@@ -110,7 +124,7 @@ if ($DeploymentGuide -eq 'CLIENT_INTAKE_FORMS_RELEASE.md') {
 }
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
-$manifest = [ordered]@{ release_name=$ReleaseName; source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='separate-public-clinic-portal-and-neutral-landing'; deployment_guide=$DeploymentGuide; archives=@() }
+$manifest = [ordered]@{ release_name=$ReleaseName; source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='shared-clinic-portal-and-separate-marketing-sites'; deployment_guide=$DeploymentGuide; archives=@() }
 if ($staffInvitationFlag -eq 'true') {
     $manifest.staff_authentication = [ordered]@{
         enabled_in_portal=$true
@@ -127,6 +141,14 @@ foreach ($file in Get-ChildItem -LiteralPath $destination -Filter '*.zip') {
         if (@($archive.Entries | Where-Object { $_.FullName -match '(^|/)(\.env[^/]*|\.git)(/|$)' }).Count -gt 0) { throw 'Unexpected private file in archive' }
         $manifest.archives += [ordered]@{ file=$file.Name; bytes=$file.Length; entries=$archive.Entries.Count; sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
     } finally { $archive.Dispose() }
+}
+$manifest.deployment_targets = [ordered]@{
+    'wellness-public.zip'='/public_html/livinlively.ca'
+    'wellness-common-portal.zip'='/public_html/wellness-common-portal'
+    'copihue-portal-landing.zip'='/public_html/wellness-portal'
+    'wellness-api-private.zip'='/wellness-api'
+    'wellness-api-public.zip'='Thin api/ entries only; see DEPLOYMENT_LAYOUT.md'
+    'tuff-tar-mail-bridge.zip'='Existing mail bridge host only; see EMAIL_DELIVERY.md'
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
 Write-Output "Deployment files: $destination"

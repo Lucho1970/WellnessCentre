@@ -1,5 +1,7 @@
 # Recurring appointments release — 6 October 2026
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 This release adds weekly, biweekly and monthly appointment series, per-date conflict previews, atomic confirmation, and explicit cancellation/rescheduling of future visits. Ordinary appointment actions still change one visit. The manifest records the exact source revision and ZIP hashes. Package creation does not update Netfirms.
 
 ## Required files and destinations
@@ -7,14 +9,14 @@ This release adds weekly, biweekly and monthly appointment series, per-date conf
 | File | Destination or action |
 |---|---|
 | `wellness-api-private.zip` | Extract its contents into the existing private `/wellness-api`, including `src`, `bin`, `vendor` and Composer files |
-| `wellness-portal.zip` | Extract into the actual document root assigned to `willowwellness.copihue.ca`, including `index.html`, `assets`, `.htaccess` and `api` |
+| `wellness-common-portal.zip` | Extract once into `/public_html/wellness-common-portal` for both clinic hosts, including `index.html`, `assets`, `.htaccess` and `api` |
 | `sql-updates/035_recurring_booking_requests.sql` | Apply once in the existing API database using phpMyAdmin, before uploading the new API |
 
-These two ZIPs and migration 035 are the recurrence update. The builder also creates public website, neutral portal landing, API-public-only and mail-bridge archives for the standard release layout; uploading them is not necessary for this feature. Confirm Willow's physical document root in Netfirms rather than deriving it from the domain name. Do not nest another `wellness-api` directory inside the private directory or upload PHP classes into a public document root.
+These two ZIPs and migration 035 are the recurrence update. The builder also creates public website, neutral portal landing, API-public-only and mail-bridge archives for the standard release layout; uploading them is not necessary for this feature. Both clinic hosts must map to the common portal folder in Netfirms. Do not nest another `wellness-api` directory inside the private directory or upload PHP classes into a public document root.
 
 ## Upload order
 
-1. Back up the development database and current matching private API/Willow portal files. Preserve the live private `.env`, runtime data and uploads.
+1. Back up the development database and current matching private API/Livin’ Lively portal files. Preserve the live private `.env`, runtime data and uploads.
 2. Confirm the previous release migrations are already applied, including appointment action links (034). This package contains earlier source changes too; if an earlier release was skipped, follow its documented migration prerequisites before proceeding. Do not import the entire `sql-updates` directory or full schema.
 3. In phpMyAdmin, select the database configured in private `/wellness-api/.env`. Run:
 
@@ -24,7 +26,7 @@ These two ZIPs and migration 035 are the recurrence update. The builder also cre
    ```
 
    If both new `clinic_id` and `timezone` columns and the request table are absent, import **035_recurring_booking_requests.sql** once. If all are present, verify `SHOW CREATE TABLE recurring_series;` and `SHOW CREATE TABLE recurring_booking_requests;` against the migration and skip reapplying it. If only part is present, stop and inspect the migration error/backup; the migration contains DDL and cannot be assumed to have rolled back completely. Do not blindly rerun it.
-4. Upload/extract the private API archive, then the matching Willow portal archive. Arrange a quiet testing window so users do not book while the files are being replaced. Preserve the existing private `.env`; no new environment settings, identity-provider callbacks or frontend flags are needed. Keep the working staff membership settings and disabled practitioner invitation settings as they are.
+4. Upload/extract the private API archive, then the matching Livin’ Lively portal archive. Arrange a quiet testing window so users do not book while the files are being replaced. Preserve the existing private `.env`; no new environment settings, identity-provider callbacks or frontend flags are needed. Keep the working staff membership settings and disabled practitioner invitation settings as they are.
 5. Hard-refresh staff and client tabs. Confirm administrator and Esther's existing Microsoft sign-in, client sign-in, normal appointment lists and ordinary single bookings still work.
 6. In **Services**, enable **Recurring bookings** for a selected test service. This existing service setting controls whether the Repeat option is available. Use synthetic clients for the checks below.
 

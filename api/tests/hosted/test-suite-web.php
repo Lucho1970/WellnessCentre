@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-/** Temporary public entry point. Upload only as /public_html/wellness/api/test-suite.php. */
+/** Temporary public entry point. Upload only as /public_html/livinlively.ca/api/test-suite.php. */
 ini_set('display_errors', '0');
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');

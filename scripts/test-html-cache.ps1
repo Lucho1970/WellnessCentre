@@ -1,6 +1,6 @@
 param(
-    [string]$PublicUrl = 'https://wellness.copihue.ca/',
-    [string]$PortalUrl = 'https://willowwellness.copihue.ca/',
+    [string]$PublicUrl = 'https://livinlively.ca/',
+    [string]$PortalUrl = 'https://livinlively.copihue.ca/',
     [string]$LandingUrl = 'https://portal.copihue.ca/'
 )
 $ErrorActionPreference = 'Stop'

@@ -62,3 +62,7 @@ npm --prefix Wellnexa run test:browser
 ```
 
 Browser tests use synthetic published cards and failure/empty fixtures. On Windows they use installed Microsoft Edge; other systems need `npx playwright install chromium` from `Wellnexa/`. Production acceptance: after upload, verify both same-origin API URLs return JSON, publish a controlled public profile/service and confirm the website and booking links, then unpublish it and verify removal on refresh. The existing portal remains the source of truth; no hosted writes are performed by local tests.
+
+## Hosting destination
+
+Upload the contents of `Wellnexa/dist/` (including `api/` and hidden `.htaccess`) to `/public_html/wellnexa.ca/`. This marketing build is separate from the shared clinic portal in `/public_html/wellness-common-portal/`. See [Deployment layout](../documentation/DEPLOYMENT_LAYOUT.md).

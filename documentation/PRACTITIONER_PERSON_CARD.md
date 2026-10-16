@@ -1,5 +1,7 @@
 # Practitioner person card
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 The reusable practitioner card appears after a short hover (or keyboard focus) over a practitioner link in the guest catalogue, guest booking choices, public service details, practitioner directory, and team section. The portal practitioner detail page uses the same public contact actions in its expanded layout. The card uses a circular profile photo when available, preferred public name, professional title/credentials, and the bilingual public biography. Missing fields are omitted rather than filled from staff account data.
 
 The public name is `public_team_profiles.public_name`, **not** the identity-provider display name. `booking_name` remains the shorter friendly name used in booking actions. Both can be edited by the practitioner under Profile → Public practitioner card, or by an administrator under Team profiles. Publishing, profile URL, and professional title remain administrator-controlled. Existing profiles retain their current public names until edited.
@@ -9,7 +11,7 @@ Contact details are a separate, opt-in set of fields: `public_contact_email`, `p
 ## Deployment and checks
 
 1. Back up the database and apply `api/database/migrations/030_practitioner_public_card_contact.sql` once. Do this **before** deploying the matching API and frontend; the new queries require these columns.
-2. Deploy `wellness-api-private.zip` to the existing private `/wellness-api`, preserving `.env`, then `wellness-portal.zip` to `/public_html/willow-wellness-portal` and `wellness-public.zip` to `/public_html/wellness`. The neutral `portal.copihue.ca` landing page does not change.
+2. Deploy `wellness-api-private.zip` to the existing private `/wellness-api`, preserving `.env`, then `wellness-common-portal.zip` to `/public_html/wellness-common-portal` and `wellness-public.zip` to `/public_html/livinlively.ca`. The neutral `portal.copihue.ca` landing page does not change.
 3. In a practitioner account, open Profile, change the preferred public name and biography, and save. Enter a **test-only public** email/phone, opt in to Text, and verify the guest catalogue hover card and its links. Clear the fields and confirm the links disappear. Check the card with no photo, credentials, or bio. Verify French text and keyboard focus. Confirm private notification email/mobile never appear unless separately entered into the public fields.
 4. From admin Team profiles, verify the same fields and the published setting. Unpublish the profile and confirm it disappears from public endpoints. The practitioner cannot publish their own profile or edit the admin-controlled professional title.
 

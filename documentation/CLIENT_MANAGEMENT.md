@@ -1,5 +1,7 @@
 # Client management — deployment and acceptance
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 ## Included
 
 The Clients page is available to Super Admin, Clinic Admin, and reception staff. The API enforces those roles and requires a staff identity. Every lookup and edit is restricted to clients in the actor's clinic; practitioners, accounting staff, and clients cannot access this directory.
@@ -23,7 +25,7 @@ The following packages describe the historical initial client-management release
 
 Deploy both ZIPs from `release/client-management-2026-09-15`:
 
-1. Extract the frontend ZIP into `/public_html/wellness/`, preserving its `api/` directory.
+1. Extract the frontend ZIP into `/public_html/livinlively.ca/`, preserving its `api/` directory.
 2. Extract the private API ZIP into the private API directory, preserving `.env` and runtime files.
 3. Refresh the browser and open Staff portal → Clients.
 

@@ -1,5 +1,7 @@
 # Booking confirmation checkpoint — 2026-09-15
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 No database migration is required. Deploy the private API while preserving its `.env`.
 
 Confirmation now validates the requested time through the same availability search used to offer slots. This covers recurring hours, extra openings, time off, blocked periods, buffers, booking windows, existing appointments, room capabilities, restrictions, and turnover. The API verifies active clients and bookable locations belong to the signed-in clinic. Practitioners without administration/reception roles can book only their own schedules. The server assigns the booking source.
@@ -49,10 +51,10 @@ For the current consolidated procedure, use the [temporary hosted test suite](HO
 
 If the development database is reachable only from Netfirms, a temporary [web entry point](../api/tests/integration/booking-race-web.php) can run the same four-scenario harness there. It starts **two independent PHP booking workers** for each race; it does not use a browser token or call the public API. It therefore validates the booking service and MySQL locking, while the normal portal journeys still need separate testing. The private API deployment archive does not include tests, and the public archive intentionally does not expose this runner.
 
-1. Back up the development database. Upload `api/tests/integration/booking-race.php` and `booking-race-worker.php` to `/wellness-api/tests/integration/` (create those private directories if needed). Upload `booking-race-web.php` to `/public_html/wellness/api/booking-race-web.php` **only for this test**.
+1. Back up the development database. Upload `api/tests/integration/booking-race.php` and `booking-race-worker.php` to `/wellness-api/tests/integration/` (create those private directories if needed). Upload `booking-race-web.php` to `/public_html/livinlively.ca/api/booking-race-web.php` **only for this test**.
 2. Generate a unique random secret of at least 32 characters and add `BOOKING_RACE_WEB_ENABLED=true`, `BOOKING_RACE_WEB_SECRET=<secret>`, and `BOOKING_RACE_WEB_DATABASE_ACK=<exact DB_NAME>` to the private `/wellness-api/.env`. Confirm that `DB_NAME` is the **development** database before acknowledging it. Do not put the secret in Git, chat, a URL, or a screenshot. If Netfirms' web PHP binary is not a CLI executable, set `BOOKING_TEST_PHP_CLI` in the same file to the host's PHP CLI binary path.
-3. Open `https://wellness.copihue.ca/api/booking-race-web.php`. Enter the secret in the form and run once. A pass reports four scenarios, four appointments, one history and notification each, and the new synthetic clinic ID. The test clinic is then marked inactive and its queued notifications canceled; test records remain for audit.
-4. Record the result and inspect the synthetic clinic in phpMyAdmin. **Immediately** set `BOOKING_RACE_WEB_ENABLED=false`, remove `BOOKING_RACE_WEB_SECRET` and `BOOKING_RACE_WEB_DATABASE_ACK` from `.env`, and delete `/public_html/wellness/api/booking-race-web.php`. The private test files may also be removed. The endpoint is not part of normal deployment.
+3. Open `https://livinlively.ca/api/booking-race-web.php`. Enter the secret in the form and run once. A pass reports four scenarios, four appointments, one history and notification each, and the new synthetic clinic ID. The test clinic is then marked inactive and its queued notifications canceled; test records remain for audit.
+4. Record the result and inspect the synthetic clinic in phpMyAdmin. **Immediately** set `BOOKING_RACE_WEB_ENABLED=false`, remove `BOOKING_RACE_WEB_SECRET` and `BOOKING_RACE_WEB_DATABASE_ACK` from `.env`, and delete `/public_html/livinlively.ca/api/booking-race-web.php`. The private test files may also be removed. The endpoint is not part of normal deployment.
 
 If the page reports that `proc_open` is disabled, or the host cannot start two CLI workers, the automated test cannot run on that hosting plan; use the manual two-browser procedure below. A generic failure returns a short reference; the PHP error log has details. Do not paste secrets or database credentials into a support report.
 

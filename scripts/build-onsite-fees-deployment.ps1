@@ -11,7 +11,7 @@ $base=Join-Path $repo "deployments/$baseName"
 $baseManifest=Get-Content -LiteralPath (Join-Path $base 'manifest.json') -Raw | ConvertFrom-Json
 New-Item -ItemType Directory -Path (Join-Path $destination 'sql') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $base 'wellness-api-private.zip') -Destination $destination
-Copy-Item -LiteralPath (Join-Path $base 'wellness-portal.zip') -Destination (Join-Path $destination 'wellnexa-portal.zip')
+Copy-Item -LiteralPath (Join-Path $base 'wellness-common-portal.zip') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'api/database/migrations/044_onsite_distance_fees.sql') -Destination (Join-Path $destination 'sql')
 foreach($name in @('onsite-distance-fees-preflight.sql','onsite-distance-fees-postflight.sql')){
     Copy-Item -LiteralPath (Join-Path $repo "api/database/maintenance/$name") -Destination (Join-Path $destination 'sql')
@@ -19,7 +19,7 @@ foreach($name in @('onsite-distance-fees-preflight.sql','onsite-distance-fees-po
 Copy-Item -LiteralPath (Join-Path $repo 'documentation/ONSITE_DISTANCE_FEES_RELEASE.md') -Destination (Join-Path $destination 'README.md')
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-foreach($name in @('wellness-api-private.zip','wellnexa-portal.zip')){
+foreach($name in @('wellness-api-private.zip','wellness-common-portal.zip')){
     $archive=[System.IO.Compression.ZipFile]::OpenRead((Join-Path $destination $name))
     try{
         $entries=@($archive.Entries | ForEach-Object {$_.FullName})
@@ -32,7 +32,7 @@ $manifest=[ordered]@{
     release_name=$ReleaseName;source_commit=$baseManifest.source_commit;source_branch=(git -C $repo branch --show-current)
     built_at_utc=[DateTime]::UtcNow.ToString('o');frontend_release_name=$baseName
     api_update_required=$true;database_migration='044_onsite_distance_fees.sql';receipt_feature_flag='SESSION_RECEIPTS_ENABLED';distance_pricing_enabled_by='assignment mobile_free_radius_km'
-    wellnexa_theme_included=$true;hosted_acceptance='pending';files=@()
+    deployment_targets=[ordered]@{'wellness-api-private.zip'='/wellness-api';'wellness-common-portal.zip'='/public_html/wellness-common-portal'};wellnexa_theme_included=$true;hosted_acceptance='pending';files=@()
 }
 foreach($file in Get-ChildItem -LiteralPath $destination -File -Recurse){
     $manifest.files += [ordered]@{file=$file.FullName.Substring($destination.Length+1).Replace('\','/');bytes=$file.Length;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}

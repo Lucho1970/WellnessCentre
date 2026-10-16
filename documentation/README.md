@@ -11,7 +11,7 @@ Start with these two authoritative documents:
 - [Practitioner invitation pilot](PRACTITIONER_INVITATIONS.md): disabled staff registration, manual invitations, administrator approval, dedicated External ID apps and rollout checks.
 - [Client overview](CLIENT_OVERVIEW.md): appointment history, saved changes, configured practitioner access, role/clinic boundaries and deployment acceptance.
 - [Appointment action links](APPOINTMENT_ACTION_LINKS.md): sign-in-required email links, expiry/revocation, cancellation fee acknowledgement, migration and activation checks.
-- [Portal host cutover](PORTAL_HOST_CUTOVER.md): move Willow to `willowwellness.copihue.ca` and deploy a neutral landing page at `portal.copihue.ca`.
+- [Deployment layout](DEPLOYMENT_LAYOUT.md): confirmed marketing folders, shared clinic portal, general landing and private API; package destinations and configuration.
 - [Runtime website configuration](RUNTIME_WEBSITE_CONFIGURATION.md): live public website destination, temporary .com cutover, deployment order and checks.
 - [Practitioner external link plan](PRACTITIONER_EXTERNAL_LINK_PLAN.md): optional website/social-page links for independent practitioners and portal-only virtual clinics; local implementation and pending hosted acceptance.
 - [Practitioner person card](PRACTITIONER_PERSON_CARD.md): preferred public name, biography, optional public contacts, and hover previews.

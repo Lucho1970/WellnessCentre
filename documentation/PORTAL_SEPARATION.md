@@ -61,38 +61,19 @@ Vite's normal environment precedence is preserved: builds read `.env.production`
 
 **16 September hosting correction:** production portal builds now always use
 `/api/v1` on the portal origin. Upload the two files from
-`api/deploy/netfirms/public` into `/public_html/wellness-portal/api/`, including
+`api/deploy/netfirms/public` into `/public_html/wellness-common-portal/api/`, including
 `.htaccess`. Both entry points load the same private `/wellness-api`; no vendor,
 environment, database or application-source copy belongs in the portal root.
-The release builder includes these two files inside `wellness-portal.zip`.
+The release builder includes these two files inside `wellness-common-portal.zip`.
 `VITE_API_BASE_URL` still configures the public build and local development;
 production portal builds deliberately override it. Direct `dist/portal` uploads
 must also include the entry-point files. Vite preview itself does not execute PHP.
 This avoids cross-origin preflight for deployed portal requests; it does not fix
 Netfirms OPTIONS handling for cross-origin local development.
 
-This section records the original Willow deployment on `portal.copihue.ca`. The October 2026 host cutover supersedes it: Willow moves to `willowwellness.copihue.ca`, while `portal.copihue.ca` becomes a neutral landing page. Use [Portal Host Cutover](PORTAL_HOST_CUTOVER.md) for current deployment order, callbacks, and URLs. The prior confirmed mapping was `portal.copihue.ca` → `/public_html/wellness-portal`; the new Willow document root must be confirmed before upload.
+The confirmed hosting layout is maintained in [Deployment layout](DEPLOYMENT_LAYOUT.md). Both clinic hostnames serve `/public_html/wellness-common-portal`; the general landing/admin application serves `/public_html/wellness-portal`. Livin' Lively's public website serves `/public_html/livinlively.ca`, and Wellnexa's separate public build serves `/public_html/wellnexa.ca`. The private application remains `/wellness-api`.
 
-1. Verify that `portal.copihue.ca` serves `/public_html/wellness-portal` and has a valid HTTPS certificate. This is a sibling of `/public_html/wellness`, not a directory inside it. Do not point the subdomain at the private PHP application directory.
-2. The current **frontend build** values are:
-
-   ```dotenv
-   VITE_PUBLIC_URL=https://wellness.copihue.ca/
-   VITE_PORTAL_URL=https://portal.copihue.ca/
-   VITE_API_BASE_URL=https://wellness.copihue.ca/api/v1
-   ```
-
-   Retain the existing three Entra IDs. By default the auth callback/logout destination is the portal origin plus its build base, so a subdomain-root build returns to `https://portal.copihue.ca/`. `VITE_ENTRA_REDIRECT_URI` is an optional exact override on that same portal origin/base; it must not point back to the public site. No client secret belongs in the frontend.
-3. In the **existing staff SPA app registration**, add the exact HTTPS portal callback under the **Single-page application** platform. Keep authorization-code/PKCE via MSAL; do not enable implicit grant or add a client secret. Keep API audience, scope, role assignments and database identity links unchanged. Retain old callbacks during a controlled rollback window, then remove obsolete ones after acceptance. Existing public-site browser sessions do not transfer to the new origin: expect staff to sign in again.
-4. Preserve the private API `.env`, including its explicit CORS allowlist. No configuration change is required for the same-origin portal entry point. Do not use `*` or change `APP_URL` to the portal. Cross-origin development still requires working hosting preflight handling; deployed portal requests no longer depend on that.
-5. Run `npm run build` in `Frontend`. Upload **contents** of `dist/public` to `/public_html/wellness` and **contents** of `dist/portal` to `/public_html/wellness-portal`. Each destination should contain its own `index.html`, `assets/` and `.htaccess` directly, not an extra wrapper directory. Also install the portal API entry files described above, or use the deployment ZIP which includes them. Preserve hosting-required directives when updating `.htaccess`. Never overwrite/delete the existing website API, private `.env`, vendor or runtime uploads during this frontend deployment.
-6. Test the checks below before considering the split deployed. No SQL script or data seed is needed.
-
-The PHP API itself is unchanged by this feature; only the example CORS configuration includes the new local development origin. Actual server configuration must be updated by the operator.
-
-### Same-host fallback
-
-Without URL overrides, production builds use public `/` and portal `/portal/`. Upload portal assets beneath the public document root's `portal` directory and register `https://wellness.copihue.ca/portal/` as the staff SPA callback. This fallback is useful for staging, not an assumption that the owner has chosen it instead of a subdomain.
+Use `wellness-common-portal.zip` for a single shared clinic portal upload. It includes the thin `api/` entries and routing/share-preview files. Public, portal and landing entry points load the same private backend; preserve `.env`, runtime data and uploads. Each clinic's hostname selects its own records and theme. Keep exact provider callbacks registered for both clinic hosts.
 
 ## Build and package
 
@@ -104,13 +85,13 @@ npm test
 npm run test:build
 ```
 
-The deployment script now produces `wellness-public.zip` and `wellness-portal.zip` instead of a combined `wellness-frontend.zip`, plus the existing API archives and SQL-update folder when generating a complete release. The frontend split needs no new SQL; that folder holds historical upgrades only. Do not run them again without inspecting the database's existing state.
+The deployment script now produces `wellness-public.zip` and `wellness-common-portal.zip` instead of a combined `wellness-frontend.zip`, plus the existing API archives and SQL-update folder when generating a complete release. The frontend split needs no new SQL; that folder holds historical upgrades only. Do not run them again without inspecting the database's existing state.
 
 ```powershell
 ./scripts/build-deployment.ps1 -ReleaseName YOUR-UNIQUE-RELEASE-NAME
 ```
 
-Run packaging from the repository root after configuring the actual deployment URLs and committing the source to be packaged. Packages include hidden routing files and exclude environment files. The complete [portal-split-2026-09-16 release](../deployments/portal-split-2026-09-16/README.md) is now generated for the confirmed hosts, with all four ZIPs and checksums tracked in Git.
+Run packaging from the repository root after configuring the actual deployment URLs and committing the source to be packaged. Packages include hidden routing files and exclude environment files. The complete [portal-split-2026-09-16 release](../deployments/portal-split-2026-09-16/README.md) is now generated for the confirmed hosts, as a historical record; generate new ignored packages from committed source.
 
 ## Verification
 

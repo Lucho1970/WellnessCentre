@@ -12,7 +12,7 @@ The first clinic administrator is established by a controlled, audited operator 
 
 ## Client access through clinic portals
 
-The neutral `portal.copihue.ca` site may later offer an authenticated index containing only clinics and independent practices already linked to the verified identity. Its October 2026 landing page is public only: cross-clinic sign-in and membership listing have not been implemented. Willow's clinic portal moves to `willowwellness.copihue.ca`; see [Portal Host Cutover](PORTAL_HOST_CUTOVER.md). Following a clinic's direct link must continue to work without first visiting this hub.
+The neutral `portal.copihue.ca` site may later offer an authenticated index containing only clinics and independent practices already linked to the verified identity. Its October 2026 landing page is public only: cross-clinic sign-in and membership listing have not been implemented. Livin’ Lively's clinic portal moves to `livinlively.copihue.ca`; see [Portal Host Cutover](PORTAL_HOST_CUTOVER.md). Following a clinic's direct link must continue to work without first visiting this hub.
 
 A client may follow Clinic A's public booking link to Clinic A's branded portal, sign in with Google, and access only their Clinic A client record. Later, the same person may follow Clinic B's booking link to Clinic B's portal and use the same Google account. Clinic B resolves its own clinic context from trusted host configuration, then links that verified identity to a **separate Clinic B client record** through Clinic B's registration or verified claim process. The second sign-in does not import, reveal or merge Clinic A's profile, appointments, notes or consents. A general clinic switcher is not required for this portal-driven journey.
 
@@ -50,7 +50,7 @@ For money, a practitioner's choice between self-handled and clinic-assisted coll
 
 Delivery gates for this mode:
 
-1. Agree the virtual-clinic operating agreement, practitioner stewardship/custody matrix, delegated-admin fields, client sharing basis and seller/merchant choices. Complete MT0 and design additive migrations preserving Willow's records.
+1. Agree the virtual-clinic operating agreement, practitioner stewardship/custody matrix, delegated-admin fields, client sharing basis and seller/merchant choices. Complete MT0 and design additive migrations preserving Livin’ Lively's records.
 2. Complete MT1–MT2 and prove a synthetic second clinic is tenant-isolated, including identity links, workers, exports and operational support access.
 3. Implement practitioner-specific client profiles and relationship authorization. Test two practitioners with the same client login but different names, contacts and private records; neither may enumerate or mutate the other's data through any endpoint.
 4. Implement and audit ongoing sharing, one-appointment coverage, revocation, practitioner departure and scoped export. Test expired grants, direct-ID attacks, canceled/reassigned bookings, notifications and On-Site constraints.
@@ -80,7 +80,7 @@ The requirements in [Master Requirements](MASTER_REQUIREMENTS.md) and architectu
 
 ## MT0 checkpoint — 5 October 2026
 
-The [local source review and proposed architecture](MT0_IDENTITY_AND_PRACTICE_ARCHITECTURE.md) and [route/module/table inventory](MT0_SOURCE_INVENTORY.md) are recorded. Architecture acceptance is still pending: live schema reconciliation, provider proof-of-concept criteria review, storage/restore decisions and independent-practice access policy must be resolved. The next implementation slice is trusted server-side clinic context while preserving the existing Willow login. No production identity changes or executable migrations were introduced by this checkpoint.
+The [local source review and proposed architecture](MT0_IDENTITY_AND_PRACTICE_ARCHITECTURE.md) and [route/module/table inventory](MT0_SOURCE_INVENTORY.md) are recorded. Architecture acceptance is still pending: live schema reconciliation, provider proof-of-concept criteria review, storage/restore decisions and independent-practice access policy must be resolved. The next implementation slice is trusted server-side clinic context while preserving the existing Livin’ Lively login. No production identity changes or executable migrations were introduced by this checkpoint.
 
 ## Clinic provisioning checkpoint — 8 October 2026
 

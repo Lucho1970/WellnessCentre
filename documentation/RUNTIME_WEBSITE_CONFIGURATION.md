@@ -14,7 +14,7 @@ Later, change this value and refresh either site; no frontend rebuild is needed.
 
 1. Add the setting to the live private `.env`; local files do not update Netfirms automatically.
 2. Deploy `api/src/Service/PublicRuntimeConfig.php` to the matching private application's `src/Service/` directory. Its namespace follows the existing Composer PSR-4 mapping.
-3. Upload `api/deploy/netfirms/public/runtime-config.php` as `api/runtime-config.php` under **both** the public website and Willow portal document roots. Check both HTTPS endpoints return the configured URL and `Cache-Control: no-store` before replacing the frontend bundles.
+3. Upload `api/deploy/netfirms/public/runtime-config.php` as `api/runtime-config.php` under **both** the public website and Livin’ Lively portal document roots. Check both HTTPS endpoints return the configured URL and `Cache-Control: no-store` before replacing the frontend bundles.
 4. Deploy both rebuilt frontend outputs. Public and portal API requests now use same-origin `/api/v1`; the `.com` public root must expose the existing thin PHP API entry point and share the private application. If `.com` uses a separate document root, upload the API public entry-point directory there too.
 5. Upload the public `.htaccess` from the build. It redirects `.com` and both `www` variants to `https://livinlively.ca/` with status 302, preserving paths and query strings, and upgrades HTTP to HTTPS. Remove any conflicting Netfirms host-level redirects from `.ca` to `.com`.
 6. Test the public homepage, catalogue, images, portal navigation, client session display, booking, and the portal's Public website button. Change the setting to a test destination and refresh to confirm the link changes, then restore `.ca`.

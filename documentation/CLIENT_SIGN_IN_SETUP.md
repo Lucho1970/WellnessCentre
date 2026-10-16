@@ -1,5 +1,7 @@
 # R2 client sign-in proof — 17 September 2026
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 Status: owner approved External ID and reports the customer tenant created using an
 existing subscription under their other login. Branch: `codex/client-sign-in`.
 Customer tenant ID: `0a3841c6-b244-410d-821f-bbd9ccd1b5e2`.
@@ -54,7 +56,7 @@ refresh, browse availability, public refresh and account-link return, then staff
 
 Owner reports registration created: `Wellness Client Portal Dev`, single-tenant SPA
 in the customer tenant. Application (client) ID: `7a522317-d74f-4ccb-9805-8e4b912c02ab`.
-Customer-only callback: `https://willowwellness.copihue.ca/client/auth/callback`.
+Customer-only callback for Livin’ Lively (also register `https://wellnexa.copihue.ca/client/auth/callback` for Wellnexa): `https://livinlively.copihue.ca/client/auth/callback`.
 This callback is implemented in this release; deploy before end-to-end testing.
 Do not create a SPA client secret or enable implicit grants.
 
@@ -117,7 +119,7 @@ secret goes in the frontend or API environment. Both API pointers still share on
 
 Deploy the release's private API code and complete matching vendor bundle, preserving
 the server `.env` and `var` runtime directory; deploy the portal bundle to
-`/public_html/wellness-portal`. Do not mix Composer generated files between builds.
+`/public_html/wellness-common-portal`. Do not mix Composer generated files between builds.
 No SQL update is required for this identity-only release. The historical SQL scripts
 bundled with full deployments are not instructions to rerun migrations already applied.
 Ensure PHP can write `/wellness-api/var/cache`. Rollback: restore the previous portal and
@@ -127,8 +129,8 @@ private API packages; no data migration reversal is needed.
 
 1. Verify the customer SPA and API really reside in the new external tenant; compare their
    Directory tenant IDs if registration fails. Keep all workforce registrations unchanged.
-2. Customer SPA redirect must be exactly `https://willowwellness.copihue.ca/client/auth/callback`.
-   Register `https://willowwellness.copihue.ca/client` as an additional SPA redirect for the logout
+2. Customer SPA redirect must be exactly `https://livinlively.copihue.ca/client/auth/callback`.
+   Register `https://livinlively.copihue.ca/client` as an additional SPA redirect for the logout
    return, if not already registered. Do not enable implicit grants. For local testing add
    matching localhost callbacks separately; local Vite still needs a running/reachable PHP API.
 3. In the separate personal-Microsoft federation registration's Web platform, retain the
@@ -137,7 +139,7 @@ private API packages; no data migration reversal is needed.
    Keep its credential only in the customer tenant's custom identity provider.
 4. Keep Google OAuth in Testing; add intended test Google accounts under Audience/Test users
    if required. Do not publish or request Gmail/Calendar permissions for sign-in.
-5. Open `https://willowwellness.copihue.ca/client` in a private browser window. Test Google, personal
+5. Open `https://livinlively.copihue.ca/client` in a private browser window. Test Google, personal
    Microsoft and email-code sign-up/sign-in separately. Each must return to the portal and
    show **Customer sign-in verified** and **not linked**. The hosted provider screen alone
    is not success. No booking, profile or clinical data should be accessible.
