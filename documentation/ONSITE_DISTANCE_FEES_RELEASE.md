@@ -23,6 +23,8 @@ The private API is shared by the clinic portals. Apply the database migration be
 
 No new .env flag is needed. Keep the existing Google Address Validation/Routes configuration and ADDRESS_VALIDATION_SIGNING_KEY; OpenSSL with AES-256-GCM is required (normally already available for authentication). Keep SESSION_RECEIPTS_ENABLED=true to test receipt issuance. The package includes PDF dependencies; existing PHP DOM/mbstring requirements and GD for PNG logos still apply.
 
+Practitioner self-service is available through **Profile → My travel settings** for existing active On-Site assignments; see [Practitioner travel settings](PRACTITIONER_TRAVEL_SETTINGS_RELEASE.md) for its deployment package and ownership rules.
+
 ## Configure and try it
 
 1. Sign in as clinic administrator. Open **Services**, select a service, choose **Assignments**, then **Edit assignments**. Under the practitioner enable **On-Site visits**.

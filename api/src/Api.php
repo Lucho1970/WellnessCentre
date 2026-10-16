@@ -143,6 +143,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions','dashboardWidgetVersions');
                 $routes->addRoute('POST','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions/{version:\d+}/restore','restoreDashboardWidget');
                 $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
+                $routes->addRoute('GET','/api/v1/profile/travel-settings','myTravelSettings');
+                $routes->addRoute('PUT','/api/v1/profile/travel-settings/{id:\\d+}','saveMyTravelSettings');
                 $routes->addRoute('GET','/api/v1/profile/work-location','myWorkLocation');
                 $routes->addRoute('GET','/api/v1/profile/global-credentials','globalCredentials');
                 $routes->addRoute('POST','/api/v1/profile/global-credentials','createGlobalCredential');
@@ -317,6 +319,8 @@ final class Api
                 'dashboardWidgetVersions'=>$this->dashboard->versions($this->user($request),(string)$route[2]['id']),
                 'restoreDashboardWidget'=>$this->dashboard->restore($this->user($request),(string)$route[2]['id'],(int)$route[2]['version'],$request->correlationId),
                 'customerMe'=>$this->customerMe($request),
+                'myTravelSettings'=>(new \Wellness\Service\PractitionerTravelSettingsService($this->database))->get($this->user($request)),
+                'saveMyTravelSettings'=>(new \Wellness\Service\PractitionerTravelSettingsService($this->database))->save($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'myWorkLocation'=>$this->workLocations->get($this->user($request)),
                 'saveMyWorkLocation'=>$this->workLocations->save($this->user($request),$request->body,$request->correlationId),
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),

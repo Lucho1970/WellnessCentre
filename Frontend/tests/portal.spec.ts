@@ -261,6 +261,7 @@ async function fixtures(
         phone: "905-555-0100",
       };
     if (path === "/auth/me") data = { id:1, display_name:"Test Staff", email:"staff@example.test", roles: roles ?? [], permissions };
+    if (path === "/profile/travel-settings") data = { clinic_id: 1, items: [] };
     if (path === "/profile/work-location") data = {home_address:null,work_address:null,work_same_as_home:false,version:0};
     if (path === "/profile/avatar") data = { image_base64: null };
     if (path === "/profile/public-card") data = { public_name: "Test Practitioner", booking_name: "Test", summary: "", summary_fr: "", public_website_url: "", public_contact_email: "", public_contact_phone: "", public_contact_sms: false, slug: "test-practitioner", published: true };
@@ -3804,4 +3805,78 @@ test('French mobile field errors stay accessible with reduced motion', async ({p
   await expect(phone).toHaveAccessibleDescription('Utilisez + suivi de 8 à 15 chiffres');
   await expect(phone).toBeFocused();
   await expect(phone).toBeInViewport();
+});
+
+
+test('practitioner travel settings save only the selected assigned service and persist on reload', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  const rows = [
+    { service_id: 13, name: 'Deep Tissue Massage', name_fr: 'Massage profond', revision: 'a'.repeat(64), mobile_radius_km: 50, mobile_free_radius_km: 20, travel_buffer_minutes: 15, mobile_fee_cents: 1500 },
+    { service_id: 14, name: 'Reflexology', name_fr: 'Réflexologie', revision: 'c'.repeat(64), mobile_radius_km: 40, mobile_free_radius_km: null, travel_buffer_minutes: 0, mobile_fee_cents: 500 },
+  ];
+  await page.route('**/api/v1/profile/travel-settings', route => route.fulfill({ json: { data: { clinic_id: 4, items: rows } } }));
+  const saves: unknown[] = [];
+  await page.route('**/api/v1/profile/travel-settings/13', route => {
+    const body = route.request().postDataJSON(); saves.push(body);
+    expect(body).toEqual({ revision: 'a'.repeat(64), mobile_radius_km: 60, mobile_free_radius_km: 25, travel_buffer_minutes: 30, mobile_fee_cents: 1250 });
+    rows[0] = { ...rows[0], ...body, revision: 'b'.repeat(64) };
+    return route.fulfill({ json: { data: rows[0] } });
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await expect(page.getByRole('heading', { name: 'My travel settings' })).toBeVisible();
+  const form = page.getByRole('form', { name: 'Deep Tissue Massage', exact: true });
+  await form.getByLabel('Maximum driving distance (km)').fill('60');
+  await form.getByLabel('Free travel distance (km)').fill('25');
+  await form.getByLabel('Travel minutes each way').fill('30');
+  await form.getByLabel('Flat extra travel fee CAD').fill('12.50');
+  await form.getByRole('button', { name: 'Save travel settings', exact: true }).click();
+  await expect(page.getByText('Travel settings saved for this clinic.')).toBeVisible();
+  expect(saves).toHaveLength(1);
+  const other = page.getByRole('form', { name: 'Reflexology', exact: true });
+  await expect(other.getByLabel('Flat extra travel fee CAD')).toHaveValue('5.00');
+  await expect(other.getByLabel('Free travel distance (km)')).toHaveValue('');
+  await page.reload();
+  await expect(form.getByLabel('Flat extra travel fee CAD')).toHaveValue('12.50');
+  await expect(form.getByLabel('Maximum driving distance (km)')).toHaveValue('60');
+  await page.screenshot({ path: test.info().outputPath('practitioner-travel-settings.png'), fullPage: true });
+});
+
+test('practitioner travel settings show concurrent changes and reload the latest values', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let item = { service_id: 13, name: 'Massage', name_fr: '', revision: 'a'.repeat(64), mobile_radius_km: 50, mobile_free_radius_km: 20, travel_buffer_minutes: 15, mobile_fee_cents: 1500 };
+  await page.route('**/api/v1/profile/travel-settings', route => route.fulfill({ json: { data: { clinic_id: 4, items: [item] } } }));
+  await page.route('**/api/v1/profile/travel-settings/13', route => {
+    item = { ...item, revision: 'b'.repeat(64), mobile_fee_cents: 3000 };
+    return route.fulfill({ status: 409, json: { error: { code: 'travel_settings_changed', message: 'Your travel settings changed. Reload them before saving.' } } });
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole('form', { name: 'Massage', exact: true }).getByRole('button', { name: 'Save travel settings', exact: true }).click();
+  await expect(page.getByText('Your travel settings changed. Reload them before saving.')).toBeVisible();
+  await page.getByRole('button', { name: 'Reload travel settings', exact: true }).click();
+  await expect(page.getByRole('form', { name: 'Massage', exact: true }).getByLabel('Flat extra travel fee CAD')).toHaveValue('30.00');
+});
+
+test('practitioner travel settings show empty assignments and do not appear for administrator-only accounts', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await expect(page.getByText('No active On-Site services are assigned to you in this clinic. Ask an administrator to configure your service assignments.')).toBeVisible();
+  await fixtures(page, ['super_admin']);
+  await page.goto(`${portalHost}/admin/profile`);
+  await expect(page.getByRole('heading', { name: 'Account profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My travel settings' })).toHaveCount(0);
+});
+
+test('practitioner travel settings support French mobile forms and field validation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixtures(page, ['practitioner']);
+  const item = { service_id: 13, name: 'Massage', name_fr: 'Massage profond', revision: 'a'.repeat(64), mobile_radius_km: 50, mobile_free_radius_km: 20, travel_buffer_minutes: 15, mobile_fee_cents: 1500 };
+  await page.route('**/api/v1/profile/travel-settings', route => route.fulfill({ json: { data: { clinic_id: 4, items: [item] } } }));
+  await page.route('**/api/v1/profile/travel-settings/13', route => route.fulfill({ status: 422, json: { error: { code: 'validation_error', message: 'Check your travel settings.', fields: { mobile_free_radius_km: 'Free distance cannot exceed the maximum distance.' } } } }));
+  await page.goto(`${portalHost}/practitioner/profile?lang=fr`);
+  await expect(page.getByRole('heading', { name: 'Mes paramètres de déplacement' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Massage profond', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Enregistrer les paramètres de déplacement', exact: true }).click();
+  await expect(page.getByText('La distance gratuite ne peut pas dépasser la distance maximale.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('practitioner-travel-settings-mobile-fr.png'), fullPage: true });
 });
