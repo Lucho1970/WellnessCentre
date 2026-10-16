@@ -2430,7 +2430,7 @@ test("super admin deliberately publishes a bilingual public team profile", async
     });
 });
 
-test("guest portal prepares a booking handoff without reserving or creating an appointment", async ({
+for (const configuredPortal of [portalHost + '/', 'https://willowwellness.copihue.ca/']) test(`guest portal prepares a booking handoff with configured portal ${configuredPortal}`, async ({
   page,
 }) => {
   const writes: string[] = [];
@@ -2439,6 +2439,13 @@ test("guest portal prepares a booking handoff without reserving or creating an a
     if (request.method() !== "GET") writes.push(request.url());
   });
   await fixtures(page);
+  // Simulate a portable build still carrying another clinic's public-site target.
+  await page.route('**/src/shared/urls.ts', async route => {
+    const response = await route.fetch();
+    const body = (await response.text()).replaceAll(portalHost + '/', configuredPortal);
+    expect(body).toContain(configuredPortal);
+    await route.fulfill({ response, body });
+  });
   await page.route("**/api/v1/availability?**", (route) => {
     availabilityQueries.push(new URL(route.request().url()));
     const availability = Array.from({ length: 25 }, (_, index) => {
