@@ -37,5 +37,6 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 5px; }
 .button-link, .catalogue-feedback button { transition: background-color .15s ease; }
 .catalogue-empty { background: var(--mint-glow); color: var(--deep-teal); }
 .site-footer { border-top-color: var(--turquoise); }
+.contact-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1.5rem; }
 h1, .catalogue-section h2 { color: var(--deep-teal); }
 .catalogue-card { border-top: 4px solid var(--turquoise); }

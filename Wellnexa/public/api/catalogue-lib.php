@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+/** Only contact fields already published by the clinic's public site configuration. */
+function wellnexaContactProjection(array $config): array
+{
+    $email = $config['email'] ?? null;
+    $phone = $config['phone'] ?? null;
+    if ($email !== null && (!is_string($email) || !filter_var($email, FILTER_VALIDATE_EMAIL))) throw new RuntimeException('Invalid public email.');
+    if ($phone !== null && (!is_string($phone) || strlen($phone) > 60)) throw new RuntimeException('Invalid public phone.');
+    return ['email' => $email, 'phone' => $phone];
+}
+
 /** Public presentation fields only. Never expose a general-purpose API proxy. */
 function wellnexaCatalogueProjection(string $resource, array $rows): array
 {

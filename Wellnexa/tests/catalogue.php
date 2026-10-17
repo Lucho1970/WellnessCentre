@@ -20,4 +20,8 @@ $denies(fn()=>wellnexaCatalogueProjection('practitioners', [array_replace($perso
 $denies(fn()=>wellnexaCatalogueProjection('practitioners', [array_replace($person, ['image_version'=>['private']])]));
 $assert(wellnexaCatalogueProjection('services', []) === []);
 foreach ([['appointments', []], ['services', [$service + ['other'=>'x'], ['slug'=>'bad/path','name'=>'bad']]], ['services', [array_replace($service, ['name'=>['private']])]], ['services', [array_replace($service, ['durations'=>[['minutes'=>0,'price_cents'=>1]]])]], ['services', [array_replace($service, ['durations'=>[['minutes'=>60,'price_cents'=>-1]]])]], ['practitioners', [array_replace($person, ['booking_practitioner_id'=>'invalid'])]], ['practitioners', [array_replace($person, ['services'=>[['slug'=>'../private','name'=>'bad']]])]], ['services', array_fill(0,501,$service)]] as [$resource,$rows]) $denies(fn()=>wellnexaCatalogueProjection($resource,$rows));
+$assert(wellnexaContactProjection(['email'=>'clinic@example.test','phone'=>'+1 416 555 0100','internal_note'=>'private']) === ['email'=>'clinic@example.test','phone'=>'+1 416 555 0100']);
+$assert(wellnexaContactProjection([]) === ['email'=>null,'phone'=>null]);
+$denies(fn()=>wellnexaContactProjection(['email'=>'not-an-email']));
+$denies(fn()=>wellnexaContactProjection(['phone'=>['private']]));
 echo "Public catalogue projection: $checks assertions passed.\n";
