@@ -43,7 +43,7 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 5px; }
 .main-nav a { color: var(--deep-teal); text-decoration: none; font-weight: 600; }
 .main-nav a:hover, .main-nav a[aria-current] { color: var(--violet); text-decoration: underline; text-underline-offset: .3rem; }
 .main-nav .portal-link { border: 1px solid var(--turquoise); border-radius: 999px; padding: .5rem .8rem; }
-html { scroll-padding-top: 11rem; }
+html { scroll-padding-top: 11rem; scroll-behavior: smooth; }
 .detail-page { padding: 3rem 0 5rem; min-height: 60vh; }
 .detail-page h1 { font-size: clamp(2.5rem,7vw,4.5rem); }
 .detail-page h2 { margin-top: 2rem; }
