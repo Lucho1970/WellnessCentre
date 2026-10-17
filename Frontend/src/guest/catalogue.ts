@@ -15,6 +15,7 @@ export type PublicPractitioner = {
   discipline: string | null; credentials: string | null;
   has_image: boolean; image_version: string | null;
   public_website_url?: string | null; public_contact_email?: string | null; public_contact_phone?: string | null; public_contact_sms?: boolean;
+  social_links?: {label:string;url:string}[];
   booking_practitioner_id: number | null;
   services: ({slug: string} & Partial<PublicService>)[];
 };

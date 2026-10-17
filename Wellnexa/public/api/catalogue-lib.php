@@ -18,8 +18,8 @@ function wellnexaCatalogueProjection(string $resource, array $rows): array
         throw new RuntimeException('Invalid public catalogue.');
     }
     $fields = $resource === 'services'
-        ? ['slug', 'name', 'name_fr', 'public_summary', 'public_summary_fr', 'category', 'category_fr', 'durations']
-        : ['slug', 'public_name', 'public_title', 'public_title_fr', 'summary', 'summary_fr', 'discipline', 'credentials', 'booking_practitioner_id', 'services', 'has_image', 'image_version'];
+        ? ['slug', 'name', 'name_fr', 'public_summary', 'public_summary_fr', 'description', 'description_fr', 'preparation_instructions', 'preparation_instructions_fr', 'offers_clinic', 'offers_mobile', 'category', 'category_fr', 'durations']
+        : ['slug', 'public_name', 'public_title', 'public_title_fr', 'summary', 'summary_fr', 'discipline', 'credentials', 'booking_practitioner_id', 'services', 'has_image', 'image_version', 'public_website_url', 'public_contact_email', 'public_contact_phone', 'public_contact_sms', 'social_links'];
     $result = [];
     foreach ($rows as $row) {
         if (!is_array($row) || !is_string($row['slug'] ?? null) || !preg_match('/^[a-z0-9][a-z0-9-]{0,119}$/D', $row['slug'])) {
@@ -27,7 +27,7 @@ function wellnexaCatalogueProjection(string $resource, array $rows): array
         }
         $item = array_intersect_key($row, array_flip($fields));
         foreach ($item as $key => $value) {
-            if (!in_array($key, ['durations', 'services', 'booking_practitioner_id', 'has_image'], true) && $value !== null && !is_string($value)) {
+            if (!in_array($key, ['durations', 'services', 'booking_practitioner_id', 'has_image', 'offers_clinic', 'offers_mobile', 'public_contact_sms', 'social_links'], true) && $value !== null && !is_string($value)) {
                 throw new RuntimeException('Invalid public text field.');
             }
         }
@@ -43,6 +43,14 @@ function wellnexaCatalogueProjection(string $resource, array $rows): array
                 return ['minutes' => $minutes, 'price_cents' => $price];
             }, $item['durations']);
         } else {
+            $socials=$item['social_links']??[];
+            if (!is_array($socials)||!array_is_list($socials)||count($socials)>20) throw new RuntimeException('Invalid social links.');
+            $item['social_links']=array_map(static function($link):array {
+                if (!is_array($link)||!is_string($link['label']??null)||strlen($link['label'])>60||!is_string($link['url']??null)||strlen($link['url'])>2048) throw new RuntimeException('Invalid social link.');
+                $parts=parse_url($link['url']);
+                if (filter_var($link['url'],FILTER_VALIDATE_URL)===false||!is_array($parts)||strtolower($parts['scheme']??'')!=='https'||isset($parts['user'])||isset($parts['pass'])) throw new RuntimeException('Invalid social URL.');
+                return ['label'=>$link['label'],'url'=>$link['url']];
+            },$socials);
             $hasImage = $item['has_image'] ?? false;
             if (!in_array($hasImage, [true, false, 0, 1, '0', '1'], true)) throw new RuntimeException('Invalid public photo flag.');
             $item['has_image'] = (bool)$hasImage;

@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Wellnexa discovery and social profiles](WELLNEXA_WEBSITE_DISCOVERY_RELEASE.md): sticky navigation, service/profile pages, joining information and practitioner social links; migration 046 and deployment.
+
 - [Starter form templates](../api/database/templates/README.md): bilingual massage intake JSON and repeatable SQL submission to the global library.
 
 - [Form library](FORM_LIBRARY_RELEASE.md): approved global/clinic templates, previews, independent drafts and editing controls; migration 045 and deployment.

@@ -460,3 +460,5 @@ CREATE TABLE form_library_events (
  FOREIGN KEY(actor_user_id) REFERENCES users(id),
  FOREIGN KEY(actor_admin_id) REFERENCES application_administrators(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Apply once before deploying the social-links API code. Existing profiles stay empty.
+ALTER TABLE public_team_profiles ADD COLUMN social_links TEXT NULL;

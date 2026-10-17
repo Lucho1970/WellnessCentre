@@ -24,4 +24,8 @@ $assert(wellnexaContactProjection(['email'=>'clinic@example.test','phone'=>'+1 4
 $assert(wellnexaContactProjection([]) === ['email'=>null,'phone'=>null]);
 $denies(fn()=>wellnexaContactProjection(['email'=>'not-an-email']));
 $denies(fn()=>wellnexaContactProjection(['phone'=>['private']]));
+$socialPerson=$person+['social_links'=>[['label'=>'Instagram','url'=>'https://instagram.com/synthetic','private_account_id'=>55]],'public_contact_email'=>'public@example.test'];
+$assert(wellnexaCatalogueProjection('practitioners',[$socialPerson])[0]['social_links'] === [['label'=>'Instagram','url'=>'https://instagram.com/synthetic']]);
+$denies(fn()=>wellnexaCatalogueProjection('practitioners',[array_replace($person,['social_links'=>[['label'=>'Bad','url'=>'javascript:alert(1)']]])]));
+$assert(wellnexaCatalogueProjection('services',[array_replace($service,['description'=>'Published detail','preparation_instructions'=>'Published preparation'])])[0]['description']==='Published detail');
 echo "Public catalogue projection: $checks assertions passed.\n";

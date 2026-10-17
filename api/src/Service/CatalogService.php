@@ -59,7 +59,7 @@ final class CatalogService
         $sql="SELECT s.slug,s.name,s.name_fr,s.public_summary,s.public_summary_fr,s.description,s.description_fr,s.preparation_instructions,s.preparation_instructions_fr,c.id category_id,c.name category,c.name_fr category_fr,c.description category_description,c.description_fr category_description_fr,
                      EXISTS(SELECT 1 FROM practitioner_services ps WHERE ps.service_id=s.id AND ps.active=1 AND ps.offers_clinic=1) offers_clinic,
                      EXISTS(SELECT 1 FROM practitioner_services ps WHERE ps.service_id=s.id AND ps.active=1 AND ps.offers_mobile=1) offers_mobile,
-                     JSON_ARRAYAGG(JSON_OBJECT('minutes',d.duration_minutes,'price_cents',COALESCE(d.price_cents,s.price_cents))) durations
+                     JSON_ARRAYAGG(JSON_OBJECT('minutes',d.duration_minutes,'price_cents',COALESCE((SELECT MIN(COALESCE(ps.price_override_cents,d.price_cents,s.price_cents)) FROM practitioner_services ps JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1 JOIN users u ON u.id=p.user_id AND u.status='active' JOIN public_team_profiles t ON t.user_id=u.id AND t.published=1 AND t.section='practitioner' AND t.show_booking_action=1 AND t.clinic_id=s.clinic_id WHERE ps.service_id=s.id AND ps.active=1),d.price_cents,s.price_cents))) durations
                 FROM services s
            LEFT JOIN service_categories c ON c.id=s.category_id AND c.clinic_id=s.clinic_id
                 JOIN service_duration_options d ON d.service_id=s.id AND d.active=1
@@ -96,7 +96,7 @@ final class CatalogService
 
     public function publicPractitioners(): array
     {
-        $sql = "SELECT t.slug,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.public_website_url,t.public_contact_email,t.public_contact_phone,t.public_contact_sms,
+        $sql = "SELECT t.slug,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.public_website_url,t.public_contact_email,t.public_contact_phone,t.public_contact_sms,t.social_links,
                        p.discipline,p.credentials,t.display_order,
                        CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image,
                        i.content_hash image_version,
@@ -129,6 +129,7 @@ final class CatalogService
         foreach ($practitioners as &$practitioner) {
             $practitioner['has_image'] = (bool)$practitioner['has_image'];
             $practitioner['public_contact_sms'] = (bool)$practitioner['public_contact_sms'];
+            $practitioner['social_links'] = PublicSocialLinks::decode($practitioner['social_links']);
             $practitioner['services'] = $servicesByPractitioner[(string)$practitioner['slug']] ?? [];
         }
         return $practitioners;

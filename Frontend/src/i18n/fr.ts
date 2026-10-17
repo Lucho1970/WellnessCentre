@@ -1,4 +1,9 @@
 const fr: Record<string, string> = {
+  "Public social links": "Liens sociaux publics",
+  "Platform name": "Nom de la plateforme",
+  "Social profile URL": "URL du profil social",
+  "Remove social link": "Supprimer le lien social",
+  "Add social link": "Ajouter un lien social",
   "Form library": "Bibliothèque de formulaires",
   "Library": "Bibliothèque",
   "Global library": "Bibliothèque globale",

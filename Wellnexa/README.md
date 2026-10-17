@@ -1,5 +1,7 @@
 # Wellnexa public website
 
+Website discovery includes sticky translucent navigation, service and practitioner detail pages, a practitioner joining page, and public social profile links. See [release and database instructions](../documentation/WELLNEXA_WEBSITE_DISCOVERY_RELEASE.md) for migration 046 and package destinations. Detail routes refresh through the root `.htaccess`; practitioners edit social links in the clinic portal's public card settings.
+
 React and TypeScript application for **Wellnexa — Virtual Wellness Collective**, intended for `wellnexa.ca`. This is the public website starter; booking, client accounts and staff operations remain in the existing clinic portal.
 
 ## Develop from the solution root

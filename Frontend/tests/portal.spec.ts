@@ -3592,6 +3592,32 @@ test("clinic-managed practitioner availability is read-only", async ({ page }) =
   await expect(page.getByRole("button", { name: "Add time off", exact: true })).toBeDisabled();
 });
 
+test('practitioner saves multiple public social links and removes them', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let card = { public_name: 'Grace', booking_name: 'Grace', summary: '', summary_fr: '', public_contact_email: '', public_contact_phone: '', public_contact_sms: false, public_website_url: '', slug: 'grace', published: true, social_links: [] as {label:string;url:string}[] };
+  await page.route('**/api/v1/profile/public-card', route => {
+    if(route.request().method()==='PUT') card={...card,...route.request().postDataJSON()};
+    return route.fulfill({json:{data:card}});
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole('button',{name:'Add social link',exact:true}).click();
+  await page.getByRole('textbox',{name:'Platform name',exact:true}).fill('Instagram');
+  await page.getByRole('textbox',{name:'Social profile URL',exact:true}).fill('https://www.instagram.com/synthetic');
+  await page.getByRole('button',{name:'Add social link',exact:true}).click();
+  await page.getByRole('textbox',{name:'Platform name',exact:true}).nth(1).fill('Other network');
+  await page.getByRole('textbox',{name:'Social profile URL',exact:true}).nth(1).fill('https://example.test/synthetic');
+  await page.getByRole('button',{name:'Save public card',exact:true}).click();
+  await expect(page.getByText('Public card saved.',{exact:true})).toBeVisible();
+  expect(card.social_links).toHaveLength(2);
+  await page.reload();
+  await expect(page.getByRole('textbox',{name:'Platform name',exact:true}).first()).toHaveValue('Instagram');
+  await page.getByRole('button',{name:'Remove social link 2',exact:true}).click();
+  await page.getByRole('button',{name:'Remove social link 1',exact:true}).click();
+  await page.getByRole('button',{name:'Save public card',exact:true}).click();
+  await expect(page.getByText('Public card saved.',{exact:true})).toBeVisible();
+  expect(card.social_links).toEqual([]);
+});
+
 test('practitioner saves and clears their public website URL', async ({ page }) => {
   await fixtures(page, ['practitioner']);
   let card = { public_name: 'Grace Preferred', booking_name: 'Grace', summary: '', summary_fr: '', public_contact_email: '', public_contact_phone: '', public_contact_sms: false, public_website_url: '', slug: 'grace', published: true };

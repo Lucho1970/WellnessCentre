@@ -1,4 +1,9 @@
 const en = {
+  "Public social links": "Public social links",
+  "Platform name": "Platform name",
+  "Social profile URL": "Social profile URL",
+  "Remove social link": "Remove social link",
+  "Add social link": "Add social link",
   "Form library": "Form library",
   "Library": "Library",
   "Global library": "Global library",
