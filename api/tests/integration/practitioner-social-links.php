@@ -24,10 +24,20 @@ $pdo->exec('UPDATE public_team_profiles SET published=0 WHERE user_id=2');
 $assert($catalogue->publicPractitioners()===[],'Unpublished profile links never leak');
 $pdo->exec('UPDATE public_team_profiles SET published=1 WHERE user_id=2');
 $pdo->exec('UPDATE services SET published=1 WHERE id=4');
+$pdo->exec("SET SESSION sql_mode=CONCAT(@@SESSION.sql_mode,',ONLY_FULL_GROUP_BY')");
 $pdo->exec('UPDATE practitioner_services SET price_override_cents=7500 WHERE practitioner_id=3 AND service_id=4');
 $assert($catalogue->publicServices()[0]['durations'][0]['price_cents']===7500,'From price uses practitioner override');
 $pdo->exec('UPDATE practitioner_services SET price_override_cents=12500 WHERE practitioner_id=3 AND service_id=4');
 $assert($catalogue->publicServices()[0]['durations'][0]['price_cents']===12500,'From price does not underquote a higher practitioner override');
+$pdo->exec('UPDATE public_team_profiles SET published=0 WHERE user_id=2');
+$assert($catalogue->publicServices()[0]['durations'][0]['price_cents']===10000,'No published practitioner falls back to duration price');
+$pdo->exec('UPDATE public_team_profiles SET published=1 WHERE user_id=2');
+$pdo->exec('UPDATE practitioner_services SET price_override_cents=0 WHERE practitioner_id=3 AND service_id=4');
+$assert($catalogue->publicServices()[0]['durations'][0]['price_cents']===0,'Explicit zero practitioner price is retained');
+$pdo->exec('UPDATE practitioner_services SET price_override_cents=NULL WHERE practitioner_id=3 AND service_id=4');
+$pdo->exec('INSERT INTO service_duration_options(service_id,duration_minutes,price_cents) VALUES(4,90,15000)');
+$assert(array_column($catalogue->publicServices()[0]['durations'],'price_cents')===[10000,15000],'Each duration keeps its own fallback price');
+$assert((new CatalogService($database,2))->publicServices()===[],'Empty clinic returns no prices or services');
 foreach ([[['label'=>'X','url'=>'javascript:alert(1)']],[['label'=>'X','url'=>'http://example.test']],[['label'=>'X','url'=>'https://user:pass@example.test']],[['label'=>'','url'=>'https://example.test']],array_fill(0,21,['label'=>'X','url'=>'https://example.test']),[['label'=>'X','url'=>'https://example.test'],['label'=>'Y','url'=>'https://example.test']]] as $invalid) {
     try{PublicSocialLinks::validate($invalid);throw new RuntimeException('Invalid social accepted');}catch(ApiException){$assert(true,'Unsafe social rejected');}
 }
