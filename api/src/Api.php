@@ -123,6 +123,10 @@ final class Api
                 $routes->addRoute('GET','/api/v1/locations','locations');
                 $routes->addRoute('GET','/api/v1/services','services');
                 $routes->addRoute('GET','/api/v1/public/services','publicServices');
+                $routes->addRoute('POST','/api/v1/public/practitioner-enquiries','submitPractitionerEnquiry');
+                $routes->addRoute('GET','/api/v1/admin/practitioner-enquiries','practitionerEnquiries');
+                $routes->addRoute('PATCH','/api/v1/admin/practitioner-enquiries/{id:\\d+}','updatePractitionerEnquiry');
+                $routes->addRoute('POST','/api/v1/admin/practitioner-enquiries/{id:\\d+}/notify','notifyPractitionerEnquiry');
                 $routes->addRoute('GET','/api/v1/public/services/{slug:[a-z0-9-]+}','publicService');
                 $routes->addRoute('GET','/api/v1/public/practitioners','publicPractitioners');
                 $routes->addRoute('GET','/api/v1/public/practitioners/{slug:[a-z0-9-]+}','publicPractitioner');
@@ -280,6 +284,10 @@ final class Api
                 $this->clinicContext->assertActive($this->database);
             }
             $data=match($route[1]){
+                'submitPractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->submit($this->clinicContext->clinicId,$request->body,$_SERVER['REMOTE_ADDR']??'unknown'),
+                'practitionerEnquiries'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->list($this->user($request),$this->clinicContext->clinicId,$request->query),
+                'updatePractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->update($this->user($request),$this->clinicContext->clinicId,(int)$route[2]['id'],$request->body,$request->correlationId),
+                'notifyPractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->retryNotification($this->user($request),$this->clinicContext->clinicId,(int)$route[2]['id']),
                 'travelFeeContext'=>(new \Wellness\Service\OnsiteFeeService($this->database))->context($this->user($request),(int)$route[2]['id']),
                 'waiveTravelFee'=>(new \Wellness\Service\OnsiteFeeService($this->database))->waive($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'sessionReceiptContext'=>$this->receipts()->context($this->user($request),(int)$route[2]['id']),
@@ -515,6 +523,13 @@ final class Api
         $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($request->bearerToken());
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        if(preg_match('#^clinics/(\d+)/practitioner-enquiries(?:/(settings|\d+)(/notify)?)?$#D',$path,$m)){
+            $enquiries=new \Wellness\Service\PractitionerEnquiryService($this->database);$clinic=(int)$m[1];$target=$m[2]??'';
+            if($request->method==='GET'&&$target==='')return $enquiries->list($actor,$clinic,$request->query);
+            if($request->method==='PUT'&&$target==='settings')return $enquiries->saveSettings($actor,$clinic,$request->body,$request->correlationId);
+            if($request->method==='PATCH'&&ctype_digit($target)&&empty($m[3]))return $enquiries->update($actor,$clinic,(int)$target,$request->body,$request->correlationId);
+            if($request->method==='POST'&&ctype_digit($target)&&!empty($m[3]))return $enquiries->retryNotification($actor,$clinic,(int)$target);
+        }
         $library=new \Wellness\Service\FormLibraryService($this->database);
         if($request->method==='GET'&&$path==='form-library')return $library->list($actor,$request->query);
         if($request->method==='POST'&&$path==='form-library')return $library->submit($actor,$request->body,$request->correlationId);

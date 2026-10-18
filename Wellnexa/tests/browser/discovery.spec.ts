@@ -34,7 +34,7 @@ test('sticky translucent menu remains visible and join page describes current of
   expect(await header.evaluate(el=>getComputedStyle(el).backgroundColor)).toMatch(/0\.86/)
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Join the collective'}).click()
   await expect(page).toHaveURL('http://localhost:5177/join')
-  await expect(page.getByRole('link',{name:'Ask about joining'})).toHaveAttribute('href','/contact?topic=joining')
+  await expect(page.getByRole('link',{name:'Ask about joining'})).toHaveAttribute('href','#enquiry-form')
 })
 test('unpublished or unknown detail has a useful recovery instead of a blank screen',async({page})=>{
   await page.goto('http://localhost:5177/practitioners/unpublished')

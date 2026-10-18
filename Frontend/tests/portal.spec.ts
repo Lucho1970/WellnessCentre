@@ -3592,6 +3592,15 @@ test("clinic-managed practitioner availability is read-only", async ({ page }) =
   await expect(page.getByRole("button", { name: "Add time off", exact: true })).toBeDisabled();
 });
 
+test('clinic admin reviews practitioner enquiries while recipient settings stay in central admin',async({page})=>{
+  await fixtures(page,['clinic_admin']);
+  await page.route('**/api/v1/admin/practitioner-enquiries**',route=>route.fulfill({json:{data:{items:[],has_more:false,settings:{recipient_email:'info@copihue.ca',enabled:true,revision:1,mail_configured:false}}}}));
+  await page.goto(`${portalHost}/admin/enquiries`);
+  await expect(page.getByText('No practitioner enquiries yet.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Manage the notification address in Application administration.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Enquiry notification email'})).toHaveCount(0);
+});
+
 test('practitioner saves multiple public social links and removes them', async ({ page }) => {
   await fixtures(page, ['practitioner']);
   let card = { public_name: 'Grace', booking_name: 'Grace', summary: '', summary_fr: '', public_contact_email: '', public_contact_phone: '', public_contact_sms: false, public_website_url: '', slug: 'grace', published: true, social_links: [] as {label:string;url:string}[] };

@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     host: 'localhost', port: 5175, strictPort: true,
     proxy: {
+      '/api/public/practitioner-enquiries': { target: 'https://wellnexa.copihue.ca', changeOrigin: true, rewrite: () => '/api/v1/public/practitioner-enquiries' },
       '/api/public/contact': { target: 'https://wellnexa.copihue.ca', changeOrigin: true, rewrite: () => '/api/v1/site-config' },
       '/api/public/services': { target: 'https://wellnexa.copihue.ca', changeOrigin: true, rewrite: () => '/api/v1/public/services' },
       '/api/public/practitioners': { target: 'https://wellnexa.copihue.ca', changeOrigin: true, rewrite: () => '/api/v1/public/practitioners' },

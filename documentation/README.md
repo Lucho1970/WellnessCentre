@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Practitioner enquiries and FAQ](PRACTITIONER_ENQUIRIES_RELEASE.md): public joining form, private admin inbox, editable central notification recipient and migration 047.
+
 - [Public services price correction](PUBLIC_SERVICE_PRICE_FIX.md): one-file API patch for services failing after the Wellnexa discovery release.
 
 - [Wellnexa discovery and social profiles](WELLNEXA_WEBSITE_DISCOVERY_RELEASE.md): sticky navigation, service/profile pages, joining information and practitioner social links; migration 046 and deployment.

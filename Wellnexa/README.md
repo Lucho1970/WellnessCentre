@@ -1,5 +1,7 @@
 # Wellnexa public website
 
+The homepage FAQ and `/join` enquiry form are described in [Practitioner enquiries and FAQ](../documentation/PRACTITIONER_ENQUIRIES_RELEASE.md), including migration 047, the central-admin recipient setting and deployment destinations. Enquiries are saved in the private clinic inbox before optional notification mail is attempted. The new POST bridge is limited to practitioner enquiries and does not change the read-only catalogue bridge.
+
 Website discovery includes sticky translucent navigation, service and practitioner detail pages, a practitioner joining page, and public social profile links. See [release and database instructions](../documentation/WELLNEXA_WEBSITE_DISCOVERY_RELEASE.md) for migration 046 and package destinations. Detail routes refresh through the root `.htaccess`; practitioners edit social links in the clinic portal's public card settings.
 
 React and TypeScript application for **Wellnexa — Virtual Wellness Collective**, intended for `wellnexa.ca`. This is the public website starter; booking, client accounts and staff operations remain in the existing clinic portal.

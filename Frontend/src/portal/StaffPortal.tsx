@@ -45,6 +45,7 @@ const RoomAdmin = lazy(() => import('../admin/RoomAdmin').then(module => ({ defa
 const ServiceAdmin = lazy(() => import('../admin/ServiceAdmin').then(module => ({ default: module.ServiceAdmin })));
 const CatalogueSettings = lazy(() => import('../admin/CatalogueSettings').then(module => ({ default: module.CatalogueSettings })));
 const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ default: module.StaffAdmin })));
+const PractitionerEnquiries = lazy(() => import('../admin/PractitionerEnquiries').then(module => ({default:module.PractitionerEnquiries})));
 const TeamAdmin = lazy(() => import('../admin/TeamAdmin').then(module => ({ default: module.TeamAdmin })));
 const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
@@ -79,6 +80,7 @@ const navigation: NavigationItem[] = [
   { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} /> },
   { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} /> },
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
+  { id: "enquiries", label: "Practitioner enquiries", description: "Review interest in joining the clinic", icon: <MailCheck size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
   { id: "notifications", label: "Notification status", description: "Review appointment notification delivery", icon: <MailCheck size={20} /> },
@@ -185,6 +187,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}
+        {page === "enquiries" && <PractitionerEnquiries />}
         {page === "widgets" && <DashboardWidgetAdmin />}
         {page === "notifications" && <NotificationStatusAdmin />}
         {page === "my_notifications" && <PractitionerNotifications />}

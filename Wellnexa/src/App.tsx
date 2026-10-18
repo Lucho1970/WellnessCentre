@@ -3,6 +3,7 @@ import './App.css'
 import { PublicCatalogue } from './catalogue/PublicCatalogue'
 import { Contact } from './Contact'
 import { Join } from './Join'
+import { Faq } from './Faq'
 
 function App() {
   const contactPage = /^\/contact\/?$/.test(window.location.pathname)
@@ -19,7 +20,7 @@ function App() {
           <span className="brand-mark" aria-hidden="true">W</span>
           <span>{site.name}</span>
         </a>
-        <nav className="main-nav" aria-label="Main navigation"><a href="/#services">Services</a><a href="/#practitioners">Practitioners</a><a href="/join" aria-current={joinPage?'page':undefined}>Join the collective</a><a href="/contact">Contact</a><a className="portal-link" href={site.portalUrl}>Clinic portal <span aria-hidden="true">↗</span></a></nav>
+        <nav className="main-nav" aria-label="Main navigation"><a href="/#services">Services</a><a href="/#practitioners">Practitioners</a><a href="/#faq">FAQ</a><a href="/join" aria-current={joinPage?'page':undefined}>Join the collective</a><a href="/contact">Contact</a><a className="portal-link" href={site.portalUrl}>Clinic portal <span aria-hidden="true">↗</span></a></nav>
       </header>
       <main id="main-content">
         {contactPage ? <Contact french={french} /> : joinPage ? <Join/> : <>{!detailPage&&<section className="welcome" aria-labelledby="welcome-title">
@@ -31,7 +32,7 @@ function App() {
         </section>}
         <PublicCatalogue />
         {!detailPage&&<section className="catalogue-section" aria-labelledby="booking-guide"><p className="eyebrow">Your next step</p><h2 id="booking-guide">How booking works</h2><ol className="booking-steps"><li>Explore a service and meet your practitioner.</li><li>Choose your practitioner, location and available time in the clinic portal.</li><li>Sign in, review the price and any travel fee, then confirm your appointment.</li></ol><p>Browsing a time does not reserve it. On-site eligibility is checked during booking.</p><a href="/join">Are you a practitioner? Explore joining Wellnexa →</a></section>}
-        </>}
+        {!detailPage&&<Faq/>}</>}
       </main>
       <footer className="site-footer"><span>{site.name}</span><a href={`/contact?lang=${french ? 'fr' : 'en'}`}>{french ? 'Contactez-nous' : 'Contact us'}</a><span>{site.descriptor}</span></footer>
     </div>

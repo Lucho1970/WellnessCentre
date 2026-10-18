@@ -1,4 +1,28 @@
 import { test, expect, type Page } from '@playwright/test';
+test('application admin changes the practitioner enquiry recipient and reviews a saved enquiry',async({page})=>{
+  await authentication(page);
+  await page.route('**/api/v1/application/me',route=>route.fulfill({json:{data:{id:1}}}));
+  await page.route('**/api/v1/application/clinics',route=>route.fulfill({json:{data:{items:[{id:4,name:'Wellnexa'}]}}}));
+  let settings={recipient_email:'info@copihue.ca',enabled:true,revision:1,mail_configured:true};
+  let item={id:91,reference:'10000000-0000-4000-8000-000000000001',full_name:'Synthetic applicant',email:'applicant@example.test',phone:'',discipline:'Massage therapy',credentials:'Synthetic',service_area:'Toronto',message:'Interested in joining',status:'new',revision:1,notification_status:'sent',created_at:'2026-10-18 12:00:00'};
+  await page.route('**/api/v1/application/clinics/4/practitioner-enquiries**',route=>{
+    if(route.request().method()==='PUT'){
+      expect(route.request().postDataJSON()).toEqual({recipient_email:'joining@example.test',enabled:true,revision:1});
+      settings={...settings,recipient_email:'joining@example.test',revision:2};return route.fulfill({json:{data:settings}});
+    }
+    if(route.request().method()==='PATCH'){
+      expect(route.request().postDataJSON()).toEqual({status:'contacted',revision:1});item={...item,status:'contacted',revision:2};return route.fulfill({json:{data:item}});
+    }
+    return route.fulfill({json:{data:{items:[item],has_more:false,settings}}});
+  });
+  await page.goto('http://localhost:5185/admin/');await page.getByRole('tab',{name:'Practitioner enquiries',exact:true}).click();
+  const recipient=page.getByRole('textbox',{name:'Enquiry notification email',exact:true});
+  await expect(recipient).toHaveValue('info@copihue.ca');await recipient.fill('joining@example.test');
+  await page.getByRole('button',{name:'Save enquiry settings',exact:true}).click();
+  await expect(page.getByText('Enquiry changes saved.',{exact:true})).toBeVisible();await expect(recipient).toHaveValue('joining@example.test');
+  await page.getByRole('combobox',{name:'Enquiry status'}).click();await page.getByRole('option',{name:'contacted',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:'Enquiry status'})).toContainText('contacted');
+});
 test('platform form library creates a template and approves its immutable version', async ({ page }) => {
   await authentication(page);
   await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));

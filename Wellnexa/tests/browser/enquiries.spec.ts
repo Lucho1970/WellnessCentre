@@ -1,0 +1,60 @@
+import { expect, test, type Page } from '@playwright/test'
+async function fill(page:Page) {
+  await page.getByLabel('Full name *',{exact:true}).fill('Synthetic Applicant')
+  await page.getByLabel('Email address *',{exact:true}).fill('applicant@example.test')
+  await page.getByLabel('Discipline / type of practice *',{exact:true}).fill('Massage therapy')
+  await page.getByLabel('City, province and service area *',{exact:true}).fill('Toronto, Ontario')
+  await page.getByLabel('Introduce yourself and the services you would like to offer *',{exact:true}).fill('A synthetic introduction for testing only.')
+  await page.getByRole('checkbox',{name:/I agree to the use/}).check()
+}
+test('FAQ expands with keyboard and links to joining information',async({page})=>{
+  await page.route('**/api/public/**',route=>route.fulfill({json:{data:[]}}))
+  await page.goto('http://localhost:5177/#faq')
+  const question=page.getByText('Why does the price say “From”?',{exact:true})
+  await question.focus();await page.keyboard.press('Enter')
+  await expect(page.getByText(/Prices can vary by practitioner and appointment duration/)).toBeVisible()
+  expect(await question.evaluate(el=>el.parentElement?.hasAttribute('open'))).toBe(true)
+})
+test('practitioner form stores an enquiry and displays its reference without claiming membership',async({page})=>{
+  let submitted:Record<string,unknown>|null=null
+  await page.route('**/api/public/practitioner-enquiries',route=>{submitted=route.request().postDataJSON();return route.fulfill({json:{data:{received:true,reference:submitted!.idempotency_key}}})})
+  await page.goto('http://localhost:5177/join');await fill(page)
+  await page.getByRole('button',{name:'Send enquiry',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Thank you for your interest'})).toBeVisible()
+  expect(submitted!['consent']).toBe(true)
+  await expect(page.getByText(/Your reference:/)).toBeVisible()
+  await expect(page.getByText('Submitting an enquiry does not create a practitioner account or confirm membership.')).toBeVisible()
+})
+test('unconfirmed submission retries the same immutable payload and reference',async({page})=>{
+  const attempts:Record<string,unknown>[]=[]
+  await page.route('**/api/public/practitioner-enquiries',route=>{
+    const body=route.request().postDataJSON();attempts.push(body)
+    return route.fulfill(attempts.length===1?{status:503,json:{error:{message:'Unavailable'}}}:{json:{data:{received:true,reference:body.idempotency_key}}})
+  })
+  await page.goto('http://localhost:5177/join');await fill(page)
+  await page.getByRole('button',{name:'Send enquiry',exact:true}).click()
+  await expect(page.getByRole('alert')).toContainText('We could not confirm receipt')
+  await expect(page.getByLabel('Full name *',{exact:true})).toBeDisabled()
+  await page.getByRole('button',{name:'Retry enquiry',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Thank you for your interest'})).toBeVisible()
+  expect(attempts).toHaveLength(2);expect(attempts[0]).toEqual(attempts[1])
+})
+test('confirmed validation error keeps fields editable and mobile layout within the viewport',async({page})=>{
+  await page.setViewportSize({width:390,height:844})
+  await page.route('**/api/public/practitioner-enquiries',route=>route.fulfill({status:422,json:{error:{message:'Check your enquiry details.'}}}))
+  await page.goto('http://localhost:5177/join');await fill(page)
+  await page.getByRole('button',{name:'Send enquiry',exact:true}).click()
+  await expect(page.getByRole('alert')).toContainText('Check your enquiry details.')
+  await expect(page.getByLabel('Full name *',{exact:true})).toBeEnabled()
+  await expect(page.getByLabel('Full name *',{exact:true})).toHaveValue('Synthetic Applicant')
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
+  await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}))
+  await page.screenshot({path:'test-results/join-enquiry-mobile.png',fullPage:true})
+})
+test('paused enquiries show a clear message without trapping the form in an uncertain retry',async({page})=>{
+  await page.route('**/api/public/practitioner-enquiries',route=>route.fulfill({status:503,json:{error:{code:'enquiries_closed',message:'Practitioner enquiries are temporarily closed. Please contact the clinic.'}}}))
+  await page.goto('http://localhost:5177/join');await fill(page)
+  await page.getByRole('button',{name:'Send enquiry',exact:true}).click()
+  await expect(page.getByRole('alert')).toContainText('temporarily closed')
+  await expect(page.getByLabel('Full name *',{exact:true})).toBeEnabled()
+})
