@@ -13,7 +13,7 @@ foreach($file in @('Frontend/.env.production','Frontend/.env.production.local'))
 $centralScripts=Get-ChildItem -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin/assets') -Filter '*.js' -File
 foreach($name in @('VITE_ENTRA_TENANT_ID','VITE_ENTRA_API_CLIENT_ID','VITE_ENTRA_SPA_CLIENT_ID')){
     $value=[Environment]::GetEnvironmentVariable($name,'Process');if([string]::IsNullOrWhiteSpace($value)){$value=$centralSettings[$name]}
-    if([string]::IsNullOrWhiteSpace($value)||-not @($centralScripts | Where-Object {[IO.File]::ReadAllText($_.FullName).Contains($value)}).Count){throw "Application administration is missing production setting: $name"}
+    if([string]::IsNullOrWhiteSpace($value) -or -not @($centralScripts | Where-Object {[IO.File]::ReadAllText($_.FullName).Contains($value)}).Count){throw "Application administration is missing production setting: $name"}
 }
 Push-Location (Join-Path $repo 'Wellnexa')
 $previousPortal=[Environment]::GetEnvironmentVariable('VITE_PORTAL_URL','Process')
