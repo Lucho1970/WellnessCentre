@@ -14,6 +14,8 @@
 
 This folder contains the living technical and delivery documentation for the Wellness Centre scheduling platform.
 
+- [Ontario PHIPA readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md): implemented safeguards, application gaps, unverified hosting/operational controls and required gates before using real patient data.
+
 Start with these two authoritative documents:
 
 - [Master Requirements](MASTER_REQUIREMENTS.md): product scope, retained features, role permissions, implementation baseline, delivery stages and acceptance criteria.
