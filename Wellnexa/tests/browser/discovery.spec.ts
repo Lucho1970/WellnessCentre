@@ -8,6 +8,7 @@ test('services open locally with detail, preparation and price before booking',a
   await page.goto('http://localhost:5177/')
   await page.getByRole('link',{name:'About this service'}).click()
   await expect(page).toHaveURL('http://localhost:5177/services/massage')
+  await expect(page.getByRole('navigation').getByRole('link',{name:'Services',exact:true})).toHaveAttribute('aria-current','page')
   await expect(page.getByText('Full published service description')).toBeVisible()
   await expect(page.getByText('Please bring comfortable clothing.')).toBeVisible()
   await expect(page.getByText(/From \$75.00 CAD/)).toBeVisible()
@@ -20,6 +21,7 @@ test('compact profiles open full biography with social links and practitioner bo
   await expect(page.getByText('Full published biography')).toHaveCount(0)
   await page.getByRole('link',{name:'Meet Esther →'}).click()
   await expect(page.getByText('Full published biography')).toBeVisible()
+  await expect(page.getByRole('navigation').getByRole('link',{name:'Practitioners',exact:true})).toHaveAttribute('aria-current','page')
   await expect(page.getByRole('link',{name:'Book with me'})).toHaveAttribute('href','https://wellnexa.copihue.ca/availability?practitioner_id=8')
   await expect(page.getByRole('link',{name:'Esther on Instagram (opens in a new tab)'})).toHaveAttribute('rel','noopener noreferrer')
   await page.setViewportSize({width:390,height:844})
@@ -34,7 +36,48 @@ test('sticky translucent menu remains visible and join page describes current of
   expect(await header.evaluate(el=>getComputedStyle(el).backgroundColor)).toMatch(/0\.86/)
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Join the collective'}).click()
   await expect(page).toHaveURL('http://localhost:5177/join')
+  await expect(page.getByRole('navigation').getByRole('link',{name:'Join the collective'})).toHaveAttribute('aria-current','page')
   await expect(page.getByRole('link',{name:'Ask about joining'})).toHaveAttribute('href','#enquiry-form')
+})
+
+for (const width of [1280, 390]) {
+  test(`section navigation aligns below the measured header and follows scrolling at ${width}px`,async({page})=>{
+    await page.setViewportSize({width,height:800})
+    await page.goto('http://localhost:5177/')
+    await expect(page.getByRole('link',{name:'Meet Esther →'})).toBeVisible()
+    const nav=page.getByRole('navigation',{name:'Main navigation'})
+    await expect(nav.locator('[aria-current]')).toHaveCount(0)
+    await nav.getByRole('link',{name:'Services',exact:true}).click()
+    await expect.poll(()=>page.evaluate(()=>Math.round(document.getElementById('services')!.getBoundingClientRect().top-document.querySelector('header')!.getBoundingClientRect().bottom))).toBe(8)
+    await expect(nav.getByRole('link',{name:'Services',exact:true})).toHaveAttribute('aria-current','location')
+    // Scroll without clicking a menu item: the current section follows in both directions.
+    for (const id of ['practitioners','faq','services']) {
+      await page.locator(`#${id}`).evaluate(el=>el.scrollIntoView({behavior:'instant',block:'start'}))
+      await expect(nav.locator('[aria-current]')).toHaveCount(1)
+      await expect(nav.locator(`[href="/#${id}"]`)).toHaveAttribute('aria-current','location')
+      await expect(page).toHaveURL(/#services$/)
+    }
+    await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}))
+    await expect(nav.locator('[aria-current]')).toHaveCount(0)
+    // Resizing to a wrapped menu must update the offset as well.
+    await page.setViewportSize({width:width===1280?390:1280,height:800})
+    await nav.getByRole('link',{name:'Services',exact:true}).click()
+    await expect.poll(()=>page.evaluate(()=>Math.round(document.getElementById('services')!.getBoundingClientRect().top-document.querySelector('header')!.getBoundingClientRect().bottom))).toBe(8)
+    await page.screenshot({path:`test-results/section-navigation-${width}.png`})
+  })
+}
+
+test('direct section links remain aligned after catalogue loading with reduced motion',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'})
+  await page.route('**/api/public/services',async route=>{
+    await new Promise(resolve=>setTimeout(resolve,500))
+    await route.fulfill({json:{data:Array.from({length:12},(_,i)=>({...service,slug:`massage-${i}`}))}})
+  })
+  await page.goto('http://localhost:5177/#practitioners')
+  await expect(page.getByRole('link',{name:'Meet Esther →'})).toBeVisible()
+  await expect.poll(()=>page.evaluate(()=>Math.round(document.getElementById('practitioners')!.getBoundingClientRect().top-document.querySelector('header')!.getBoundingClientRect().bottom))).toBe(8)
+  await expect(page.getByRole('navigation').getByRole('link',{name:'Practitioners',exact:true})).toHaveAttribute('aria-current','location')
+  expect(await page.evaluate(()=>getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto')
 })
 test('unpublished or unknown detail has a useful recovery instead of a blank screen',async({page})=>{
   await page.goto('http://localhost:5177/practitioners/unpublished')

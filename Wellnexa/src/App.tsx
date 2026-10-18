@@ -4,6 +4,7 @@ import { PublicCatalogue } from './catalogue/PublicCatalogue'
 import { Contact } from './Contact'
 import { Join } from './Join'
 import { Faq } from './Faq'
+import { SiteNavigation } from './SiteNavigation'
 
 function App() {
   const contactPage = /^\/contact\/?$/.test(window.location.pathname)
@@ -15,13 +16,7 @@ function App() {
   return (
     <div className="site-shell">
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <header className="site-header">
-        <a className="brand" href="/" aria-label={`${site.name} home`}>
-          <span className="brand-mark" aria-hidden="true">W</span>
-          <span>{site.name}</span>
-        </a>
-        <nav className="main-nav" aria-label="Main navigation"><a href="/#services">Services</a><a href="/#practitioners">Practitioners</a><a href="/#faq">FAQ</a><a href="/join" aria-current={joinPage?'page':undefined}>Join the collective</a><a href="/contact">Contact</a><a className="portal-link" href={site.portalUrl}>Clinic portal <span aria-hidden="true">↗</span></a></nav>
-      </header>
+      <SiteNavigation />
       <main id="main-content">
         {contactPage ? <Contact french={french} /> : joinPage ? <Join/> : <>{!detailPage&&<section className="welcome" aria-labelledby="welcome-title">
           <p className="eyebrow">{site.descriptor}</p>
