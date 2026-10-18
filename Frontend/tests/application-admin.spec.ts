@@ -1,4 +1,22 @@
 import { test, expect, type Page } from '@playwright/test';
+
+test('global discovery settings save revisioned distances and expose conflicts',async({page})=>{
+  await authentication(page);
+  await page.route('**/api/v1/application/me',route=>route.fulfill({json:{data:{id:1}}}));
+  await page.route('**/api/v1/application/clinics',route=>route.fulfill({json:{data:{items:[]}}}));
+  let settings={extra_km:25,cap_km:100,revision:1};
+  await page.route('**/api/v1/application/discovery-settings',route=>{
+    if(route.request().method()==='PUT'){expect(route.request().postDataJSON()).toEqual({extra_km:30,cap_km:100,revision:1});settings={extra_km:30,cap_km:100,revision:2};}
+    return route.fulfill({json:{data:settings}});
+  });
+  await page.goto('http://localhost:5185/admin/');await page.getByRole('tab',{name:'Location discovery settings',exact:true}).click();
+  await expect(page.getByLabel('Extra enquiry allowance (km)')).toHaveValue('25');
+  await page.getByLabel('Extra enquiry allowance (km)').fill('30');
+  await page.getByRole('button',{name:'Save discovery settings',exact:true}).click();
+  await expect(page.getByText('Discovery settings saved.',{exact:true})).toBeVisible();
+  await page.route('**/api/v1/application/discovery-settings',route=>route.fulfill({status:409,json:{error:{code:'settings_changed',message:'Discovery settings changed. Reload and try again.'}}}));
+  await page.getByRole('button',{name:'Save discovery settings',exact:true}).click();await expect(page.getByRole('alert')).toBeVisible();
+});
 test('application admin changes the practitioner enquiry recipient and reviews a saved enquiry',async({page})=>{
   await authentication(page);
   await page.route('**/api/v1/application/me',route=>route.fulfill({json:{data:{id:1}}}));

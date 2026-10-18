@@ -6,8 +6,10 @@ import { customerConfigured, customerHome, customerInstance, selectCustomerAccou
 import { finishCustomerLogin } from './session';
 import { bookingSignInKey, captureCustomerBookingIntent, customerBookingIntent } from './bookingIntent';
 import { captureAppointmentLink } from './appointmentLink';
+import { captureTravelIntent } from '../discovery/travelIntent';
 
 export async function bootstrap() {
+  captureTravelIntent();
   captureAppointmentLink(customerHome);
   if (window.location.pathname === `${import.meta.env.BASE_URL}client` && new URLSearchParams(window.location.search).get('return') === 'browse') {
     sessionStorage.setItem('wellness.customer.return-to-browse.v1', 'pending');

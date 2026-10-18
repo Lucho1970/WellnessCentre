@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { ApiError } from '../shared/api';
 import { TextField, useFormValidation, withFormValidation } from '../shared/FormValidation';
+import { DiscoveryPreferences } from '../discovery/DiscoverySettings';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Assignment = {
@@ -76,6 +77,7 @@ export function PractitionerTravelSettings() {
   return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
     <Stack spacing={2}>
       <Typography variant="h5">{t('My travel settings')}</Typography>
+      <DiscoveryPreferences request={request}/>
       <Typography>{t('Set travel distances, fees and buffers for your assigned On-Site services in this clinic. Other clinics and existing appointments keep their settings.')}</Typography>
       <Typography variant="body2">{t('The free distance is included. Beyond it, the flat fee applies up to your maximum distance. Travel time is reserved before and after each new visit.')}</Typography>
       {message && <Alert severity="success">{message}</Alert>}

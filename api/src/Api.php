@@ -85,6 +85,15 @@ final class Api
             if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
                 Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
             }
+            if (str_starts_with($request->path,'/api/v1/public/discovery/') || $request->path==='/api/v1/profile/discovery-preferences' || str_starts_with($request->path,'/api/v1/travel-enquiries')) {
+                $this->clinicContext->assertActive($this->database);header('Cache-Control: no-store');
+                $discovery=$this->discovery();
+                if($request->path==='/api/v1/public/discovery/options'&&$request->method==='GET')Response::json(['data'=>$discovery->options()],200,$request->correlationId);
+                if($request->path==='/api/v1/public/discovery/search'&&$request->method==='POST')Response::json(['data'=>$discovery->search($this->clinicContext->clinicId,$request->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'))],200,$request->correlationId);
+                if($request->path==='/api/v1/profile/discovery-preferences'&&in_array($request->method,['GET','PUT'],true))Response::json(['data'=>$discovery->preferences($this->user($request),$request->method==='PUT'?$request->body:null,$request->correlationId)],200,$request->correlationId);
+                if(str_starts_with($request->path,'/api/v1/travel-enquiries'))Response::json(['data'=>$this->travelRoute($this->user($request),$request,substr($request->path,strlen('/api/v1/')))],200,$request->correlationId);
+                throw new ApiException(404,'not_found','Route not found.');
+            }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
                 $routes->addRoute('GET','/api/v1/appointments/{id:\d+}/travel-fee','travelFeeContext');
@@ -523,6 +532,8 @@ final class Api
         $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($request->bearerToken());
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        if($path==='discovery-settings'&&$request->method==='GET')return $this->discovery()->settings();
+        if($path==='discovery-settings'&&$request->method==='PUT')return $this->discovery()->saveSettings($actor,$request->body,$request->correlationId);
         if(preg_match('#^clinics/(\d+)/practitioner-enquiries(?:/(settings|\d+)(/notify)?)?$#D',$path,$m)){
             $enquiries=new \Wellness\Service\PractitionerEnquiryService($this->database);$clinic=(int)$m[1];$target=$m[2]??'';
             if($request->method==='GET'&&$target==='')return $enquiries->list($actor,$clinic,$request->query);
@@ -582,6 +593,8 @@ final class Api
         $identity = $session['identity_id'];
         unset($session['identity_id']);
         $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        if(str_starts_with(substr($r->path,strlen('/api/v1/customer/')),'travel-enquiries'))return $this->travelRoute($bookingActor(),$r,substr($r->path,strlen('/api/v1/customer/')));
+        if($route==='POST discovery/search')return $this->discovery()->search($this->clinicContext->clinicId,$r->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'));
         if($route==='GET receipts')return $this->receipts()->list($bookingActor(),$r->query);
         if(preg_match('#^GET receipts/(\d+)/pdf$#',$route,$receiptMatch))return $this->receipts()->pdf($bookingActor(),(int)$receiptMatch[1],$r->correlationId);
         $forms=new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database));
@@ -617,6 +630,22 @@ final class Api
         };
     }
 
+    private function discovery(): \Wellness\Service\LocationDiscoveryService
+    {
+        return new \Wellness\Service\LocationDiscoveryService($this->database,$this->config);
+    }
+    private function travelRoute(AuthContext $actor,Request $request,string $path): array
+    {
+        header('Cache-Control: no-store');
+        $service=new \Wellness\Service\TravelEnquiryService($this->database,$this->discovery());
+        if($path==='travel-enquiries'&&$request->method==='GET')return $service->list($actor,$request->query);
+        if($path==='travel-enquiries'&&$request->method==='POST')return $service->create($actor,$request->body,$request->correlationId);
+        if(preg_match('#^travel-enquiries/(\d+)(?:/(reply|read|close))?$#D',$path,$match)){
+            if($request->method==='GET'&&!isset($match[2]))return $service->detail($actor,(int)$match[1],$request->query);
+            if($request->method==='POST'&&isset($match[2]))return $service->act($actor,(int)$match[1],$match[2],$request->body,$request->correlationId);
+        }
+        throw new ApiException(404,'not_found','Route not found.');
+    }
     private function receipts(): \Wellness\Service\SessionReceiptService
     {
         return new \Wellness\Service\SessionReceiptService($this->database,new AuditLogger($this->database));

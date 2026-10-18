@@ -1,3 +1,5 @@
+import { LocationSearch, type SearchResult } from '../discovery/LocationSearch';
+import { publicDiscoveryRequest } from '../discovery/publicRequest';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { RecurringBooking } from '../booking/RecurringBooking';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -20,22 +22,23 @@ const emptyDestination = (): Destination => ({ address_line1:'', address_line2:'
 const unique = (rows: Combination[], key: keyof Combination) => [...new Map(rows.map(row => [String(row[key]), row])).values()];
 const today = (zone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 
-function CustomerBookingForm({ cancel, complete, onLockedChange }: { onLockedChange?: (locked: boolean) => void; cancel: () => void; complete: (id: number, message?: string) => void }) {
+function CustomerBookingForm({ cancel, complete, onLockedChange, selection, onDiscover }: { onDiscover?:()=>void; selection?: {location_id:number;service_id:number;practitioner_id:number}; onLockedChange?: (locked: boolean) => void; cancel: () => void; complete: (id: number, message?: string) => void }) {
   const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   useEffect(() => () => onLockedChange?.(false), [onLockedChange]);
   const [intent] = useState(customerBookingIntent);
+  const [search,setSearch]=useState<SearchResult|null>(null);
   const [options,setOptions]=useState<Combination[]>([]),[rooms,setRooms]=useState<Room[]>([]);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [step,setStep]=useState(0),[mode,setMode]=useState<'clinic'|'mobile'>(intent?.delivery_mode??'mobile');
   const [intentStatus,setIntentStatus]=useState<'checking'|'available'|'unavailable'|'invalid'|null>(intent?'checking':null);
   const [intentForwarded,setIntentForwarded]=useState(false);
-  const [location,setLocation]=useState(intent?.location_id??''),[service,setService]=useState(intent?.service_id??''),[practitioner,setPractitioner]=useState(intent?.practitioner_id??''),[duration,setDuration]=useState(intent?.duration_option_id??''),[date,setDate]=useState(''),[room,setRoom]=useState('');
+  const [location,setLocation]=useState(intent?.location_id??String(selection?.location_id??'')),[service,setService]=useState(intent?.service_id??String(selection?.service_id??'')),[practitioner,setPractitioner]=useState(intent?.practitioner_id??String(selection?.practitioner_id??'')),[duration,setDuration]=useState(intent?.duration_option_id??''),[date,setDate]=useState(''),[room,setRoom]=useState('');
   const [slots,setSlots]=useState<Slot[]>([]),[slot,setSlot]=useState<Slot|null>(null),[searched,setSearched]=useState(false);
   const [destination,setDestination]=useState<Destination>(emptyDestination),[coverage,setCoverage]=useState<Coverage|null>(null),[coverageBusy,setCoverageBusy]=useState(false),[addressLoaded,setAddressLoaded]=useState(false),[areaApproved,setAreaApproved]=useState(false);
   const [pending,setPending]=useState<Payload|null>(null); const pendingRef=useRef<Payload|null>(null), sending=useRef(false);
   useEffect(() => { onLockedChange?.(busy); }, [busy, onLockedChange]);
-  const eligible=useMemo(()=>options.filter(row=>Number(mode==='mobile'?row.offers_mobile:row.offers_clinic)),[mode,options]);
+  const eligible=useMemo(()=>options.filter(row=>Number(mode==='mobile'?row.offers_mobile:row.offers_clinic)&&(mode!=='mobile'||!search||search.matches.some(match=>match.status==='within_area'&&match.practitioner_id===Number(row.practitioner_id)&&match.service_id===Number(row.service_id)&&match.location_id===Number(row.location_id)))),[mode,options,search]);
   const locationRows=eligible.filter(row=>String(row.location_id)===location), serviceRows=locationRows.filter(row=>String(row.service_id)===service), practitionerRows=serviceRows.filter(row=>String(row.practitioner_id)===practitioner);
   const selected=practitionerRows.find(row=>String(row.duration_option_id)===duration);
   const timezone=options.find(row=>String(row.location_id)===location)?.timezone??'America/Toronto';
@@ -85,8 +88,9 @@ function CustomerBookingForm({ cancel, complete, onLockedChange }: { onLockedCha
     {intentStatus==='unavailable'&&<Alert severity="warning" sx={{mb:2}}>{t('The time you selected before sign-in is no longer available. Please choose another time.')}</Alert>}
     {loading?<CircularProgress aria-label={t('Loading booking options')}/>:options.length===0?<Alert severity="info">{t('No booking combinations are configured. Check active services, durations, practitioners, and location assignments in administration.')}</Alert>:<>
       {step===0&&<Stack spacing={3}>
+        {mode==='mobile'&&<><LocationSearch request={publicDiscoveryRequest} onResult={value=>{setSearch(value);if(value&&!value.matches.some(row=>row.status==='within_area'&&row.practitioner_id===Number(practitioner)&&row.service_id===Number(service)&&row.location_id===Number(location))){setPractitioner('');setDuration('');setCoverage(null);}}} defaultArea={addressLoaded&&addressComplete?[destination.address_line1,destination.city,destination.province,destination.postal_code,destination.country].join(', '):undefined} t={t}/>{onDiscover&&<Button onClick={onDiscover}>{t('Find nearby care')}</Button>}</>}
         <TextField name="delivery_mode" select label={t('Visit type')} value={mode} onChange={event=>resetCare(event.target.value as 'clinic'|'mobile')}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
-        {eligible.length===0&&<Alert severity="info">{t('No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
+        {eligible.length===0&&<Alert severity="info">{t(search&&mode==='mobile'?'No practitioners within normal coverage for this selection.':'No services are configured for this visit type. Enable it under Service assignments and choose a base location.')}</Alert>}
         <Grid container spacing={2}><Grid size={{xs:12,sm:6}}>{select(t('Base location / service area'),location,eligible,'location_id',row=>row.location_name,value=>{setLocation(value);setService('');setPractitioner('');setDuration('');setCoverage(null);clearSlots();})}</Grid><Grid size={{xs:12,sm:6}}>{select(t('Service'),service,locationRows,'service_id',row=>row.service_name,value=>{setService(value);setPractitioner('');setDuration('');setCoverage(null);clearSlots();})}</Grid><Grid size={{xs:12,sm:6}}>{select(t('Practitioner'),practitioner,serviceRows,'practitioner_id',row=>row.practitioner_name,value=>{setPractitioner(value);setDuration('');setCoverage(null);clearSlots();})}</Grid><Grid size={{xs:12,sm:6}}>{select(t('Duration'),duration,practitionerRows,'duration_option_id',row=>t('{{minutes}} minutes — {{price}}',{minutes:row.duration_minutes,price:formatCad(Number(row.base_price_cents),i18n.resolvedLanguage)}),value=>{setDuration(value);clearSlots();})}</Grid></Grid>
         {mode==='mobile'&&<Stack spacing={2}><Typography variant="h6">{t('Visit address')}</Typography>{addressLoaded&&addressComplete&&<Alert severity="info">{t('The saved client address is loaded. You can replace it using Google address suggestions. Changes apply only to this appointment.')}</Alert>}<AddressEntry required showInstructions disabled={coverageBusy} value={destination} onChange={value=>{setDestination({...value,instructions:value.instructions??''});setCoverage(null);setAreaApproved(false);}}/><Alert severity="info">{t('Google validates your visit address and checks whether it is within the practitioner’s On-Site service area.')}</Alert>{areaApproved&&<Alert severity="success">{t('Clinic staff approved this address for the selected On-Site service. You can book without another distance check.')}</Alert>}<Button variant="outlined" disabled={!selected||!addressComplete||coverageBusy} onClick={()=>void validateCoverage()}>{t(coverageBusy?'Validating address…':'Validate address and coverage')}</Button>{coverage&&<Alert severity="info">{t('Travel fee for this address: {{fee}} CAD', { fee: formatCad(mobileFee,i18n.resolvedLanguage) })}</Alert>}{coverage&&<Alert severity="success">{t('Your address is within the practitioner’s On-Site service area.')}</Alert>}</Stack>}
         <Button variant="contained" disabled={!selected||!addressReady} onClick={()=>{setDate(date||today(timezone));setStep(1);}}>{t('Find a time')}</Button>

@@ -2783,6 +2783,32 @@ test("clinic welcome and category translations can be edited without rebuilding"
   await expect.poll(()=>category?.name_fr).toBe('Massothérapie');
 });
 
+test('guest availability keeps location hints and removes enquiry-only practitioners from booking choices',async({page})=>{
+  await fixtures(page);
+  await page.route('**/api/v1/locations',route=>route.fulfill({json:{data:[{id:1,name:'First base'},{id:5,name:'Selected base'}]}}));
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/discovery/search',route=>route.fulfill({json:{data:{point:{latitude:43.6,longitude:-79.4},label:'Synthetic area',settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:3,service_id:2,location_id:5,practitioner_slug:'test',service_slug:'massage',status:'enquiry_only',token:'ZXh0cmE=',starting_price_cents:10000}]}}}));
+  await page.goto(`${portalHost}/services/massage/book?practitioner_id=3&location_id=5`);
+  await expect(page.getByRole('combobox',{name:/^Base location \/ service area/})).toContainText('Selected base');
+  await page.getByLabel('City, postal code or address').fill('Toronto');await page.getByRole('button',{name:'Search this area',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:/^Practitioner\b/})).toHaveAttribute('aria-disabled','true');
+  await expect(page.getByRole('link',{name:'Ask about travel',exact:true})).toHaveAttribute('href','/client#travel=ZXh0cmE%3D');
+});
+
+test('guest location search filters services and offers enquiry instead of booking beyond normal coverage',async({page})=>{
+  await fixtures(page);
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/services',route=>route.fulfill({json:{data:[{slug:'massage',name:'Massage',category_id:3,category:'Bodywork',durations:[{minutes:60,price_cents:7500}],offers_mobile:true},{slug:'nutrition',name:'Nutrition',category_id:4,category:'Nutrition',durations:[{minutes:60,price_cents:9500}]}]}}));
+  await page.route('**/api/v1/public/practitioners',route=>route.fulfill({json:{data:[{slug:'esther',public_name:'Esther',booking_practitioner_id:8,services:[{slug:'massage'}]}]}}));
+  await page.route('**/api/v1/public/discovery/search',route=>route.fulfill({json:{data:{point:{latitude:43.6,longitude:-79.4},label:'Synthetic area',settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:8,service_id:13,location_id:8,practitioner_slug:'esther',service_slug:'massage',status:'enquiry_only',token:'ZXh0cmE=',starting_price_cents:8500}]}}}));
+  await page.goto(portalHost);
+  await page.getByLabel('City, postal code or address').fill('Toronto');await page.getByRole('button',{name:'Search this area',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Nutrition',exact:true})).toHaveCount(0);
+  await expect(page.getByText('Starting price: $85.00',{exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Ask about travel',exact:true})).toHaveAttribute('href','/client#travel=ZXh0cmE%3D');
+  await expect(page.getByRole('link',{name:'Book this treatment',exact:true})).toHaveCount(0);
+});
+
 test("guest catalogue groups multilingual treatments and links public practitioner profiles",async({page})=>{
   await fixtures(page);
   await page.route('**/api/v1/site-config',route=>route.fulfill({json:{data:{name:'Willow',welcome_title_en:'Welcome to Willow',welcome_title_fr:'Bienvenue chez Willow',welcome_body_en:'Care at your pace.',welcome_body_fr:'Des soins à votre rythme.'}}}));
@@ -3842,6 +3868,28 @@ test('French mobile field errors stay accessible with reduced motion', async ({p
   await expect(phone).toBeInViewport();
 });
 
+
+test('practitioner controls extra-distance enquiries and replies privately through the travel inbox',async({page})=>{
+  await fixtures(page,['practitioner']);
+  let allow=true;
+  await page.route('**/api/v1/profile/discovery-preferences',route=>{
+    if(route.request().method()==='PUT'){expect(route.request().postDataJSON()).toEqual({service_id:13,allow_extra:false});allow=false;}
+    return route.fulfill({json:{data:{items:[{service_id:13,name:'Synthetic travel preference',allow_extra:allow}]}}});
+  });
+  await page.route('**/api/v1/travel-enquiries',route=>route.fulfill({json:{data:{items:[{id:91,status:'open',service_name:'Massage',client_name:'Synthetic client',practitioner_name:'Esther',unread:1}],unread_count:1,next_before:null}}}));
+  const messages=[{id:201,body:'Could you travel to my area?',created_at:'2026-10-18 16:00:00',sender_name:'Client'}];
+  await page.route('**/api/v1/travel-enquiries/91',route=>route.fulfill({json:{data:{id:91,status:'open',search_label:'Synthetic area',practitioner_name:'Esther',service_name:'Massage',messages,next_after:null}}}));
+  await page.route('**/api/v1/travel-enquiries/91/read',route=>route.fulfill({json:{data:{saved:true}}}));
+  await page.route('**/api/v1/travel-enquiries/91/reply',route=>{expect(route.request().postDataJSON()).toMatchObject({message:'Please ask the clinic to arrange this.'});messages.push({id:202,body:'Please ask the clinic to arrange this.',created_at:'2026-10-18 16:01:00',sender_name:'Clinic team'});return route.fulfill({json:{data:{saved:true}}});});
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByLabel('Synthetic travel preference',{exact:true}).uncheck();
+  await expect(page.getByLabel('Synthetic travel preference',{exact:true})).not.toBeChecked();
+  await page.goto(`${portalHost}/practitioner/travel-enquiries`);
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  await page.getByLabel('Your reply',{exact:true}).fill('Please ask the clinic to arrange this.');
+  await page.getByRole('button',{name:'Send reply',exact:true}).click();
+  await expect(page.getByText('Please ask the clinic to arrange this.',{exact:true})).toBeVisible();
+});
 
 test('practitioner travel settings save only the selected assigned service and persist on reload', async ({ page }) => {
   await fixtures(page, ['practitioner']);

@@ -18,7 +18,7 @@ final readonly class Request
     {
         $headers = function_exists('getallheaders') ? getallheaders() : [];
         $requestPath=parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-        $customer = str_starts_with($requestPath, '/api/v1/customer/') || $requestPath==='/api/v1/public/practitioner-enquiries';
+        $customer = str_starts_with($requestPath, '/api/v1/customer/') || str_starts_with($requestPath,'/api/v1/public/') || str_starts_with($requestPath,'/api/v1/travel-enquiries') || $requestPath==='/api/v1/profile/discovery-preferences';
         $raw = ($customer ? file_get_contents('php://input', false, null, 0, 65537) : file_get_contents('php://input')) ?: '';
         if ($customer && strlen($raw) > 65536) throw new ApiException(413, 'request_too_large', 'The request is too large.');
         $body = $raw === '' ? [] : json_decode($raw, true);

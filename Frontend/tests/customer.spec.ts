@@ -6,6 +6,51 @@ import {
 } from "../src/customer/providerRouting";
 import type { AccountInfo } from "@azure/msal-browser";
 
+test('client discovers from a saved address and sends a duplicate-safe travel enquiry before reading a reply',async({page})=>{
+  await fixture(page,true);
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments','book_own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**',route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route('**/api/v1/customer/profile',route=>route.fulfill({json:{data:{address:{address_line1:'1 Synthetic Street',city:'Toronto',province:'Ontario',postal_code:'M5V 1A1',country:'Canada'}}}}));
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/practitioners',route=>route.fulfill({json:{data:[{slug:'esther',public_name:'Esther'}]}}));
+  await page.route('**/api/v1/public/services',route=>route.fulfill({json:{data:[{slug:'massage',name:'Massage'}]}}));
+  await page.route('**/api/v1/customer/discovery/search',route=>{expect(route.request().postDataJSON()).toMatchObject({area:'1 Synthetic Street, Toronto, Ontario, M5V 1A1, Canada'});return route.fulfill({json:{data:{label:'Synthetic area',point:{latitude:43.6,longitude:-79.4},settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:8,service_id:13,location_id:8,practitioner_slug:'esther',service_slug:'massage',status:'enquiry_only',token:'synthetic-proof',starting_price_cents:7500}]}}});});
+  let received:any=null,attempts=0;
+  await page.route('**/api/v1/customer/travel-enquiries',route=>{
+    if(route.request().method()==='POST'){
+      const body=route.request().postDataJSON();attempts++;if(!received)received=body;else expect(body).toEqual(received);
+      return attempts===1?route.abort('failed'):route.fulfill({json:{data:{id:81}}});
+    }
+    return route.fulfill({json:{data:{items:received?[{id:81,status:'open',service_name:'Massage',practitioner_name:'Esther',client_name:'Client',unread:1}]:[],unread_count:received?1:0,next_before:null}}});
+  });
+  await page.route('**/api/v1/customer/travel-enquiries/81',route=>route.fulfill({json:{data:{id:81,status:'open',search_label:'Synthetic area',service_name:'Massage',practitioner_name:'Esther',messages:[{id:101,body:'Please ask staff to arrange a visit.',created_at:'2026-10-18 15:00:00',sender_name:'Clinic team'}],next_after:null}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81/read',route=>route.fulfill({json:{data:{saved:true}}}));
+  await page.goto('http://localhost:5184/client#discover=1');
+  await expect(page.getByText('Travel approval required',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Ask about travel',exact:true}).click();
+  await page.getByLabel('Your message',{exact:true}).fill('Would you consider extra travel?');
+  await page.getByRole('button',{name:'Send travel enquiry',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Retry same enquiry',exact:true})).toBeEnabled();
+  await expect(page.getByRole('textbox',{name:'Your message',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Retry same enquiry',exact:true}).click();
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  await expect(page.getByText('Please ask staff to arrange a visit.',{exact:true})).toBeVisible();
+  expect(attempts).toBe(2);expect(received).toMatchObject({token:'synthetic-proof',search_label:'Synthetic area'});
+});
+
+test('signed-in booking defaults to saved-address filtering and keeps extra-distance matches out of booking choices',async({page})=>{
+  await fixture(page,true);
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['book_own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**',route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route('**/api/v1/customer/booking-options',route=>route.fulfill({json:{data:{default_location_id:8,rooms:[],combinations:[{location_id:8,location_name:'Virtual clinic',timezone:'America/Toronto',service_id:13,service_name:'Massage',practitioner_id:8,practitioner_name:'Esther',duration_option_id:4,duration_minutes:60,offers_mobile:1,offers_clinic:0,base_price_cents:7500,mobile_fee_cents:0}]}}}));
+  await page.route('**/api/v1/customer/profile',route=>route.fulfill({json:{data:{address:{address_line1:'1 Synthetic Street',city:'Toronto',province:'Ontario',postal_code:'M5V 1A1',country:'Canada'}}}}));
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/discovery/search',route=>{expect(route.request().postDataJSON()).toMatchObject({area:'1 Synthetic Street, Toronto, Ontario, M5V 1A1, Canada'});return route.fulfill({json:{data:{label:'Synthetic area',point:{latitude:43.6,longitude:-79.4},settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:8,service_id:13,location_id:8,practitioner_slug:'esther',service_slug:'massage',status:'enquiry_only',token:'synthetic-proof',starting_price_cents:7500}]}}});});
+  await page.goto('http://localhost:5184/client');await page.getByRole('button',{name:'Book appointment',exact:true}).click();
+  await expect(page.getByText('No practitioners within normal coverage for this selection.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Find nearby care',exact:true}).last()).toBeVisible();
+});
+
 test('clients retrieve receipt PDFs and see voided receipts on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await fixture(page, true);

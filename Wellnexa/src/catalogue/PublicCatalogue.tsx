@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 import { site } from '../config/site'
 import { fetchCatalogue, type PublicPractitioner, type PublicService } from './api'
 import { PractitionerDetails, ServiceDetails, ServicePrice } from './Details'
+import { LocationSearch, TravelMatchActions, type SearchResult } from '../../../Frontend/src/discovery/LocationSearch'
+
+const discoveryRequest = async (path: string, body?: unknown) => {
+  const response = await fetch(path.replace('/public/', '/api/public/'), { method: body === undefined ? 'GET' : 'POST', credentials: 'omit', cache: 'no-store', headers: {'Content-Type':'application/json'}, ...(body === undefined ? {} : {body:JSON.stringify(body)}), signal:AbortSignal.timeout(45000) })
+  const json=await response.json()
+  if(!response.ok||!json.data)throw new Error(json.error?.message??'Location search is temporarily unavailable.')
+  return json.data
+}
 
 type CatalogueState = { services: PublicService[] | null; practitioners: PublicPractitioner[] | null; serviceError: boolean; practitionerError: boolean }
 const initial: CatalogueState = { services: null, practitioners: null, serviceError: false, practitionerError: false }
@@ -24,6 +32,7 @@ function PractitionerPhoto({ person }: { person: PublicPractitioner }) {
 export function PublicCatalogue() {
   const [state, setState] = useState<CatalogueState>(initial)
   const [reload, setReload] = useState(0)
+  const [search,setSearch]=useState<SearchResult|null>(null)
   useEffect(() => {
     const controller = new AbortController()
     const load = async () => {
@@ -49,21 +58,25 @@ export function PublicCatalogue() {
   return <>
     <section className="catalogue-section" id="services" aria-labelledby="services-title">
       <p className="eyebrow">Explore your options</p><h2 id="services-title">Our services</h2>
+      <LocationSearch request={discoveryRequest} onResult={setSearch} savedAddressLink={`${site.portalUrl.replace(/\/$/,'')}/client#discover=1`}/>
       <CatalogueFeedback label="services" loading={!state.services && !state.serviceError} error={state.serviceError} empty={state.services?.length === 0} onRetry={retry}/>
-      <div className="catalogue-grid">{state.services?.map(service => <article className="catalogue-card" key={service.slug}>
+      <div className="catalogue-grid">{state.services?.filter(service=>!search||search.matches.some(row=>row.service_slug===service.slug)).map(service => <article className="catalogue-card" key={service.slug}>
         {service.category && <p className="card-eyebrow">{service.category}</p>}<h3><a className="profile-link" href={`/services/${service.slug}`}>{service.name}</a></h3>
         {service.public_summary && <p className="card-summary">{service.public_summary}</p>}
-        <ServicePrice service={service}/>
+        {search?<p>From {new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(Math.min(...search.matches.filter(row=>row.service_slug===service.slug).map(row=>row.starting_price_cents))/100)} CAD · travel fees may apply</p>:<ServicePrice service={service}/>}
+        {search&&<TravelMatchActions matches={search.matches.filter(row=>row.service_slug===service.slug)} portal={site.portalUrl.replace(/\/$/,'')}/>}
         <a className="card-link" href={`/services/${service.slug}`}>About this service →</a>
       </article>)}</div>
     </section>
     <section className="catalogue-section" id="practitioners" aria-labelledby="practitioners-title">
       <p className="eyebrow">Get to know the collective</p><h2 id="practitioners-title">Our practitioners</h2>
+      {search&&<p>Using your selected search area. <a href="#services">Change search area</a>{!search.matches.length&&' No practitioners match your current location filter.'}</p>}
       <CatalogueFeedback label="practitioners" loading={!state.practitioners && !state.practitionerError} error={state.practitionerError} empty={state.practitioners?.length === 0} onRetry={retry}/>
-      <div className="catalogue-grid practitioner-grid">{state.practitioners?.map(person => <article className="catalogue-card practitioner-compact" key={person.slug}>
+      <div className="catalogue-grid practitioner-grid">{state.practitioners?.filter(person=>!search||search.matches.some(row=>row.practitioner_slug===person.slug)).map(person => <article className="catalogue-card practitioner-compact" key={person.slug}>
         <PractitionerPhoto key={person.image_version ?? 'no-photo'} person={person}/>
         <h3><a className="profile-link" href={`/practitioners/${person.slug}`}>{person.public_name}</a></h3>{(person.public_title || person.discipline) && <p className="card-eyebrow">{person.public_title || person.discipline}</p>}
         {person.credentials && <p>{person.credentials}</p>}
+        {search&&<TravelMatchActions matches={search.matches.filter(row=>row.practitioner_slug===person.slug)} portal={site.portalUrl.replace(/\/$/,'')}/>}
         <a className="card-link" href={`/practitioners/${person.slug}`}>Meet {person.public_name} →</a>
       </article>)}</div>
     </section>

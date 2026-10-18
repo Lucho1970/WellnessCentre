@@ -1,3 +1,5 @@
+import { LocationSearch, TravelMatchActions, type SearchResult } from '../discovery/LocationSearch';
+import { publicDiscoveryRequest } from '../discovery/publicRequest';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Button, CircularProgress, Container, Grid, MenuItem, Paper, Stack, Typography } from '@mui/material';
@@ -25,11 +27,13 @@ function GuestBookingForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedPractitionerId = /^\d+$/.test(searchParams.get('practitioner_id') ?? '') ? searchParams.get('practitioner_id')! : '';
+  const requestedLocationId = /^\d+$/.test(searchParams.get('location_id') ?? '') ? searchParams.get('location_id')! : '';
   const bookingSlug = location.pathname.match(/^\/services\/([a-z0-9-]+)\/book$/)?.[1] ?? '';
   const requestedServiceSlug = bookingSlug || (/^[a-z0-9-]+$/.test(searchParams.get('service') ?? '') ? searchParams.get('service')! : '');
   const requestedDuration = /^\d+$/.test(searchParams.get('duration') ?? '') ? Number(searchParams.get('duration')) : 0;
   const message = (cause: unknown) => cause instanceof Error ? cause.message : t('Unable to load online booking.');
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
+  const [search,setSearch]=useState<SearchResult|null>(null);
   const [mode,setMode]=useState('mobile');
   const [locations, setLocations] = useState<Location[]>([]), [services, setServices] = useState<Service[]>([]), [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [publicPractitioners, setPublicPractitioners] = useState<PublicPractitioner[]>([]), [preferredPractitionerId, setPreferredPractitionerId] = useState(requestedPractitionerId);
@@ -38,6 +42,10 @@ function GuestBookingForm() {
   const [availability, setAvailability] = useState<Availability>({ availability: [] });
   const [slot, setSlot] = useState<Slot | null>(null), [loading, setLoading] = useState(true), [practitionerBusy, setPractitionerBusy] = useState(false), [slotBusy, setSlotBusy] = useState(false);
   const [error, setError] = useState(''), [practitionerError, setPractitionerError] = useState(''), [slotError, setSlotError] = useState(''), [retry, setRetry] = useState(0);
+  const visibleServices=services.filter(item=>mode!=='mobile'||!search||search.matches.some(row=>row.service_slug===item.slug));
+  const visiblePeople=publicPractitioners.filter(item=>mode!=='mobile'||!search||search.matches.some(row=>row.practitioner_id===Number(item.booking_practitioner_id)));
+  const visiblePractitioners=practitioners.filter(item=>mode!=='mobile'||!search||search.matches.some(row=>row.status==='within_area'&&row.practitioner_id===Number(item.id)&&row.service_id===Number(serviceId)&&row.location_id===Number(locationId)));
+  useEffect(()=>{if(mode!=='mobile'||!search)return;if(serviceId&&!search.matches.some(row=>row.service_id===Number(serviceId))){setServiceId('');setSlot(null);}if(practitionerId&&!visiblePractitioners.some(item=>Number(item.id)===Number(practitionerId))){setPractitionerId('');setSlot(null);}},[search,mode,serviceId,practitionerId,practitioners,locationId]);
   const service = services.find(item => item.id === Number(serviceId));
   const durations = useMemo(() => [...(service?.durations ?? [])].sort((a, b) => a.minutes - b.minutes || a.id - b.id), [service]);
   const selectedDuration = durations.find(option => String(option.id) === durationOptionId);
@@ -55,7 +63,7 @@ function GuestBookingForm() {
     const controller = new AbortController(); setLoading(true); (formValidation.clear(), setError(''));
     const servicePath = preferredPractitionerId ? `/services?practitioner_id=${preferredPractitionerId}` : '/services';
     void Promise.all([apiRequest<Location[]>('/locations', { signal: controller.signal }), apiRequest<Service[]>(servicePath, { signal: controller.signal }), apiRequest<PublicPractitioner[]>('/public/practitioners', { signal: controller.signal })])
-      .then(([nextLocations, nextServices, nextPublicPractitioners]) => { if (!controller.signal.aborted) { const requestedService=nextServices.find(item=>item.slug===requestedServiceSlug);setLocations(nextLocations); setServices(nextServices); setPublicPractitioners(nextPublicPractitioners.filter(item => item.booking_practitioner_id)); setLocationId(String(nextLocations[0]?.id ?? '')); setServiceId(String(requestedServiceSlug ? requestedService?.id ?? '' : nextServices[0]?.id ?? '')); if (requestedServiceSlug && !requestedService) setError(t('This treatment is not available for online booking.')); } })
+      .then(([nextLocations, nextServices, nextPublicPractitioners]) => { if (!controller.signal.aborted) { const requestedService=nextServices.find(item=>item.slug===requestedServiceSlug);setLocations(nextLocations); setServices(nextServices); setPublicPractitioners(nextPublicPractitioners.filter(item => item.booking_practitioner_id)); setLocationId(String(nextLocations.find(item=>String(item.id)===requestedLocationId)?.id??nextLocations[0]?.id??'')); setServiceId(String(requestedServiceSlug ? requestedService?.id ?? '' : nextServices[0]?.id ?? '')); if (requestedServiceSlug && !requestedService) setError(t('This treatment is not available for online booking.')); } })
       .catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(message(cause)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -98,6 +106,8 @@ function GuestBookingForm() {
     void navigate(`${location.pathname}${params.size ? `?${params}` : ''}`, { replace: true });
   };
   return <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 } }}>
+    {mode==='mobile'&&<LocationSearch request={publicDiscoveryRequest} onResult={setSearch} savedAddressLink="/client#discover=1" t={t}/>}
+    {mode==='mobile'&&search?.matches.filter(row=>row.status==='enquiry_only'&&(!serviceId||row.service_id===Number(serviceId))).map(match=><div key={`${match.practitioner_id}:${match.service_id}:${match.location_id}`}><strong>{publicPractitioners.find(person=>Number(person.booking_practitioner_id)===match.practitioner_id)?.public_name}</strong><TravelMatchActions matches={[match]} t={t}/></div>)}
     <Button component={Link} to="/" size="small">{t('Back to treatments')}</Button>
     <Typography variant="overline" color="primary" display="block" mt={2}>{t('Book online')}</Typography><Typography variant="h3" component="h1">{t('Find a time that fits your life.')}</Typography>
     {bookingSlug && service && <Box sx={{ mt: 2 }}><Typography variant="h6">{service.name}{selectedDuration ? ` · ${t('{{minutes}} minutes', { minutes: selectedDuration.minutes })}` : ''}</Typography><ShareBookingLink path={serviceBookingPath(bookingSlug, selectedDuration?.minutes, requestedPractitionerId ? Number(requestedPractitionerId) : undefined)} title={service.name}/></Box>}
@@ -107,16 +117,16 @@ function GuestBookingForm() {
     {!loading && !error && (!services.length || !locations.length) && <Alert severity="info">{t('Online services and locations have not been configured yet.')}</Alert>}
     {!loading && !error && services.length > 0 && <Stack spacing={2} mb={3}>
       {!bookingSlug && <><Typography variant="h5" component="h2">{t('Our services')}</Typography>
-      <Stack direction="row" gap={1} flexWrap="wrap">{services.map(item => <Button key={item.id} variant={serviceId === String(item.id) ? 'contained' : 'outlined'} onClick={() => { setSlot(null); setServiceId(String(item.id)); setDurationOptionId(''); }}>{item.name}</Button>)}</Stack></>}
-      {!bookingSlug && publicPractitioners.length > 0 && <><Typography variant="h5" component="h2">{t('Our practitioners')}</Typography><Stack direction="row" gap={1} flexWrap="wrap">{publicPractitioners.map(item => <PractitionerNameHover key={item.booking_practitioner_id} person={item}><Button variant={preferredPractitionerId === String(item.booking_practitioner_id) ? 'contained' : 'outlined'} onClick={() => { setSlot(null); setServiceId(''); setPractitionerId(''); setDurationOptionId(''); setPreferredPractitionerId(String(item.booking_practitioner_id)); }}>{item.booking_name || item.public_name}</Button></PractitionerNameHover>)}</Stack></>}
+      <Stack direction="row" gap={1} flexWrap="wrap">{visibleServices.map(item => <Button key={item.id} variant={serviceId === String(item.id) ? 'contained' : 'outlined'} onClick={() => { setSlot(null); setServiceId(String(item.id)); setDurationOptionId(''); }}>{item.name}</Button>)}</Stack></>}
+      {!bookingSlug && publicPractitioners.length > 0 && <><Typography variant="h5" component="h2">{t('Our practitioners')}</Typography><Stack direction="row" gap={1} flexWrap="wrap">{visiblePeople.map(item => <PractitionerNameHover key={item.booking_practitioner_id} person={item}><Button variant={preferredPractitionerId === String(item.booking_practitioner_id) ? 'contained' : 'outlined'} onClick={() => { setSlot(null); setServiceId(''); setPractitionerId(''); setDurationOptionId(''); setPreferredPractitionerId(String(item.booking_practitioner_id)); }}>{item.booking_name || item.public_name}</Button></PractitionerNameHover>)}</Stack></>}
     </Stack>}
     {!loading && !error && services.length > 0 && locations.length > 0 && <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 5 }}><Paper variant="outlined" sx={{ p: 3 }}><Stack spacing={3}>
         <Typography variant="h5" component="h2">{t('Choose care')}</Typography>
         <TextField name="delivery_mode" select label={t('Visit type')} value={mode} onChange={event=>{setSlot(null);setMode(event.target.value);}}><MenuItem value="mobile">{t('On-Site (client location)')}</MenuItem><MenuItem value="clinic">{t('In clinic')}</MenuItem></TextField>
         <TextField name="location_id" select label={t('Base location / service area')} value={locationId} onChange={event => { setSlot(null); setLocationId(event.target.value); }}>{locations.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
-        {!bookingSlug && <TextField name="preferredPractitionerId" select label={t('Start with a practitioner (optional)')} value={preferredPractitionerId} helperText={t('Choose a practitioner first to see only the services they offer.')} onChange={event => { setSlot(null); setServiceId(''); setPractitionerId(''); setDurationOptionId(''); setPreferredPractitionerId(event.target.value); }}><MenuItem value="">{t('Any practitioner')}</MenuItem>{publicPractitioners.map(item => <MenuItem key={item.booking_practitioner_id} value={String(item.booking_practitioner_id)}>{item.booking_name || item.public_name}</MenuItem>)}</TextField>}
-        <TextField name="service_id" select label={t('Service')} value={serviceId} disabled={Boolean(bookingSlug)} onChange={event => { setSlot(null); setPractitionerId(''); setDurationOptionId(''); setServiceId(event.target.value); }}>{services.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
+        {!bookingSlug && <TextField name="preferredPractitionerId" select label={t('Start with a practitioner (optional)')} value={preferredPractitionerId} helperText={t('Choose a practitioner first to see only the services they offer.')} onChange={event => { setSlot(null); setServiceId(''); setPractitionerId(''); setDurationOptionId(''); setPreferredPractitionerId(event.target.value); }}><MenuItem value="">{t('Any practitioner')}</MenuItem>{visiblePeople.map(item => <MenuItem key={item.booking_practitioner_id} value={String(item.booking_practitioner_id)}>{item.booking_name || item.public_name}</MenuItem>)}</TextField>}
+        <TextField name="service_id" select label={t('Service')} value={serviceId} disabled={Boolean(bookingSlug)} onChange={event => { setSlot(null); setPractitionerId(''); setDurationOptionId(''); setServiceId(event.target.value); }}>{visibleServices.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.name}</MenuItem>)}</TextField>
         {service && <><TextField name="durationOptionId" select label={t('Appointment length')} value={durationOptionId} disabled={!durations.length} helperText={t('Prices shown before taxes.')} onChange={event => selectDuration(event.target.value)}>
           {durations.length > 1 && <MenuItem value="" disabled>{t('Select a length')}</MenuItem>}
           {durations.map(option => <MenuItem key={option.id} value={String(option.id)}>{t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(Number(option.price_cents)) })}</MenuItem>)}
@@ -124,7 +134,7 @@ function GuestBookingForm() {
       </Stack></Paper></Grid>
       <Grid size={{ xs: 12, md: 7 }}><Paper variant="outlined" sx={{ p: 3 }}><Stack spacing={2}>
         <Typography variant="h5" component="h2">{t('Choose a time')}</Typography>
-        <TextField name="practitioner_id" select label={t('Practitioner')} value={practitionerId} disabled={practitionerBusy || !practitioners.length} onChange={event => { setSlot(null); setPractitionerId(event.target.value); }}>{practitioners.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.display_name} · {item.credentials || item.discipline}</MenuItem>)}</TextField>
+        <TextField name="practitioner_id" select label={t('Practitioner')} value={practitionerId} disabled={practitionerBusy || !visiblePractitioners.length} onChange={event => { setSlot(null); setPractitionerId(event.target.value); }}>{visiblePractitioners.map(item => <MenuItem key={item.id} value={String(item.id)}>{item.display_name} · {item.credentials || item.discipline}</MenuItem>)}</TextField>
         {service && !durations.length && <Alert severity="info">{t('No appointment lengths are configured for this service.')}</Alert>}
         {durations.length > 1 && !durationOptionId && <Alert severity="info">{t('Choose an appointment length before selecting a time.')}</Alert>}
         <Typography variant="body2" color="text.secondary">{t('Select a date on the calendar to load its available times. You can also enter a date below.')}</Typography>
@@ -132,7 +142,7 @@ function GuestBookingForm() {
         <TextField name="appointmentDate" type="date" label={t('Appointment date')} value={appointmentDate} disabled={practitionerBusy || !practitionerId || !durationOptionId} InputLabelProps={{ shrink: true }} inputProps={{ min: dateInZone(selectedTimezone) }} onChange={event => { setSlot(null); setAppointmentDate(event.target.value); }} />
         {(practitionerBusy || slotBusy) && <CircularProgress size={24} aria-label={t('Loading available times')} />}
         {(practitionerError || slotError) && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{practitionerError || slotError}</Alert>}
-        {!practitionerBusy && !practitionerError && !practitioners.length && <Alert severity="info">{t('No practitioner is assigned to this service yet.')}</Alert>}
+        {!practitionerBusy && !practitionerError && !visiblePractitioners.length && <Alert severity="info">{t(search?'No practitioners within normal coverage for this selection.':'No practitioner is assigned to this service yet.')}</Alert>}
         {!slotBusy && !practitionerBusy && practitionerId && selectedDuration && appointmentDate && !slotError && !selectedDaySlots.length && <Alert severity="info">{t('No available times were found on this date.')}</Alert>}
         {!slotBusy && selectedDuration && appointmentDate && <><Typography variant="body2" color="text.secondary">{t('Available times for {{minutes}} minutes, shown in {{timezone}}.', { minutes: selectedDuration.minutes, timezone: selectedTimezone })}</Typography>
           <Grid container spacing={1}>{selectedDaySlots.map(time => <Grid size={{ xs: 12, sm: 6 }} key={`${time.duration_option_id}-${time.starts_at}`}>

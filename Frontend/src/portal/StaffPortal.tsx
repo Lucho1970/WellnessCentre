@@ -1,3 +1,4 @@
+import { StaffTravelEnquiries, TravelEnquiryNotice, useTravelRequest } from '../discovery/TravelEnquiries';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { legacyPage, pageAt, pagePath, pagesFor, workspacesFor, type PortalPage, type Workspace } from './access';
@@ -37,6 +38,7 @@ import {
   MailCheck,
   X,
 } from "lucide-react";
+function TravelNotice({workspace}:{workspace:Workspace}){const request=useTravelRequest();return <TravelEnquiryNotice request={request} open={()=>{window.location.href=pagePath(workspace,'travel');}}/>;}
 const BusinessSettings = lazy(() => import('../admin/BusinessSettings').then(module => ({ default: module.BusinessSettings })));
 const PractitionerAdmin = lazy(() => import('../admin/PractitionerAdmin').then(module => ({ default: module.PractitionerAdmin })));
 const LocationAdmin = lazy(() => import('../admin/LocationAdmin').then(module => ({ default: module.LocationAdmin })));
@@ -80,6 +82,7 @@ const navigation: NavigationItem[] = [
   { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} /> },
   { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} /> },
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
+  { id: "travel", label: "Travel enquiries", description: "Private client travel enquiries", icon: <MailCheck size={20} /> },
   { id: "enquiries", label: "Practitioner enquiries", description: "Review interest in joining the clinic", icon: <MailCheck size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
@@ -149,6 +152,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
       </Stack>
       <Divider sx={{ mb: 1.5 }} />
       {workspaces.length > 1 && <Stack spacing={1} mb={2} aria-label={t('Switch workspace')}>{workspaces.map(item => <Button key={item} component={Link} to={pagePath(item, 'dashboard')} onClick={() => rememberWorkspace(item)} variant={workspace === item ? 'contained' : 'outlined'}>{t(item === 'admin' ? 'Operations' : 'Practitioner')}</Button>)}</Stack>}
+      {allowedPages.includes('travel')&&<TravelNotice workspace={workspace}/>}
       <List aria-label={t('Staff portal navigation')}>
         {allowedNavigation.map((item) => (
           <ListItemButton component={Link} to={pagePath(workspace, item.id)} aria-current={page === item.id ? 'page' : undefined} key={item.id} selected={page === item.id} sx={{ borderRadius: 2, mb: 0.75, alignItems: "flex-start" }}>
@@ -187,6 +191,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}
+        {page === "travel" && <StaffTravelEnquiries />}
         {page === "enquiries" && <PractitionerEnquiries />}
         {page === "widgets" && <DashboardWidgetAdmin />}
         {page === "notifications" && <NotificationStatusAdmin />}
