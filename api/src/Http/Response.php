@@ -7,6 +7,12 @@ final class Response
 {
     private const STRING_IDENTIFIER_KEYS = ['object_id', 'tenant_id', 'correlation_id', 'external_id', 'source_event_id', 'home_account_id'];
     private static ?\Closure $afterJson = null;
+    private static ?\Closure $beforeJson = null;
+
+    public static function beforeJson(callable $callback): void
+    {
+        self::$beforeJson = \Closure::fromCallable($callback);
+    }
 
     public static function afterJson(callable $callback): void
     {
@@ -38,6 +44,12 @@ final class Response
 
     public static function json(array $payload, int $status = 200, ?string $correlationId = null): never
     {
+        $encoded = $status === 204 ? '' : json_encode(self::normalizeNumericIds($payload), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        if (self::$beforeJson !== null) {
+            $callback = self::$beforeJson;
+            self::$beforeJson = null; // A failure response must not recurse into the same failing audit.
+            $callback($payload,$status);
+        }
         http_response_code($status);
         if ($correlationId) header('X-Correlation-ID: ' . $correlationId);
         // A 204 response ends at the headers. Do not serialize even an empty
@@ -48,7 +60,7 @@ final class Response
             exit;
         }
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(self::normalizeNumericIds($payload), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        echo $encoded;
         if (self::$afterJson !== null) {
             $callback = self::$afterJson;
             self::$afterJson = null;

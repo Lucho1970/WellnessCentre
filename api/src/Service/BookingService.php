@@ -309,7 +309,7 @@ final class BookingService
         $page=max(1,min(100000,(int)($query['page']??1)));$offset=($page-1)*50;
         $sql.=$view==='upcoming'?' ORDER BY a.starts_at ASC,a.id ASC':' ORDER BY a.starts_at DESC,a.id DESC';
         $sql.=" LIMIT 50 OFFSET {$offset}";$statement=$this->database->connection()->prepare($sql);$statement->execute($params);$rows=$statement->fetchAll();
-        if(array_filter($rows,fn($row)=>$row['delivery_mode']==='mobile'))$this->audit->write($actor->clinicId,$actor,bin2hex(random_bytes(16)),'appointment.destination.view','appointment',null,'success',['page'=>$page]);
+        // The API response audit records every disclosed appointment under the request correlation.
         return $rows;
     }
 

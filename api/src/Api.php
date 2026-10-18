@@ -37,6 +37,8 @@ use function FastRoute\simpleDispatcher;
 final class Api
 {
     private EntraAuthenticator $auth;
+    private ?CustomerAuthenticator $customerAuth = null;
+    private ?\Wellness\Service\AccessAudit $accessAudit = null;
     private ?ClinicContext $clinicContext = null;
     private CatalogService $catalog;
     private AvailabilityService $availability;
@@ -65,6 +67,10 @@ final class Api
     public function handle(): never
     {
         $request=null;
+        $this->accessAudit=new \Wellness\Service\AccessAudit($this->database);
+        Response::beforeJson(function(array $payload,int $status)use(&$request):void{
+            $this->accessAudit->response($request,$payload,$status,$this->clinicContext?->clinicId);
+        });
         try{
             $request=Request::capture();$this->cors($request);
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
@@ -512,11 +518,12 @@ final class Api
         $this->clinicContext->assertActive($this->database);
         if ($this->config->customerOnboardingEnabled) {
             $service = $this->onboarding();
-            $session = $service->session((new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
+            $session = $service->session(($this->customerAuth ??= new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
             $identity = $session['identity_id']; unset($session['identity_id']);
+            $this->accessAudit?->customerIdentity((int)$identity,$this->clinicContext->clinicId);
             return $service->status($identity) + ['session' => $session];
         }
-        return (new CustomerAuthenticator($this->config))->authenticate($request->bearerToken());
+        return ($this->customerAuth ??= new CustomerAuthenticator($this->config))->authenticate($request->bearerToken());
     }
 
     private function onboarding(): CustomerOnboarding
@@ -530,6 +537,7 @@ final class Api
         if (!$this->config->applicationAdminEnabled || !$this->config->clinicManagementEnabled) throw new ApiException(503,'application_admin_unavailable','Application administration is not enabled.');
         header('Cache-Control: no-store');
         $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($request->bearerToken());
+        $this->accessAudit?->applicationActor($actor);
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
         if($path==='discovery-settings'&&$request->method==='GET')return $this->discovery()->settings();
@@ -583,7 +591,7 @@ final class Api
         if ($route === 'POST auth/challenge') return $service->challenge($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         $token = $r->headers['x-customer-session'] ?? null;
         if ($route === 'POST auth/logout') return $service->logout($token, $r->correlationId);
-        $auth = new CustomerAuthenticator($this->config);
+        $auth = $this->customerAuth ??= new CustomerAuthenticator($this->config);
         $claims = $auth->claims($r->bearerToken());
         if ($route === 'POST auth/session') {
             if (!is_string($r->body['id_token'] ?? null)) throw new ApiException(422, 'invalid_proof', 'A fresh sign-in proof is required.');
@@ -591,8 +599,12 @@ final class Api
         }
         $session = $service->session($claims, $token, $route === 'POST auth/activity');
         $identity = $session['identity_id'];
+        $this->accessAudit?->customerIdentity((int)$identity,$this->clinicContext->clinicId);
         unset($session['identity_id']);
-        $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        $bookingActor = function()use($service,$identity):AuthContext{
+            $actor=$service->bookingActor($identity);$this->accessAudit?->actor($actor);return $actor;
+        };
+        if(in_array($route,['GET profile','PATCH profile','GET appointments'],true))$bookingActor();
         if(str_starts_with(substr($r->path,strlen('/api/v1/customer/')),'travel-enquiries'))return $this->travelRoute($bookingActor(),$r,substr($r->path,strlen('/api/v1/customer/')));
         if($route==='POST discovery/search')return $this->discovery()->search($this->clinicContext->clinicId,$r->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'));
         if($route==='GET receipts')return $this->receipts()->list($bookingActor(),$r->query);
@@ -681,6 +693,7 @@ final class Api
             ? (new \Wellness\Auth\StaffMembershipResolver($this->database))->resolve($external->verify($request->bearerToken()),$this->clinicContext)
             : $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
         $this->clinicContext->assertActive($this->database);
+        $this->accessAudit?->actor($actor);
         return $actor;
     }
     private function staffInvitations(): \Wellness\Service\StaffInvitationService

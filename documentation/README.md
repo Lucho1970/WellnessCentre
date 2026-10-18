@@ -16,6 +16,7 @@ This folder contains the living technical and delivery documentation for the Wel
 
 - [Ontario PHIPA readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md): implemented safeguards, application gaps, unverified hosting/operational controls and required gates before using real patient data.
 - [Practitioner booking contact access](PRACTITIONER_BOOKING_CONTACT_ACCESS.md): relationship-scoped contacts/addresses, direct-booking bypass protection and synthetic authorization acceptance.
+- [Sensitive access audit](SENSITIVE_ACCESS_AUDIT.md): response-boundary read/search/export coverage, denied-access logging, migration 049, failure behavior and acceptance evidence.
 
 Start with these two authoritative documents:
 
