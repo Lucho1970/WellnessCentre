@@ -15,6 +15,7 @@
 This folder contains the living technical and delivery documentation for the Wellness Centre scheduling platform.
 
 - [Ontario PHIPA readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md): implemented safeguards, application gaps, unverified hosting/operational controls and required gates before using real patient data.
+- [Practitioner booking contact access](PRACTITIONER_BOOKING_CONTACT_ACCESS.md): relationship-scoped contacts/addresses, direct-booking bypass protection and synthetic authorization acceptance.
 
 Start with these two authoritative documents:
 

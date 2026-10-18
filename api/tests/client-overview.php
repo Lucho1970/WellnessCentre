@@ -14,13 +14,17 @@ function check(bool $ok): void {global $checks;if(!$ok)throw new RuntimeExceptio
 function denies(callable $f,int $status): void {try{$f();}catch(ApiException $e){check($e->status===$status);return;}throw new RuntimeException('Expected overview denial');}
 $row=['account_status'=>'active','practitioner_active'=>1,'roles'=>'practitioner','permissions'=>'','appointment_count'=>0,'created_client'=>0,'booking_mode'=>'practitioner_managed'];
 $access=Overview::configuredAccess($row);
-check(!$access['client_directory']&&$access['booking_contact']&&$access['appointments']==='own'&&$access['logistics_notes']==='own');
+check(!$access['client_directory']&&!$access['booking_contact']&&$access['appointments']==='own'&&$access['logistics_notes']==='own');
 check($access['appointment_changes']==='own'&&!$access['client_administration']);
 check(Overview::configuredAccess(array_replace($row,['appointment_count'=>1]))['client_directory']);
 check(Overview::configuredAccess(array_replace($row,['created_client'=>1]))['client_directory']);
+check(Overview::configuredAccess(array_replace($row,['appointment_count'=>1]))['booking_contact']);
+check(Overview::configuredAccess(array_replace($row,['created_client'=>1]))['booking_contact']);
+check(Overview::configuredAccess(array_replace($row,['assigned_form'=>true]))['booking_contact']);
+check(!Overview::configuredAccess(array_replace($row,['assigned_form'=>true,'practitioner_active'=>0]))['booking_contact']);
 check(!Overview::configuredAccess($row,'inactive')['booking_contact']);
 $access=Overview::configuredAccess(array_replace($row,['permissions'=>'schedule_for_other_practitioners']));
-check($access['appointments']==='clinic'&&$access['appointment_changes']==='clinic'&&$access['logistics_notes']==='own'&&!$access['client_directory']);
+check($access['booking_contact']&&$access['appointments']==='clinic'&&$access['appointment_changes']==='clinic'&&$access['logistics_notes']==='own'&&!$access['client_directory']);
 check(Overview::configuredAccess(array_replace($row,['booking_mode'=>'clinic_managed']))['appointment_changes']==='none');
 $inactiveProfile=Overview::configuredAccess(array_replace($row,['practitioner_active'=>0,'appointment_count'=>1]));
 check($inactiveProfile['client_directory']&&$inactiveProfile['appointments']==='own'&&$inactiveProfile['appointment_changes']==='none');

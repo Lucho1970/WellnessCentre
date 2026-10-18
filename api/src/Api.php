@@ -383,7 +383,7 @@ final class Api
                 'practitionerVisitMilestone'=>$this->practitionerVisits->milestone($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'practitionerVisitOutcome'=>$this->practitionerVisits->outcome($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
-                'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
+                'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query,$request->correlationId),
                 'practitionerClients'=>$this->clients->practitionerList($this->user($request),$request->query),
                 'formDrafts'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->list($this->user($request),$request->query),
                 'saveFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId),

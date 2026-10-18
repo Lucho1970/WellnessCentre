@@ -138,13 +138,12 @@ final class ClientOverviewService
         }
         $operator = $active && (bool)array_intersect($roles, ['super_admin','clinic_admin','reception']);
         $practitioner = $active && in_array('practitioner', $roles, true);
-        $related = (int)$row['appointment_count'] > 0 || (bool)$row['created_client'];
+        $related = (int)$row['appointment_count'] > 0 || (bool)$row['created_client'] || (bool)($row['assigned_form'] ?? false);
         $clinicScheduling = $operator || ($practitioner && in_array('schedule_for_other_practitioners', $permissions, true));
         return [
             'client_directory' => $operator || ($practitioner && $related),
             'staff_configuration_active' => $active,
-            // The existing booking search and saved-address APIs permit clinic-wide contact lookup.
-            'booking_contact' => $clientStatus === 'active' && ($operator || $practitioner),
+            'booking_contact' => $clientStatus === 'active' && ($operator || ($practitioner && (bool)$row['practitioner_active'] && ($related || $clinicScheduling))),
             'client_administration' => $operator,
             'appointments' => $clinicScheduling ? 'clinic' : ($practitioner ? 'own' : 'none'),
             'appointment_changes' => $clinicScheduling ? 'clinic' : ($practitioner && (bool)$row['practitioner_active'] && $row['booking_mode']==='practitioner_managed' ? 'own' : 'none'),
@@ -159,12 +158,14 @@ final class ClientOverviewService
         $page = self::page($query);
         $client = $this->client($actor, $id);
         $offset = ($page - 1) * 25;
+        $formRelationship=ClientFormsService::enabled()?"EXISTS(SELECT 1 FROM client_form_tasks task WHERE task.clinic_id=u.clinic_id AND task.client_id=:form_client AND task.practitioner_id=p.id AND task.status<>'revoked')":'0';
         $statement = $this->database->connection()->prepare("SELECT p.id practitioner_id,u.id user_id,
             u.display_name,p.discipline,p.active practitioner_active,p.booking_mode,u.status account_status,
             identity.adapter identity_adapter,identity.status identity_status,membership.status membership_status,
             (SELECT GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id) roles,
             (SELECT GROUP_CONCAT(DISTINCT perm.code ORDER BY perm.code) FROM user_permissions up JOIN permissions perm ON perm.id=up.permission_id WHERE up.user_id=u.id) permissions,
             COALESCE(history.appointment_count,0) appointment_count,history.first_appointment_at,history.last_appointment_at,
+            $formRelationship assigned_form,
             EXISTS(SELECT 1 FROM audit_logs created WHERE created.clinic_id=u.clinic_id AND created.actor_user_id=u.id
                 AND created.action='client.create' AND created.entity_type='client' AND created.entity_id=:created_client AND created.outcome='success') created_client
             FROM practitioners p JOIN users u ON u.id=p.user_id AND u.clinic_id=:clinic AND u.user_type='staff'
@@ -174,7 +175,9 @@ final class ClientOverviewService
                 FROM appointments a WHERE a.clinic_id=:history_clinic AND a.client_id=:history_client GROUP BY a.practitioner_id) history ON history.practitioner_id=p.id
             ORDER BY (COALESCE(history.appointment_count,0)>0 OR created_client) DESC,(u.status='active') DESC,u.display_name,p.id
             LIMIT 26 OFFSET {$offset}");
-        $statement->execute(['created_client'=>$id,'clinic'=>$actor->clinicId,'history_clinic'=>$actor->clinicId,'history_client'=>$id]);
+        $params=['created_client'=>$id,'clinic'=>$actor->clinicId,'history_clinic'=>$actor->clinicId,'history_client'=>$id];
+        if(ClientFormsService::enabled())$params['form_client']=$id;
+        $statement->execute($params);
         $rows = $statement->fetchAll();
         $items = [];
         foreach (array_slice($rows,0,25) as $row) {

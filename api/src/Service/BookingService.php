@@ -45,13 +45,14 @@ final class BookingService
             // All booking writers acquire this existing row before reading a snapshot.
             // Serializing confirmations per clinic protects even an entirely empty schedule.
             $lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            // Check before replay, coverage or creating an appointment that could establish a relationship.
+            $this->assertBookingClientAccess($actor,$clientId);
             $existing=$pdo->prepare('SELECT * FROM appointments WHERE clinic_id=:clinic AND idempotency_key=:key FOR UPDATE');$existing->execute(['clinic'=>$actor->clinicId,'key'=>$body['idempotency_key']]);if($row=$existing->fetch()){
                 BookingRequest::assertReplay($row,$body,$actor->userId,$startsUtc);
                 $result=$this->getById($actor,(int)$row['id']);if(!$participate)$pdo->commit();return $result;
             }
             $coverage=$mode==='mobile'?$this->addressCoverage->verifyBooking($actor,$body,$destination):[];
             $practitionerOnly=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')&&!$actor->hasPermission('schedule_for_other_practitioners');
-            $client=$pdo->prepare("SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'");$client->execute(['id'=>$clientId,'clinic'=>$actor->clinicId]);if(!$client->fetchColumn())throw new ApiException(422,'invalid_client','Select an active client in this clinic.');
             if($practitionerOnly){
                 $owner=$pdo->prepare("SELECT id FROM practitioners WHERE id=:id AND user_id=:user AND active=1 AND booking_mode='practitioner_managed'");$owner->execute(['id'=>(int)$body['practitioner_id'],'user'=>$actor->userId]);if(!$owner->fetchColumn())throw new ApiException(403,'forbidden','Practitioners can only book their own practitioner-managed appointments.');
             }
@@ -146,29 +147,32 @@ final class BookingService
         return (new AvailabilityService($this->database))->search($query);
     }
 
-    public function bookingClients(AuthContext $actor,array $query=[]): array
+    public function bookingClients(AuthContext $actor,array $query=[],string $correlationId=''): array
     {
         if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot search booking clients.');
-        $practitionerScope=(($query['scope']??'')==='practitioner'||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')))&&!$actor->hasPermission('schedule_for_other_practitioners');
-        if($practitionerScope&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
         $term=trim((string)($query['q']??''));$birthdate=trim((string)($query['date_of_birth']??''));
         if($term!==''&&(strlen($term)<2||strlen($term)>190))throw new ApiException(422,'validation_error','Search must contain between 2 and 190 characters.');
         if($birthdate!==''&&!self::validDate($birthdate))throw new ApiException(422,'validation_error','Birthdate must be a valid date.',['date_of_birth'=>'Invalid date']);
         if($term===''&&$birthdate==='')throw new ApiException(422,'validation_error','Enter a birthdate or at least 2 search characters.');
         $sql="SELECT DISTINCT u.id,u.display_name,u.email,p.phone FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND u.status='active'";
         $params=['clinic'=>$actor->clinicId];
+        // Browser scope and selected practitioner never widen the actor's authority.
+        $sql.=BookingClientAccess::condition($actor,$params);
         if($birthdate!==''){$sql.=' AND p.date_of_birth=:birthdate';$params['birthdate']=$birthdate;}
         if($term!==''){$escaped='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';$sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR p.phone LIKE :phone ESCAPE '!')";$params+=['name'=>$escaped,'email'=>$escaped,'phone'=>$escaped];}
         $sql.=' ORDER BY u.display_name,u.id LIMIT 26';
         $statement=$this->database->connection()->prepare($sql);$statement->execute($params);$rows=$statement->fetchAll();$more=count($rows)>25;
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'client.booking_contacts.search','client',null,'success',['client_ids'=>array_map('intval',array_column(array_slice($rows,0,25),'id'))]);
         return ['items'=>array_slice($rows,0,25),'has_more'=>$more];
     }
 
     public function bookingClientAddress(AuthContext $actor,int $clientId,string $correlationId): array
     {
         self::authorizeBookingClientAddress($actor);
-        $statement=$this->database->connection()->prepare("SELECT a.address_json FROM users u LEFT JOIN client_contact_addresses a ON a.client_id=u.id WHERE u.id=:client AND u.clinic_id=:clinic AND u.user_type='client' AND u.status='active'");
-        $statement->execute(['client'=>$clientId,'clinic'=>$actor->clinicId]);$row=$statement->fetch();
+        $params=['client'=>$clientId,'clinic'=>$actor->clinicId];
+        $scope=BookingClientAccess::condition($actor,$params);
+        $statement=$this->database->connection()->prepare("SELECT a.address_json FROM users u LEFT JOIN client_contact_addresses a ON a.client_id=u.id WHERE u.id=:client AND u.clinic_id=:clinic AND u.user_type='client' AND u.status='active' $scope");
+        $statement->execute($params);$row=$statement->fetch();
         if(!$row)throw new ApiException(404,'client_not_found','The active client was not found.');
         $address=null;
         if(is_string($row['address_json']??null)&&$row['address_json']!==''){
@@ -183,6 +187,19 @@ final class BookingService
     public static function authorizeBookingClientAddress(AuthContext $actor): void
     {
         if($actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin','reception','practitioner'))throw new ApiException(403,'forbidden','Your role cannot view a booking address.');
+    }
+
+    /** Also used by recurring previews so a submitted client ID cannot bootstrap access. */
+    public function assertBookingClientAccess(AuthContext $actor,int $clientId): void
+    {
+        $params=['client'=>$clientId,'clinic'=>$actor->clinicId];
+        if($actor->userType==='client'){
+            if($clientId!==$actor->userId)throw new ApiException(403,'forbidden','Clients can only book for themselves.');
+            $scope='';
+        }else $scope=BookingClientAccess::condition($actor,$params);
+        $statement=$this->database->connection()->prepare("SELECT u.id FROM users u WHERE u.id=:client AND u.clinic_id=:clinic AND u.user_type='client' AND u.status='active' $scope");
+        $statement->execute($params);
+        if(!$statement->fetchColumn())throw new ApiException(422,'invalid_client','Select an available active client in this clinic.');
     }
 
     public function updateAvailability(AuthContext $actor,int $id,array $query): array
