@@ -20,6 +20,7 @@ This folder contains the living technical and delivery documentation for the Wel
 - [Consent restrictions and withdrawal](CONSENT_RESTRICTIONS_WITHDRAWAL.md): patient controls, negative access permissions, queued-message enforcement, migration 050, conservative bulk-route limits and synthetic authorization acceptance.
 - [Consent-filtered dashboards and schedules](CONSENT_FILTERED_DASHBOARDS_SCHEDULES.md): permitted-record counts, day cards, next visits, schedule impacts and notification activity without a clinic-wide consent block.
 - [Consent-filtered notifications](CONSENT_FILTERED_NOTIFICATIONS.md): permitted notification lists/counts, current review and retry authorization, recipient rechecks and stale-contact browser handling.
+- [Consent-filtered travel enquiries and messages](CONSENT_FILTERED_TRAVEL_ENQUIRIES.md): permitted inboxes/unread counts, thread actions, patient history, recipient restrictions and stale-thread browser handling.
 
 Start with these two authoritative documents:
 

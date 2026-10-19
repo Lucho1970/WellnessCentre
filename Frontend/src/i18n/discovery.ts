@@ -1,4 +1,6 @@
 const fr = {
+  'This travel enquiry is no longer available. Refresh your inbox.': 'Cette demande de déplacement n’est plus accessible. Actualisez votre boîte de réception.',
+  'This enquiry cannot receive new messages under the current access permissions.': 'Cette demande ne peut pas recevoir de nouveaux messages avec les autorisations d’accès actuelles.',
   'Starting price': 'Prix de départ',
   'No practitioners within normal coverage for this selection.': 'Aucun praticien dans sa zone habituelle pour cette sélection.',
   'Absolute discovery cap (km)': 'Distance maximale de recherche (km)',

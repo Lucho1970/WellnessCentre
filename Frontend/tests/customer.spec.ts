@@ -61,6 +61,26 @@ import {
 } from "../src/customer/providerRouting";
 import type { AccountInfo } from "@azure/msal-browser";
 
+test('travel inbox preserves patient history and draft when recipient access is restricted',async({page})=>{
+  await fixture(page,true);
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**',route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route('**/api/v1/customer/travel-enquiries',route=>route.fulfill({json:{data:{items:[{id:81,status:'open',service_name:'Massage',practitioner_name:'Esther',unread:1}],unread_count:1,next_before:null}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81',route=>route.fulfill({json:{data:{id:81,status:'open',search_label:'Own visit area',service_name:'Massage',practitioner_name:'Esther',messages:[{id:101,body:'Own message history',created_at:'2026-10-18 15:00:00',sender_name:'Client'}],next_after:null}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81/read',route=>route.fulfill({json:{data:{saved:true}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81/reply',route=>route.fulfill({status:409,json:{error:{code:'travel_recipient_unavailable',message:'This enquiry cannot receive new messages under the current access permissions.'}}}));
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button',{name:'Travel enquiries',exact:true}).click();
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  await page.getByLabel('Your reply',{exact:true}).fill('Keep my draft');
+  await page.getByRole('button',{name:'Send reply',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'This enquiry cannot receive new messages under the current access permissions.'})).toBeVisible();
+  await expect(page.getByText('Own message history',{exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Your reply',exact:true})).toHaveValue('Keep my draft');
+  await expect(page.getByRole('textbox',{name:'Your reply',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Retry same reply',exact:true})).toHaveCount(0);
+});
+
 test('client discovers from a saved address and sends a duplicate-safe travel enquiry before reading a reply',async({page})=>{
   await fixture(page,true);
   await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments','book_own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));

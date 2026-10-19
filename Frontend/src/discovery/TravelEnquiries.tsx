@@ -20,7 +20,7 @@ export function StaffTravelEnquiries(){const request=useTravelRequest();return <
 
 export function TravelEnquiryNotice({request,open}:{request:DiscoveryRequest;open:()=>void}) {
   const {t}=useTranslation();const [count,setCount]=useState(0);
-  useEffect(()=>{let live=true;const load=()=>{void request('/travel-enquiries').then(data=>{if(live)setCount(data.unread_count);}).catch(()=>{});};load();const timer=setInterval(load,60000);return()=>{live=false;clearInterval(timer);};},[request]);
+  useEffect(()=>{let live=true;const load=()=>{void request('/travel-enquiries').then(data=>{if(live)setCount(data.unread_count);}).catch(()=>{if(live)setCount(0);});};load();const timer=setInterval(load,60000);return()=>{live=false;clearInterval(timer);};},[request]);
   return count>0?<div className="discovery-ui" role="status"><button type="button" onClick={open}>{t('Unread travel enquiries')}: {count}</button></div>:null;
 }
 
@@ -29,29 +29,41 @@ export function TravelEnquiries({client=false,request,onLockedChange}:{client?:b
   const [items,setItems]=useState<Thread[]>([]),[thread,setThread]=useState<(Thread&{messages:Message[];next_after:number|null})|null>(null),[before,setBefore]=useState<number|null>(null);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[notice,setNotice]=useState('');
   const pending=useRef<{reference:string;message:string}|null>(null),[uncertain,setUncertain]=useState(false);
-  const active=useRef(true);
+  const active=useRef(true),generation=useRef(0);
+  const revoked=useCallback((cause:unknown)=>{
+    if(![401,403,404].includes((cause as {status?:number})?.status??0))return false;
+    generation.current++;setItems([]);setBefore(null);setThread(null);setMessage('');pending.current=null;setUncertain(false);setNotice('');setBusy(false);
+    setError(t('This travel enquiry is no longer available. Refresh your inbox.'));return true;
+  },[t]);
   useUnsavedChanges(Boolean(message)||uncertain);
   useEffect(()=>{onLockedChange?.(Boolean(message)||uncertain||busy);return()=>onLockedChange?.(false);},[message,uncertain,busy,onLockedChange]);
-  useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
-  const list=useCallback(async(cursor?:number)=>{try{const data=await request(`/travel-enquiries${cursor?`?before=${cursor}`:''}`);if(active.current){setItems(data.items);setBefore(data.next_before);setError('');}}catch(cause){if(active.current)setError(cause instanceof Error?cause.message:t('Unable to load travel enquiries.'));}},[request,t]);
+  useEffect(()=>{active.current=true;return()=>{active.current=false;generation.current++;};},[]);
+  const list=useCallback(async(cursor?:number)=>{const version=generation.current;try{const data=await request(`/travel-enquiries${cursor?`?before=${cursor}`:''}`);if(active.current&&version===generation.current){setItems(data.items);setBefore(data.next_before);setError('');}}catch(cause){if(active.current&&version===generation.current&&!revoked(cause))setError(cause instanceof Error?cause.message:t('Unable to load travel enquiries.'));}},[request,t,revoked]);
   useEffect(()=>{void list();},[list]);
   const show=async(id:number,after?:number)=>{
-    setError('');setBusy(true);
+    const version=generation.current;setError('');setBusy(true);
     try{
       const data=await request(`/travel-enquiries/${id}${after?`?after=${after}`:''}`);
-      if(!active.current)return;setThread(data);setNotice('');
+      if(!active.current||version!==generation.current)return;setThread(data);setNotice('');
       const last=data.messages.at(-1)?.id??0;
-      await request(`/travel-enquiries/${id}/read`,{message_id:last});await list();
-    }catch(cause){if(active.current)setError(cause instanceof Error?cause.message:t('Unable to load travel enquiries.'));}
-    finally{if(active.current)setBusy(false);}
+      await request(`/travel-enquiries/${id}/read`,{message_id:last});if(active.current&&version===generation.current)await list();
+    }catch(cause){if(active.current&&version===generation.current&&!revoked(cause))setError(cause instanceof Error?cause.message:t('Unable to load travel enquiries.'));}
+    finally{if(active.current&&version===generation.current)setBusy(false);}
   };
   const reply=async()=>{
-    if(!thread)return;setBusy(true);setError('');
+    if(!thread)return;const version=generation.current;setBusy(true);setError('');
     pending.current??={reference:crypto.randomUUID(),message};
     try{
-      await request(`/travel-enquiries/${thread.id}/reply`,pending.current);pending.current=null;setUncertain(false);setMessage('');await show(thread.id);setNotice(t('Reply saved.'));
-    }catch(cause){const status=(cause as {status?:number}).status;const unknown=!status||status>=500;setUncertain(unknown);if(!unknown)pending.current=null;setError(cause instanceof Error?cause.message:t('Reply could not be confirmed. Retry the same message.'));}
-    finally{setBusy(false);}
+      await request(`/travel-enquiries/${thread.id}/reply`,pending.current);if(!active.current||version!==generation.current)return;pending.current=null;setUncertain(false);setMessage('');await show(thread.id);if(active.current&&version===generation.current)setNotice(t('Reply saved.'));
+    }catch(cause){if(!active.current||version!==generation.current||revoked(cause))return;const status=(cause as {status?:number}).status;const unknown=!status||status>=500;setUncertain(unknown);if(!unknown)pending.current=null;setError(cause instanceof Error?cause.message:t('Reply could not be confirmed. Retry the same message.'));}
+    finally{if(active.current&&version===generation.current)setBusy(false);}
+  };
+  const close=async()=>{
+    if(!thread||!window.confirm(t('Close this travel enquiry?')))return;
+    const version=generation.current;setBusy(true);setError('');
+    try{await request(`/travel-enquiries/${thread.id}/close`,{});if(active.current&&version===generation.current)await show(thread.id);}
+    catch(cause){if(active.current&&version===generation.current&&!revoked(cause))setError(cause instanceof Error?cause.message:t('Unable to load travel enquiries.'));}
+    finally{if(active.current&&version===generation.current)setBusy(false);}
   };
   useEffect(()=>{if(!message&&!uncertain)return;const warn=(event:BeforeUnloadEvent)=>event.preventDefault();window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[message,uncertain]);
   return <section className="discovery-ui"><h2>{t('Travel enquiries')}</h2><p>{t('Messages discuss possible travel only. Staff must arrange any resulting appointment; a reply does not confirm a booking or fee.')}</p>
@@ -63,7 +75,7 @@ export function TravelEnquiries({client=false,request,onLockedChange}:{client?:b
     {thread&&<article><h3>{thread.service_name} — {thread.practitioner_name}</h3><p>{t('Proposed visit area')}: {thread.search_label}</p>
       <ul className="travel-messages">{thread.messages.map(item=><li key={item.id}><strong>{item.sender_name==='Client'?t('Client'):item.sender_name==='Clinic team'?t('Clinic team'):item.sender_name}</strong> <time>{new Date(item.created_at.replace(' ','T')+'Z').toLocaleString()}</time><p>{item.body}</p></li>)}</ul>
       {thread.next_after&&<button type="button" disabled={busy||Boolean(message)||uncertain} onClick={()=>void show(thread.id,thread.next_after!)}>{t('More messages')}</button>}
-      {thread.status==='open'&&<><label>{t('Your reply')}<textarea rows={5} maxLength={2000} value={message} disabled={busy||uncertain} onChange={event=>setMessage(event.target.value)}/></label><button type="button" disabled={busy||!message.trim()} onClick={()=>void reply()}>{uncertain?t('Retry same reply'):t('Send reply')}</button>{!client&&<button type="button" disabled={busy||Boolean(message)||uncertain} onClick={()=>{if(window.confirm(t('Close this travel enquiry?'))){setBusy(true);void request(`/travel-enquiries/${thread.id}/close`,{}).then(()=>show(thread.id)).catch(cause=>setError(cause.message)).finally(()=>setBusy(false));}}}>{t('Close enquiry')}</button>}</>}
+      {thread.status==='open'&&<><label>{t('Your reply')}<textarea rows={5} maxLength={2000} value={message} disabled={busy||uncertain} onChange={event=>setMessage(event.target.value)}/></label><button type="button" disabled={busy||!message.trim()} onClick={()=>void reply()}>{uncertain?t('Retry same reply'):t('Send reply')}</button>{!client&&<button type="button" disabled={busy||Boolean(message)||uncertain} onClick={()=>void close()}>{t('Close enquiry')}</button>}</>}
       {thread.status==='closed'&&<p>{t('This enquiry is closed.')}</p>}
     </article>}
   </section>;

@@ -3904,6 +3904,34 @@ test('French mobile field errors stay accessible with reduced motion', async ({p
 });
 
 
+for(const action of ['reply','more','read','close'])test(`travel inbox clears private details after denied ${action}`,async({page})=>{
+  await fixtures(page,['practitioner']);
+  await page.route('**/api/v1/travel-enquiries',route=>route.fulfill({json:{data:{items:[{id:91,status:'open',service_name:'Massage',client_name:'Private patient',practitioner_name:'Esther',unread:1}],unread_count:1,next_before:null}}}));
+  await page.route('**/api/v1/travel-enquiries/91**',route=>{
+    const url=new URL(route.request().url());
+    const denied=url.pathname.endsWith(`/${action}`)||(action==='more'&&url.searchParams.has('after'));
+    if(denied)return route.fulfill({status:404,json:{error:{code:'enquiry_not_found',message:'Travel enquiry unavailable.'}}});
+    if(url.pathname.endsWith('/read'))return route.fulfill({json:{data:{saved:true}}});
+    return route.fulfill({json:{data:{id:91,status:'open',search_label:'Private visit area',practitioner_name:'Esther',service_name:'Massage',messages:[{id:201,body:'Private travel message',created_at:'2026-10-18 16:00:00',sender_name:'Client'}],next_after:201}}});
+  });
+  await page.goto(`${portalHost}/practitioner/travel-enquiries`);
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  if(action!=='read'){
+    await expect(page.getByText('Private travel message',{exact:true})).toBeVisible();
+    if(action==='reply'){
+      await page.getByLabel('Your reply',{exact:true}).fill('Private draft');
+      await page.getByRole('button',{name:'Send reply',exact:true}).click();
+    }else if(action==='more')await page.getByRole('button',{name:'More messages',exact:true}).click();
+    else {page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Close enquiry',exact:true}).click();}
+  }
+  await expect(page.getByRole('alert')).toContainText('This travel enquiry is no longer available. Refresh your inbox.');
+  await expect(page.getByText('Private travel message',{exact:true})).toHaveCount(0);
+  await expect(page.getByText(/Private visit area/)).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Private patient/})).toHaveCount(0);
+  await expect(page.getByRole('textbox',{name:'Your reply',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Refresh inbox',exact:true})).toBeEnabled();
+});
+
 test('practitioner controls extra-distance enquiries and replies privately through the travel inbox',async({page})=>{
   await fixtures(page,['practitioner']);
   let allow=true;

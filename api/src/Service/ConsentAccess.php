@@ -62,6 +62,8 @@ final class ConsentAccess
     public function request(AuthContext $actor,Request $r,string $route): void
     {
         if($actor->userType!=='staff')return;
+        if(preg_match('#^/api/v1/travel-enquiries(?:/\d+(?:/(?:reply|read|close))?)?$#D',$r->path)
+            && in_array($r->method,['GET','POST'],true))return; // TravelEnquiryService owns row-level authorization.
         // These routes contain no patient records, or enforce their own filtered boundary below.
         if(in_array($route,[
             'adminNotifications','practitionerNotifications','reviewNotification',
