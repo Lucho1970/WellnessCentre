@@ -77,6 +77,8 @@ $last=end($pdo->rows);$targets=json_decode($last['metadata'],true)['attempted_re
 $check($last['actor_id']===7&&count($targets)===3&&in_array(['type'=>'practitioner','id'=>12],$targets,true)&&in_array(['type'=>'client','id'=>12],$targets,true),'Numeric attempted targets neither collide across types nor replace verified attribution');
 $audit->response($request('/api/v1/clients','POST'),['error'=>['code'=>'possible_duplicate','fields'=>['candidates'=>[['id'=>18,'email'=>'private-email']]]]],409,1);
 $check(json_decode(end($pdo->rows)['metadata'],true)['resources']===[['type'=>'client','id'=>18]],'Duplicate review candidates in validation responses are audited');
+$audit->response($request('/api/v1/clients','POST'),['error'=>['code'=>'client_registration_review']],409,1);
+$check(end($pdo->rows)['outcome']==='denied'&&json_decode(end($pdo->rows)['metadata'],true)['resources']===[],'Registration review is an authorization denial without disclosed identities');
 $audit->response($request(),['data'=>['items'=>[]]],200,1);
 $check(json_decode(end($pdo->rows)['metadata'],true)===['resources'=>[]],'Empty searches are still logged');
 foreach([401,403,404,422] as $status){

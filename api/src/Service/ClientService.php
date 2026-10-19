@@ -141,17 +141,29 @@ final class ClientService
     {
         if($id===null){self::authorizeCreate($actor);self::validatePractitionerCreation($actor,$body);}else self::authorize($actor);
         $data=self::validate($body);$pdo=$this->database->connection();
+        $lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
         try{
             $pdo->beginTransaction();
+            $q=$pdo->prepare("SELECT id FROM clinics WHERE id=? AND status='active' FOR UPDATE");$q->execute([$actor->clinicId]);
+            if(!$q->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $q=$pdo->prepare("SELECT 1 FROM users WHERE id=? AND clinic_id=? AND user_type='staff' AND status='active'");$q->execute([$actor->userId,$actor->clinicId]);
+            if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Client creation is not permitted for this staff account.');
+            if(!$actor->hasAnyRole('super_admin','clinic_admin','reception')){
+                $q=$pdo->prepare('SELECT 1 FROM practitioners WHERE user_id=? AND active=1');$q->execute([$actor->userId]);
+                if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Client creation is not permitted for this staff account.');
+            }
+            $identityChanged=$id===null;
             if($id!==null){
                 $current=$this->find($actor,$id,true);
+                foreach(['given_name','family_name','email'] as $identityField)if($data[$identityField]!==$current[$identityField])$identityChanged=true;
                 if(!is_string($body['revision']??null)||!hash_equals($current['revision'],$body['revision']))throw new ApiException(409,'client_changed','This client was changed by another staff member. Reopen the record before saving.');
                 if(json_encode($current['address']??null,JSON_THROW_ON_ERROR)!==json_encode($data['address'],JSON_THROW_ON_ERROR))$pdo->prepare('DELETE FROM onsite_area_approvals WHERE client_id=:client')->execute(['client'=>$id]);
             }
+            if($identityChanged)$this->assertRegistrationMatches($actor,$data,$id??0);
             $s=$pdo->prepare('SELECT client_id FROM client_email_addresses WHERE clinic_id=:clinic AND email=:email AND client_id<>:id FOR UPDATE');$s->execute(['clinic'=>$actor->clinicId,'email'=>$data['email'],'id'=>$id??0]);
-            if($s->fetchColumn())throw new ApiException(409,'email_in_use','This email is already used by another account in this clinic.');
+            if($s->fetchColumn())throw new ApiException(409,'client_registration_review','This registration requires an authorized review. No changes were saved.');
             $s=$pdo->prepare('SELECT id FROM users WHERE clinic_id=:clinic AND email=:email AND id<>:id');$s->execute(['clinic'=>$actor->clinicId,'email'=>$data['email'],'id'=>$id??0]);
-            if($s->fetchColumn())throw new ApiException(409,'email_in_use','This email is already used by another account in this clinic.');
+            if($s->fetchColumn())throw new ApiException(409,'client_registration_review','This registration requires an authorized review. No changes were saved.');
             if($id===null&&!($body['confirm_possible_duplicate']??false)){
                 $candidates=$this->duplicateCandidates($actor,$data);
                 if($candidates)throw new ApiException(409,'possible_duplicate','A similar client record already exists. Review it before creating another client.',['candidates'=>$candidates]);
@@ -173,15 +185,31 @@ final class ClientService
             $result=$this->find($actor,$id);$pdo->commit();return $result;
         }catch(\Throwable $e){
             if($pdo->inTransaction())$pdo->rollBack();
-            if($e instanceof \PDOException&&(int)($e->errorInfo[1]??0)===1062)throw new ApiException(409,'email_in_use','This email is already used by another account in this clinic.');
+            if($e instanceof \PDOException&&(int)($e->errorInfo[1]??0)===1062)throw new ApiException(409,'client_registration_review','This registration requires an authorized review. No changes were saved.');
             throw $e;
-        }
+        }finally{$lock->release();}
+    }
+
+    /** Check all matches before caps or confirmation; never create a new relationship to bypass hidden records. */
+    private function assertRegistrationMatches(AuthContext $actor,array $data,int $exclude): void
+    {
+        $params=['clinic'=>$actor->clinicId,'exclude'=>$exclude,'canonical_exclude'=>$exclude,'given'=>$data['given_name'],'family'=>$data['family_name'],'name'=>$data['display_name']];
+        $visible=BookingClientAccess::condition($actor,$params);
+        $q=$this->database->connection()->prepare("SELECT 1 FROM users identity_record
+            LEFT JOIN client_merge_records merged ON merged.duplicate_client_id=identity_record.id AND merged.clinic_id=identity_record.clinic_id
+            LEFT JOIN users u ON u.id=COALESCE(merged.survivor_client_id,identity_record.id) AND u.clinic_id=identity_record.clinic_id AND u.user_type='client'
+            WHERE identity_record.clinic_id=:clinic AND identity_record.user_type='client' AND identity_record.id<>:exclude AND (u.id IS NULL OR u.id<>:canonical_exclude)
+            AND ((LOWER(identity_record.given_name)=LOWER(:given) AND LOWER(identity_record.family_name)=LOWER(:family)) OR LOWER(identity_record.display_name)=LOWER(:name))
+            AND (u.id IS NULL OR NOT (1=1 $visible)) LIMIT 1");
+        $q->execute($params);
+        if($q->fetchColumn())throw new ApiException(409,'client_registration_review','This registration requires an authorized review. No changes were saved.');
     }
 
     private function duplicateCandidates(AuthContext $actor,array $data): array
     {
-        $sql="SELECT u.id,u.display_name,u.email,u.status,p.phone,p.date_of_birth FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id) AND LOWER(u.given_name)=LOWER(:given) AND LOWER(u.family_name)=LOWER(:family)";
+        $sql="SELECT u.id,u.display_name,u.email,u.status,p.phone FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id) AND LOWER(u.given_name)=LOWER(:given) AND LOWER(u.family_name)=LOWER(:family)";
         $params=['clinic'=>$actor->clinicId,'given'=>$data['given_name'],'family'=>$data['family_name'],'email'=>$data['email']];
+        $sql.=BookingClientAccess::condition($actor,$params);
         $sql.=' ORDER BY (u.email=:email) DESC';
         if($data['phone']){$sql.=',(p.phone=:phone) DESC';$params['phone']=$data['phone'];}
         if($data['date_of_birth']){$sql.=',(p.date_of_birth=:dob) DESC';$params['dob']=$data['date_of_birth'];}

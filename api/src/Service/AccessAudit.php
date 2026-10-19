@@ -172,7 +172,7 @@ final class AccessAudit
         $method = in_array($request?->method,['GET','POST','PUT','PATCH','DELETE','HEAD'],true) ? $request->method : 'OTHER';
         $code = $payload['error']['code'] ?? null;
         $code = is_string($code) && preg_match('/^[a-z_]{1,80}$/D',$code) ? $code : null;
-        $denied = in_array($status,[401,403,404],true) || $code === 'invalid_client';
+        $denied = in_array($status,[401,403,404],true) || in_array($code,['invalid_client','client_registration_review'],true);
         $outcome = $status < 400 ? 'success' : ($denied ? 'denied' : 'failure');
         $action = $outcome !== 'success' ? 'access.'.$outcome : ($method === 'GET' ? 'access.read' : 'access.response');
         if ($outcome === 'success' && $method === 'POST' && preg_match('#/(search|preview|validate|resolve|approval|travel-estimate)$#',$description['route'])) $action = 'access.read';

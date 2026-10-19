@@ -970,6 +970,30 @@ test("clients use list-first actions with details and edit panels", async ({
   });
 });
 
+test('registration review removes stale duplicate suggestions and disables confirmation bypass',async({page})=>{
+  await fixtures(page,['super_admin']);
+  let attempts=0;
+  await page.route('**/api/v1/clients',route=>{
+    if(route.request().method()!=='POST')return route.fulfill({json:{data:{items:[],has_more:false}}});
+    attempts++;
+    if(attempts===1)return route.fulfill({status:409,json:{error:{code:'possible_duplicate',fields:{candidates:[{id:77,display_name:'Previously permitted patient',email:'old@example.test'}]}}}});
+    expect(route.request().postDataJSON().confirm_possible_duplicate).toBe(true);
+    return route.fulfill({status:409,json:{error:{code:'client_registration_review'}}});
+  });
+  await page.goto(`${portalHost}/admin/clients`);
+  await page.getByRole('button',{name:'New client',exact:true}).click();
+  await page.getByRole('textbox',{name:'First name',exact:true}).fill('Same');await page.getByRole('textbox',{name:'Last name',exact:true}).fill('Patient');
+  await page.getByRole('textbox',{name:'Email',exact:true}).fill('new@example.test');
+  await page.getByRole('button',{name:'Save client',exact:true}).click();
+  await expect(page.getByText(/Previously permitted patient/)).toBeVisible();
+  await page.getByRole('button',{name:'Create anyway',exact:true}).click();
+  await expect(page.getByText('This registration requires an authorized review. No changes were saved.',{exact:true})).toBeVisible();
+  await expect(page.getByText(/Previously permitted patient/)).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Create anyway',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('textbox',{name:'Email',exact:true})).toHaveValue('new@example.test');
+  expect(attempts).toBe(2);
+});
+
 test("possible duplicates require acknowledgement and Super Admin can merge with a preview", async ({
   page,
 }) => {

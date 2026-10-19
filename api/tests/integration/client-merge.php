@@ -13,8 +13,12 @@ $port=(int)(getenv('ONBOARDING_TEST_PORT')?:13317);
 $root=new PDO("mysql:host=127.0.0.1;port=$port;charset=utf8mb4",getenv('ONBOARDING_TEST_USER')?:'root',getenv('ONBOARDING_TEST_PASSWORD')?:'',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::ATTR_EMULATE_PREPARES=>false]);
 $name='wellness_client_merge_test_'.bin2hex(random_bytes(6));
 $root->exec("CREATE DATABASE `$name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");$root->exec("USE `$name`");
-$schema=file_get_contents(dirname(__DIR__,2).'/database/schema.sql');$schema=preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m','',$schema);$root->exec($schema);
+$schema=file_get_contents(dirname(__DIR__,2).'/database/schema.sql');$offset=strpos($schema,'CREATE TABLE form_library_entries');
+if($offset===false)throw new RuntimeException('Cannot isolate the client schema baseline.');
+// Use the same client/booking baseline as consent acceptance; unrelated library FKs are outside this fixture.
+$root->exec(preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m','',substr($schema,0,$offset)));
 $root->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/005_customer_onboarding.sql'));
+$root->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/050_consent_directives.sql'));
 $migration=file_get_contents(dirname(__DIR__,2).'/database/migrations/006_client_merge.sql');$root->exec($migration);
 $root->exec("INSERT INTO clinics(id,name)VALUES(1,'Synthetic clinic');
 INSERT INTO users(id,clinic_id,email,display_name,given_name,family_name,user_type,status)VALUES
@@ -26,7 +30,7 @@ INSERT INTO client_profiles(user_id,phone,date_of_birth,administrative_notes)VAL
 INSERT INTO client_contact_addresses(client_id,address_json)VALUES(2,JSON_OBJECT('city','Survivor City')),(3,JSON_OBJECT('city','Duplicate City'));
 INSERT INTO locations(id,clinic_id,name)VALUES(1,1,'Test location');
 INSERT INTO practitioners(id,user_id,discipline)VALUES(1,1,'Therapist');
-INSERT INTO services(id,clinic_id,name,price_cents)VALUES(1,1,'Massage',10000);
+INSERT INTO services(id,clinic_id,slug,name,price_cents)VALUES(1,1,'synthetic-merge','Massage',10000);
 INSERT INTO appointments(id,clinic_id,location_id,client_id,practitioner_id,service_id,starts_at,ends_at,buffer_starts_at,buffer_ends_at,status,source,created_by)VALUES(1,1,1,3,1,1,'2026-10-01 14:00:00','2026-10-01 15:00:00','2026-10-01 14:00:00','2026-10-01 15:00:00','confirmed','reception',1);
 INSERT INTO consent_records(client_id,purpose_code,policy_version,status,recorded_at)VALUES(3,'care','1','granted',UTC_TIMESTAMP());
 INSERT INTO customer_identities(id,identity_hash,issuer,subject,created_at)VALUES(1,REPEAT('a',64),'issuer','one',UTC_TIMESTAMP()),(2,REPEAT('b',64),'issuer','two',UTC_TIMESTAMP());

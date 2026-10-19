@@ -75,6 +75,7 @@ final class ConsentAccess
             'profileAvatar','saveProfileAvatar','deleteProfileAvatar','myPublicCard','updateMyPublicCard',
             'qualificationTypes','myQualifications','submitMyQualification','globalCredentials','createGlobalCredential','shareGlobalCredential',
             'staffNotificationPreferences','saveStaffNotificationPreferences','sendStaffNotificationCode','verifyStaffNotificationEmail',
+            'createClient', // ClientService checks registration matches, consent and current creator scope.
             'bookingOptions','clientConsent','saveClientConsent','clients','practitionerClients','bookingClients','appointments','practitionerCalendar',
             'formTemplates','publishForm','publishFormVersion','formHistory','formDrafts','saveFormDraft','updateFormDraft','formDraftDetail','importFormDraft','validateFormSource',
             'formLibrary','submitLibraryForm','libraryFormDetail','reviewLibraryForm','copyLibraryForm',
