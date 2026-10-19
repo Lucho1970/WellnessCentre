@@ -562,3 +562,8 @@ CREATE TABLE client_consent_events (
 
 INSERT INTO permissions(code,name,description) VALUES
 ('manage_client_consent','Record verified consent instructions','Record verified patient instructions without granting access to patient records.');
+
+-- Explicit clinic privacy-review permission; no automatic grants.
+INSERT INTO permissions(code,name,description) VALUES
+('review_privacy_audit','Review clinic privacy audit','Review minimal access history for this clinic for authorized privacy oversight. Does not grant clinical-record access.');
+CREATE INDEX ix_access_clinic_id ON access_audit_events(clinic_id,id);

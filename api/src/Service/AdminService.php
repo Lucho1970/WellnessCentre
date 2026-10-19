@@ -206,7 +206,7 @@ final class AdminService
     public function staff(AuthContext $actor): array
     {
         $this->superAdmin($actor);
-        $s=$this->database->connection()->prepare("SELECT u.id,u.display_name,u.email,u.status,GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) roles,GROUP_CONCAT(DISTINCT permission.code ORDER BY permission.code) permissions FROM users u JOIN staff_accounts a ON a.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id LEFT JOIN user_permissions user_permission ON user_permission.user_id=u.id LEFT JOIN permissions permission ON permission.id=user_permission.permission_id WHERE u.clinic_id=:clinic GROUP BY u.id,u.display_name,u.email,u.status ORDER BY u.display_name");
+        $s=$this->database->connection()->prepare("SELECT u.id,u.display_name,u.email,u.status,GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) roles,GROUP_CONCAT(DISTINCT permission.code ORDER BY permission.code) permissions FROM users u JOIN staff_accounts a ON a.user_id=u.id LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id LEFT JOIN user_permissions user_permission ON user_permission.user_id=u.id LEFT JOIN permissions permission ON permission.id=user_permission.permission_id WHERE u.clinic_id=:clinic AND u.user_type='staff' GROUP BY u.id,u.display_name,u.email,u.status ORDER BY u.display_name");
         $s->execute(['clinic'=>$actor->clinicId]);$rows=$s->fetchAll();
         foreach($rows as &$row){$row['roles']=$row['roles']?explode(',',$row['roles']):[];$row['permissions']=$row['permissions']?explode(',',$row['permissions']):[];}
         return $rows;
@@ -217,8 +217,9 @@ final class AdminService
         $this->superAdmin($actor);$this->required($body,['display_name','email','status','roles']);
         if($userId===$actor->userId)throw new ApiException(422,'self_role_change','Use another Super Admin to change your own access.');
         $roles=array_values(array_unique($body['roles']));$allowed=['super_admin','clinic_admin','reception','practitioner','accountant'];foreach($roles as $role)if(!in_array($role,$allowed,true))throw new ApiException(422,'validation_error','Invalid role.');
-        $permissions=array_values(array_unique($body['permissions']??[]));$allowedPermissions=['schedule_for_other_practitioners','add_clients','approve_onsite_service_area','manage_client_consent'];foreach($permissions as $permission)if(!in_array($permission,$allowedPermissions,true))throw new ApiException(422,'validation_error','Invalid permission.');
-        if(array_diff($permissions,['manage_client_consent'])!==[]&&!in_array('practitioner',$roles,true))throw new ApiException(422,'validation_error','Additional permissions can only be assigned to a practitioner.');
+        $permissions=array_values(array_unique($body['permissions']??[]));$allowedPermissions=['schedule_for_other_practitioners','add_clients','approve_onsite_service_area','manage_client_consent','review_privacy_audit'];foreach($permissions as $permission)if(!in_array($permission,$allowedPermissions,true))throw new ApiException(422,'validation_error','Invalid permission.');
+        if(in_array('review_privacy_audit',$permissions,true)&&!array_intersect($roles,['super_admin','clinic_admin']))throw new ApiException(422,'validation_error','Privacy review requires a clinic administrator role.');
+        if(array_diff($permissions,['manage_client_consent','review_privacy_audit'])!==[]&&!in_array('practitioner',$roles,true))throw new ApiException(422,'validation_error','Additional permissions can only be assigned to a practitioner.');
         if(!in_array($body['status'],['active','inactive','locked'],true))throw new ApiException(422,'validation_error','Invalid staff status.');
         $pdo=$this->database->connection();
         try{

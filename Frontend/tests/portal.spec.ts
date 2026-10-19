@@ -263,6 +263,52 @@ test("staff portal does not start authentication inside a silent refresh iframe"
   await expect(page.frameLocator('#silent-auth-probe').locator('#root')).toBeEmpty();
 });
 
+for (const roles of [['super_admin'], ['clinic_admin'], ['reception'], ['practitioner']]) test(`privacy audit requires explicit authority for ${roles[0]}`, async ({page}) => {
+  await fixtures(page,roles,roles[0] === 'practitioner' || roles[0] === 'reception' ? ['review_privacy_audit'] : []);
+  let reads=0; await page.route('**/api/v1/admin/privacy-audit**',route=>{reads++;return route.fulfill({json:{data:{items:[],next_before:null}}});});
+  await page.goto(`${portalHost}/admin/privacy-audit`);
+  await expect(page.getByText('You do not have permission to access this page.',{exact:true})).toBeVisible();
+  expect(reads).toBe(0);
+});
+
+test('privacy audit filters, pagination and revocation clear previous results', async ({page}) => {
+  await fixtures(page,['clinic_admin'],['review_privacy_audit']);
+  const queries: URL[]=[]; let revoked=false;
+  await page.route('**/api/v1/admin/privacy-audit**',route=>{
+    const url=new URL(route.request().url());queries.push(url);
+    if(revoked)return route.fulfill({status:403,json:{error:{code:'privacy_review_required'}}});
+    const id=url.searchParams.has('before')?49:81;
+    return route.fulfill({json:{data:{items:[{id,event_group:'a'.repeat(32),part_number:1,part_count:1,created_at:'2026-10-19 14:00:00',actor_type:'staff',actor_id:23,action:'access.denied',route:'/api/v1/clients/:id',http_method:'GET',http_status:403,outcome:'denied',resources:[],attempted_resources:[{type:'client',id:101}],requested_resources:[]}],next_before:id===81?81:null,filters:{}}}});
+  });
+  await page.goto(`${portalHost}/admin/privacy-audit`);
+  await expect(page.getByRole('table',{name:'Clinic access history'})).toContainText('#81');
+  await page.getByText('Recorded references',{exact:true}).click();
+  await expect(page.getByText('Attempted: client #101',{exact:true})).toBeVisible();
+  await page.getByLabel('From date (UTC)').fill('2026-10-01');await page.getByLabel('Before date (UTC)').fill('2026-10-20');
+  await page.getByLabel('Actor type').click();await page.getByRole('option',{name:'staff',exact:true}).click();await page.getByLabel('Actor ID',{exact:true}).fill('23');
+  await page.getByLabel('Resource type').click();await page.getByRole('option',{name:'client',exact:true}).click();await page.getByLabel('Resource ID').fill('101');
+  await page.getByLabel('Outcome',{exact:true}).click();await page.getByRole('option',{name:'denied',exact:true}).click();
+  await page.getByRole('button',{name:'Search access history'}).click();
+  await expect.poll(()=>queries.at(-1)?.searchParams.get('resource_id')).toBe('101');
+  expect(queries.at(-1)?.searchParams.get('actor_id')).toBe('23');expect(queries.at(-1)?.searchParams.get('outcome')).toBe('denied');
+  await page.getByRole('button',{name:'Older results'}).click();await expect(page.getByRole('table')).toContainText('#49');
+  expect(queries.at(-1)?.searchParams.get('before')).toBe('81');
+  revoked=true;await page.getByRole('button',{name:'Newest results'}).click();
+  await expect(page.getByText('Clinic privacy-review permission is required.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);await expect(page.getByText('client #101',{exact:false})).toHaveCount(0);
+});
+
+test('super admin explicitly grants and revokes another administrators privacy permission', async ({page}) => {
+  await fixtures(page,['super_admin']);
+  const member={id:9,display_name:'Privacy Reviewer',email:'reviewer@example.test',status:'active',roles:['clinic_admin'],permissions:[] as string[]};const methods: string[]=[];
+  await page.route('**/api/v1/admin/staff',route=>route.fulfill({json:{data:[member]}}));
+  await page.route('**/api/v1/admin/privacy-audit/reviewers/9',route=>{methods.push(route.request().method());member.permissions=route.request().method()==='PUT'?['review_privacy_audit']:[];return route.fulfill({json:{data:{id:9}}});});
+  await page.goto(`${portalHost}/admin/users`);await page.getByRole('button',{name:/Privacy Reviewer.*reviewer@example.test/}).click();await page.getByRole('button',{name:'Details',exact:true}).click();
+  await page.getByRole('button',{name:'Grant privacy-review permission',exact:true}).click();await expect(page.getByText('Privacy-review permission updated.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Details',exact:true}).click();await page.getByRole('button',{name:'Revoke privacy-review permission',exact:true}).click();
+  await expect.poll(()=>methods.join(',')).toBe('PUT,DELETE');
+});
+
 async function fixtures(
   page: Page,
   roles?: string[],

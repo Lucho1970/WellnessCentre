@@ -158,6 +158,9 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/dashboard/preferences','saveDashboardPreferences');
                 $routes->addRoute('DELETE','/api/v1/dashboard/preferences','resetDashboardPreferences');
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets','adminDashboardWidgets');
+                $routes->addRoute('GET','/api/v1/admin/privacy-audit','privacyAuditHistory');
+                $routes->addRoute('PUT','/api/v1/admin/privacy-audit/reviewers/{id:\d+}','grantPrivacyReview');
+                $routes->addRoute('DELETE','/api/v1/admin/privacy-audit/reviewers/{id:\d+}','revokePrivacyReview');
                 $routes->addRoute('GET','/api/v1/admin/notifications','adminNotifications');
                 $routes->addRoute('GET','/api/v1/practitioner/notifications','practitionerNotifications');
                 $routes->addRoute('POST','/api/v1/admin/notifications/{id:\d+}/review','reviewNotification');
@@ -341,6 +344,8 @@ final class Api
                 'saveDashboardPreferences'=>$this->dashboard->savePreferences($this->user($request),(string)($request->query['workspace']??''),$request->body),
                 'resetDashboardPreferences'=>$this->dashboard->resetPreferences($this->user($request),(string)($request->query['workspace']??'')),
                 'adminDashboardWidgets'=>$this->dashboard->adminList($this->user($request)),
+                'grantPrivacyReview','revokePrivacyReview'=>(new \Wellness\Service\PrivacyAuditService($this->database,new AuditLogger($this->database)))->setPermission($this->user($request),(int)$route[2]['id'],$route[1]==='grantPrivacyReview',$request->correlationId),
+                'privacyAuditHistory'=>(new \Wellness\Service\PrivacyAuditService($this->database,new AuditLogger($this->database)))->search($this->user($request),$request->query,$request->correlationId),
                 'adminNotifications'=>$this->notificationStatus->list($this->user($request),$request->query),
                 'practitionerNotifications'=>$this->notificationStatus->practitionerList($this->user($request),$request->query),
                 'reviewNotification'=>$this->notificationReviews->review($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),

@@ -56,6 +56,7 @@ const FormTemplates = lazy(() => import('../forms/FormTemplates').then(module =>
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
+const PrivacyAuditReview = lazy(() => import('../admin/PrivacyAuditReview').then(module => ({default:module.PrivacyAuditReview})));
 const NotificationStatusAdmin = lazy(() => import('../admin/NotificationStatusAdmin').then(module => ({ default: module.NotificationStatusAdmin })));
 const PractitionerNotifications = lazy(() => import('./PractitionerNotifications').then(module => ({ default: module.PractitionerNotifications })));
 const PractitionerCalendar = lazy(() => import('../scheduling/PractitionerCalendar').then(module => ({ default: module.PractitionerCalendar })));
@@ -86,6 +87,7 @@ const navigation: NavigationItem[] = [
   { id: "enquiries", label: "Practitioner enquiries", description: "Review interest in joining the clinic", icon: <MailCheck size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
+  { id: "privacy_audit", label: "Privacy audit", description: "Review clinic access history", icon: <Users size={20} /> },
   { id: "notifications", label: "Notification status", description: "Review appointment notification delivery", icon: <MailCheck size={20} /> },
   { id: "my_notifications", label: "My notifications", description: "Booking notices sent to you", icon: <MailCheck size={20} /> },
   { id: "forms", label: "Intake and consent forms", description: "Questionnaires, consent and template versions", icon: <PanelsTopLeft size={20} /> },
@@ -125,7 +127,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
   try { remembered = sessionStorage.getItem(preferenceKey); } catch { /* Storage may be disabled. */ }
   const defaultWorkspace = workspaces.find(item => item === remembered) ?? workspaces[0];
   const workspace = location.pathname.split('/')[1] as Workspace;
-  const allowedPages = pagesFor(roles, workspace);
+  const allowedPages = pagesFor(roles, workspace, permissions);
   const allowedNavigation = navigation.filter(item => allowedPages.includes(item.id));
   const page = pageAt(location.pathname, workspace);
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
@@ -194,6 +196,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "travel" && <StaffTravelEnquiries />}
         {page === "enquiries" && <PractitionerEnquiries />}
         {page === "widgets" && <DashboardWidgetAdmin />}
+        {page === "privacy_audit" && <PrivacyAuditReview />}
         {page === "notifications" && <NotificationStatusAdmin />}
         {page === "my_notifications" && <PractitionerNotifications />}
         {page === "calendar" && <AvailabilityAdmin practitionerMode={workspace === 'practitioner'} />}

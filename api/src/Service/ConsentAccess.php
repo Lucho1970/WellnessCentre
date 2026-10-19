@@ -66,6 +66,7 @@ final class ConsentAccess
             && in_array($r->method,['GET','POST'],true))return; // TravelEnquiryService owns row-level authorization.
         // These routes contain no patient records, or enforce their own filtered boundary below.
         if(in_array($route,[
+            'privacyAuditHistory','grantPrivacyReview','revokePrivacyReview','adminStaff', // Minimal oversight history has separate, explicit authority in PrivacyAuditService.
             'adminNotifications','practitionerNotifications','reviewNotification',
             'dashboard','practitionerToday','practitionerVisitSummary','practitionerNextOnsite',
             'availabilityRules','scheduleExceptions','timeOffImpact','previewTimeOffImpact','practitionerAvailabilityContext',

@@ -35,7 +35,7 @@ final class AccessAudit
         'amendment_id'=>'form_amendment',
     ];
     private const ENTITIES = [
-        'clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
+        'reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
         'next-onsite'=>'appointment','calendar'=>'appointment','receipts'=>'session_receipt','receipt'=>'session_receipt',
         'forms'=>'client_form_task','tasks'=>'client_form_task','templates'=>'form_template','drafts'=>'form_draft',
         'notifications'=>'notification','travel-enquiries'=>'travel_enquiry','messages'=>'travel_enquiry_message',
@@ -50,6 +50,9 @@ final class AccessAudit
     ];
 
     public function __construct(private readonly Database $database) {}
+
+    public static function resourceTypes(): array
+    {return array_values(array_unique(array_merge(array_values(self::ENTITIES),array_values(self::IDS),['record','audit_event','time_off','event'])));}
 
     public function actor(AuthContext $actor): void
     {
@@ -174,6 +177,10 @@ final class AccessAudit
         $code = is_string($code) && preg_match('/^[a-z_]{1,80}$/D',$code) ? $code : null;
         $denied = in_array($status,[401,403,404],true) || in_array($code,['invalid_client','client_registration_review'],true);
         $outcome = $status < 400 ? 'success' : ($denied ? 'denied' : 'failure');
+        if($outcome!=='success'&&$request?->path==='/api/v1/admin/privacy-audit'){
+            $type=$request->query['resource_type']??null;$id=self::positiveId($request->query['resource_id']??null);
+            if(is_string($type)&&in_array($type,self::resourceTypes(),true)&&$id!==null)$attempted[$type.':'.$id]=['type'=>$type,'id'=>$id];
+        }
         $action = $outcome !== 'success' ? 'access.'.$outcome : ($method === 'GET' ? 'access.read' : 'access.response');
         if ($outcome === 'success' && $method === 'POST' && preg_match('#/(search|preview|validate|resolve|approval|travel-estimate)$#',$description['route'])) $action = 'access.read';
         if ($outcome === 'success' && (str_contains($description['route'],'search') || preg_match('#/(clients|booking-clients)$#',$description['route']))) $action = 'access.search';

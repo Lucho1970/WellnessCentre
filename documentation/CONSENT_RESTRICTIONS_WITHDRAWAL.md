@@ -35,6 +35,7 @@ Policy updates, append-only `client_consent_events` evidence and the `consent.di
 
 ## Enforcement boundaries
 
+- [Privacy-audit review](PRIVACY_AUDIT_REVIEW.md) has separate, explicit clinic oversight authority for minimal access-history references. It preserves ordinary clinical restrictions; narrowly scoped permission revocation remains available under those restrictions.
 - Client searches/directories, booking contacts, appointment lists and practitioner calendars filter restricted clients in SQL before ordering, pagination or `has_more` calculation.
 - Client detail/history, form tasks and answers, saved addresses, appointment actions and receipts are checked before handler reads or writes. Existing role, clinic, active-account and relationship checks still apply. Core booking, client and form services also apply the negative permission.
 - Reassignment and new/recurring booking paths validate the destination practitioner; ordinary writes cannot establish a relationship to defeat withdrawal.
