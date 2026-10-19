@@ -18,6 +18,21 @@ final class ConsentAccess
         return " AND NOT EXISTS(SELECT 1 FROM client_consent_directives consent WHERE consent.clinic_id=:consent_clinic AND consent.client_id=$client AND consent.scope='staff_access' AND consent.restricted=1 AND consent.target_staff_id IN (0,:consent_actor))";
     }
 
+    /** Only count notifications whose patient can be resolved in the current clinic.
+     * Appointment-less patient messages use their client recipient; orphan/staff-only
+     * events have no proven patient scope and are excluded from patient activity totals.
+     */
+    public static function notificationCondition(AuthContext $actor,array &$params): string
+    {
+        $visible=self::condition($actor,$params,'consent_client.id');
+        return " AND EXISTS(SELECT 1 FROM users consent_client WHERE consent_client.user_type='client'
+            AND consent_client.clinic_id=n.clinic_id AND consent_client.id=CASE
+                WHEN n.appointment_id IS NULL THEN n.recipient_user_id
+                ELSE (SELECT consent_appointment.client_id FROM appointments consent_appointment
+                      WHERE consent_appointment.id=n.appointment_id AND consent_appointment.clinic_id=n.clinic_id)
+            END $visible)";
+    }
+
     public function restricted(int $clinic,int $client,int $staff): bool
     {
         $q=$this->pdo->prepare("SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND client_id=? AND scope='staff_access' AND restricted=1 AND target_staff_id IN (0,?) LIMIT 1");
@@ -49,6 +64,8 @@ final class ConsentAccess
         if($actor->userType!=='staff')return;
         // These routes contain no patient records, or enforce their own filtered boundary below.
         if(in_array($route,[
+            'dashboard','practitionerToday','practitionerVisitSummary','practitionerNextOnsite',
+            'availabilityRules','scheduleExceptions','timeOffImpact','previewTimeOffImpact','practitionerAvailabilityContext',
             'me','dashboardPreferences','saveDashboardPreferences','resetDashboardPreferences',
             'myTravelSettings','saveMyTravelSettings','myWorkLocation','saveMyWorkLocation',
             'profileAvatar','saveProfileAvatar','deleteProfileAvatar','myPublicCard','updateMyPublicCard',

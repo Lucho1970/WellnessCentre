@@ -92,7 +92,7 @@ final class DashboardService
     private function project(AuthContext $actor,string $workspace,string $timezone,array $definition): mixed
     {
         if($definition['dataProjection']==='notification_summary')return $this->notificationSummary($actor,$timezone);
-        $params=['clinic'=>$actor->clinicId];$where='a.clinic_id=:clinic';if($workspace==='practitioner'){$where.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user AND active=1 LIMIT 1)';$params['user']=$actor->userId;}$configuration=$definition['parameters']??[];
+        $params=['clinic'=>$actor->clinicId];$where='a.clinic_id=:clinic';if($workspace==='practitioner'){$where.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user AND active=1 LIMIT 1)';$params['user']=$actor->userId;}$where.=ConsentAccess::condition($actor,$params,'a.client_id');$configuration=$definition['parameters']??[];
         if(($configuration['date']??null)==='today'){$local=new DateTimeImmutable('now',new DateTimeZone($timezone));$from=$local->setTime(0,0)->setTimezone(new DateTimeZone('UTC'));$to=$local->modify('+1 day')->setTime(0,0)->setTimezone(new DateTimeZone('UTC'));$where.=' AND a.starts_at>=:from_time AND a.starts_at<:to_time';$params['from_time']=$from->format('Y-m-d H:i:s');$params['to_time']=$to->format('Y-m-d H:i:s');}
         $statuses=$configuration['statuses']??self::STATUSES;if($statuses){$marks=[];foreach($statuses as $index=>$status){$key='status_'.$index;$marks[]=':'.$key;$params[$key]=$status;}$where.=' AND a.status IN ('.implode(',',$marks).')';}if(isset($configuration['delivery_mode'])){$where.=' AND a.delivery_mode=:delivery_mode';$params['delivery_mode']=$configuration['delivery_mode'];}
         if($definition['dataProjection']==='appointment_count'){$statement=$this->database->connection()->prepare("SELECT COUNT(*) FROM appointments a WHERE {$where}");$statement->execute($params);return (int)$statement->fetchColumn();}
@@ -106,18 +106,21 @@ final class DashboardService
         [$last7,$end]=NotificationActivityWindow::bounds('last7',$timezone,$now);
         $counts=[];
         foreach(['today','last7'] as $period)foreach(['email','sms'] as $channel)$counts[$period][$channel]=['sent'=>0,'queued'=>0,'failed'=>0,'needs_review'=>0];
+        $params=['today_start'=>$today,'last7_start'=>$last7,'end_time'=>$end,'clinic'=>$actor->clinicId];
+        $visible=ConsentAccess::notificationCondition($actor,$params);
         $statement=$this->database->connection()->prepare("SELECT n.channel,n.status,
             SUM(CASE WHEN n.activity_at>=:today_start THEN 1 ELSE 0 END) today_count,
             COUNT(*) last7_count
             FROM (SELECT channel,status,CASE WHEN status IN ('sent','delivered') THEN sent_at ELSE scheduled_at END activity_at
-                  FROM notification_events WHERE clinic_id=:clinic AND channel IN ('email','sms')
+                  FROM notification_events n WHERE n.clinic_id=:clinic $visible AND channel IN ('email','sms')
                   AND status IN ('sent','delivered','queued','failed','needs_review')) n
             WHERE n.activity_at>=:last7_start AND n.activity_at<:end_time
             GROUP BY n.channel,n.status");
-        $statement->execute(['today_start'=>$today,'last7_start'=>$last7,'end_time'=>$end,'clinic'=>$actor->clinicId]);
+        $statement->execute($params);
         foreach($statement->fetchAll() as $row){$status=in_array($row['status'],['sent','delivered'],true)?'sent':$row['status'];$counts['today'][$row['channel']][$status]+=(int)$row['today_count'];$counts['last7'][$row['channel']][$status]+=(int)$row['last7_count'];}
-        $unresolved=$this->database->connection()->prepare("SELECT COUNT(*) FROM notification_events WHERE clinic_id=:clinic AND status='needs_review'");
-        $unresolved->execute(['clinic'=>$actor->clinicId]);
+        $params=['clinic'=>$actor->clinicId];$visible=ConsentAccess::notificationCondition($actor,$params);
+        $unresolved=$this->database->connection()->prepare("SELECT COUNT(*) FROM notification_events n WHERE n.clinic_id=:clinic AND n.status='needs_review' $visible");
+        $unresolved->execute($params);
         $counts['needs_review_total']=(int)$unresolved->fetchColumn();
         $counts['health']=(new NotificationSchedulerHealth($this->database))->summary($actor);
         return $counts;
@@ -131,6 +134,7 @@ final class DashboardService
             WHERE a.clinic_id=:clinic AND p.user_id=:user AND p.active=1
             AND a.ends_at>UTC_TIMESTAMP() AND a.status IN ('requested','confirmed','rescheduled')";
         $params=['clinic'=>$actor->clinicId,'user'=>$actor->userId];
+        $from.=ConsentAccess::condition($actor,$params,'a.client_id');
         $pdo=$this->database->connection();
         $count=$pdo->prepare("SELECT COUNT(DISTINCT a.id) {$from}");
         $count->execute($params);
@@ -157,10 +161,10 @@ final class DashboardService
     private function builtIns(): array
     {
         $base=['schemaVersion'=>1,'renderer'=>'metric','dataProjection'=>'appointment_count','icon'=>'calendar-check','destination'=>['page'=>'appointments'],'sizes'=>self::SIZES,'defaultSize'=>'small','defaultEnabled'=>true];$definitions=[
-            ['id'=>'appointments_today','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>"Today's appointments",'fr'=>'Rendez-vous d’aujourd’hui'],'description'=>['en'=>'All active appointments scheduled today.','fr'=>'Tous les rendez-vous actifs prévus aujourd’hui.'],'parameters'=>['date'=>'today'],'defaultOrder'=>10],
+            ['id'=>'appointments_today','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>"Today's appointments",'fr'=>'Rendez-vous d’aujourd’hui'],'description'=>['en'=>'Active appointments you can access scheduled today.','fr'=>'Rendez-vous actifs auxquels vous avez accès prévus aujourd’hui.'],'parameters'=>['date'=>'today'],'defaultOrder'=>10],
             ['id'=>'awaiting_confirmation','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>'Awaiting confirmation','fr'=>'En attente de confirmation'],'description'=>['en'=>'Requested appointments that still need confirmation.','fr'=>'Rendez-vous demandés qui doivent encore être confirmés.'],'parameters'=>['date'=>'today','statuses'=>['requested']],'icon'=>'clock','defaultOrder'=>20],
-            ['id'=>'onsite_today','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>"Today's On-Site visits",'fr'=>'Visites sur place aujourd’hui'],'description'=>['en'=>'Appointments taking place at a client location.','fr'=>'Rendez-vous ayant lieu chez un client.'],'parameters'=>['date'=>'today','delivery_mode'=>'mobile'],'icon'=>'map-pin','defaultOrder'=>30],
-            ['id'=>'notification_delivery_summary','workspaces'=>['admin'],'requiredCapability'=>'notifications.view.clinic','title'=>['en'=>'Email and SMS activity','fr'=>'Activité des courriels et SMS'],'description'=>['en'=>'Provider acceptance today and over the last 7 days; other statuses use scheduled time.','fr'=>'Acceptation du fournisseur aujourd’hui et au cours des 7 derniers jours; les autres états utilisent l’heure prévue.'],'parameters'=>[],'renderer'=>'notification_summary','dataProjection'=>'notification_summary','icon'=>'mail-check','destination'=>['page'=>'notifications'],'sizes'=>['wide'],'defaultSize'=>'wide','defaultOrder'=>40],
+            ['id'=>'onsite_today','workspaces'=>['admin'],'requiredCapability'=>'appointments.view.clinic','title'=>['en'=>"Today's On-Site visits",'fr'=>'Visites sur place aujourd’hui'],'description'=>['en'=>'Appointments you can access taking place at a client location.','fr'=>'Rendez-vous auxquels vous avez accès ayant lieu chez un client.'],'parameters'=>['date'=>'today','delivery_mode'=>'mobile'],'icon'=>'map-pin','defaultOrder'=>30],
+            ['id'=>'notification_delivery_summary','workspaces'=>['admin'],'requiredCapability'=>'notifications.view.clinic','title'=>['en'=>'Email and SMS activity','fr'=>'Activité des courriels et SMS'],'description'=>['en'=>'Messages for records you can access: provider acceptance today and over the last 7 days; other statuses use scheduled time.','fr'=>'Messages pour les dossiers auxquels vous avez accès : acceptation du fournisseur aujourd’hui et au cours des 7 derniers jours; les autres états utilisent l’heure prévue.'],'parameters'=>[],'renderer'=>'notification_summary','dataProjection'=>'notification_summary','icon'=>'mail-check','destination'=>['page'=>'notifications'],'sizes'=>['wide'],'defaultSize'=>'wide','defaultOrder'=>40],
             ['id'=>'my_appointments_today','workspaces'=>['practitioner'],'requiredCapability'=>'appointments.view.own','title'=>['en'=>'My appointments today','fr'=>'Mes rendez-vous aujourd’hui'],'description'=>['en'=>'Your active appointments scheduled today.','fr'=>'Vos rendez-vous actifs prévus aujourd’hui.'],'parameters'=>['date'=>'today'],'defaultOrder'=>10],
             ['id'=>'my_next_appointment','workspaces'=>['practitioner'],'requiredCapability'=>'appointments.view.own','title'=>['en'=>'My next appointment','fr'=>'Mon prochain rendez-vous'],'description'=>['en'=>'Your next active appointment.','fr'=>'Votre prochain rendez-vous actif.'],'parameters'=>[],'renderer'=>'next_appointment','dataProjection'=>'next_appointment','icon'=>'clock','defaultSize'=>'medium','defaultOrder'=>20],
             ['id'=>'my_onsite_today','workspaces'=>['practitioner'],'requiredCapability'=>'appointments.view.own','title'=>['en'=>'My On-Site visits today','fr'=>'Mes visites sur place aujourd’hui'],'description'=>['en'=>'Your visits taking place at a client location.','fr'=>'Vos visites ayant lieu chez un client.'],'parameters'=>['date'=>'today','delivery_mode'=>'mobile'],'icon'=>'map-pin','defaultOrder'=>30],

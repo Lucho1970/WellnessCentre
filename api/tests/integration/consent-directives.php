@@ -51,7 +51,7 @@ try {
     }
     [$status]=$call('/api/v1/booking-clients/104/address',$practitionerToken);$expect($status===200,'Unrestricted client access still works');
     [$status]=$call('/api/v1/booking-clients/101/address',$adminToken);$expect($status===200,'Named restriction does not block other authorized staff');
-    foreach(['/api/v1/dashboard','/api/v1/practitioner/today','/api/v1/admin/notifications'] as $path){[$status]=$call($path,$practitionerToken);$expect($status===403,'Unfiltered aggregate/list route fails closed');}
+    foreach(['/api/v1/admin/notifications','/api/v1/practitioner/notifications','/api/v1/travel-enquiries'] as $path){[$status]=$call($path,$practitionerToken);$expect($status===403,'Unfiltered aggregate/list route fails closed');}
     [$status]=$call('/api/v1/appointments',$practitionerToken,'POST',['client_id'=>101,'practitioner_id'=>2]);$expect($status===403,'Restriction checked before booking side effects');
     [$status]=$call('/api/v1/appointments/'.$appointment,$practitionerToken,'PATCH',['status'=>'canceled_by_clinic']);$expect($status===403,'Restricted appointment write denied before validation and mutations');
     [$status]=$call('/api/v1/recurring-series/preview',$practitionerToken,'POST',['client_id'=>101,'practitioner_id'=>2]);$expect($status===403,'Recurring preview cannot bootstrap consent');

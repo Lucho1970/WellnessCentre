@@ -18,6 +18,7 @@ This folder contains the living technical and delivery documentation for the Wel
 - [Practitioner booking contact access](PRACTITIONER_BOOKING_CONTACT_ACCESS.md): relationship-scoped contacts/addresses, direct-booking bypass protection and synthetic authorization acceptance.
 - [Sensitive access audit](SENSITIVE_ACCESS_AUDIT.md): response-boundary read/search/export coverage, denied-access logging, migration 049, failure behavior and acceptance evidence.
 - [Consent restrictions and withdrawal](CONSENT_RESTRICTIONS_WITHDRAWAL.md): patient controls, negative access permissions, queued-message enforcement, migration 050, conservative bulk-route limits and synthetic authorization acceptance.
+- [Consent-filtered dashboards and schedules](CONSENT_FILTERED_DASHBOARDS_SCHEDULES.md): permitted-record counts, day cards, next visits, schedule impacts and notification activity without a clinic-wide consent block.
 
 Start with these two authoritative documents:
 

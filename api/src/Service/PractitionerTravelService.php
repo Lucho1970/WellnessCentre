@@ -26,6 +26,8 @@ final class PractitionerTravelService
     public function next(AuthContext $actor): ?array
     {
         BookingService::authorizePractitionerCalendar($actor);
+        $params=['user'=>$actor->userId,'clinic'=>$actor->clinicId];
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
         $statement = $this->database->connection()->prepare(
             "SELECT a.id,a.starts_at,a.destination_snapshot,a.travel_buffer_minutes,
                     s.name service_name,u.display_name client_name,l.name location_name,l.timezone,
@@ -35,13 +37,13 @@ final class PractitionerTravelService
              JOIN services s ON s.id=a.service_id
              JOIN users u ON u.id=a.client_id
              JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id
-             WHERE a.clinic_id=:clinic AND a.delivery_mode='mobile'
+             WHERE a.clinic_id=:clinic $visible AND a.delivery_mode='mobile'
                AND a.status IN ('confirmed','rescheduled')
                AND a.starts_at>=UTC_TIMESTAMP()
                AND a.starts_at<DATE_ADD(UTC_TIMESTAMP(),INTERVAL 24 HOUR)
              ORDER BY a.starts_at,a.id LIMIT 1"
         );
-        $statement->execute(['user'=>$actor->userId,'clinic'=>$actor->clinicId]);
+        $statement->execute($params);
         $row=$statement->fetch();
         if(!$row)return null;
         return [
@@ -59,17 +61,19 @@ final class PractitionerTravelService
         $source=$body['source']??null;
         if(!in_array($source,['current','clinic'],true))throw new ApiException(422,'validation_error','Choose current or clinic as the starting point.');
         $coordinates=$source==='current'?self::coordinates($body):null;
+        $params=['id'=>$appointmentId,'user'=>$actor->userId,'clinic'=>$actor->clinicId];
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
         $statement=$this->database->connection()->prepare(
             "SELECT a.id,a.starts_at,a.destination_snapshot,l.address_line1,l.address_line2,l.city,l.province,l.postal_code
              FROM appointments a
              JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1
              JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id
-             WHERE a.id=:id AND a.clinic_id=:clinic AND a.delivery_mode='mobile'
+             WHERE a.id=:id AND a.clinic_id=:clinic $visible AND a.delivery_mode='mobile'
                AND a.status IN ('confirmed','rescheduled')
                AND a.starts_at>=UTC_TIMESTAMP()
                AND a.starts_at<DATE_ADD(UTC_TIMESTAMP(),INTERVAL 24 HOUR)"
         );
-        $statement->execute(['id'=>$appointmentId,'user'=>$actor->userId,'clinic'=>$actor->clinicId]);
+        $statement->execute($params);
         $row=$statement->fetch();
         if(!$row)throw new ApiException(404,'appointment_not_found','No upcoming On-Site appointment was found.');
         $snapshot=json_decode((string)($row['destination_snapshot']??''),true);
