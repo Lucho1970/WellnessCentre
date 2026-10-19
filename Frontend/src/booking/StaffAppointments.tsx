@@ -475,12 +475,12 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
     finally { setBusy(false); }
   };
   const validateCoverage = async () => {
-    if (!selected || !addressComplete) return;
+    if (!client || !selected || !addressComplete) return;
     setCoverageBusy(true); setCoverage(null); (formValidation.clear(), setError('')); clearSlots();
     try {
-      const result = await request('/address-coverage/validate', { method: 'POST', body: JSON.stringify({ location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
+      const result = await request('/address-coverage/validate', { method: 'POST', body: JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
       setDestination(result.destination); setCoverage(result);
-    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to validate this address.')); }
+    } catch (cause) { formValidation.capture(cause); if(cause instanceof RequestError && [401,403,404].includes(cause.status)){approvalLookup.current?.abort();setApprovalLoading(false);setAreaApproved(false);setCoverage(null);clearSlots();} setError(cause instanceof Error ? cause.message : t('Unable to validate this address.')); }
     finally { setCoverageBusy(false); }
   };
   const approveCoverage = async () => {
@@ -490,7 +490,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
       await request('/address-coverage/approve', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination, address_validation_token:coverage.token }) });
       approvalLookup.current?.abort();
       setAreaApproved(true);
-    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to save the On-Site approval.')); }
+    } catch (cause) { formValidation.capture(cause); if(cause instanceof RequestError && [401,403,404].includes(cause.status)){approvalLookup.current?.abort();setApprovalLoading(false);setAreaApproved(false);setCoverage(null);clearSlots();} setError(cause instanceof Error ? cause.message : t('Unable to save the On-Site approval.')); }
     finally { setApprovalBusy(false); }
   };
   const revokeCoverage = async () => {
@@ -500,7 +500,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
       await request('/address-coverage/revoke', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
       approvalLookup.current?.abort();
       setAreaApproved(false); setCoverage(null);
-    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to remove the On-Site approval.')); }
+    } catch (cause) { formValidation.capture(cause); if(cause instanceof RequestError && [401,403,404].includes(cause.status)){approvalLookup.current?.abort();setApprovalLoading(false);setAreaApproved(false);setCoverage(null);clearSlots();} setError(cause instanceof Error ? cause.message : t('Unable to remove the On-Site approval.')); }
     finally { setApprovalBusy(false); }
   };
   const confirm = async () => {

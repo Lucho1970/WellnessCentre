@@ -25,7 +25,7 @@ Remaining conservative route groups identified in this review:
 | Group | Why retained / next work |
 | --- | --- |
 | Recurring availability rules and one-time overrides | Schedule mutations still require their own tested effect/authorization policy, including old/new ranges and unbounded recurrence. The time-off implementation does not exempt them. |
-| Address coverage validation, approvals and revocation | These body-scoped routes can involve a patient and an external maps provider. They need patient/recipient authorization before provider requests or writes. |
+| Address coverage validation, approvals and revocation | Resolved in the subsequent [address coverage authorization change](CONSENT_AUTHORIZED_ADDRESS_COVERAGE.md): patient/recipient checks before provider requests or writes, patient-bound proofs and atomic mutation audits. |
 | Unclassified administrative configuration, reminder schedules, widget management and staff administration | No blanket exemption was added. Classify and test each service's role/clinic and downstream patient effects before exempting it. |
 | Client merge with any consent history | The explicit reviewed-migration requirement remains, including restored directives. Registration does not transfer or reconcile consent instructions. |
 

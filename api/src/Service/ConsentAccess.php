@@ -33,9 +33,9 @@ final class ConsentAccess
             END $visible)";
     }
 
-    public function restricted(int $clinic,int $client,int $staff): bool
+    public function restricted(int $clinic,int $client,int $staff,bool $current=false): bool
     {
-        $q=$this->pdo->prepare("SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND client_id=? AND scope='staff_access' AND restricted=1 AND target_staff_id IN (0,?) LIMIT 1");
+        $q=$this->pdo->prepare("SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND client_id=? AND scope='staff_access' AND restricted=1 AND target_staff_id IN (0,?) LIMIT 1".($current?' FOR UPDATE':''));
         $q->execute([$clinic,$client,$staff]);return (bool)$q->fetchColumn();
     }
 
@@ -75,6 +75,7 @@ final class ConsentAccess
             'profileAvatar','saveProfileAvatar','deleteProfileAvatar','myPublicCard','updateMyPublicCard',
             'qualificationTypes','myQualifications','submitMyQualification','globalCredentials','createGlobalCredential','shareGlobalCredential',
             'staffNotificationPreferences','saveStaffNotificationPreferences','sendStaffNotificationCode','verifyStaffNotificationEmail',
+            'validateAddressCoverage','addressCoverageApproval','approveAddressCoverage','revokeAddressCoverage', // AddressCoverageService owns patient/recipient authorization.
             'createClient', // ClientService checks registration matches, consent and current creator scope.
             'bookingOptions','clientConsent','saveClientConsent','clients','practitionerClients','bookingClients','appointments','practitionerCalendar',
             'formTemplates','publishForm','publishFormVersion','formHistory','formDrafts','saveFormDraft','updateFormDraft','formDraftDetail','importFormDraft','validateFormSource',

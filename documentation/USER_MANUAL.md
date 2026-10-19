@@ -24,6 +24,8 @@ After a duplicate client is merged, only the surviving client appears in client 
 
 When staff book an appointment, they may select the service or the practitioner first after choosing the base location. Each choice narrows the other menu to compatible assignments; use **Clear service** or **Clear practitioner** to switch paths. For an On-Site visit, an earlier Google distance check by itself does not create a reusable approval. Authorized clinic staff must click **Approve this address for future On-Site bookings** after a successful check. Future bookings with the same client address, base location, service, practitioner, and service-area settings can reuse that approval without another Google distance request. Changing any of those details requires a new check and approval.
 
+Select the patient before validating coverage. The check and any saved approval require current access to that patient and permission for the selected practitioner workflow. An unrelated restriction does not block the check; a restriction affecting this patient/workflow must be resolved through the clinic privacy lead. A refused operation clears cached coverage and selected times. Coverage proofs cannot be transferred between patients, and in-progress proofs from before the patient-bound update require a new validation.
+
 ## Common administration pattern
 
 Administration pages are moving to a list-first layout:

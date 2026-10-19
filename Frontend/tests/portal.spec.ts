@@ -1245,6 +1245,7 @@ test("mobile-only booking captures destination and price without requesting a ro
   await page.route("**/api/v1/address-coverage/validate", (route) => {
     const body = route.request().postDataJSON();
     expect(body).toMatchObject({
+      client_id: 5,
       location_id: 1,
       service_id: 2,
       practitioner_id: 3,
@@ -1354,6 +1355,13 @@ test("mobile-only booking captures destination and price without requesting a ro
   await expect(page.getByText(/No new distance check is needed/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Validate address and coverage" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Find a time", exact: true })).toBeEnabled();
+  await page.route('**/api/v1/address-coverage/revoke',route=>route.fulfill({status:403,json:{error:{code:'consent_restricted'}}}));
+  await page.getByRole('button',{name:'Remove On-Site approval',exact:true}).click();
+  await expect(page.getByText('Access is restricted by a patient privacy instruction.',{exact:true})).toBeVisible();
+  await expect(page.getByText(/No new distance check is needed/)).toHaveCount(0);
+  await expect(page.getByText(/Address confirmed: 8.4 km/)).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Find a time',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Validate address and coverage',exact:true})).toBeEnabled();
 });
 
 test("appointment client finder filters by exact birthdate and debounced contact details", async ({
