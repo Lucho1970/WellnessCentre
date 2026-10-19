@@ -13,6 +13,7 @@ final class BookingClientAccess
         BookingService::authorizeBookingClientAddress($actor);
         $params['booking_actor'] = $actor->userId;
         $activeActor = "EXISTS(SELECT 1 FROM users booking_actor WHERE booking_actor.id=:booking_actor AND booking_actor.clinic_id=u.clinic_id AND booking_actor.user_type='staff' AND booking_actor.status='active')";
+        $activeActor .= ConsentAccess::condition($actor,$params);
         $notMerged = 'NOT EXISTS(SELECT 1 FROM client_merge_records merged WHERE merged.duplicate_client_id=u.id)';
         if ($actor->hasAnyRole('super_admin', 'clinic_admin', 'reception')) {
             return " AND $activeActor AND $notMerged";

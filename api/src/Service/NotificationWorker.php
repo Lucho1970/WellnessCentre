@@ -28,56 +28,60 @@ final class NotificationWorker
         for ($processed = 0; $processed < $limit; $processed++) {
             $event = $this->claim($appointmentId);
             if ($event === null) break;
+            $consentLock=new ConsentLock($this->pdo);
             try {
-                $details = $this->details((int)$event['id']);
-                $superseded = $details === null || $this->superseded($details)
-                    || ($event['channel'] === 'sms' && strtotime((string)$details['scheduled_at'] . ' UTC') < time() - 3600)
-                    || (str_starts_with((string)$details['event_code'], 'staff_') && !$this->staffRecipientStillAllowed($details));
-                $staffNotice = !$superseded && str_starts_with((string)$details['event_code'], 'staff_');
-                $portalUrl = $superseded ? $this->clientPortalUrl : ClinicPortalUrl::resolve($this->pdo,(int)$details['clinic_id'],$this->clientPortalUrl);
-                if (!$superseded && !$staffNotice && $event['channel'] === 'email') {
-                    $details['appointment_action_url'] = (new AppointmentActionLinks($this->pdo, $this->appointmentActionLinksEnabled))->issue($details, $portalUrl);
+                try {
+                    $consentLock->acquire((int)$this->eventClinic((int)$event['id']));
+                    $details = $this->details((int)$event['id']);
+                    $superseded = $details === null || !(new ConsentAccess($this->pdo))->notificationAllowed($details) || $this->superseded($details)
+                        || ($event['channel'] === 'sms' && strtotime((string)$details['scheduled_at'] . ' UTC') < time() - 3600)
+                        || (str_starts_with((string)$details['event_code'], 'staff_') && !$this->staffRecipientStillAllowed($details));
+                    $staffNotice = !$superseded && str_starts_with((string)$details['event_code'], 'staff_');
+                    $portalUrl = $superseded ? $this->clientPortalUrl : ClinicPortalUrl::resolve($this->pdo,(int)$details['clinic_id'],$this->clientPortalUrl);
+                    if (!$superseded && !$staffNotice && $event['channel'] === 'email') {
+                        $details['appointment_action_url'] = (new AppointmentActionLinks($this->pdo, $this->appointmentActionLinksEnabled))->issue($details, $portalUrl);
+                    }
+                    $message = $superseded ? null : ($event['channel'] === 'sms'
+                        ? StaffAppointmentSms::compose($details, $portalUrl)
+                        : ($staffNotice ? StaffAppointmentEmail::compose($details, $portalUrl) : AppointmentEmail::compose($details, $portalUrl)));
+                    $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $portalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
+                } catch (Throwable $e) {
+                    $this->finish($event, 'needs_review', 'Notification could not be prepared (' . get_class($e) . ').');
+                    $summary['review']++;
+                    continue;
                 }
-                $message = $superseded ? null : ($event['channel'] === 'sms'
-                    ? StaffAppointmentSms::compose($details, $portalUrl)
-                    : ($staffNotice ? StaffAppointmentEmail::compose($details, $portalUrl) : AppointmentEmail::compose($details, $portalUrl)));
-                $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $portalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
-            } catch (Throwable $e) {
-                $this->finish($event, 'needs_review', 'Notification could not be prepared (' . get_class($e) . ').');
-                $summary['review']++;
-                continue;
-            }
-            if ($superseded) {
-                $this->finish($event, 'canceled', null);
-                $summary['canceled']++;
-                continue;
-            }
-            try {
-                $providerId = null;
-                if ($event['channel'] === 'sms') {
-                    $providerId = $this->sms->send((string)$event['recipient_address'], $message);
-                } else {
-                    $this->mailer->send((string)$event['recipient_address'], $message['subject'], $message['body'], $calendar);
+                if ($superseded) {
+                    $this->finish($event, 'canceled', null);
+                    $summary['canceled']++;
+                    continue;
                 }
-            } catch (SmsSendException $e) {
-                // A provider response or timeout cannot prove the message was not sent.
-                $this->finish($event, 'needs_review', $e->getMessage());
-                $summary['review']++;
-                continue;
-            } catch (MailSendException $e) {
-                $retry = $e->retryable && !$e->ambiguous && (int)$event['attempt_count'] < 5;
-                $this->finish($event, $retry ? 'failed' : 'needs_review', $e->getMessage(), $retry ? max($e->retryAfterSeconds, self::backoff((int)$event['attempt_count'])) : 0);
-                $summary[$retry ? 'retry' : 'review']++;
-                continue;
-            } catch (Throwable $e) {
-                // An unexpected transport failure may have happened after Graph accepted
-                // the request. Never retry it automatically.
-                $this->finish($event, 'needs_review', 'Unexpected mail transport failure (' . get_class($e) . ').');
-                $summary['review']++;
-                continue;
-            }
-            $this->finish($event, 'sent', null, 0, $providerId);
-            $summary['sent']++;
+                try {
+                    $providerId = null;
+                    if ($event['channel'] === 'sms') {
+                        $providerId = $this->sms->send((string)$event['recipient_address'], $message);
+                    } else {
+                        $this->mailer->send((string)$event['recipient_address'], $message['subject'], $message['body'], $calendar);
+                    }
+                } catch (SmsSendException $e) {
+                    // A provider response or timeout cannot prove the message was not sent.
+                    $this->finish($event, 'needs_review', $e->getMessage());
+                    $summary['review']++;
+                    continue;
+                } catch (MailSendException $e) {
+                    $retry = $e->retryable && !$e->ambiguous && (int)$event['attempt_count'] < 5;
+                    $this->finish($event, $retry ? 'failed' : 'needs_review', $e->getMessage(), $retry ? max($e->retryAfterSeconds, self::backoff((int)$event['attempt_count'])) : 0);
+                    $summary[$retry ? 'retry' : 'review']++;
+                    continue;
+                } catch (Throwable $e) {
+                    // An unexpected transport failure may have happened after Graph accepted
+                    // the request. Never retry it automatically.
+                    $this->finish($event, 'needs_review', 'Unexpected mail transport failure (' . get_class($e) . ').');
+                    $summary['review']++;
+                    continue;
+                }
+                $this->finish($event, 'sent', null, 0, $providerId);
+                $summary['sent']++;
+            } finally { $consentLock->release(); }
         }
         return $summary;
     }
@@ -109,9 +113,14 @@ final class NotificationWorker
         }
     }
 
+    private function eventClinic(int $eventId): int
+    {
+        $q=$this->pdo->prepare('SELECT clinic_id FROM notification_events WHERE id=?');$q->execute([$eventId]);return (int)$q->fetchColumn();
+    }
+
     private function details(int $eventId): ?array
     {
-        $query = $this->pdo->prepare('SELECT n.id,n.clinic_id,n.appointment_id,n.recipient_user_id,n.recipient_address,n.event_code,n.channel,n.scheduled_at,n.payload,a.status appointment_status,a.version,a.starts_at,a.ends_at,l.timezone,c.name clinic_name FROM notification_events n JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id JOIN locations l ON l.id=a.location_id JOIN clinics c ON c.id=n.clinic_id WHERE n.id=:id');
+        $query = $this->pdo->prepare('SELECT n.id,n.clinic_id,n.appointment_id,n.recipient_user_id,n.recipient_address,n.event_code,n.channel,n.scheduled_at,n.payload,a.client_id,a.status appointment_status,a.version,a.starts_at,a.ends_at,l.timezone,c.name clinic_name FROM notification_events n JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id JOIN locations l ON l.id=a.location_id JOIN clinics c ON c.id=n.clinic_id WHERE n.id=:id');
         $query->execute(['id' => $eventId]);
         $row = $query->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;

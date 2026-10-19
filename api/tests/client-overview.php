@@ -41,7 +41,7 @@ check(Overview::page([])===1&&Overview::view([])==='all');
 
 final class OverviewPDO extends PDO {
  public array $queries=[],$appointments=[],$practitioners=[],$changes=[];
- public bool $missing=false;
+ public bool $missing=false,$restricted=false;
  public function __construct(){}
  public function prepare(string $query,array $options=[]): PDOStatement|false {return new OverviewStatement($this,$query);}
 }
@@ -49,7 +49,9 @@ final class OverviewStatement extends PDOStatement {
  private mixed $result=false;
  public function __construct(private OverviewPDO $db,private string $sql){}
  public function execute(?array $params=null): bool {
-  $p=$params??[];$this->db->queries[]=[$this->sql,$p];
+  $p=$params??[];
+  if(str_contains($this->sql,'FROM client_consent_directives')){$this->result=$this->db->restricted;return true;}
+  $this->db->queries[]=[$this->sql,$p];
   if(str_contains($this->sql,'SELECT u.id,u.display_name,u.status'))$this->result=(!$this->db->missing&&$p===['client'=>7,'clinic'=>1])?['id'=>7,'display_name'=>'Selected Client','status'=>'active']:false;
   elseif(str_starts_with($this->sql,'SELECT a.id,l.timezone,a.currency'))$this->result=$p===['appointment'=>71,'client'=>7,'clinic'=>1]?['id'=>71,'timezone'=>'America/Toronto','currency'=>'CAD']:false;
   elseif(str_starts_with($this->sql,'SELECT e.kind'))$this->result=$this->db->changes;
@@ -60,6 +62,7 @@ final class OverviewStatement extends PDOStatement {
   else throw new RuntimeException('Unexpected overview query');
   return true;
  }
+ public function fetchColumn(int $column=0): mixed {return $this->result;}
  public function fetch(int $mode=PDO::FETCH_DEFAULT,int $orientation=PDO::FETCH_ORI_NEXT,int $offset=0): mixed {return $this->result;}
  public function fetchAll(int $mode=PDO::FETCH_DEFAULT,mixed ...$args): array {return $this->result;}
 }
@@ -97,4 +100,7 @@ check($pdo->queries[2][1]===['status_appointment'=>71,'reassignment_appointment'
 check(!str_contains($sql,'practitioner_client_notes')&&str_contains($sql,'actor.clinic_id=a.clinic_id'));
 $otherClinic=new AuthContext(3,2,'','admin@example.test','Admin','staff',['super_admin']);
 $pdo->queries=[];denies(fn()=>$service->practitionerAccess($otherClinic,7,[],'test'),404);check(count($pdo->queries)===1);
+$pdo->restricted=true;denies(fn()=>$service->appointments($actor,7,[],'test'),403);denies(fn()=>$service->practitionerAccess($actor,7,[],'test'),403);
+$blocked=Overview::configuredAccess(array_replace($row,['consent_restricted'=>true,'roles'=>'super_admin,practitioner','permissions'=>'schedule_for_other_practitioners','appointment_count'=>10]));
+check(!$blocked['client_directory']&&!$blocked['booking_contact']&&!$blocked['client_administration']&&$blocked['appointments']==='none'&&$blocked['logistics_notes']==='none');
 echo "$checks client overview policy/query checks passed (PDO double).\n";

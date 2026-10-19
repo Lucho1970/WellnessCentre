@@ -48,6 +48,8 @@ final class Api
     private ProfileService $profiles;
     private PractitionerPublicProfileService $publicProfiles;
     private ClientService $clients;
+    private ?\Wellness\Service\ConsentLock $consentLock = null;
+    private string $consentRoute = '';
     private AddressCoverageService $addressCoverage;
     private PractitionerWorkLocationService $workLocations;
     private PractitionerTravelService $practitionerTravel;
@@ -223,6 +225,8 @@ final class Api
                 $routes->addRoute('POST','/api/v1/address-coverage/approval','addressCoverageApproval');
                 $routes->addRoute('POST','/api/v1/address-coverage/approve','approveAddressCoverage');
                 $routes->addRoute('POST','/api/v1/address-coverage/revoke','revokeAddressCoverage');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/consent','clientConsent');
+                $routes->addRoute('PUT','/api/v1/clients/{id:\\d+}/consent','saveClientConsent');
                 $routes->addRoute('GET','/api/v1/clients','clients');
                 $routes->addRoute('POST','/api/v1/appointments/{id:\\d+}/action-links/revoke','revokeAppointmentActionLinks');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments','clientAppointments');
@@ -298,6 +302,7 @@ final class Api
             if (in_array($route[1], ['siteConfig', 'brandAsset', 'locations', 'services', 'publicServices', 'publicService', 'publicPractitioners', 'publicPractitioner', 'practitioners', 'team', 'teamImage', 'availability'], true)) {
                 $this->clinicContext->assertActive($this->database);
             }
+            $this->consentRoute=$route[1];
             $data=match($route[1]){
                 'submitPractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->submit($this->clinicContext->clinicId,$request->body,$_SERVER['REMOTE_ADDR']??'unknown'),
                 'practitionerEnquiries'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->list($this->user($request),$this->clinicContext->clinicId,$request->query),
@@ -375,6 +380,8 @@ final class Api
                 'recurringView'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->view($this->user($request),(int)$route[2]['id']),
                 'recurringChangePreview'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,false),
                 'recurringChange'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,true),
+                'clientConsent'=>(new \Wellness\Service\ClientConsentService($this->database,new AuditLogger($this->database)))->list($this->user($request),(int)$route[2]['id']),
+                'saveClientConsent'=>(new \Wellness\Service\ClientConsentService($this->database,new AuditLogger($this->database)))->save($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
                 'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId) + ['action_links_enabled'=>$this->config->appointmentActionLinksEnabled],
                 'appointmentReassignmentOptions'=>$this->bookings->reassignmentOptions($this->user($request),(int)$route[2]['id']),
@@ -585,6 +592,7 @@ final class Api
     private function customerRoute(Request $r): array
     {
         $this->clinicContext->assertActive($this->database);
+        header('Cache-Control: no-store');
         $route = $r->method . ' ' . substr($r->path, strlen('/api/v1/customer/'));
         if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled && ($this->config->clinicManagementEnabled || $this->clinicContext?->clinicId === $this->config->customerClinicId)];
         $service = $this->onboarding();
@@ -602,11 +610,16 @@ final class Api
         $this->accessAudit?->customerIdentity((int)$identity,$this->clinicContext->clinicId);
         unset($session['identity_id']);
         $bookingActor = function()use($service,$identity):AuthContext{
+            ($this->consentLock ??= new \Wellness\Service\ConsentLock($this->database->connection()))->acquire($this->clinicContext->clinicId);
             $actor=$service->bookingActor($identity);$this->accessAudit?->actor($actor);return $actor;
         };
         if(in_array($route,['GET profile','PATCH profile','GET appointments'],true))$bookingActor();
         if(str_starts_with(substr($r->path,strlen('/api/v1/customer/')),'travel-enquiries'))return $this->travelRoute($bookingActor(),$r,substr($r->path,strlen('/api/v1/customer/')));
         if($route==='POST discovery/search')return $this->discovery()->search($this->clinicContext->clinicId,$r->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'));
+        if(in_array($route,['GET consent','PUT consent'],true)){
+            $actor=$bookingActor();$consent=new \Wellness\Service\ClientConsentService($this->database,new AuditLogger($this->database));
+            return $r->method==='GET'?$consent->list($actor,$actor->userId):$consent->save($actor,$actor->userId,$r->body,$r->correlationId);
+        }
         if($route==='GET receipts')return $this->receipts()->list($bookingActor(),$r->query);
         if(preg_match('#^GET receipts/(\d+)/pdf$#',$route,$receiptMatch))return $this->receipts()->pdf($bookingActor(),(int)$receiptMatch[1],$r->correlationId);
         $forms=new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database));
@@ -694,6 +707,9 @@ final class Api
             : $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
         $this->clinicContext->assertActive($this->database);
         $this->accessAudit?->actor($actor);
+        header('Cache-Control: no-store');
+        ($this->consentLock ??= new \Wellness\Service\ConsentLock($this->database->connection()))->acquire($actor->clinicId);
+        (new \Wellness\Service\ConsentAccess($this->database->connection()))->request($actor,$request,$this->consentRoute);
         return $actor;
     }
     private function staffInvitations(): \Wellness\Service\StaffInvitationService

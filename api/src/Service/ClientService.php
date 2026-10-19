@@ -45,6 +45,7 @@ final class ClientService
         $page=max(1,min(100000,(int)($query['page']??1))); $offset=($page-1)*25;
         $sql="FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id WHERE u.clinic_id=:clinic AND u.user_type='client' AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id)";
         $params=['clinic'=>$actor->clinicId];
+        $sql.=ConsentAccess::condition($actor,$params);
         if(($query['status']??'')==='active')$sql.=" AND u.status='active'";
         if ($term!=='') {
             $sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR p.phone LIKE :phone ESCAPE '!' OR EXISTS(SELECT 1 FROM client_email_addresses e WHERE e.client_id=u.id AND e.email LIKE :alias ESCAPE '!'))";
@@ -75,6 +76,7 @@ final class ClientService
             AND (EXISTS(SELECT 1 FROM appointments own WHERE own.clinic_id=u.clinic_id AND own.practitioner_id=p.id AND own.client_id=u.id)
               OR EXISTS(SELECT 1 FROM audit_logs created WHERE created.clinic_id=u.clinic_id AND created.actor_user_id=:creator AND created.action='client.create' AND created.entity_type='client' AND created.entity_id=u.id AND created.outcome='success'){$formRelated})";
         $params=['clinic'=>$actor->clinicId,'actor'=>$actor->userId,'creator'=>$actor->userId];
+        $sql.=ConsentAccess::condition($actor,$params);
         if($term!==''){
             $like='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';
             $sql.=" AND (u.display_name LIKE :name ESCAPE '!' OR u.email LIKE :email ESCAPE '!' OR cp.phone LIKE :phone ESCAPE '!')";
@@ -95,6 +97,7 @@ final class ClientService
 
     private function find(AuthContext $actor,int $id,bool $lock=false): array
     {
+        (new ConsentAccess($this->database->connection()))->assertClient($actor,$id);
         $s=$this->database->connection()->prepare("SELECT u.id,u.display_name,u.given_name,u.family_name,u.email,u.status,p.phone,p.preferred_contact,p.date_of_birth,p.emergency_contact_name,p.emergency_contact_phone,p.administrative_notes,a.address_json FROM users u LEFT JOIN client_profiles p ON p.user_id=u.id LEFT JOIN client_contact_addresses a ON a.client_id=u.id WHERE u.id=:id AND u.clinic_id=:clinic AND u.user_type='client'".($lock?' FOR UPDATE':''));
         $s->execute(['id'=>$id,'clinic'=>$actor->clinicId]);$row=$s->fetch();
         if (!$row) throw new ApiException(404,'client_not_found','Client not found.');
@@ -189,6 +192,8 @@ final class ClientService
     public function mergePreview(AuthContext $actor,int $survivorId,int $duplicateId,string $cid): array
     {
         self::authorizeMerge($actor);
+        $consent=$this->database->connection()->prepare('SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND client_id IN (?,?) LIMIT 1');$consent->execute([$actor->clinicId,$survivorId,$duplicateId]);
+        if($consent->fetchColumn())throw new ApiException(409,'consent_merge_review','Client records with consent instructions require a reviewed migration before merging.');
         if($survivorId===$duplicateId)throw new ApiException(422,'validation_error','Choose two different client records.');
         $survivor=$this->find($actor,$survivorId);$duplicate=$this->find($actor,$duplicateId);
         $counts=$this->relationshipCounts($duplicateId);
@@ -201,6 +206,8 @@ final class ClientService
     public function merge(AuthContext $actor,int $survivorId,int $duplicateId,array $body,string $cid): array
     {
         self::authorizeMerge($actor);
+        $consent=$this->database->connection()->prepare('SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND client_id IN (?,?) LIMIT 1');$consent->execute([$actor->clinicId,$survivorId,$duplicateId]);
+        if($consent->fetchColumn())throw new ApiException(409,'consent_merge_review','Client records with consent instructions require a reviewed migration before merging.');
         if($survivorId===$duplicateId)throw new ApiException(422,'validation_error','Choose two different client records.');
         $reason=trim((string)($body['reason']??''));
         if(strlen($reason)<5||strlen($reason)>500)throw new ApiException(422,'validation_error','Enter a merge reason between 5 and 500 characters.');

@@ -134,8 +134,9 @@ function StaffAdminForm() {
             <Typography fontWeight={700}>{t('Local roles')}</Typography>
             {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => {
               const roles = event.target.checked ? [...editing.roles, role] : editing.roles.filter(item => item !== role);
-              setEditing({ ...editing, roles, permissions: roles.includes('practitioner') ? editing.permissions : [] });
+              setEditing({ ...editing, roles, permissions: roles.includes('practitioner') ? editing.permissions : editing.permissions.filter(permission => permission === 'manage_client_consent') });
             }}/>} label={role.replaceAll('_', ' ')}/>)}
+            <FormControlLabel control={<Checkbox checked={editing.permissions.includes('manage_client_consent')} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, 'manage_client_consent'] : editing.permissions.filter(item => item !== 'manage_client_consent'))}/>} label={t('Record verified consent instructions')}/>
             {editing.roles.includes('practitioner') && <>
               <Typography fontWeight={700}>{t('Additional permissions')}</Typography>
               <FormControlLabel control={<Checkbox checked={editing.permissions.includes(scheduleOthers)} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, scheduleOthers] : editing.permissions.filter(item => item !== scheduleOthers))}/>} label={t('Schedule for other practitioners')}/>

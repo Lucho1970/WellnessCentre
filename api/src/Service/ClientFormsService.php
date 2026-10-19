@@ -31,6 +31,7 @@ final class ClientFormsService
         return $row;
     }
     private function client(AuthContext $actor,int $id): array {
+        (new ConsentAccess($this->database->connection()))->assertClient($actor,$id);
         $s=$this->database->connection()->prepare("SELECT u.id,u.display_name FROM users u WHERE u.id=? AND u.clinic_id=? AND u.user_type='client' AND u.status='active' AND NOT EXISTS(SELECT 1 FROM client_merge_records m WHERE m.duplicate_client_id=u.id)");$s->execute([$id,$actor->clinicId]);$row=$s->fetch();
         if(!$row||($actor->userType==='client'&&$actor->userId!==$id))throw new ApiException(404,'client_not_found','Client not found.');
         if(!$this->operator($actor)&&$actor->userType!=='client'){

@@ -22,6 +22,7 @@ if($offset===false)throw new RuntimeException('Cannot isolate the booking schema
 // Later unrelated fresh-schema library foreign keys are outside this authorization test.
 $pdo->exec(preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m','',substr($schema,0,$offset)));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/005_customer_onboarding.sql'));
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/050_consent_directives.sql'));
 $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Synthetic A'),(2,'Synthetic B');
     INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES
     (1,1,'admin@example.test','Admin','staff','active'),(2,1,'practitioner@example.test','Practitioner','staff','active'),

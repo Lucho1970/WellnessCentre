@@ -217,8 +217,8 @@ final class AdminService
         $this->superAdmin($actor);$this->required($body,['display_name','email','status','roles']);
         if($userId===$actor->userId)throw new ApiException(422,'self_role_change','Use another Super Admin to change your own access.');
         $roles=array_values(array_unique($body['roles']));$allowed=['super_admin','clinic_admin','reception','practitioner','accountant'];foreach($roles as $role)if(!in_array($role,$allowed,true))throw new ApiException(422,'validation_error','Invalid role.');
-        $permissions=array_values(array_unique($body['permissions']??[]));$allowedPermissions=['schedule_for_other_practitioners','add_clients','approve_onsite_service_area'];foreach($permissions as $permission)if(!in_array($permission,$allowedPermissions,true))throw new ApiException(422,'validation_error','Invalid permission.');
-        if($permissions!==[]&&!in_array('practitioner',$roles,true))throw new ApiException(422,'validation_error','Additional permissions can only be assigned to a practitioner.');
+        $permissions=array_values(array_unique($body['permissions']??[]));$allowedPermissions=['schedule_for_other_practitioners','add_clients','approve_onsite_service_area','manage_client_consent'];foreach($permissions as $permission)if(!in_array($permission,$allowedPermissions,true))throw new ApiException(422,'validation_error','Invalid permission.');
+        if(array_diff($permissions,['manage_client_consent'])!==[]&&!in_array('practitioner',$roles,true))throw new ApiException(422,'validation_error','Additional permissions can only be assigned to a practitioner.');
         if(!in_array($body['status'],['active','inactive','locked'],true))throw new ApiException(422,'validation_error','Invalid staff status.');
         $pdo=$this->database->connection();
         try{

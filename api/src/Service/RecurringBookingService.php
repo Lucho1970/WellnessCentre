@@ -23,6 +23,7 @@ final class RecurringBookingService
         return $this->transaction($actor,$body,$apply,function()use($actor,$body,$correlation){
             $pdo=$this->database->connection();
             $this->bookings->assertBookingClientAccess($actor,(int)($body['client_id']??0));
+            (new ConsentAccess($pdo))->assertRecipient($actor->clinicId,(int)($body['client_id']??0),(int)($body['practitioner_id']??0));
             $eligible=false;
             foreach($this->bookings->options($actor)['combinations'] as $option){
                 $matches=true;

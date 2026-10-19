@@ -47,6 +47,7 @@ final class BookingService
             $lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
             // Check before replay, coverage or creating an appointment that could establish a relationship.
             $this->assertBookingClientAccess($actor,$clientId);
+            (new ConsentAccess($pdo))->assertRecipient($actor->clinicId,$clientId,(int)$body['practitioner_id']);
             $existing=$pdo->prepare('SELECT * FROM appointments WHERE clinic_id=:clinic AND idempotency_key=:key FOR UPDATE');$existing->execute(['clinic'=>$actor->clinicId,'key'=>$body['idempotency_key']]);if($row=$existing->fetch()){
                 BookingRequest::assertReplay($row,$body,$actor->userId,$startsUtc);
                 $result=$this->getById($actor,(int)$row['id']);if(!$participate)$pdo->commit();return $result;
@@ -192,6 +193,7 @@ final class BookingService
     /** Also used by recurring previews so a submitted client ID cannot bootstrap access. */
     public function assertBookingClientAccess(AuthContext $actor,int $clientId): void
     {
+        (new ConsentAccess($this->database->connection()))->assertClient($actor,$clientId);
         $params=['client'=>$clientId,'clinic'=>$actor->clinicId];
         if($actor->userType==='client'){
             if($clientId!==$actor->userId)throw new ApiException(403,'forbidden','Clients can only book for themselves.');
@@ -297,6 +299,7 @@ final class BookingService
     {
         self::authorizeList($actor);
         $sql="SELECT a.recurring_series_id,a.delivery_mode,a.destination_snapshot,a.travel_buffer_minutes,a.base_price_cents,a.mobile_fee_cents,a.cancellation_fee_cents,a.currency,a.id,a.client_id,a.practitioner_id,a.service_id,a.duration_option_id,a.room_id,a.starts_at,a.ends_at,a.status,a.version,s.name service_name,u.display_name client_name,pu.display_name practitioner_name,l.name location_name,l.timezone,r.name room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN practitioners p ON p.id=a.practitioner_id JOIN users pu ON pu.id=p.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.clinic_id=:clinic";$params=['clinic'=>$actor->clinicId];
+        $sql.=ConsentAccess::condition($actor,$params,'a.client_id');
         $practitionerScope=(($query['scope']??'')==='practitioner'||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')))&&!$actor->hasPermission('schedule_for_other_practitioners');
         if(($query['scope']??'')==='practitioner'&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
         if($actor->userType==='client'){$sql.=' AND a.client_id=:user';$params['user']=$actor->userId;}elseif($practitionerScope){$sql.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user)';$params['user']=$actor->userId;}
@@ -349,6 +352,7 @@ final class BookingService
                 }
                 throw new ApiException(409,'appointment_changed','This appointment changed. Refresh it before making another change.');
             }
+            (new ConsentAccess($pdo))->assertRecipient($actor->clinicId,(int)$appointment['client_id'],$newPractitionerId);
             $this->assertReassignable($appointment);
             if((int)$appointment['practitioner_id']===$newPractitionerId)throw new ApiException(422,'practitioner_unchanged','Choose a different practitioner.');
             $chosen=null;
@@ -413,6 +417,7 @@ final class BookingService
         if($scope==='practitioner'&&!$actor->hasAnyRole('practitioner'))throw new ApiException(403,'forbidden','Practitioner scope requires the practitioner role.');
         $sql="SELECT a.recurring_series_id,a.delivery_mode,a.destination_snapshot,a.travel_buffer_minutes,a.base_price_cents,a.mobile_fee_cents,a.cancellation_fee_cents,a.currency,a.id,a.client_id,a.practitioner_id,a.service_id,a.duration_option_id,a.room_id,a.starts_at,a.ends_at,a.status,a.version,s.name service_name,u.display_name client_name,u.email client_email,cp.phone client_phone,cp.preferred_contact client_preferred_contact,pu.display_name practitioner_name,l.name location_name,l.timezone,r.name room_name FROM appointments a JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id LEFT JOIN client_profiles cp ON cp.user_id=u.id JOIN practitioners p ON p.id=a.practitioner_id JOIN users pu ON pu.id=p.user_id JOIN locations l ON l.id=a.location_id LEFT JOIN rooms r ON r.id=a.room_id WHERE a.id=:id AND a.clinic_id=:clinic";
         $params=['id'=>$id,'clinic'=>$actor->clinicId];
+        $sql.=ConsentAccess::condition($actor,$params,'a.client_id');
         $ownOnly=(($scope==='practitioner')||($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin','reception')))&&!$actor->hasPermission('schedule_for_other_practitioners');
         if($ownOnly){$sql.=' AND p.user_id=:user';$params['user']=$actor->userId;}
         $statement=$this->database->connection()->prepare($sql);$statement->execute($params);$row=$statement->fetch();
@@ -428,8 +433,9 @@ final class BookingService
         self::authorizePractitionerCalendar($actor);
         [$start,$end]=self::calendarRange($query);
         $sql="SELECT 'appointment' kind,a.id,a.starts_at,a.ends_at,a.status,a.delivery_mode,s.name service_name,u.display_name client_name,l.name location_name,l.timezone FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1 JOIN services s ON s.id=a.service_id JOIN users u ON u.id=a.client_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.clinic_id=:clinic AND a.starts_at<:end AND a.ends_at>:start ORDER BY a.starts_at,a.id LIMIT 1001";
-        $statement=$this->database->connection()->prepare($sql);
-        $statement->execute(['user'=>$actor->userId,'clinic'=>$actor->clinicId,'start'=>$start,'end'=>$end]);
+        $calendarParams=['user'=>$actor->userId,'clinic'=>$actor->clinicId,'start'=>$start,'end'=>$end];
+        $sql=str_replace(' ORDER BY a.starts_at,a.id LIMIT 1001',ConsentAccess::condition($actor,$calendarParams,'a.client_id').' ORDER BY a.starts_at,a.id LIMIT 1001',$sql);
+        $statement=$this->database->connection()->prepare($sql);$statement->execute($calendarParams);
         $rows=$statement->fetchAll();
         if(count($rows)>1000)throw new ApiException(422,'calendar_range_too_busy','Too many appointments in this calendar range.');
         $timeOff=$this->database->connection()->prepare("SELECT 'time_off' kind,t.id,t.starts_at,t.ends_at,t.reason_type,l.name location_name FROM time_off t JOIN practitioners p ON p.id=t.practitioner_id AND p.user_id=:user AND p.active=1 JOIN users u ON u.id=p.user_id AND u.clinic_id=:clinic LEFT JOIN locations l ON l.id=t.location_id AND l.clinic_id=u.clinic_id WHERE t.starts_at<:end AND t.ends_at>:start ORDER BY t.starts_at,t.id LIMIT 1001");
@@ -474,7 +480,7 @@ final class BookingService
 
     private function appointment(AuthContext $actor,int $id,bool $lock): array
     {
-        $statement=$this->database->connection()->prepare('SELECT id,recurring_series_id,clinic_id,location_id,client_id,practitioner_id,service_id,duration_option_id,room_id,delivery_mode,starts_at,ends_at,buffer_starts_at,buffer_ends_at,base_price_cents,mobile_fee_cents,currency,cancellation_window_minutes,cancellation_fee_type,cancellation_fee_value,cancellation_fee_cents,status,version,created_at FROM appointments WHERE id=:id AND clinic_id=:clinic'.($lock?' FOR UPDATE':''));$statement->execute(['id'=>$id,'clinic'=>$actor->clinicId]);$row=$statement->fetch();if(!$row)throw new ApiException(404,'appointment_not_found','Appointment not found.');return $row;
+        $statement=$this->database->connection()->prepare('SELECT id,recurring_series_id,clinic_id,location_id,client_id,practitioner_id,service_id,duration_option_id,room_id,delivery_mode,starts_at,ends_at,buffer_starts_at,buffer_ends_at,base_price_cents,mobile_fee_cents,currency,cancellation_window_minutes,cancellation_fee_type,cancellation_fee_value,cancellation_fee_cents,status,version,created_at FROM appointments WHERE id=:id AND clinic_id=:clinic'.($lock?' FOR UPDATE':''));$statement->execute(['id'=>$id,'clinic'=>$actor->clinicId]);$row=$statement->fetch();if(!$row)throw new ApiException(404,'appointment_not_found','Appointment not found.');(new ConsentAccess($this->database->connection()))->assertClient($actor,(int)$row['client_id']);return $row;
     }
 
     public static function authorizeChange(AuthContext $actor,bool $ownsPractitioner,string $bookingMode): void

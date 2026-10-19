@@ -1,5 +1,60 @@
 import { expect, test, type Page } from "@playwright/test";
 import { selectAccount } from "../src/auth/accountSelection";
+
+test('patient privacy instructions preserve independent restrictions and current versions', async ({ page }) => {
+  await fixture(page, true);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: 'linked', capabilities: ['own_appointments'], session: { idle_expires_at: Date.now()/1000+1800, absolute_expires_at: Date.now()/1000+28800 } } } }));
+  await page.route('**/api/v1/customer/appointments?**', route => route.fulfill({ json: { data: { items: [] } } }));
+  const items: {scope: string; target_staff_id: number; restricted: boolean; version: number}[] = [];
+  const changes: unknown[] = [];
+  await page.route('**/api/v1/customer/consent', async route => {
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON(); changes.push(body);
+      const old = items.find(item => item.scope === body.scope && item.target_staff_id === body.target_staff_id);
+      expect(body.version).toBe(old?.version ?? 0);
+      if (old) Object.assign(old, {restricted: body.restricted, version: old.version+1});
+      else items.push({...body, version: 1});
+    }
+    await route.fulfill({json: {data: {items, staff: [{id: 2, display_name: 'Practitioner A'}]}}});
+  });
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button', {name: 'Privacy instructions', exact: true}).click();
+  await page.getByRole('button', {name: 'Withdraw staff access permission', exact: true}).click();
+  await expect(page.getByText('Access restricted', {exact: true})).toBeVisible();
+  await page.getByLabel('Staff access restriction', {exact: true}).click();
+  await page.getByRole('option', {name: 'Practitioner A', exact: true}).click();
+  await expect(page.getByText('The restriction for all clinic staff also applies. Restoring one staff member does not clear it.', {exact: true})).toBeVisible();
+  await page.getByRole('button', {name: 'Withdraw staff access permission', exact: true}).click();
+  await page.getByRole('button', {name: 'Restore staff access permission', exact: true}).click();
+  expect(changes).toEqual([
+    {scope:'staff_access', target_staff_id:0, restricted:true, version:0},
+    {scope:'staff_access', target_staff_id:2, restricted:true, version:0},
+    {scope:'staff_access', target_staff_id:2, restricted:false, version:1},
+  ]);
+  expect(items.find(item => item.target_staff_id === 0)?.restricted).toBe(true);
+  await page.screenshot({path:test.info().outputPath('privacy-instructions.png'), fullPage:true});
+});
+
+test('mobile privacy conflict requires reload before another change', async ({ page }) => {
+  await page.setViewportSize({width:390,height:844});
+  await fixture(page, true);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**', route => route.fulfill({json:{data:{items:[]}}}));
+  let attempts=0;
+  await page.route('**/api/v1/customer/consent', route => {
+    if(route.request().method()==='PUT') {attempts++;return route.fulfill({status:409,json:{error:{code:'consent_changed',message:'Consent instructions changed. Reload before saving.'}}});}
+    return route.fulfill({json:{data:{items:[],staff:[]}}});
+  });
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button',{name:'Privacy instructions',exact:true}).click();
+  await page.getByRole('button',{name:'Stop appointment messages',exact:true}).click();
+  await expect(page.getByText('Consent instructions changed. Reload before saving.',{exact:false})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Stop appointment messages',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Reload',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Stop appointment messages',exact:true})).toBeEnabled();
+  expect(attempts).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
 import {
   freshCustomerLoginParameters,
   shouldClearCustomerAccountHint,
