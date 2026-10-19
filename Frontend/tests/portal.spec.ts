@@ -3514,6 +3514,35 @@ test("availability is practitioner-first with selectable hours, changes, and tim
   await expect.poll(() => update).toMatchObject({ practitioner_id: 8, location_id: 1, weekday: 1, end_time: "18:00" });
 });
 
+for (const kind of ['rule', 'override']) test(`availability ${kind} privacy denial preserves the schedule`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const rule = { id: 31, practitioner_id: 8, location_id: 1, weekday: 1, start_time: '09:00:00', end_time: '17:00:00', valid_from: '2026-09-01', valid_until: null, recurrence_interval_weeks: 1, active: 1 };
+  const override = { id: 42, practitioner_id: 8, location_id: 1, starts_at: '2026-10-05 13:00:00', ends_at: '2026-10-05 21:00:00', type: 'blocked', reason: 'Synthetic change', kind: 'override' };
+  await page.route('**/api/v1/admin/practitioners', route => route.fulfill({ json: { data: [{ practitioner_id: 8, display_name: 'Esther', location_id: 1, active: 1 }] } }));
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 1, name: 'Holland Landing', timezone: 'America/Toronto' }] } }));
+  await page.route('**/api/v1/admin/availability-rules**', route => route.request().method() === 'GET'
+    ? route.fulfill({ json: { data: [rule] } })
+    : route.fulfill({ status: 403, json: { error: { code: 'schedule_access_restricted' } } }));
+  await page.route('**/api/v1/admin/schedule-exceptions', route => route.fulfill({ json: { data: [override] } }));
+  await page.route('**/api/v1/admin/availability-overrides/**', route => route.fulfill({ status: 403, json: { error: { code: 'schedule_access_restricted' } } }));
+  await page.goto(`${portalHost}/admin/availability`);
+  await page.getByRole('button', { name: /Esther.*1 hour rules.*1 changes/ }).click();
+  if (kind === 'rule') {
+    await page.getByRole('button', { name: /Monday.*09:00–17:00/ }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.getByLabel('Ends').fill('18:00');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByLabel('Ends')).toHaveValue('18:00');
+  } else {
+    await page.getByRole('button', { name: /Synthetic change/ }).click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Details', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Synthetic change/ })).toBeVisible();
+  }
+  await expect(page.getByText('This schedule change requires an authorized privacy review. No changes were saved.', { exact: true })).toBeVisible();
+});
+
 for(const action of ['save','delete'])test(`time off privacy denial clears stale impact after ${action}`,async({page})=>{
   await page.clock.setFixedTime(new Date('2026-10-01T12:00:00Z'));
   await fixtures(page,['super_admin']);

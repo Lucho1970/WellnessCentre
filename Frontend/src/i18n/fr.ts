@@ -1,4 +1,5 @@
 const fr: Record<string, string> = {
+  "API error: schedule_access_restricted": "Cette modification d’horaire nécessite un examen de confidentialité autorisé. Aucune modification n’a été enregistrée.",
   "API error: client_registration_review": "Cette inscription nécessite un examen autorisé. Aucune modification n’a été enregistrée.",
   "API error: time_off_access_restricted": "Cette modification d’horaire nécessite un examen de confidentialité autorisé. Aucune modification n’a été enregistrée.",
   "This notification is no longer available. Refresh the list.": "Cette notification n’est plus accessible. Actualisez la liste.",

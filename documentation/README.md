@@ -24,6 +24,7 @@ This folder contains the living technical and delivery documentation for the Wel
 - [Consent-authorized bulk time-off](CONSENT_AUTHORIZED_TIME_OFF.md): complete affected-set authorization for create/update/delete, old/new-period checks, atomic audit rollback and denial handling.
 - [Consent-authorized client registration](CONSENT_AUTHORIZED_CLIENT_REGISTRATION.md): scoped duplicate review, hidden-match refusal before confirmation, legacy identity checks and remaining conservative-route inventory.
 - [Consent-authorized address coverage](CONSENT_AUTHORIZED_ADDRESS_COVERAGE.md): patient/recipient checks before maps requests, patient-bound proofs, atomic approvals/revocations and denial cleanup.
+- [Consent-authorized availability](CONSENT_AUTHORIZED_AVAILABILITY.md): old/new recurring rule and override windows, buffered appointment authorization, open-ended recurrence and atomic mutation audits.
 
 Start with these two authoritative documents:
 

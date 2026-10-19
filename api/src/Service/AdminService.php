@@ -328,16 +328,80 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
 
     public function createAvailability(AuthContext $actor,array $body,string $correlationId): array
     {
-        $this->validateAvailabilityRule($actor,$body);
-        $statement=$this->database->connection()->prepare('INSERT INTO availability_rules(practitioner_id,location_id,weekday,start_time,end_time,valid_from,valid_until,recurrence_interval_weeks) VALUES(:p,:l,:weekday,:start,:end,:valid_from,:valid_until,:interval)');$statement->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'weekday'=>(int)$body['weekday'],'start'=>$body['start_time'],'end'=>$body['end_time'],'valid_from'=>$body['valid_from'],'valid_until'=>$body['valid_until']??null,'interval'=>(int)($body['recurrence_interval_weeks']??1)]);return $this->created($actor,$correlationId,'availability_rule',(int)$this->database->connection()->lastInsertId());
+        return $this->scheduleMutation($actor,function()use($actor,$body,$correlationId):array{
+            $this->validateAvailabilityRule($actor,$body);$this->authorizeRuleChange($actor,$body);
+            $q=$this->database->connection()->prepare('INSERT INTO availability_rules(practitioner_id,location_id,weekday,start_time,end_time,valid_from,valid_until,recurrence_interval_weeks) VALUES(:p,:l,:weekday,:start,:end,:valid_from,:valid_until,:interval)');
+            $q->execute($this->ruleParams($body));return $this->created($actor,$correlationId,'availability_rule',(int)$this->database->connection()->lastInsertId());
+        });
+    }
+    private function ruleParams(array $body): array
+    {
+        return ['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'weekday'=>(int)$body['weekday'],'start'=>$body['start_time'],'end'=>$body['end_time'],'valid_from'=>$body['valid_from'],'valid_until'=>$body['valid_until']??null,'interval'=>(int)($body['recurrence_interval_weeks']??1)];
+    }
+    private function authorizeRuleChange(AuthContext $actor,array $body): void
+    {
+        $q=$this->database->connection()->prepare('SELECT timezone FROM locations WHERE id=? AND clinic_id=?');$q->execute([(int)$body['location_id'],$actor->clinicId]);
+        (new ScheduleChangeAccess($this->database))->assertRule($actor,array_replace($body,['timezone'=>$q->fetchColumn(),'valid_until'=>$body['valid_until']??null,'recurrence_interval_weeks'=>(int)($body['recurrence_interval_weeks']??1)]));
+    }
+    private function lockedScheduleChange(AuthContext $actor,string $table,int $id): array
+    {
+        $code=$table==='availability_rules'?'availability_rule_not_found':'schedule_exception_not_found';
+        $this->scheduleRecordAccess($actor,$table,$id,$code);
+        $q=$this->database->connection()->prepare("SELECT x.* FROM $table x JOIN locations l ON l.id=x.location_id AND l.clinic_id=:clinic WHERE x.id=:id FOR UPDATE");$q->execute(['clinic'=>$actor->clinicId,'id'=>$id]);
+        $row=$q->fetch();if(!$row)throw new ApiException(404,$code,'Schedule item not found.');
+        $this->scheduleLocationAccess($actor,(int)$row['practitioner_id'],(int)$row['location_id']);return $row;
     }
     public function availabilityRules(AuthContext $actor): array{$this->scheduleRole($actor);$own=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin');$where=$own?' AND p.user_id=:actor AND p.active=1':'';$params=['clinic'=>$actor->clinicId];if($own)$params['actor']=$actor->userId;$s=$this->database->connection()->prepare("SELECT a.id,a.practitioner_id,a.location_id,a.weekday,a.start_time,a.end_time,a.valid_from,a.valid_until,a.recurrence_interval_weeks,a.active,u.display_name practitioner_name,l.name location_name FROM availability_rules a JOIN practitioners p ON p.id=a.practitioner_id JOIN users u ON u.id=p.user_id JOIN locations l ON l.id=a.location_id WHERE u.clinic_id=:clinic{$where} ORDER BY u.display_name,a.weekday,a.start_time");$s->execute($params);return $s->fetchAll();}
-    public function updateAvailabilityRule(AuthContext $actor,int $id,array $body,string $cid): array{$this->scheduleRecordAccess($actor,'availability_rules',$id,'availability_rule_not_found');$this->validateAvailabilityRule($actor,$body);$s=$this->database->connection()->prepare('UPDATE availability_rules SET practitioner_id=:p,location_id=:l,weekday=:weekday,start_time=:start,end_time=:end,valid_from=:valid_from,valid_until=:valid_until,recurrence_interval_weeks=:interval WHERE id=:id');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'weekday'=>(int)$body['weekday'],'start'=>$body['start_time'],'end'=>$body['end_time'],'valid_from'=>$body['valid_from'],'valid_until'=>$body['valid_until']??null,'interval'=>(int)($body['recurrence_interval_weeks']??1),'id'=>$id]);$this->audit->write($actor->clinicId,$actor,$cid,'availability_rule.update','availability_rule',$id);return ['id'=>$id];}
-    public function deleteAvailabilityRule(AuthContext $actor,int $id,string $cid): array{$this->scheduleRecordAccess($actor,'availability_rules',$id,'availability_rule_not_found');$s=$this->database->connection()->prepare('UPDATE availability_rules SET active=0 WHERE id=:id AND active=1');$s->execute(['id'=>$id]);if(!$s->rowCount())throw new ApiException(404,'availability_rule_not_found','Availability rule not found.');$this->audit->write($actor->clinicId,$actor,$cid,'availability_rule.archive','availability_rule',$id);return ['archived'=>true];}
+    public function updateAvailabilityRule(AuthContext $actor,int $id,array $body,string $cid): array
+    {
+        return $this->scheduleMutation($actor,function()use($actor,$id,$body,$cid):array{
+            $old=$this->lockedScheduleChange($actor,'availability_rules',$id);$this->validateAvailabilityRule($actor,$body);
+            $this->authorizeRuleChange($actor,$old);$this->authorizeRuleChange($actor,$body);
+            $q=$this->database->connection()->prepare('UPDATE availability_rules SET practitioner_id=:p,location_id=:l,weekday=:weekday,start_time=:start,end_time=:end,valid_from=:valid_from,valid_until=:valid_until,recurrence_interval_weeks=:interval WHERE id=:id');$q->execute($this->ruleParams($body)+['id'=>$id]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'availability_rule.update','availability_rule',$id);return ['id'=>$id];
+        });
+    }
+    public function deleteAvailabilityRule(AuthContext $actor,int $id,string $cid): array
+    {
+        return $this->scheduleMutation($actor,function()use($actor,$id,$cid):array{
+            $old=$this->lockedScheduleChange($actor,'availability_rules',$id);
+            if(!(bool)$old['active'])throw new ApiException(404,'availability_rule_not_found','Availability rule not found.');
+            $this->authorizeRuleChange($actor,$old);
+            $this->database->connection()->prepare('UPDATE availability_rules SET active=0 WHERE id=?')->execute([$id]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'availability_rule.archive','availability_rule',$id);return ['archived'=>true];
+        });
+    }
 
     public function scheduleExceptions(AuthContext $actor): array{$this->scheduleRole($actor);$own=$actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin');$where=$own?' AND p.user_id=:actor AND p.active=1':'';$params=['clinic'=>$actor->clinicId];if($own)$params['actor']=$actor->userId;$pdo=$this->database->connection();$o=$pdo->prepare("SELECT o.id,o.practitioner_id,o.location_id,o.starts_at,o.ends_at,o.override_type type,o.reason,u.display_name practitioner_name,l.name location_name,'override' kind FROM availability_overrides o JOIN practitioners p ON p.id=o.practitioner_id JOIN users u ON u.id=p.user_id JOIN locations l ON l.id=o.location_id WHERE u.clinic_id=:clinic{$where}");$o->execute($params);$visible=ConsentAccess::condition($actor,$params,'a.client_id');$t=$pdo->prepare("SELECT t.id,t.practitioner_id,t.location_id,t.starts_at,t.ends_at,t.reason_type type,t.notes reason,u.display_name practitioner_name,l.name location_name,'time_off' kind,(SELECT COUNT(*) FROM appointments a WHERE a.clinic_id=u.clinic_id AND a.practitioner_id=t.practitioner_id AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.starts_at<t.ends_at AND a.ends_at>t.starts_at $visible) affected_appointment_count FROM time_off t JOIN practitioners p ON p.id=t.practitioner_id JOIN users u ON u.id=p.user_id LEFT JOIN locations l ON l.id=t.location_id WHERE u.clinic_id=:clinic{$where}");$t->execute($params);$rows=array_merge($o->fetchAll(),$t->fetchAll());usort($rows,fn($a,$b)=>strcmp($a['starts_at'],$b['starts_at']));return $rows;}
-    public function createAvailabilityOverride(AuthContext $actor,array $body,string $cid): array{$this->required($body,['practitioner_id','location_id','starts_at','ends_at','override_type']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);[$start,$end]=$this->utcInterval($body,(int)$body['location_id']);if(!in_array($body['override_type'],['available','blocked'],true))throw new ApiException(422,'validation_error','Invalid override type.');$s=$this->database->connection()->prepare('INSERT INTO availability_overrides(practitioner_id,location_id,starts_at,ends_at,override_type,reason,created_by) VALUES(:p,:l,:starts,:ends,:type,:reason,:actor)');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['override_type'],'reason'=>$this->optional($body,'reason'),'actor'=>$actor->userId]);return $this->created($actor,$cid,'availability_override',(int)$this->database->connection()->lastInsertId());}
-    public function updateAvailabilityOverride(AuthContext $actor,int $id,array $body,string $cid): array{$this->scheduleRecordAccess($actor,'availability_overrides',$id,'schedule_exception_not_found');$this->required($body,['practitioner_id','location_id','starts_at','ends_at','override_type']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);[$start,$end]=$this->utcInterval($body,(int)$body['location_id']);if(!in_array($body['override_type'],['available','blocked'],true))throw new ApiException(422,'validation_error','Invalid override type.');$s=$this->database->connection()->prepare('UPDATE availability_overrides SET practitioner_id=:p,location_id=:l,starts_at=:starts,ends_at=:ends,override_type=:type,reason=:reason WHERE id=:id');$s->execute(['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['override_type'],'reason'=>$this->optional($body,'reason'),'id'=>$id]);$this->audit->write($actor->clinicId,$actor,$cid,'availability_override.update','availability_override',$id);return ['id'=>$id];}
+    private function overrideInput(AuthContext $actor,array $body): array
+    {
+        $this->required($body,['practitioner_id','location_id','starts_at','ends_at','override_type']);
+        $this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);
+        [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
+        if(!in_array($body['override_type'],['available','blocked'],true))throw new ApiException(422,'validation_error','Invalid override type.');
+        return array_replace($body,['starts_at'=>$start,'ends_at'=>$end]);
+    }
+    private function overrideParams(array $body): array
+    {
+        return ['p'=>(int)$body['practitioner_id'],'l'=>(int)$body['location_id'],'starts'=>$body['starts_at'],'ends'=>$body['ends_at'],'type'=>$body['override_type'],'reason'=>$this->optional($body,'reason')];
+    }
+    public function createAvailabilityOverride(AuthContext $actor,array $body,string $cid): array
+    {
+        return $this->scheduleMutation($actor,function()use($actor,$body,$cid):array{
+            $body=$this->overrideInput($actor,$body);(new ScheduleChangeAccess($this->database))->assertOverride($actor,$body);
+            $q=$this->database->connection()->prepare('INSERT INTO availability_overrides(practitioner_id,location_id,starts_at,ends_at,override_type,reason,created_by) VALUES(:p,:l,:starts,:ends,:type,:reason,:actor)');$q->execute($this->overrideParams($body)+['actor'=>$actor->userId]);
+            return $this->created($actor,$cid,'availability_override',(int)$this->database->connection()->lastInsertId());
+        });
+    }
+    public function updateAvailabilityOverride(AuthContext $actor,int $id,array $body,string $cid): array
+    {
+        return $this->scheduleMutation($actor,function()use($actor,$id,$body,$cid):array{
+            $old=$this->lockedScheduleChange($actor,'availability_overrides',$id);$body=$this->overrideInput($actor,$body);$access=new ScheduleChangeAccess($this->database);
+            $access->assertOverride($actor,$old);$access->assertOverride($actor,$body);
+            $q=$this->database->connection()->prepare('UPDATE availability_overrides SET practitioner_id=:p,location_id=:l,starts_at=:starts,ends_at=:ends,override_type=:type,reason=:reason WHERE id=:id');$q->execute($this->overrideParams($body)+['id'=>$id]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'availability_override.update','availability_override',$id);return ['id'=>$id];
+        });
+    }
     public function previewTimeOffImpact(AuthContext $actor,array $body): array
     {
         $this->required($body,['practitioner_id','location_id','starts_at','ends_at']);
@@ -405,9 +469,11 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
         if($actual!==$expected)throw new ApiException(409,'time_off_impact_changed','Appointments changed during review. Review the affected appointments again before saving.');
     }
     /** Serialize with withdrawal and booking changes, including direct service callers. */
-    private function timeOffMutation(AuthContext $actor,callable $work): array
+    private function scheduleMutation(AuthContext $actor,callable $work): array
     {
-        $this->scheduleRole($actor);$pdo=$this->database->connection();$consentLock=new ConsentLock($pdo);$consentLock->acquire($actor->clinicId);
+        $this->scheduleRole($actor);$pdo=$this->database->connection();
+        if($pdo->inTransaction())throw new \LogicException('Schedule mutations require their own transaction.');
+        $consentLock=new ConsentLock($pdo);$consentLock->acquire($actor->clinicId);
         try{
             $pdo->beginTransaction();
             $q=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$q->execute(['clinic'=>$actor->clinicId]);
@@ -446,7 +512,7 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
 
     public function createTimeOff(AuthContext $actor,array $body,string $cid): array
     {
-        return $this->timeOffMutation($actor,function()use($actor,$body,$cid):array{
+        return $this->scheduleMutation($actor,function()use($actor,$body,$cid):array{
             $this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
             $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
             [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
@@ -460,7 +526,7 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
     }
     public function updateTimeOff(AuthContext $actor,int $id,array $body,string $cid): array
     {
-        return $this->timeOffMutation($actor,function()use($actor,$id,$body,$cid):array{
+        return $this->scheduleMutation($actor,function()use($actor,$id,$body,$cid):array{
             $old=$this->lockedTimeOff($actor,$id);
             $this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
             $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
@@ -475,13 +541,18 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
     }
     public function deleteScheduleException(AuthContext $actor,string $table,int $id,string $cid): array
     {
-        if($table==='time_off')return $this->timeOffMutation($actor,function()use($actor,$id,$cid):array{
+        if($table==='time_off')return $this->scheduleMutation($actor,function()use($actor,$id,$cid):array{
             $old=$this->lockedTimeOff($actor,$id);
             $this->authorizeTimeOffAppointments($actor,(int)$old['practitioner_id'],$old['starts_at'],$old['ends_at']);
             $this->database->connection()->prepare('DELETE FROM time_off WHERE id=?')->execute([$id]);
             $this->audit->write($actor->clinicId,$actor,$cid,'schedule_exception.delete','time_off',$id);return ['deleted'=>true];
         });
-        $this->scheduleRecordAccess($actor,$table,$id,'schedule_exception_not_found');$s=$this->database->connection()->prepare("DELETE FROM {$table} WHERE id=:id");$s->execute(['id'=>$id]);if(!$s->rowCount())throw new ApiException(404,'schedule_exception_not_found','Schedule exception not found.');$this->audit->write($actor->clinicId,$actor,$cid,'schedule_exception.delete',$table,$id);return ['deleted'=>true];
+        if($table!=='availability_overrides')throw new ApiException(500,'invalid_table','Invalid schedule table.');
+        return $this->scheduleMutation($actor,function()use($actor,$id,$cid):array{
+            $old=$this->lockedScheduleChange($actor,'availability_overrides',$id);(new ScheduleChangeAccess($this->database))->assertOverride($actor,$old);
+            $this->database->connection()->prepare('DELETE FROM availability_overrides WHERE id=?')->execute([$id]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'schedule_exception.delete','availability_overrides',$id);return ['deleted'=>true];
+        });
     }
 
     private function admin(AuthContext $actor): void{if(!$actor->hasAnyRole('super_admin','clinic_admin'))throw new ApiException(403,'forbidden','Administrator access is required.');}
@@ -524,7 +595,7 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
     private function scheduleAccess(AuthContext $actor,int $practitionerId): void{$this->scheduleRole($actor);$sql='SELECT 1 FROM practitioners p JOIN users u ON u.id=p.user_id WHERE p.id=:p AND u.clinic_id=:clinic';$params=['p'=>$practitionerId,'clinic'=>$actor->clinicId];if($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin')){$sql.=" AND p.user_id=:actor AND p.active=1 AND p.booking_mode='practitioner_managed'";$params['actor']=$actor->userId;}$s=$this->database->connection()->prepare($sql);$s->execute($params);if(!$s->fetchColumn())throw new ApiException(403,'forbidden','You cannot manage that practitioner schedule.');}
     private function scheduleLocationAccess(AuthContext $actor,int $practitionerId,int $locationId): void{$this->ownedLocation($actor,$locationId);if(!$actor->hasAnyRole('practitioner')||$actor->hasAnyRole('super_admin','clinic_admin'))return;$s=$this->database->connection()->prepare('SELECT 1 FROM practitioner_locations pl JOIN practitioners p ON p.id=pl.practitioner_id WHERE pl.practitioner_id=:practitioner AND pl.location_id=:location AND pl.active=1 AND p.user_id=:actor');$s->execute(['practitioner'=>$practitionerId,'location'=>$locationId,'actor'=>$actor->userId]);if(!$s->fetchColumn())throw new ApiException(403,'forbidden','You cannot manage availability at that location.');}
     private function scheduleRecordAccess(AuthContext $actor,string $table,int $id,string $code): void{if(!in_array($table,['availability_rules','availability_overrides','time_off'],true))throw new ApiException(500,'invalid_table','Invalid schedule table.');$this->scheduleRole($actor);$sql="SELECT 1 FROM {$table} x JOIN practitioners p ON p.id=x.practitioner_id JOIN users u ON u.id=p.user_id WHERE x.id=:id AND u.clinic_id=:clinic";$params=['id'=>$id,'clinic'=>$actor->clinicId];if($actor->hasAnyRole('practitioner')&&!$actor->hasAnyRole('super_admin','clinic_admin')){$sql.=" AND p.user_id=:actor AND p.active=1 AND p.booking_mode='practitioner_managed'";$params['actor']=$actor->userId;}$s=$this->database->connection()->prepare($sql);$s->execute($params);if(!$s->fetchColumn())throw new ApiException(404,$code,'Schedule item not found.');}
-    private function validateAvailabilityRule(AuthContext $actor,array $body): void{$this->required($body,['practitioner_id','location_id','weekday','start_time','end_time','valid_from']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);$weekday=(int)$body['weekday'];$interval=(int)($body['recurrence_interval_weeks']??1);$time='/^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/';$date='/^\\d{4}-\\d{2}-\\d{2}$/';if($weekday<1||$weekday>7)throw new ApiException(422,'validation_error','Choose a valid weekday.');if(!preg_match($time,(string)$body['start_time'])||!preg_match($time,(string)$body['end_time'])||(string)$body['start_time']>=(string)$body['end_time'])throw new ApiException(422,'validation_error','Start time must be before end time.');if(!preg_match($date,(string)$body['valid_from'])||(($body['valid_until']??null)!==null&&!preg_match($date,(string)$body['valid_until'])))throw new ApiException(422,'validation_error','Enter valid effective dates.');if(($body['valid_until']??null)!==null&&(string)$body['valid_until']<(string)$body['valid_from'])throw new ApiException(422,'validation_error','Valid until must be on or after valid from.');if($interval<1||$interval>52)throw new ApiException(422,'validation_error','Recurrence interval must be between 1 and 52 weeks.');}
+    private function validateAvailabilityRule(AuthContext $actor,array $body): void{$this->required($body,['practitioner_id','location_id','weekday','start_time','end_time','valid_from']);$this->scheduleAccess($actor,(int)$body['practitioner_id']);$this->scheduleLocationAccess($actor,(int)$body['practitioner_id'],(int)$body['location_id']);$weekday=(int)$body['weekday'];$interval=(int)($body['recurrence_interval_weeks']??1);foreach(['valid_from','valid_until'] as $dateField){$value=$body[$dateField]??null;if($dateField==='valid_until'&&$value===null)continue;$parsed=is_string($value)&&preg_match('/^\d{4}-\d{2}-\d{2}$/D',$value)?\DateTimeImmutable::createFromFormat('!Y-m-d',$value):false;if(!$parsed||$parsed->format('Y-m-d')!==$value||(int)$parsed->format('Y')<1000)throw new ApiException(422,'validation_error','Enter valid effective dates.');}$time='/^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/';$date='/^\\d{4}-\\d{2}-\\d{2}$/';if($weekday<1||$weekday>7)throw new ApiException(422,'validation_error','Choose a valid weekday.');if(!preg_match($time,(string)$body['start_time'])||!preg_match($time,(string)$body['end_time'])||(string)$body['start_time']>=(string)$body['end_time'])throw new ApiException(422,'validation_error','Start time must be before end time.');if(!preg_match($date,(string)$body['valid_from'])||(($body['valid_until']??null)!==null&&!preg_match($date,(string)$body['valid_until'])))throw new ApiException(422,'validation_error','Enter valid effective dates.');if(($body['valid_until']??null)!==null&&(string)$body['valid_until']<(string)$body['valid_from'])throw new ApiException(422,'validation_error','Valid until must be on or after valid from.');if($interval<1||$interval>52)throw new ApiException(422,'validation_error','Recurrence interval must be between 1 and 52 weeks.');}
     private function utcInterval(array $body,int $locationId): array{$s=$this->database->connection()->prepare('SELECT timezone FROM locations WHERE id=:id');$s->execute(['id'=>$locationId]);$timezone=$s->fetchColumn();try{$zone=new \DateTimeZone((string)$timezone);$start=new \DateTimeImmutable((string)$body['starts_at'],$zone);$end=new \DateTimeImmutable((string)$body['ends_at'],$zone);}catch(\Throwable){throw new ApiException(422,'validation_error','Enter valid local start and end times.');}if($start>=$end)throw new ApiException(422,'validation_error','Start must be before end.');$utc=new \DateTimeZone('UTC');return [$start->setTimezone($utc)->format('Y-m-d H:i:s'),$end->setTimezone($utc)->format('Y-m-d H:i:s')];}
     private function created(AuthContext $actor,string $correlationId,string $type,int $id): array{$this->audit->write($actor->clinicId,$actor,$correlationId,$type.'.create',$type,$id);return ['id'=>$id];}
 }

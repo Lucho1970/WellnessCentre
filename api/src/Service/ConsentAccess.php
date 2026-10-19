@@ -69,6 +69,7 @@ final class ConsentAccess
             'adminNotifications','practitionerNotifications','reviewNotification',
             'dashboard','practitionerToday','practitionerVisitSummary','practitionerNextOnsite',
             'availabilityRules','scheduleExceptions','timeOffImpact','previewTimeOffImpact','practitionerAvailabilityContext',
+            'createAvailability','updateAvailabilityRule','deleteAvailabilityRule','createAvailabilityOverride','updateAvailabilityOverride','deleteAvailabilityOverride',
             'createTimeOff','updateTimeOff','deleteTimeOff', // AdminService authorizes complete old/new affected sets.
             'me','dashboardPreferences','saveDashboardPreferences','resetDashboardPreferences',
             'myTravelSettings','saveMyTravelSettings','myWorkLocation','saveMyWorkLocation',
