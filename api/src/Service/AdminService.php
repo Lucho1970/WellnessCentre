@@ -389,7 +389,7 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
     {
         $params=['clinic'=>$clinicId,'practitioner'=>$practitionerId,'start'=>$start,'end'=>$end];
         // Read previews filter patients; mutation callers must inspect the full affected set.
-        // Bulk mutation routes remain guarded by ConsentAccess::request.
+        // Mutation callers authorize the full set before hydrating or limiting it.
         $visible=$viewer?ConsentAccess::condition($viewer,$params,'a.client_id'):'';
         $statement=$this->database->connection()->prepare("SELECT a.id,a.starts_at,a.ends_at,a.status,u.display_name client_name,s.name service_name,l.name location_name,l.timezone FROM appointments a JOIN users u ON u.id=a.client_id AND u.clinic_id=a.clinic_id JOIN services s ON s.id=a.service_id AND s.clinic_id=a.clinic_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.clinic_id=:clinic AND a.practitioner_id=:practitioner AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.starts_at<:end AND a.ends_at>:start $visible ORDER BY a.starts_at,a.id LIMIT 501");
         $statement->execute($params);$rows=$statement->fetchAll();
@@ -404,33 +404,85 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
         $actual=array_map(static fn(array $row): int=>(int)$row['id'],$affected);$expected=array_map('intval',$expected);sort($actual);sort($expected);
         if($actual!==$expected)throw new ApiException(409,'time_off_impact_changed','Appointments changed during review. Review the affected appointments again before saving.');
     }
+    /** Serialize with withdrawal and booking changes, including direct service callers. */
+    private function timeOffMutation(AuthContext $actor,callable $work): array
+    {
+        $this->scheduleRole($actor);$pdo=$this->database->connection();$consentLock=new ConsentLock($pdo);$consentLock->acquire($actor->clinicId);
+        try{
+            $pdo->beginTransaction();
+            $q=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$q->execute(['clinic'=>$actor->clinicId]);
+            if(!$q->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+            $q=$pdo->prepare("SELECT 1 FROM users WHERE id=? AND clinic_id=? AND user_type='staff' AND status='active'");$q->execute([$actor->userId,$actor->clinicId]);
+            if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Schedule access is required.');
+            $result=$work();$pdo->commit();return $result;
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$consentLock->release();}
+    }
+
+    /** No preview cap or outer joins that discard appointments: one unresolvable/restricted row denies. */
+    private function authorizeTimeOffAppointments(AuthContext $actor,int $practitioner,string $start,string $end): void
+    {
+        $params=['clinic'=>$actor->clinicId,'practitioner'=>$practitioner,'start'=>$start,'end'=>$end];
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $q=$this->database->connection()->prepare("SELECT 1 FROM appointments a
+            WHERE a.clinic_id=:clinic AND a.practitioner_id=:practitioner
+              AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.starts_at<:end AND a.ends_at>:start
+              AND NOT EXISTS(SELECT 1 FROM users client
+                JOIN services service ON service.id=a.service_id AND service.clinic_id=a.clinic_id
+                JOIN locations location ON location.id=a.location_id AND location.clinic_id=a.clinic_id
+                WHERE client.id=a.client_id AND client.clinic_id=a.clinic_id AND client.user_type='client'
+                  AND NOT EXISTS(SELECT 1 FROM client_merge_records merged WHERE merged.duplicate_client_id=client.id)
+                  $visible) LIMIT 1");
+        $q->execute($params);
+        if($q->fetchColumn())throw new ApiException(403,'time_off_access_restricted','This schedule change requires an authorized privacy review. No changes were saved.');
+    }
+
+    private function lockedTimeOff(AuthContext $actor,int $id): array
+    {
+        $this->scheduleRecordAccess($actor,'time_off',$id,'schedule_exception_not_found');
+        $q=$this->database->connection()->prepare('SELECT practitioner_id,starts_at,ends_at FROM time_off WHERE id=? FOR UPDATE');$q->execute([$id]);
+        $row=$q->fetch();if(!$row)throw new ApiException(404,'schedule_exception_not_found','Schedule item not found.');return $row;
+    }
+
     public function createTimeOff(AuthContext $actor,array $body,string $cid): array
     {
-        $this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
-        $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
-        [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
-        if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');
-        $pdo=$this->database->connection();
-        try{$pdo->beginTransaction();$lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+        return $this->timeOffMutation($actor,function()use($actor,$body,$cid):array{
+            $this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
+            $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
+            [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
+            if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');
+            $this->authorizeTimeOffAppointments($actor,$practitionerId,$start,$end);
             $affected=$this->timeOffAppointments($actor->clinicId,$practitionerId,$start,$end);$this->assertTimeOffImpactMatches($body,$affected);
+            $pdo=$this->database->connection();
             $s=$pdo->prepare('INSERT INTO time_off(practitioner_id,location_id,starts_at,ends_at,reason_type,notes,created_by) VALUES(:p,:l,:starts,:ends,:type,:notes,:actor)');$s->execute(['p'=>$practitionerId,'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['reason_type'],'notes'=>$this->optional($body,'notes'),'actor'=>$actor->userId]);
-            $result=$this->created($actor,$cid,'time_off',(int)$pdo->lastInsertId());$pdo->commit();return $result+['affected_appointment_count'=>count($affected)];
-        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+            return $this->created($actor,$cid,'time_off',(int)$pdo->lastInsertId())+['affected_appointment_count'=>count($affected)];
+        });
     }
     public function updateTimeOff(AuthContext $actor,int $id,array $body,string $cid): array
     {
-        $this->scheduleRecordAccess($actor,'time_off',$id,'schedule_exception_not_found');$this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
-        $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
-        [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
-        if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');
-        $pdo=$this->database->connection();
-        try{$pdo->beginTransaction();$lock=$pdo->prepare("SELECT id FROM clinics WHERE id=:clinic AND status='active' FOR UPDATE");$lock->execute(['clinic'=>$actor->clinicId]);if(!$lock->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');
+        return $this->timeOffMutation($actor,function()use($actor,$id,$body,$cid):array{
+            $old=$this->lockedTimeOff($actor,$id);
+            $this->required($body,['practitioner_id','location_id','starts_at','ends_at','reason_type']);$practitionerId=(int)$body['practitioner_id'];
+            $this->scheduleAccess($actor,$practitionerId);$this->scheduleLocationAccess($actor,$practitionerId,(int)$body['location_id']);
+            [$start,$end]=$this->utcInterval($body,(int)$body['location_id']);
+            if(!in_array($body['reason_type'],['vacation','sick','personal','other'],true))throw new ApiException(422,'validation_error','Invalid reason type.');
+            $this->authorizeTimeOffAppointments($actor,(int)$old['practitioner_id'],$old['starts_at'],$old['ends_at']);
+            $this->authorizeTimeOffAppointments($actor,$practitionerId,$start,$end);
             $affected=$this->timeOffAppointments($actor->clinicId,$practitionerId,$start,$end);$this->assertTimeOffImpactMatches($body,$affected);
-            $s=$pdo->prepare('UPDATE time_off SET practitioner_id=:p,location_id=:l,starts_at=:starts,ends_at=:ends,reason_type=:type,notes=:notes WHERE id=:id');$s->execute(['p'=>$practitionerId,'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['reason_type'],'notes'=>$this->optional($body,'notes'),'id'=>$id]);
-            $this->audit->write($actor->clinicId,$actor,$cid,'time_off.update','time_off',$id);$pdo->commit();return ['id'=>$id,'affected_appointment_count'=>count($affected)];
-        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+            $s=$this->database->connection()->prepare('UPDATE time_off SET practitioner_id=:p,location_id=:l,starts_at=:starts,ends_at=:ends,reason_type=:type,notes=:notes WHERE id=:id');$s->execute(['p'=>$practitionerId,'l'=>(int)$body['location_id'],'starts'=>$start,'ends'=>$end,'type'=>$body['reason_type'],'notes'=>$this->optional($body,'notes'),'id'=>$id]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'time_off.update','time_off',$id);return ['id'=>$id,'affected_appointment_count'=>count($affected)];
+        });
     }
-    public function deleteScheduleException(AuthContext $actor,string $table,int $id,string $cid): array{$this->scheduleRecordAccess($actor,$table,$id,'schedule_exception_not_found');$s=$this->database->connection()->prepare("DELETE FROM {$table} WHERE id=:id");$s->execute(['id'=>$id]);if(!$s->rowCount())throw new ApiException(404,'schedule_exception_not_found','Schedule exception not found.');$this->audit->write($actor->clinicId,$actor,$cid,'schedule_exception.delete',$table,$id);return ['deleted'=>true];}
+    public function deleteScheduleException(AuthContext $actor,string $table,int $id,string $cid): array
+    {
+        if($table==='time_off')return $this->timeOffMutation($actor,function()use($actor,$id,$cid):array{
+            $old=$this->lockedTimeOff($actor,$id);
+            $this->authorizeTimeOffAppointments($actor,(int)$old['practitioner_id'],$old['starts_at'],$old['ends_at']);
+            $this->database->connection()->prepare('DELETE FROM time_off WHERE id=?')->execute([$id]);
+            $this->audit->write($actor->clinicId,$actor,$cid,'schedule_exception.delete','time_off',$id);return ['deleted'=>true];
+        });
+        $this->scheduleRecordAccess($actor,$table,$id,'schedule_exception_not_found');$s=$this->database->connection()->prepare("DELETE FROM {$table} WHERE id=:id");$s->execute(['id'=>$id]);if(!$s->rowCount())throw new ApiException(404,'schedule_exception_not_found','Schedule exception not found.');$this->audit->write($actor->clinicId,$actor,$cid,'schedule_exception.delete',$table,$id);return ['deleted'=>true];
+    }
 
     private function admin(AuthContext $actor): void{if(!$actor->hasAnyRole('super_admin','clinic_admin'))throw new ApiException(403,'forbidden','Administrator access is required.');}
     private function superAdmin(AuthContext $actor): void{if(!$actor->hasAnyRole('super_admin'))throw new ApiException(403,'forbidden','Super administrator access is required.');}

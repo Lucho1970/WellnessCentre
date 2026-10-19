@@ -21,6 +21,7 @@ This folder contains the living technical and delivery documentation for the Wel
 - [Consent-filtered dashboards and schedules](CONSENT_FILTERED_DASHBOARDS_SCHEDULES.md): permitted-record counts, day cards, next visits, schedule impacts and notification activity without a clinic-wide consent block.
 - [Consent-filtered notifications](CONSENT_FILTERED_NOTIFICATIONS.md): permitted notification lists/counts, current review and retry authorization, recipient rechecks and stale-contact browser handling.
 - [Consent-filtered travel enquiries and messages](CONSENT_FILTERED_TRAVEL_ENQUIRIES.md): permitted inboxes/unread counts, thread actions, patient history, recipient restrictions and stale-thread browser handling.
+- [Consent-authorized bulk time-off](CONSENT_AUTHORIZED_TIME_OFF.md): complete affected-set authorization for create/update/delete, old/new-period checks, atomic audit rollback and denial handling.
 
 Start with these two authoritative documents:
 

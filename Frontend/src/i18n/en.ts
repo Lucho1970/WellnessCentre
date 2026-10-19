@@ -1,4 +1,5 @@
 const en = {
+  "API error: time_off_access_restricted": "This schedule change requires an authorized privacy review. No changes were saved.",
   "This notification is no longer available. Refresh the list.": "This notification is no longer available. Refresh the list.",
   "API error: consent_changed": "Consent instructions changed. Reload before saving.",
   "API error: consent_restricted": "Access is restricted by a patient privacy instruction.",

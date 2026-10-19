@@ -69,6 +69,7 @@ final class ConsentAccess
             'adminNotifications','practitionerNotifications','reviewNotification',
             'dashboard','practitionerToday','practitionerVisitSummary','practitionerNextOnsite',
             'availabilityRules','scheduleExceptions','timeOffImpact','previewTimeOffImpact','practitionerAvailabilityContext',
+            'createTimeOff','updateTimeOff','deleteTimeOff', // AdminService authorizes complete old/new affected sets.
             'me','dashboardPreferences','saveDashboardPreferences','resetDashboardPreferences',
             'myTravelSettings','saveMyTravelSettings','myWorkLocation','saveMyWorkLocation',
             'profileAvatar','saveProfileAvatar','deleteProfileAvatar','myPublicCard','updateMyPublicCard',
@@ -103,7 +104,7 @@ final class ConsentAccess
             return;
         }
         // Unknown/new routes must not silently bypass restrictions (including aggregate counts,
-        // exports, duplicate candidates and time-off bulk changes).
+        // exports and duplicate candidates).
         $q=$this->pdo->prepare("SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND scope='staff_access' AND restricted=1 AND target_staff_id IN (0,?) LIMIT 1");
         $q->execute([$actor->clinicId,$actor->userId]);
         if($q->fetchColumn())throw new ApiException(403,'consent_scope_restricted','This operation requires a privacy review because it may include restricted records.');

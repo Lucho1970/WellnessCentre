@@ -28,7 +28,7 @@ Appointment email and SMS buckets, unresolved totals and overdue counts use that
 ## Authorization that remains restrictive
 
 - Direct visit-history, milestone, outcome, travel-estimate and appointment actions still deny restricted patient access. Visit and travel service queries enforce the restriction even when called directly.
-- Time-off previews are filtered reads. Bulk create/update/delete operations retain the existing conservative API block: their full affected set is needed for safe mutation and impact confirmation. A filtered preview is not authorization to change hidden appointments. Mutation logic still examines its complete affected set.
+- Time-off previews are filtered reads. The subsequent [bulk time-off authorization change](CONSENT_AUTHORIZED_TIME_OFF.md) checks every affected appointment before create/update/delete, including both old and proposed periods on updates. A filtered preview is not authorization to change hidden appointments; a restricted overlap denies the entire mutation.
 - Other unclassified routes retain the existing conservative boundary. Notification lists/review now have their own tested filtering and authorization, described in the follow-up above. [Travel enquiries and messages](CONSENT_FILTERED_TRAVEL_ENQUIRIES.md) now also enforce their own patient and recipient boundaries.
 - Public availability and booking conflict checks still treat all occupied slots as busy. Hiding records does not make their times available for double booking.
 

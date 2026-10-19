@@ -115,6 +115,8 @@ The calendar displays times in the device's timezone, which is shown above the g
 
 When adding or editing **Time off** in Availability, choose **Review affected appointments** before saving. Review any overlapping bookings, then save the block if it is correct. Saving does not cancel, reschedule, or notify those clients. A follow-up count appears in the Time off list; select the item and open **Details** to see the current affected appointments. Choose **Review appointment #…** to open that exact booking, even when it is not on the first appointment-list page, then reschedule or cancel it using the permitted actions. The impact list updates as appointments are rescheduled or canceled.
 
+Patient privacy restrictions also apply when saving or removing time off. A preview shows only appointments you can access. If any appointment in the affected period requires a privacy review, the entire change is refused and nothing is saved. Editing checks both the existing and proposed periods. Contact the clinic privacy lead to arrange authorized handling; an administrator cannot override the restriction. Restrictions on unrelated patients do not prevent changes to other periods.
+
 The Practitioner dashboard also shows a warning while any upcoming, active appointments overlap your time off. It counts each appointment once, even if multiple time-off blocks overlap it, and links directly to the first five bookings. Use **Refresh** after resolving one; the warning disappears when no future overlaps remain. This is a follow-up aid, not an automatic cancellation or client notification.
 
 ### Travel to the next On-Site visit

@@ -3482,6 +3482,39 @@ test("availability is practitioner-first with selectable hours, changes, and tim
   await expect.poll(() => update).toMatchObject({ practitioner_id: 8, location_id: 1, weekday: 1, end_time: "18:00" });
 });
 
+for(const action of ['save','delete'])test(`time off privacy denial clears stale impact after ${action}`,async({page})=>{
+  await page.clock.setFixedTime(new Date('2026-10-01T12:00:00Z'));
+  await fixtures(page,['super_admin']);
+  const affected={id:71,starts_at:'2026-10-06 14:00:00',ends_at:'2026-10-06 15:00:00',status:'confirmed',client_name:'Private preview patient',service_name:'Massage',location_name:'Holland Landing',timezone:'America/Toronto'};
+  const existing={id:42,practitioner_id:8,location_id:1,practitioner_name:'Esther',location_name:'Holland Landing',starts_at:'2026-10-05 13:00:00',ends_at:'2026-10-09 21:00:00',type:'vacation',reason:null,kind:'time_off',affected_appointment_count:1};
+  await page.route('**/api/v1/admin/practitioners',route=>route.fulfill({json:{data:[{practitioner_id:8,display_name:'Esther',location_id:1,active:1}]}}));
+  await page.route('**/api/v1/admin/locations',route=>route.fulfill({json:{data:[{id:1,name:'Holland Landing',timezone:'America/Toronto'}]}}));
+  await page.route('**/api/v1/admin/availability-rules',route=>route.fulfill({json:{data:[]}}));
+  await page.route('**/api/v1/admin/schedule-exceptions',route=>route.fulfill({json:{data:[existing]}}));
+  await page.route('**/api/v1/admin/time-off/**',route=>route.request().url().endsWith('/impact')?route.fulfill({json:{data:{appointments:[affected]}}}):route.fulfill({status:403,json:{error:{code:'time_off_access_restricted'}}}));
+  await page.route('**/api/v1/admin/time-off',route=>route.fulfill({status:403,json:{error:{code:'time_off_access_restricted'}}}));
+  await page.goto(`${portalHost}/admin/availability`);
+  await page.getByRole('button',{name:/Esther.*1 time off/}).click();
+  if(action==='save'){
+    await page.getByRole('button',{name:'Add time off',exact:true}).first().click();
+    await page.getByLabel('Starts').fill('2026-10-06T09:00');await page.getByLabel('Ends').fill('2026-10-06T17:00');
+    await page.getByRole('button',{name:'Review affected appointments'}).click();
+    await expect(page.getByText('Private preview patient · Massage')).toBeVisible();
+    await page.getByRole('button',{name:'Add time off',exact:true}).last().click();
+    await expect(page.getByRole('button',{name:'Review affected appointments'})).toBeEnabled();
+  }else{
+    await page.getByRole('button',{name:/Vacation.*1 need follow-up/}).click();
+    await page.getByRole('button',{name:'Details',exact:true}).click();
+    await expect(page.getByText('Private preview patient · Massage')).toBeVisible();
+    await page.getByRole('button',{name:'Close panel',exact:true}).click();
+    page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Remove',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Details',exact:true})).toBeDisabled();
+  }
+  await expect(page.getByText('This schedule change requires an authorized privacy review. No changes were saved.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Private preview patient · Massage')).toHaveCount(0);
+  await expect(page.getByText('Time off added.',{exact:true})).toHaveCount(0);
+});
+
 test("time off previews booked appointments before save and retains a follow-up list", async ({ page }) => {
   // Keep this fixture's appointment in the future without freezing network/UI timers.
   await page.clock.setFixedTime(new Date('2026-10-01T12:00:00Z'));

@@ -164,7 +164,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
       const response = await fetch(`${api}/admin/${resource}/${selected.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json(); if (!response.ok) throw new ApiError(body, response.status, t('Unable to remove schedule item.'));
       setSelected(null); await load(); setSaved(t(selected.kind === 'rule' ? 'Working hours archived.' : 'Schedule item removed.'));
-    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to remove schedule item.')); }
+    } catch (cause) { formValidation.capture(cause); if (selected.kind === 'time_off' && cause instanceof ApiError && [401,403,404].includes(cause.status)) { setSelected(null); setPanelMode(null); setImpactReview(null); } setLoadError(cause instanceof Error ? cause.message : t('Unable to remove schedule item.')); }
     finally { setBusy(false); }
   };
 
