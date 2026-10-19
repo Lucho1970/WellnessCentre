@@ -9,6 +9,41 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+
+for (const unavailable of [false, true]) test(`notification review ${unavailable ? 'clears stale contact details after access denial' : 'closes a permitted notice and refreshes the list'}`, async ({ page }) => {
+  await fixtures(page, ['clinic_admin']);
+  let finished = false, attempts = 0;
+  const notice = { id: 31, appointment_id: 12, recipient_address: 'private-notice@example.test', event_code: 'staff_booking_confirmation', channel: 'email', status: 'needs_review', scheduled_at: '2026-09-28 13:00:00', sent_at: null, next_attempt_at: null, attempt_count: 1, last_error: null, review_outcome: null };
+  await page.route('**/api/v1/admin/notifications?**', route => route.fulfill({ json: { data: { items: finished ? [] : [notice], counts: { needs_review: finished ? 0 : 1 }, total: finished ? 0 : 1, page: 1, page_size: 25 } } }));
+  await page.route('**/api/v1/admin/notifications/31/review', route => {
+    attempts++; finished = true;
+    expect(route.request().postDataJSON()).toEqual({ decision: 'resolve', outcome: 'no_longer_needed', checked_provider_history: true, checked_recipient: true });
+    return route.fulfill(unavailable ? { status: 404, json: { error: { code: 'notification_not_found', message: 'Notification not found.' } } } : { json: { data: { id: 31, status: 'resolved' } } });
+  });
+  await page.goto(`${portalHost}/admin/notifications`);
+  await page.getByText('#31 · Staff booking notice').click();
+  await expect(page.getByRole('button', { name: 'Close after review', exact: true })).toBeDisabled();
+  await page.getByLabel('I checked provider message history.', { exact: true }).check();
+  await page.getByLabel('I checked whether the recipient received the notice.', { exact: true }).check();
+  await page.getByRole('button', { name: 'Close after review', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Notification #31', exact: true })).toHaveCount(0);
+  await expect(page.getByText('private-notice@example.test', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('No notifications match this status.', { exact: true })).toBeVisible();
+  if (unavailable) await expect(page.getByText('This notification is no longer available. Refresh the list.', { exact: true })).toBeVisible();
+  expect(attempts).toBe(1);
+});
+
+test('notification history removes cached contacts when a refresh is denied', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let denied = false;
+  await page.route('**/api/v1/practitioner/notifications?**', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden', message: 'Access denied.' } } } : { json: { data: { items: [{ id: 31, appointment_id: 12, recipient_address: 'private-history@example.test', event_code: 'staff_booking_confirmation', channel: 'email', status: 'sent', scheduled_at: '2026-09-28 13:00:00', sent_at: '2026-09-28 13:00:01' }], total: 1, page: 1, page_size: 25 } } }));
+  await page.goto(`${portalHost}/practitioner/notifications`);
+  await expect(page.getByText(/private-history@example.test/)).toBeVisible();
+  denied = true;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByText(/private-history@example.test/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+});
 test('session travel fee can be waived before issuing a receipt', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'mobile', destination_snapshot: null, travel_buffer_minutes: 30, base_price_cents: 10000, mobile_fee_cents: 1500 };

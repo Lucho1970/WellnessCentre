@@ -1,4 +1,5 @@
 const en = {
+  "This notification is no longer available. Refresh the list.": "This notification is no longer available. Refresh the list.",
   "API error: consent_changed": "Consent instructions changed. Reload before saving.",
   "API error: consent_restricted": "Access is restricted by a patient privacy instruction.",
   "API error: consent_scope_restricted": "This operation may include restricted records. Contact the clinic privacy lead.",

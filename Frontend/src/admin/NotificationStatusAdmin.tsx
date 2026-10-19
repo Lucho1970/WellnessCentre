@@ -49,6 +49,7 @@ function NotificationStatusAdminForm() {
   const [checkedRecipient, setCheckedRecipient] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState('');
+  const [accessNotice, setAccessNotice] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -89,13 +90,15 @@ function NotificationStatusAdminForm() {
       const response = await fetch(`${apiBaseUrl}/admin/notifications?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status);
-      setData(normalizeNumericIds(body.data));
-    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load notification status.')); }
+      const next = normalizeNumericIds<Result>(body.data);
+      setData(next);
+      setSelected(previous => previous ? next.items.find(item => item.id === previous.id) ?? null : null);
+    } catch (cause) { setData(null); setSelected(null); formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load notification status.')); }
     finally { setLoading(false); }
   }, [getAccessToken, page, status, channel, period, t]);
   useEffect(() => { void load(); }, [load]);
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.page_size ?? 25)));
-  const openEvent = (item: Event) => { setSelected(item); setReviewOutcome('no_longer_needed'); setCheckedProvider(false); setCheckedRecipient(false); (formValidation.clear(), setReviewError('')); };
+  const openEvent = (item: Event) => { setAccessNotice(''); setSelected(item); setReviewOutcome('no_longer_needed'); setCheckedProvider(false); setCheckedRecipient(false); (formValidation.clear(), setReviewError('')); };
   const review = async (decision: 'resolve' | 'retry') => {
     if (!selected) return;
     setReviewBusy(true); (formValidation.clear(), setReviewError(''));
@@ -108,7 +111,14 @@ function NotificationStatusAdminForm() {
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status);
       setSelected(null); void load();
-    } catch (cause) { formValidation.capture(cause); setReviewError(cause instanceof Error ? cause.message : t('Unable to save notification review.')); }
+    } catch (cause) {
+      formValidation.capture(cause);
+      if (cause instanceof ApiError && [401, 403, 404].includes(cause.status)) {
+        setSelected(null); setData(null);
+        setAccessNotice(t('This notification is no longer available. Refresh the list.'));
+        void load();
+      } else setReviewError(cause instanceof Error ? cause.message : t('Unable to save notification review.'));
+    }
     finally { setReviewBusy(false); }
   };
   const retryAge = selected ? Date.now() - Date.parse(`${selected.scheduled_at.replace(' ', 'T')}Z`) : Number.POSITIVE_INFINITY;
@@ -119,6 +129,7 @@ function NotificationStatusAdminForm() {
   return <Stack spacing={2}>
     <Alert severity="info">{t('Notification status reflects the queue and provider acceptance, not proof of delivery. Items needing review are never resent automatically.')}</Alert>
     <NotificationHealthBanner health={data?.health} />
+    {accessNotice && <Alert severity="info">{accessNotice}</Alert>}
     {error && <Alert severity="error">{error}</Alert>}
     <Paper variant="outlined"><Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems={{ sm: 'center' }} p={1.5}>
       <TextField name="status" select size="small" label={t('Status')} value={status} onChange={event => setFilter('status', event.target.value)} sx={{ minWidth: 220 }}>

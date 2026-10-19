@@ -1,4 +1,5 @@
 const fr: Record<string, string> = {
+  "This notification is no longer available. Refresh the list.": "Cette notification n’est plus accessible. Actualisez la liste.",
   "API error: consent_changed": "Les instructions de consentement ont changé. Rechargez-les avant d’enregistrer.",
   "API error: consent_restricted": "L’accès est restreint par une instruction de confidentialité du patient.",
   "API error: consent_scope_restricted": "Cette opération peut inclure des dossiers à accès restreint. Communiquez avec la personne responsable de la confidentialité.",

@@ -19,6 +19,7 @@ This folder contains the living technical and delivery documentation for the Wel
 - [Sensitive access audit](SENSITIVE_ACCESS_AUDIT.md): response-boundary read/search/export coverage, denied-access logging, migration 049, failure behavior and acceptance evidence.
 - [Consent restrictions and withdrawal](CONSENT_RESTRICTIONS_WITHDRAWAL.md): patient controls, negative access permissions, queued-message enforcement, migration 050, conservative bulk-route limits and synthetic authorization acceptance.
 - [Consent-filtered dashboards and schedules](CONSENT_FILTERED_DASHBOARDS_SCHEDULES.md): permitted-record counts, day cards, next visits, schedule impacts and notification activity without a clinic-wide consent block.
+- [Consent-filtered notifications](CONSENT_FILTERED_NOTIFICATIONS.md): permitted notification lists/counts, current review and retry authorization, recipient rechecks and stale-contact browser handling.
 
 Start with these two authoritative documents:
 

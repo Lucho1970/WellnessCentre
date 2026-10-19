@@ -35,7 +35,7 @@ final class NotificationWorker
                     $details = $this->details((int)$event['id']);
                     $superseded = $details === null || !(new ConsentAccess($this->pdo))->notificationAllowed($details) || $this->superseded($details)
                         || ($event['channel'] === 'sms' && strtotime((string)$details['scheduled_at'] . ' UTC') < time() - 3600)
-                        || (str_starts_with((string)$details['event_code'], 'staff_') && !$this->staffRecipientStillAllowed($details));
+                        || (str_starts_with((string)$details['event_code'], 'staff_') && !StaffNotificationRecipient::allowed($this->pdo,$details));
                     $staffNotice = !$superseded && str_starts_with((string)$details['event_code'], 'staff_');
                     $portalUrl = $superseded ? $this->clientPortalUrl : ClinicPortalUrl::resolve($this->pdo,(int)$details['clinic_id'],$this->clientPortalUrl);
                     if (!$superseded && !$staffNotice && $event['channel'] === 'email') {
@@ -152,27 +152,6 @@ final class NotificationWorker
         $query = $this->pdo->prepare("SELECT 1 FROM notification_events WHERE appointment_id=:appointment AND id>:event AND recipient_user_id=:recipient AND recipient_address=:address AND channel=:channel AND event_code IN (" . ($staff ? "'staff_booking_confirmation','staff_booking_change','staff_booking_cancellation','staff_booking_reassigned_away'" : "'booking_confirmation','booking_change','booking_cancellation'") . ") LIMIT 1");
         $query->execute(['appointment' => $event['appointment_id'], 'event' => $event['id'], 'recipient' => $event['recipient_user_id'], 'address' => $event['recipient_address'], 'channel' => $event['channel']]);
         return $query->fetchColumn() !== false;
-    }
-
-    private function staffRecipientStillAllowed(array $event): bool
-    {
-        // Preferences or contact details may change between booking and worker delivery.
-        $away=(string)$event['event_code']==='staff_booking_reassigned_away';
-        $payload=$away?json_decode((string)($event['payload']??''),true):null;
-        if($away&&(!is_array($payload)||(int)($payload['reassignment_id']??0)<1))return false;
-        $assignmentJoin=$away
-            ? 'JOIN appointment_reassignments ar ON ar.old_practitioner_id=practitioner.id AND ar.id=:reassignment AND ar.appointment_id=:appointment AND ar.clinic_id=u.clinic_id'
-            : 'JOIN appointments a ON a.practitioner_id=practitioner.id AND a.id=:appointment AND a.clinic_id=u.clinic_id';
-        $query = $this->pdo->prepare("SELECT u.email,p.email_enabled,p.email_destination,p.personal_email,p.personal_email_verified_at,p.mobile_phone,p.sms_requested FROM users u JOIN staff_notification_preferences p ON p.user_id=u.id JOIN practitioners practitioner ON practitioner.user_id=u.id AND practitioner.active=1 {$assignmentJoin} WHERE u.id=:recipient AND u.clinic_id=:clinic AND u.user_type='staff' AND u.status='active'");
-        $params=['appointment' => $event['appointment_id'], 'recipient' => $event['recipient_user_id'], 'clinic' => $event['clinic_id']];
-        if($away)$params['reassignment']=(int)$payload['reassignment_id'];
-        $query->execute($params);
-        $row = $query->fetch(PDO::FETCH_ASSOC);
-        if (!$row) return false;
-        $address = (string)$event['recipient_address'];
-        if ($event['channel'] === 'sms') return (bool)$row['sms_requested'] && CanadianSmsNumber::isAllowed($address) && hash_equals((string)$row['mobile_phone'], $address);
-        return (bool)$row['email_enabled'] && ((in_array($row['email_destination'], ['work', 'both'], true) && strcasecmp($address, (string)$row['email']) === 0)
-            || (in_array($row['email_destination'], ['personal', 'both'], true) && $row['personal_email_verified_at'] !== null && strcasecmp($address, (string)$row['personal_email']) === 0));
     }
 
     private function finish(array $event, string $status, ?string $error, int $retrySeconds = 0, ?string $providerId = null): void

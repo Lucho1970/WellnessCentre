@@ -23,13 +23,13 @@ The predicate runs in SQL before aggregation, sorting, limits, cap checks and ev
 
 A notification's patient is resolved through its same-clinic appointment. For an appointment-less message, its recipient must be a client in that clinic. Staff notices with appointments inherit the appointment patient's restriction. Events with no provable patient association, missing appointment links or mismatched appointment clinics are excluded from these dashboard patient-activity totals, even without an active restriction. Payload JSON and destination strings are never used to infer patient identity.
 
-Appointment email and SMS buckets, unresolved totals and overdue counts use that same boundary. The scheduler's existing process status and run timestamps remain operational metadata; the overdue patient-message count is filtered. This does not grant access to the notification event list/review routes, which retain their prior consent blocks.
+Appointment email and SMS buckets, unresolved totals and overdue counts use that same boundary. The scheduler's existing process status and run timestamps remain operational metadata; the overdue patient-message count is filtered. The subsequent [notification filtering change](CONSENT_FILTERED_NOTIFICATIONS.md) applies that patient boundary to notification lists and adds current authorization for reviews/retries.
 
 ## Authorization that remains restrictive
 
 - Direct visit-history, milestone, outcome, travel-estimate and appointment actions still deny restricted patient access. Visit and travel service queries enforce the restriction even when called directly.
 - Time-off previews are filtered reads. Bulk create/update/delete operations retain the existing conservative API block: their full affected set is needed for safe mutation and impact confirmation. A filtered preview is not authorization to change hidden appointments. Mutation logic still examines its complete affected set.
-- Travel-enquiry routes, notification event lists/review and other unclassified routes retain the existing conservative boundary.
+- Travel-enquiry routes and other unclassified routes retain the existing conservative boundary. Notification lists/review now have their own tested filtering and authorization, described in the follow-up above.
 - Public availability and booking conflict checks still treat all occupied slots as busy. Hiding records does not make their times available for double booking.
 
 No consent, relationship, role, clinic or patient-rights grant is added by this change. The clinic advisory lock continues to serialize disclosures, withdrawals and notification delivery. Missing consent storage blocks patient-bearing queries, and response audits record disclosed resource IDs without including hidden appointments or clinical content.
