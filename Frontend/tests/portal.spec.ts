@@ -2498,7 +2498,7 @@ test("super admin deliberately publishes a bilingual public team profile", async
     });
 });
 
-for (const configuredPortal of [portalHost + '/', 'https://willowwellness.copihue.ca/']) test(`guest portal prepares a booking handoff with configured portal ${configuredPortal}`, async ({
+for (const configuredPortal of [portalHost + '/', 'https://livinlively.copihue.ca/']) test(`guest portal prepares a booking handoff with configured portal ${configuredPortal}`, async ({
   page,
 }) => {
   const writes: string[] = [];

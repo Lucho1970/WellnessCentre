@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [19 October current application release](CURRENT_APP_RELEASE_2026-10-19.md): corrected Livin Lively portal destination, cumulative consent changes, archive destinations and migration prerequisites.
+
 - [Practitioner enquiries and FAQ](PRACTITIONER_ENQUIRIES_RELEASE.md): public joining form, private admin inbox, editable central notification recipient and migration 047.
 
 - [Public services price correction](PUBLIC_SERVICE_PRICE_FIX.md): one-file API patch for services failing after the Wellnexa discovery release.
