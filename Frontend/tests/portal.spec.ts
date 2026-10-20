@@ -4251,3 +4251,42 @@ for (const deniedStatus of [403, 404]) {
     await expect(page.getByRole('button', {name: 'New practitioner', exact: true})).toBeDisabled();
   });
 }
+
+for (const action of ['approve', 'revoke', 'success'] as const) {
+  test(`staff invitation ${action} retains authorization and clears denied claim details`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    // Mount the optional pilot component under the real guarded staff page without enabling it for unrelated tests.
+    await page.route('**/src/admin/StaffAdmin.tsx*', route => route.fulfill({contentType: 'application/javascript', body: 'export { StaffInvitations as StaffAdmin } from "/src/admin/StaffInvitations.tsx";'}));
+    const invitation = {id: 51, recipient_email: 'private-invite@example.test', given_name: 'Synthetic', family_name: 'Invitee',
+      expires_at: '2099-01-01 00:00:00', revoked_at: null as string|null, accepted_at: null as string|null,
+      claimant_name: 'Synthetic claimant', claim_status: 'pending', verification_code: 'ABCDEF123456'};
+    await page.route('**/api/v1/admin/staff-invitations', route => route.fulfill({json: {data: {items: [invitation]}}}));
+    await page.route('**/api/v1/admin/locations', route => route.fulfill({json: {data: [{id: 1, name: 'Main clinic', is_bookable: 1}]}}));
+    let submitted: unknown;
+    await page.route('**/api/v1/admin/staff-invitations/51/*', route => {
+      submitted = route.request().postDataJSON();
+      if(action === 'success') {invitation.accepted_at = '2026-10-19 12:00:00'; return route.fulfill({json: {data: {status: 'approved'}}});}
+      return route.fulfill({status: action === 'approve' ? 403 : 404, json: {error: {code: action === 'approve' ? 'forbidden' : 'invitation_not_found'}}});
+    });
+    await page.goto(`${portalHost}/admin/users`);
+    await expect(page.getByText('private-invite@example.test', {exact: true})).toBeVisible();
+    if(action !== 'revoke') {
+      await page.getByRole('button', {name: 'Review claim', exact: true}).click();
+      await expect(page.getByRole('button', {name: 'Approve practitioner', exact: true})).toBeDisabled();
+      await page.getByRole('textbox', {name: 'Verification code', exact: true}).fill('ABCDEF123456');
+      await page.getByRole('checkbox', {name: 'I verified this claim with the intended recipient.'}).check();
+      await page.getByRole('button', {name: 'Approve practitioner', exact: true}).click();
+    } else await page.getByRole('button', {name: 'Revoke invitation', exact: true}).click();
+    await expect.poll(() => submitted).toBeTruthy();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    if(action === 'success') {
+      expect(submitted).toEqual({recipient_verified: true, verification_code: 'ABCDEF123456'});
+      await expect(page.getByText('Synthetic Invitee · Approved')).toBeVisible();
+      await expect(page.getByRole('button', {name: 'Review claim', exact: true})).toHaveCount(0);
+    } else {
+      await expect(page.getByText('private-invite@example.test', {exact: true})).toHaveCount(0);
+      await expect(page.getByRole('button', {name: 'Create practitioner invitation', exact: true})).toBeDisabled();
+      await expect(page.getByRole('button', {name: 'Revoke invitation', exact: true})).toHaveCount(0);
+    }
+  });
+}

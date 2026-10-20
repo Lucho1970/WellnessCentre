@@ -1,5 +1,6 @@
 # Wellness Centre Documentation
 
+- [Consent-authorized staff invitations](CONSENT_AUTHORIZED_STAFF_INVITATIONS.md): current clinic Super Admin authority, verified claim approval/revocation, preserved patient restrictions and atomic membership audits.
 - [Consent-authorized practitioner account management](CONSENT_AUTHORIZED_PRACTITIONER_MANAGEMENT.md): current clinic authority, safe deactivation/onboarding, atomic audits and preserved patient restrictions.
 - [Consent-authorized dashboard widget management](CONSENT_AUTHORIZED_DASHBOARD_WIDGETS.md): current clinic Super Admin checks, stored-definition validation, atomic configuration audits and denial cleanup.
 - [Consent-authorized reminder schedules](CONSENT_AUTHORIZED_REMINDER_SCHEDULES.md): complete pending queue authorization, strict worker timing parsing, atomic cancellation audits and settings denial handling.

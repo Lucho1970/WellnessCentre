@@ -21,6 +21,7 @@ final class InvitationPDO extends PDO {
  public function rollBack(): bool {[$this->invite,$this->claim,$this->writes,$this->last]=$this->saved;$this->transaction=false;$this->rollbacks++;return true;}
  public function inTransaction(): bool {return $this->transaction;}
  public function lastInsertId(?string $name=null): string|false {return (string)$this->last;}
+ public function query(string $query,?int $fetchMode=null,mixed ...$fetchModeArgs): PDOStatement|false {$q=$this->prepare($query);$q->execute();return $q;}
  public function prepare(string $query,array $options=[]): PDOStatement|false {return new InvitationStatement($this,$query);}
 }
 final class InvitationStatement extends PDOStatement {
@@ -29,7 +30,9 @@ final class InvitationStatement extends PDOStatement {
  public function execute(?array $params=null): bool {
   $p=$params??[];$s=$this->sql;$this->result=false;
   if(str_starts_with($s,'SELECT')) {
-   if(str_contains($s,'FROM staff_invitations')) {
+   if(str_contains($s,'DATABASE()'))$this->result='synthetic-invitation-unit';
+   elseif(str_contains($s,'GET_LOCK')||str_contains($s,'RELEASE_LOCK')||str_contains($s,'FROM clinics'))$this->result=1;
+   elseif(str_contains($s,'FROM staff_invitations')) {
     $clinic=str_contains($s,'token_hash')?$p[0]:$p[1];
     $this->result=$this->db->invite&&$this->db->invite['clinic_id']===$clinic?$this->db->invite:false;
    } elseif(str_contains($s,'FROM staff_invitation_claims')) $this->result=$this->db->claim;

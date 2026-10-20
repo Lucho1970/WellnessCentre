@@ -12,6 +12,7 @@ $config=new Config('test',false,'synthetic-key',[],'127.0.0.1',(int)getenv('RECU
     'audit-tenant','audit-api','access_as_user',300,
     customerTenantId:'11111111-1111-1111-1111-111111111111',customerSubdomain:'synthetic',
     customerApiClientId:'22222222-2222-2222-2222-222222222222',customerSpaClientId:'33333333-3333-3333-3333-333333333333',
+    staffInvitationsEnabled:getenv('ACCESS_AUDIT_TEST_STAFF_INVITATIONS')==='synthetic-local-only',
     customerOnboardingEnabled:true,customerClinicId:1,clientPortalUrl:'https://audit-a.test/',
     clinicHostMap:['audit-a.test'=>1,'audit-b.test'=>2],
     googleMapsApiKey:$coverageTest?'synthetic-coverage':'',addressValidationSigningKey:$coverageTest?str_repeat('c',32):'');

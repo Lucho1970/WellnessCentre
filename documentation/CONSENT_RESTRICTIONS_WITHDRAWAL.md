@@ -35,6 +35,7 @@ Policy updates, append-only `client_consent_events` evidence and the `consent.di
 
 ## Enforcement boundaries
 
+- [Staff invitations](CONSENT_AUTHORIZED_STAFF_INVITATIONS.md) now permit authorized invitation management and revocation despite unrelated patient restrictions; verified claims, least-privilege memberships, named/global directives and current local authority remain enforced.
 - [Practitioner account management](CONSENT_AUTHORIZED_PRACTITIONER_MANAGEMENT.md) now permits authorized local account deactivation, reactivation and onboarding despite unrelated restrictions, with current authority checks and atomic audits. It does not transfer identities or clear patient directives.
 - [Dashboard widget management](CONSENT_AUTHORIZED_DASHBOARD_WIDGETS.md) now permits patient-free declarative configuration with current clinic Super Admin authority, stored-definition revalidation and atomic audit writes. Published widgets retain viewer-specific consent and practitioner filters.
 - [Reminder settings](CONSENT_AUTHORIZED_REMINDER_SCHEDULES.md) now separate patient-free configuration reads from complete authorization of matching pending queue effects. Worker communication restrictions remain independent; malformed timing payloads cannot bypass the authorization predicate through numeric coercion.
