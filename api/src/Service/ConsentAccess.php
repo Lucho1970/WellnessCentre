@@ -78,6 +78,7 @@ final class ConsentAccess
             'me','dashboardPreferences','saveDashboardPreferences','resetDashboardPreferences',
             'myTravelSettings','saveMyTravelSettings','myWorkLocation','saveMyWorkLocation',
             'profileAvatar','saveProfileAvatar','deleteProfileAvatar','myPublicCard','updateMyPublicCard',
+            'createQualificationType','practitionerQualifications','submitPractitionerQualification','reviewQualification', // Qualification service owns current authority and independent review; no patient data.
             'qualificationTypes','myQualifications','submitMyQualification','globalCredentials','createGlobalCredential','shareGlobalCredential',
             'staffNotificationPreferences','saveStaffNotificationPreferences','sendStaffNotificationCode','verifyStaffNotificationEmail',
             'validateAddressCoverage','addressCoverageApproval','approveAddressCoverage','revokeAddressCoverage', // AddressCoverageService owns patient/recipient authorization.

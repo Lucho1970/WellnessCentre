@@ -4290,3 +4290,38 @@ for (const action of ['approve', 'revoke', 'success'] as const) {
     }
   });
 }
+
+for (const action of ['Verify', 'Revoke'] as const) {
+  test(`qualification ${action} denial clears credential details until successful reload`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    await page.route('**/api/v1/admin/practitioners', route => route.fulfill({json: {data: [{
+      practitioner_id: 2, user_id: 12, given_name: 'Synthetic', family_name: 'Practitioner', display_name: 'Synthetic Practitioner',
+      email: 'synthetic@example.test', status: 'active', discipline: 'Massage', credentials: 'Synthetic registration',
+      booking_mode: 'practitioner_managed', active: 1, location_id: 1, locations: 'Main clinic',
+    }]}}));
+    await page.route('**/api/v1/qualifications/types', route => route.fulfill({json: {data: [{id: 2, name: 'Synthetic registration', requires_expiry: true, active: true}]}}));
+    await page.route('**/api/v1/admin/practitioners/2/qualifications', route => route.fulfill({json: {data: [{
+      id: 81, qualification_type_id: 2, qualification_name: 'Synthetic registration', issuer: 'Private synthetic issuer',
+      issued_on: '2026-01-01', expires_on: '2099-01-01', status: action === 'Verify' ? 'pending' : 'verified',
+      days_until_expiry: 1000, renewal_warning: false, review_note: null,
+    }]}}));
+    let submitted: unknown;
+    await page.route('**/api/v1/admin/qualifications/81/review', route => {
+      submitted = route.request().postDataJSON();
+      return route.fulfill({status: action === 'Verify' ? 403 : 404, json: {error: {code: action === 'Verify' ? 'self_review_forbidden' : 'qualification_not_found'}}});
+    });
+    await page.goto(`${portalHost}/admin/practitioners`);
+    await page.getByRole('button', {name: /Synthetic Practitioner.*Synthetic registration/}).click();
+    await page.getByRole('button', {name: 'Details', exact: true}).click();
+    await expect(page.getByText(/Private synthetic issuer/)).toBeVisible();
+    if(action === 'Revoke') {await page.getByRole('textbox', {name: 'Review note', exact: true}).fill('Synthetic revocation');page.once('dialog', dialog => dialog.accept());}
+    await page.getByRole('button', {name: action, exact: true}).click();
+    await expect.poll(() => submitted).toBeTruthy();
+    await expect(page.getByText(/Private synthetic issuer/)).toHaveCount(0);
+    await expect(page.getByRole('textbox', {name: 'Review note', exact: true})).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Add type', exact: true})).toBeDisabled();
+    await page.getByRole('button', {name: 'Retry', exact: true}).click();
+    await expect(page.getByText(/Private synthetic issuer/)).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Add type', exact: true})).toBeEnabled();
+  });
+}

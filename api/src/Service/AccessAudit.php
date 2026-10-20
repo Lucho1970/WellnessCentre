@@ -24,7 +24,7 @@ final class AccessAudit
         'staff','qualifications','types','clinics','credentials','customer_links','survivor','duplicate','memberships',
     ];
     private const IDS = [
-        'existing_user_id'=>'user','widget_id'=>'dashboard_widget','target_staff_id'=>'user','client_id'=>'client','user_id'=>'user','practitioner_id'=>'practitioner','appointment_id'=>'appointment',
+        'qualification_type_id'=>'qualification_type','existing_user_id'=>'user','widget_id'=>'dashboard_widget','target_staff_id'=>'user','client_id'=>'client','user_id'=>'user','practitioner_id'=>'practitioner','appointment_id'=>'appointment',
         'form_template_id'=>'form_template','submission_id'=>'form_submission','task_id'=>'client_form_task',
         'receipt_id'=>'session_receipt','invoice_id'=>'invoice','payment_id'=>'payment','enquiry_id'=>'travel_enquiry',
         'notification_id'=>'notification','series_id'=>'recurring_series','recurring_series_id'=>'recurring_series',
