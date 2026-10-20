@@ -4497,3 +4497,30 @@ for (const mode of ['403', '404', 'reload', 'review'] as const) test(`room ${mod
   await expect(page.getByText('Unapproved room draft was updated.', { exact: true })).toHaveCount(0);
   expect(writes).toBe(1);
 });
+
+for (const mode of ['403', 'reload'] as const) test(`room capabilities ${mode} denial clears cached assignments and drafts`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  await page.route('**/api/v1/admin/rooms', route => route.fulfill({ json: { data: [{ id: 21, location_id: 11, name: 'Test room', is_bookable: 1 }] } }));
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 11, name: 'Test site' }] } }));
+  await page.route('**/api/v1/admin/services', route => route.fulfill({ json: { data: [{ id: 31, name: 'Test service' }] } }));
+  await page.route('**/api/v1/admin/room-capabilities', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { capabilities: [{ id: 41, name: 'Synthetic equipment' }], rooms: [], services: [] } } }));
+  await page.route('**/api/v1/admin/room-capability-assignments', route => {
+    denied = true;
+    return route.fulfill(mode === 'reload' ? { json: { data: { updated: true } } } : { status: 403, json: { error: { code: 'consent_restricted' } } });
+  });
+  await page.goto(`${portalHost}/admin/rooms`);
+  await page.getByRole('button', { name: 'Capabilities', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Synthetic equipment' }).first()).toBeVisible();
+  await page.getByRole('textbox', { name: 'New capability', exact: true }).fill('Unsaved equipment');
+  await page.getByRole('button', { name: 'Save requirements', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Synthetic equipment' })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'New capability', exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Save requirements', exact: true })).toBeDisabled();
+  await expect(page.getByText('Room capabilities and service requirements saved.', { exact: true })).toHaveCount(0);
+  denied = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Synthetic equipment' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save requirements', exact: true })).toBeEnabled();
+});

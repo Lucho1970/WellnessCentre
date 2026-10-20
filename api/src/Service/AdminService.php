@@ -302,11 +302,104 @@ final class AdminService
         }
     }
 
-    public function roomCapabilities(AuthContext $actor): array{$this->superAdmin($actor);$pdo=$this->database->connection();$c=$pdo->prepare('SELECT id,code,name FROM room_capabilities WHERE clinic_id=:clinic ORDER BY name');$c->execute(['clinic'=>$actor->clinicId]);$r=$pdo->prepare('SELECT a.room_id,a.capability_id FROM room_capability_assignments a JOIN rooms r ON r.id=a.room_id JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic');$r->execute(['clinic'=>$actor->clinicId]);$s=$pdo->prepare('SELECT a.service_id,a.capability_id FROM service_room_capability_requirements a JOIN services s ON s.id=a.service_id WHERE s.clinic_id=:clinic');$s->execute(['clinic'=>$actor->clinicId]);return ['capabilities'=>$c->fetchAll(),'rooms'=>$r->fetchAll(),'services'=>$s->fetchAll()];}
-    public function createRoomCapability(AuthContext $actor,array $body,string $correlationId): array{$this->superAdmin($actor);$this->required($body,['name']);$name=trim((string)$body['name']);if(strlen($name)>120)throw new ApiException(422,'validation_error','Capability name is too long.');$code=strtolower(trim((string)preg_replace('/[^a-z0-9]+/i','_',$name),'_'));if($code==='')throw new ApiException(422,'validation_error','Enter a valid capability name.');$s=$this->database->connection()->prepare('INSERT INTO room_capabilities(clinic_id,code,name) VALUES(:clinic,:code,:name)');$s->execute(['clinic'=>$actor->clinicId,'code'=>$code,'name'=>$name]);return $this->created($actor,$correlationId,'room_capability',(int)$this->database->connection()->lastInsertId());}
-    public function updateRoomCapabilityAssignments(AuthContext $actor,array $body,string $correlationId): array{$this->superAdmin($actor);$roomId=(int)($body['room_id']??0);$serviceId=(int)($body['service_id']??0);$roomIds=array_unique(array_map('intval',$body['room_capability_ids']??[]));$serviceIds=array_unique(array_map('intval',$body['service_capability_ids']??[]));$pdo=$this->database->connection();try{$pdo->beginTransaction();if($roomId){$check=$pdo->prepare('SELECT 1 FROM rooms r JOIN locations l ON l.id=r.location_id WHERE r.id=:id AND l.clinic_id=:clinic');$check->execute(['id'=>$roomId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'room_not_found','Room not found.');$pdo->prepare('DELETE FROM room_capability_assignments WHERE room_id=:id')->execute(['id'=>$roomId]);$i=$pdo->prepare('INSERT INTO room_capability_assignments(room_id,capability_id) SELECT :room,id FROM room_capabilities WHERE id=:capability AND clinic_id=:clinic');foreach($roomIds as $cap)$i->execute(['room'=>$roomId,'capability'=>$cap,'clinic'=>$actor->clinicId]);}if($serviceId){$check=$pdo->prepare('SELECT 1 FROM services WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$serviceId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'service_not_found','Service not found.');$pdo->prepare('DELETE FROM service_room_capability_requirements WHERE service_id=:id')->execute(['id'=>$serviceId]);$i=$pdo->prepare('INSERT INTO service_room_capability_requirements(service_id,capability_id) SELECT :service,id FROM room_capabilities WHERE id=:capability AND clinic_id=:clinic');foreach($serviceIds as $cap)$i->execute(['service'=>$serviceId,'capability'=>$cap,'clinic'=>$actor->clinicId]);}$this->audit->write($actor->clinicId,$actor,$correlationId,'room.capabilities.update','clinic',$actor->clinicId);$pdo->commit();return ['updated'=>true];}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}}
-    public function roomPractitionerRestrictions(AuthContext $actor): array{$this->superAdmin($actor);$s=$this->database->connection()->prepare('SELECT x.room_id,x.practitioner_id,x.allowed FROM room_practitioner_restrictions x JOIN rooms r ON r.id=x.room_id JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic');$s->execute(['clinic'=>$actor->clinicId]);return $s->fetchAll();}
-    public function updateRoomPractitioners(AuthContext $actor,int $roomId,array $body,string $cid): array{$this->superAdmin($actor);$ids=array_unique(array_map('intval',$body['practitioner_ids']??[]));$pdo=$this->database->connection();try{$pdo->beginTransaction();$check=$pdo->prepare('SELECT 1 FROM rooms r JOIN locations l ON l.id=r.location_id WHERE r.id=:id AND l.clinic_id=:clinic');$check->execute(['id'=>$roomId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'room_not_found','Room not found.');$pdo->prepare('DELETE FROM room_practitioner_restrictions WHERE room_id=:id')->execute(['id'=>$roomId]);$i=$pdo->prepare('INSERT INTO room_practitioner_restrictions(room_id,practitioner_id,allowed) SELECT :room,p.id,1 FROM practitioners p JOIN users u ON u.id=p.user_id WHERE p.id=:practitioner AND u.clinic_id=:clinic');foreach($ids as $id)$i->execute(['room'=>$roomId,'practitioner'=>$id,'clinic'=>$actor->clinicId]);$this->audit->write($actor->clinicId,$actor,$cid,'room.practitioners.update','room',$roomId);$pdo->commit();return ['updated'=>true];}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}}
+    public function roomCapabilities(AuthContext $actor): array
+    {return $this->clinicAdministration($actor,function()use($actor){
+        $pdo=$this->database->connection();
+        $c=$pdo->prepare('SELECT id,code,name FROM room_capabilities WHERE clinic_id=? ORDER BY name');$c->execute([$actor->clinicId]);
+        $r=$pdo->prepare('SELECT a.room_id,a.capability_id FROM room_capability_assignments a JOIN rooms r ON r.id=a.room_id JOIN locations l ON l.id=r.location_id JOIN room_capabilities c ON c.id=a.capability_id AND c.clinic_id=l.clinic_id WHERE l.clinic_id=?');$r->execute([$actor->clinicId]);
+        $s=$pdo->prepare('SELECT a.service_id,a.capability_id FROM service_room_capability_requirements a JOIN services s ON s.id=a.service_id JOIN room_capabilities c ON c.id=a.capability_id AND c.clinic_id=s.clinic_id WHERE s.clinic_id=?');$s->execute([$actor->clinicId]);
+        return ['capabilities'=>$c->fetchAll(),'rooms'=>$r->fetchAll(),'services'=>$s->fetchAll()];
+    },clinicWide:true);}
+
+    public function createRoomCapability(AuthContext $actor,array $body,string $correlationId): array
+    {return $this->clinicAdministration($actor,function()use($actor,$body,$correlationId){
+        $name=$body['name']??null;
+        if(!is_string($name)||trim($name)===''||mb_strlen(trim($name))>120||preg_match('/[\x00-\x1f\x7f]/',$name))throw new ApiException(422,'validation_error','Enter a valid capability name.');
+        $name=trim($name);$code=strtolower(trim((string)preg_replace('/[^a-z0-9]+/i','_',$name),'_'));
+        if($code===''||strlen($code)>80)throw new ApiException(422,'validation_error','Enter a valid capability name.');
+        $pdo=$this->database->connection();$q=$pdo->prepare('SELECT id FROM room_capabilities WHERE clinic_id=? AND code=? FOR UPDATE');$q->execute([$actor->clinicId,$code]);
+        if($q->fetchColumn())throw new ApiException(409,'validation_error','This capability already exists.');
+        $pdo->prepare('INSERT INTO room_capabilities(clinic_id,code,name) VALUES(?,?,?)')->execute([$actor->clinicId,$code,$name]);
+        return $this->created($actor,$correlationId,'room_capability',(int)$pdo->lastInsertId());
+    },clinicWide:true);}
+
+    /** Explicit replacement lists: omitted, coerced and foreign IDs must never silently clear policy. */
+    private function assignmentIds(array $body,string $key): array
+    {
+        if(!isset($body[$key])||!is_array($body[$key])||!array_is_list($body[$key]))throw new ApiException(422,'validation_error','An explicit list of identifiers is required.');
+        $ids=[];foreach($body[$key] as $id){if(!is_int($id)||$id<=0)throw new ApiException(422,'validation_error','Invalid assignment identifier.');$ids[]=$id;}
+        $ids=array_values(array_unique($ids));sort($ids);return $ids;
+    }
+
+    private function assignmentRoom(AuthContext $actor,int $room): int
+    {
+        $q=$this->database->connection()->prepare('SELECT r.location_id FROM rooms r JOIN locations l ON l.id=r.location_id WHERE r.id=? AND l.clinic_id=? FOR UPDATE');$q->execute([$room,$actor->clinicId]);
+        $location=$q->fetchColumn();if(!$location)throw new ApiException(404,'room_not_found','Room not found.');return (int)$location;
+    }
+
+    public function updateRoomCapabilityAssignments(AuthContext $actor,array $body,string $correlationId): array
+    {return $this->clinicAdministration($actor,function()use($actor,$body,$correlationId){
+        $pdo=$this->database->connection();$targets=[];
+        foreach(['room'=>'room_capability_assignments','service'=>'service_room_capability_requirements'] as $kind=>$table){
+            if(!array_key_exists($kind.'_id',$body)){if(array_key_exists($kind.'_capability_ids',$body))throw new ApiException(422,'validation_error','An assignment target is required.');continue;}
+            $id=$body[$kind.'_id'];if(!is_int($id)||$id<=0)throw new ApiException(422,'validation_error','Invalid assignment target.');
+            $ids=$this->assignmentIds($body,$kind.'_capability_ids');
+            if($kind==='room')$this->assignmentRoom($actor,$id);
+            else{$q=$pdo->prepare('SELECT id FROM services WHERE id=? AND clinic_id=? FOR UPDATE');$q->execute([$id,$actor->clinicId]);if(!$q->fetchColumn())throw new ApiException(404,'service_not_found','Service not found.');}
+            foreach($ids as $cap){$q=$pdo->prepare('SELECT id FROM room_capabilities WHERE id=? AND clinic_id=? FOR UPDATE');$q->execute([$cap,$actor->clinicId]);if(!$q->fetchColumn())throw new ApiException(404,'capability_not_found','Capability not found.');}
+            $q=$pdo->prepare("SELECT a.capability_id,c.clinic_id FROM $table a LEFT JOIN room_capabilities c ON c.id=a.capability_id WHERE a.{$kind}_id=? ORDER BY a.capability_id FOR UPDATE");$q->execute([$id]);$old=$q->fetchAll();
+            foreach($old as $row)if((int)$row['clinic_id']!==$actor->clinicId)throw new ApiException(409,'room_privacy_review','The assignment requires review.');
+            if(array_map('intval',array_column($old,'capability_id'))!==$ids)$targets[]=[$kind,$table,$id,$ids];
+        }
+        if(!array_key_exists('room_id',$body)&&!array_key_exists('service_id',$body))throw new ApiException(422,'validation_error','An assignment target is required.');
+        // Authorize the complete union before either half of a combined command writes.
+        foreach($targets as [$kind,$table,$id,$ids])$this->assignmentAppointmentEffects($actor,$kind,$id);
+        foreach($targets as [$kind,$table,$id,$ids]){
+            $pdo->prepare("DELETE FROM $table WHERE {$kind}_id=?")->execute([$id]);
+            $q=$pdo->prepare("INSERT INTO $table({$kind}_id,capability_id) VALUES(?,?)");foreach($ids as $cap)$q->execute([$id,$cap]);
+        }
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'room.capabilities.update','clinic',$actor->clinicId);return ['updated'=>true];
+    },clinicWide:true);}
+
+    public function roomPractitionerRestrictions(AuthContext $actor): array
+    {return $this->clinicAdministration($actor,function()use($actor){
+        $q=$this->database->connection()->prepare("SELECT x.room_id,x.practitioner_id,x.allowed FROM room_practitioner_restrictions x JOIN rooms r ON r.id=x.room_id JOIN locations l ON l.id=r.location_id JOIN practitioners p ON p.id=x.practitioner_id JOIN users u ON u.id=p.user_id AND u.clinic_id=l.clinic_id AND u.user_type='staff' WHERE l.clinic_id=?");$q->execute([$actor->clinicId]);return $q->fetchAll();
+    },clinicWide:true);}
+
+    public function updateRoomPractitioners(AuthContext $actor,int $roomId,array $body,string $cid): array
+    {return $this->clinicAdministration($actor,function()use($actor,$roomId,$body,$cid){
+        $pdo=$this->database->connection();$this->assignmentRoom($actor,$roomId);$ids=$this->assignmentIds($body,'practitioner_ids');
+        foreach($ids as $id){$q=$pdo->prepare("SELECT p.id FROM practitioners p JOIN users u ON u.id=p.user_id WHERE p.id=? AND u.clinic_id=? AND u.user_type='staff' AND u.status='active' AND p.active=1 FOR UPDATE");$q->execute([$id,$actor->clinicId]);if(!$q->fetchColumn())throw new ApiException(404,'practitioner_not_found','Practitioner not found.');}
+        $q=$pdo->prepare("SELECT x.practitioner_id,x.allowed,u.clinic_id,u.user_type FROM room_practitioner_restrictions x LEFT JOIN practitioners p ON p.id=x.practitioner_id LEFT JOIN users u ON u.id=p.user_id WHERE x.room_id=? ORDER BY x.practitioner_id FOR UPDATE");$q->execute([$roomId]);$old=$q->fetchAll();
+        foreach($old as $row)if((int)$row['clinic_id']!==$actor->clinicId||$row['user_type']!=='staff')throw new ApiException(409,'room_privacy_review','The assignment requires review.');
+        $same=array_map('intval',array_column($old,'practitioner_id'))===$ids&&!in_array(0,array_map('intval',array_column($old,'allowed')),true);
+        if(!$same){
+            $this->assignmentAppointmentEffects($actor,'room',$roomId);
+            $pdo->prepare('DELETE FROM room_practitioner_restrictions WHERE room_id=?')->execute([$roomId]);
+            $q=$pdo->prepare('INSERT INTO room_practitioner_restrictions(room_id,practitioner_id,allowed) VALUES(?,?,1)');foreach($ids as $id)$q->execute([$roomId,$id]);
+        }
+        $this->audit->write($actor->clinicId,$actor,$cid,'room.practitioners.update','room',$roomId);return ['updated'=>true];
+    },clinicWide:true);}
+
+    /** Eligibility configuration affects the complete noncanceled booking scope, including historical rows. */
+    private function assignmentAppointmentEffects(AuthContext $actor,string $kind,int $id): void
+    {
+        $pdo=$this->database->connection();$q=$pdo->prepare("SELECT a.clinic_id,a.location_id,a.client_id,patient.id patient_id,staff.id staff_id,s.id service_id,l.id owned_location,r.location_id room_location,a.room_id
+            FROM appointments a
+            LEFT JOIN users patient ON patient.id=a.client_id AND patient.clinic_id=a.clinic_id AND patient.user_type='client'
+            LEFT JOIN practitioners p ON p.id=a.practitioner_id
+            LEFT JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=a.clinic_id AND staff.user_type='staff'
+            LEFT JOIN services s ON s.id=a.service_id AND s.clinic_id=a.clinic_id
+            LEFT JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id
+            LEFT JOIN rooms r ON r.id=a.room_id
+            WHERE a.{$kind}_id=? AND a.status NOT IN('canceled_by_client','canceled_by_clinic') ORDER BY a.id FOR UPDATE");$q->execute([$id]);
+        $consent=new ConsentAccess($pdo);
+        foreach($q->fetchAll() as $row){
+            if((int)$row['clinic_id']!==$actor->clinicId||!$row['patient_id']||!$row['staff_id']||!$row['service_id']||!$row['owned_location']||($row['room_id']!==null&&(int)$row['room_location']!==(int)$row['location_id']))throw new ApiException(409,'room_privacy_review','The assignment requires review.');
+            if($consent->restricted($actor->clinicId,(int)$row['client_id'],$actor->userId,true)||$consent->restricted($actor->clinicId,(int)$row['client_id'],(int)$row['staff_id'],true))throw new ApiException(403,'consent_restricted','Access is restricted by a patient privacy instruction.');
+        }
+    }
+
 
     public function createStaff(AuthContext $actor,array $body,string $correlationId): array
     {

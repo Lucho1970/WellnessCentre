@@ -86,3 +86,5 @@ Local validation on 19 October 2026:
 - Full public, portal and application-admin frontend build passed, including content, TypeScript and 2,072 bilingual translation checks. Existing bundle-size warnings remain.
 
 These are local checks. Hosted migration, identity, vendor, transport and organizational acceptance have not been performed. The earlier readiness review's unrelated full-browser role-policy failure remains outside this change; this is not a claim that the entire browser suite was rerun or is green.
+
+Room capabilities and practitioner assignments now use [explicit clinic authority and booking-scope consent checks](CONSENT_AUTHORIZED_ROOM_ASSIGNMENTS.md); existing room selections require rollout review before deploying the corrected booking allowlist enforcement.

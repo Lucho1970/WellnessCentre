@@ -90,9 +90,10 @@ final class AvailabilityService
     {
         $sql="SELECT r.id FROM rooms r WHERE r.location_id=:l AND r.is_bookable=1
             AND NOT EXISTS(SELECT 1 FROM room_practitioner_restrictions x WHERE x.room_id=r.id AND x.practitioner_id=:p AND x.allowed=0)
+            AND (NOT EXISTS(SELECT 1 FROM room_practitioner_restrictions x WHERE x.room_id=r.id AND x.allowed=1) OR EXISTS(SELECT 1 FROM room_practitioner_restrictions x WHERE x.room_id=r.id AND x.practitioner_id=:allowed_practitioner AND x.allowed=1))
             AND NOT EXISTS(SELECT 1 FROM service_room_capability_requirements req WHERE req.service_id=:s AND NOT EXISTS(SELECT 1 FROM room_capability_assignments a WHERE a.room_id=r.id AND a.capability_id=req.capability_id))
             AND NOT EXISTS(SELECT 1 FROM appointments a WHERE a.room_id=r.id AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.buffer_starts_at<DATE_ADD(:end,INTERVAL r.turnover_minutes MINUTE) AND DATE_ADD(a.buffer_ends_at,INTERVAL r.turnover_minutes MINUTE)>:start".($excludeAppointmentId!==null?' AND a.id<>:exclude':'').") ORDER BY r.id";
-        $params=['l'=>$locationId,'p'=>$practitionerId,'s'=>$serviceId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];if($excludeAppointmentId!==null)$params['exclude']=$excludeAppointmentId;
+        $params=['l'=>$locationId,'p'=>$practitionerId,'allowed_practitioner'=>$practitionerId,'s'=>$serviceId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];if($excludeAppointmentId!==null)$params['exclude']=$excludeAppointmentId;
         $statement=$this->database->connection()->prepare($sql);$statement->execute($params);return array_map('intval',$statement->fetchAll(\PDO::FETCH_COLUMN));
     }
 

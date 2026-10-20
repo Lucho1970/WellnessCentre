@@ -138,4 +138,16 @@ foreach(['success','fail','bad-json'] as $mode){
     $check($mode==='success'?($decoded['data']['items'][0]['id']===12):($decoded===['error'=>['code'=>$mode==='fail'?'access_audit_unavailable':'internal_error']]&&!str_contains($body,'private-patient')),'Audit must succeed before sensitive bytes are emitted');
     $check(!str_contains($errors,'Sensitive database')&&!str_contains($errors,'private-'),'Operational fallback has no payload or exception text');
 }
+[$assignmentAudit,$assignmentPdo]=$make();$assignmentAudit->actor($actor);
+$assignmentRequest=new Request('PUT','/api/v1/admin/room-capability-assignments',[],[],['room_id'=>11,'service_id'=>22,'equipment_notes'=>'private-equipment'], 'assignment-audit');
+$assignmentAudit->response($assignmentRequest,['data'=>['updated'=>true]],200,1);
+$metadata=json_decode($assignmentPdo->rows[0]['metadata'],true);
+$check($metadata['requested_resources']===[['type'=>'room','id'=>11],['type'=>'service','id'=>22]],'Assignment body targets are searchable requested references, not disclosures');
+$check($metadata['resources']===[]&&!str_contains(json_encode($metadata),'private-equipment'),'Mutation response does not invent disclosures or serialize notes');
+$assignmentAudit->response($assignmentRequest,['error'=>['code'=>'consent_restricted']],403,1);
+$metadata=json_decode($assignmentPdo->rows[1]['metadata'],true);
+$check(count($metadata['attempted_resources'])===2&&$metadata['resources']===[],'Denied assignment retains typed requested targets without claiming access');
+$references=AccessAudit::resources(['capabilities'=>[['id'=>9,'name'=>'private-name']],'rooms'=>[['room_id'=>11,'capability_id'=>9]],'services'=>[['service_id'=>22,'capability_id'=>9]]],'room_capability');
+$check(count($references)===3&&!str_contains(json_encode($references),'private-name'),'Catalog audit records capability, room and service references only');
+
 echo "Access audit policy/response checks: $checks passed.\n";

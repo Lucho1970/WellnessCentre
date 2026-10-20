@@ -1,5 +1,8 @@
 # Consent-authorized room maintenance
 
+Subsequent work: [room capabilities and practitioner assignments](CONSENT_AUTHORIZED_ROOM_ASSIGNMENTS.md) now replaces the assignment fallback described below with explicit authority and booking-scope checks. The fallback regression now targets service configuration. This document records the earlier core-room checkpoint.
+
+
 ## Scope and authority
 
 Room creation and updates previously inherited the conservative patient-consent block. Their service also trusted supplied roles and wrote configuration separately from its business audit. The room list, create and update methods now require an active staff account in an active clinic, Super Admin authority in the supplied principal, and a current persisted clinic-wide Super Admin grant. A grant confined to one location is insufficient. Clinic Admin, practitioner, reception, accountant, client, privacy-review permission and application/global-administrator labels alone do not grant this authority.

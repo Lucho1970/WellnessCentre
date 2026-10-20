@@ -86,3 +86,5 @@ Start with these two authoritative documents:
 - Mark work complete only after its acceptance criteria and tests pass.
 - Never place credentials, tenant secrets, database passwords, client records, or production configuration values in documentation.
 - Keep implementation-specific setup instructions beside the relevant component, such as `api/README.md`, while keeping cross-solution decisions here.
+
+- [Consent-authorized room capabilities and practitioner assignments](CONSENT_AUTHORIZED_ROOM_ASSIGNMENTS.md)

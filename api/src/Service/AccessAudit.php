@@ -17,7 +17,7 @@ final class AccessAudit
     private ?int $actorId = null;
     private ?int $actorClinic = null;
     private const CONTAINERS = [
-        'data','items','versions','appointments','appointment','clients','client','practitioners','practitioner',
+        'capabilities','rooms','data','items','versions','appointments','appointment','clients','client','practitioners','practitioner',
         'users','user','profile','events','notes','note','messages','forms','tasks','receipts','notifications',
         'invitations','claims','entries','series','history','changes','widgets','results','records','amendments',
         'upcoming','recent','next_appointment','follow_ups','time_off_follow_ups','combinations','locations','services',
@@ -31,7 +31,7 @@ final class AccessAudit
         'invitation_id'=>'invitation','identity_id'=>'customer_identity','location_id'=>'location','service_id'=>'service',
         'sender_id'=>'user','author_id'=>'user','author_user_id'=>'user','actor_user_id'=>'user','claim_id'=>'claim',
         'clinic_id'=>'clinic','global_practitioner_id'=>'global_practitioner','membership_id'=>'staff_membership',
-        'room_id'=>'room','staff_invitation_id'=>'staff_invitation',
+        'capability_id'=>'room_capability','room_id'=>'room','staff_invitation_id'=>'staff_invitation',
         'amendment_id'=>'form_amendment',
     ];
     private const ENTITIES = [
@@ -41,7 +41,7 @@ final class AccessAudit
         'notifications'=>'notification','travel-enquiries'=>'travel_enquiry','messages'=>'travel_enquiry_message',
         'practitioners'=>'practitioner','staff'=>'user','users'=>'user','invitations'=>'invitation',
         'staff-invitations'=>'staff_invitation','recurring-series'=>'recurring_series','clinics'=>'clinic',
-        'locations'=>'location','services'=>'service','logistics-notes'=>'appointment_logistics_note',
+        'room-capabilities'=>'room_capability','capabilities'=>'room_capability','room-capability-assignments'=>'room_capability','room-practitioner-restrictions'=>'room','locations'=>'location','services'=>'service','logistics-notes'=>'appointment_logistics_note',
         'visit-history'=>'visit_event','history'=>'history_event','practitioner-access'=>'practitioner',
         'global-credentials'=>'global_credential','qualifications'=>'qualification','rooms'=>'room',
         'practitioner-enquiries'=>'practitioner_enquiry','form-library'=>'form_library_entry','library'=>'form_library_entry',
@@ -165,7 +165,7 @@ final class AccessAudit
         $description = self::describe($request);
         $requested = [];
         // These are requested targets, never evidence of identity, ownership or existence.
-        foreach (['client_id','appointment_id','practitioner_id','task_id','receipt_id','series_id','enquiry_id','user_id'] as $key) {
+        foreach (['room_id','service_id','capability_id','client_id','appointment_id','practitioner_id','task_id','receipt_id','series_id','enquiry_id','user_id'] as $key) {
             foreach ([$request?->body[$key] ?? null,$request?->query[$key] ?? null] as $value) {
                 $id = self::positiveId($value);
                 if ($id !== null) $requested[self::IDS[$key].':'.$id] = ['type'=>self::IDS[$key],'id'=>$id];
