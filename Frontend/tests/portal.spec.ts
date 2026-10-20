@@ -4524,3 +4524,65 @@ for (const mode of ['403', 'reload'] as const) test(`room capabilities ${mode} d
   await expect(page.getByRole('checkbox', { name: 'Synthetic equipment' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save requirements', exact: true })).toBeEnabled();
 });
+
+for (const mode of ['403', 'reload', 'review'] as const) test(`service ${mode} refusal preserves privacy and supports recovery`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  const item = { id: 21, name: 'Private synthetic service', slug: 'synthetic', category_id: null, price_cents: 5000, duration_options: [{ minutes: 60, price_cents: 5000 }], durations: [60], description: 'Private service draft notes', active: 1, requires_room: 0, recurrence_allowed: 0, published: 0, display_order: 100, lead_time_minutes: 0, booking_horizon_days: 365, cancellation_window_minutes: 1440, cancellation_fee_type: 'none', cancellation_fee_value: 0, buffer_before_minutes: 0, buffer_after_minutes: 0 };
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [] } } }));
+  await page.route('**/api/v1/admin/services**', route => {
+    if (route.request().method() === 'PATCH') {
+      if (mode === 'review') return route.fulfill({ status: 409, json: { error: { code: 'service_privacy_review' } } });
+      denied = true;
+      return route.fulfill(mode === 'reload' ? { json: { data: { id: 21 } } } : { status: 403, json: { error: { code: 'consent_restricted' } } });
+    }
+    return route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: [item] } });
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  await page.getByRole('button', { name: /Private synthetic service.*50\.00/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Service name', exact: true }).fill('Unsaved service name');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  if (mode === 'review') {
+    await expect(page.getByText('This service change needs a privacy review before it can be saved.', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Service name', exact: true })).toHaveValue('Unsaved service name');
+  } else {
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Service name', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Private synthetic service.*50\.00/ })).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Service actions' }).getByRole('button', { name: 'New service', exact: true })).toBeDisabled();
+    await expect(page.getByText('Unsaved service name was updated.', { exact: true })).toHaveCount(0);
+    denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByRole('button', { name: /Private synthetic service.*50\.00/ })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Service actions' }).getByRole('button', { name: 'New service', exact: true })).toBeEnabled();
+  }
+});
+for (const mode of ['403', 'reload'] as const) test(`service assignments ${mode} refusal clears cached configuration and drafts`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  await page.route('**/api/v1/admin/services', route => route.fulfill({ json: { data: [{ id: 21, name: 'Synthetic service', price_cents: 5000, durations: [60], active: 1 }] } }));
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [] } } }));
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 11, name: 'Synthetic assignment site' }] } }));
+  await page.route('**/api/v1/admin/practitioners', route => route.fulfill({ json: { data: [{ practitioner_id: 31, display_name: 'Synthetic assigned practitioner' }] } }));
+  await page.route('**/api/v1/admin/service-assignments', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { practitioners: [{ service_id: 21, practitioner_id: 31, active: 1, offers_mobile: 0, offers_clinic: 1, mobile_radius_km: null, mobile_free_radius_km: null, travel_buffer_minutes: 0, mobile_fee_cents: 0 }], locations: [{ service_id: 21, location_id: 11, active: 1 }] } } }));
+  await page.route('**/api/v1/admin/services/21/assignments', route => {
+    denied = true;
+    return route.fulfill(mode === 'reload' ? { json: { data: { id: 21 } } } : { status: 403, json: { error: { code: 'consent_restricted' } } });
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  await page.getByRole('button', { name: /Synthetic service.*50\.00/ }).click();
+  await page.getByRole('button', { name: 'Assignments', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Synthetic assigned practitioner', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Edit assignments', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'Synthetic assignment site', exact: true }).uncheck();
+  await dialog.getByRole('button', { name: 'Save assignments', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(dialog.getByText('Synthetic assigned practitioner', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('Synthetic assignment site', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('Service assignments saved.', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Add assignment', exact: true })).toBeDisabled();
+  denied = false; await dialog.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(dialog.getByText('Synthetic assigned practitioner', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Edit assignments', exact: true })).toBeEnabled();
+});

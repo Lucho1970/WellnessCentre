@@ -88,3 +88,5 @@ Start with these two authoritative documents:
 - Keep implementation-specific setup instructions beside the relevant component, such as `api/README.md`, while keeping cross-solution decisions here.
 
 - [Consent-authorized room capabilities and practitioner assignments](CONSENT_AUTHORIZED_ROOM_ASSIGNMENTS.md)
+
+- [Consent-authorized service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md)

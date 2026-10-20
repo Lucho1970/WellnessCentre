@@ -43,3 +43,5 @@ Local validation on 19 October 2026:
 - Initial SQL fixtures were corrected for an already-seeded location assignment and the central administrator prerequisite migration. A stale-principal assertion was corrected to respect the legacy profile-only Clinic Admin permission. Browser assertions were corrected to use the edit form's existing Email label. These corrections did not weaken role or consent enforcement.
 
 These are local checks; hosted acceptance and real-patient-data readiness remain outstanding.
+
+Subsequent service work: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have current clinic authority, complete booking/series and approval-effect checks, atomic replacement and individual approval revocation audits. Tax creation and clinic booking defaults remain separately blocked.

@@ -150,4 +150,9 @@ $check(count($metadata['attempted_resources'])===2&&$metadata['resources']===[],
 $references=AccessAudit::resources(['capabilities'=>[['id'=>9,'name'=>'private-name']],'rooms'=>[['room_id'=>11,'capability_id'=>9]],'services'=>[['service_id'=>22,'capability_id'=>9]]],'room_capability');
 $check(count($references)===3&&!str_contains(json_encode($references),'private-name'),'Catalog audit records capability, room and service references only');
 
+$catalog=AccessAudit::resources(['categories'=>[['id'=>71,'description'=>'private-category']],'taxes'=>[['id'=>81,'name'=>'private-tax']]],'record');
+$check($catalog===[['type'=>'service_category','id'=>71],['type'=>'tax','id'=>81]],'Catalog settings disclose typed category/tax IDs without presentation text');
+$description=AccessAudit::describe(new Request('PUT','/api/v1/admin/services/22/assignments',[],[],[],'service-route'));
+$check($description['targets']===[['type'=>'service','id'=>22]],'Service assignment path keeps its routed service target');
+
 echo "Access audit policy/response checks: $checks passed.\n";

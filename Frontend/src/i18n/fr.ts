@@ -1,4 +1,5 @@
 const fr: Record<string, string> = {
+  "API error: service_privacy_review": "Ce changement de service nécessite un examen de confidentialité avant de pouvoir être enregistré.",
   "API error: room_relocation_review": "Le déplacement de cette salle nécessite une migration examinée de son historique de rendez-vous ou de ses affectations.",
   "API error: room_privacy_review": "Ce changement de salle nécessite un examen de confidentialité avant de pouvoir être enregistré.",
   "API error: reminder_schedule_access_restricted": "Cette modification des rappels nécessite un examen de confidentialité autorisé. Aucune modification n’a été enregistrée.",

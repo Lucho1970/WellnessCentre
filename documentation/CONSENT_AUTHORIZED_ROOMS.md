@@ -48,3 +48,5 @@ Local validation on 20 October 2026:
 - Full public, portal and application-admin production build passed, including TypeScript, content checks and 2,113 English/French translations. Existing bundle-size warnings remain. The complete browser suite was not run.
 
 All checks are local and synthetic. No real patient data, hosted database, private environment or external service was used. Remaining conservative blocks include room capability/practitioner assignment workflows, service configuration/assignments, clinic profile/branding/themes/booking settings, and reviewed reconciliation for client merges with any consent history. Unknown authenticated staff routes retain their fail-closed fallback.
+
+Subsequent service authorization: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have explicit authority; the room/location fallback probes now target tax creation.

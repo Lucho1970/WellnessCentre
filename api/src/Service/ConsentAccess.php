@@ -66,6 +66,7 @@ final class ConsentAccess
             && in_array($r->method,['GET','POST'],true))return; // TravelEnquiryService owns row-level authorization.
         // These routes contain no patient records, or enforce their own filtered boundary below.
         if(in_array($route,[
+            'catalogueSettings','createServiceCategory','updateServiceCategory','createService','updateService','serviceAssignments','updateServiceAssignments',
             'roomCapabilities','createRoomCapability','updateRoomCapabilityAssignments','roomPractitionerRestrictions','updateRoomPractitioners',
             'createRoom','updateRoom', // AdminService owns current clinic-wide authority, turnover effects and safe relocation.
             'createLocation','updateLocation', // AdminService authorizes approval revocations and timezone appointment effects before mutation.

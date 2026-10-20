@@ -49,3 +49,5 @@ Local results on 19 October 2026:
 Hosted database, identity-provider, concurrency, vendor and production performance acceptance remain outstanding. The complete browser suite was not rerun; this does not resolve the unrelated broad-suite role-policy failure recorded in the original readiness review.
 
 The [PHIPA readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md) release gates remain open pending actual evidence and approval. Local authorization tests do not constitute hosted acceptance or compliance certification.
+
+Subsequent service work: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have current clinic authority, complete booking/series and approval-effect checks, atomic replacement and individual approval revocation audits. Tax creation and clinic booking defaults remain separately blocked.

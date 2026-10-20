@@ -22,7 +22,7 @@ The capabilities editor clears catalogs, draft names and selections after failed
 
 ## Validation and remaining gates
 
-Run `scripts/test-recurring-sql.ps1 -MariaDbDirectory <portable-runtime> -IntegrationTest consent-room-assignments.php` for disposable synthetic SQL/HTTP checks. The suite exercises persisted roles, tenancy, complete appointment scope, actor/practitioner/global restrictions, invalid IDs, combined rollback, audit failure, malformed stored references, current route authorization, typed audit resources and actual booking allowlist behavior. The room/location fallback probes now use still-unclassified service configuration.
+Run `scripts/test-recurring-sql.ps1 -MariaDbDirectory <portable-runtime> -IntegrationTest consent-room-assignments.php` for disposable synthetic SQL/HTTP checks. The suite exercises persisted roles, tenancy, complete appointment scope, actor/practitioner/global restrictions, invalid IDs, combined rollback, audit failure, malformed stored references, current route authorization, typed audit resources and actual booking allowlist behavior. The room/location fallback probes use tax creation after the subsequent service authorization change.
 
 Validated locally on 20 October 2026:
 
@@ -33,3 +33,5 @@ Validated locally on 20 October 2026:
 - Review base: `feature/consent-authorized-rooms` (`56520e1`); this branch builds on that unmerged checkpoint. Local checks do not constitute hosted database acceptance or PHIPA certification. Before real patient data, rehearse these workflows and consent locking on the hosted database, review existing assignment semantics, and complete the operational gates in [the readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md).
 
 Remaining conservative configuration groups include service configuration/assignments and clinic profile, branding, themes and booking settings. Client merges with any consent history still require reviewed reconciliation. Unknown staff routes retain the fail-closed fallback.
+
+Subsequent service work: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have current clinic authority, complete booking/series and approval-effect checks, atomic replacement and individual approval revocation audits. Tax creation and clinic booking defaults remain separately blocked.

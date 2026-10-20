@@ -1,6 +1,6 @@
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Switch, Typography } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, Settings2, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -93,7 +93,15 @@ function ServiceAdminForm() {
   }, [categoryFilter, items, query]);
   const money = (cents: number) => formatCad(cents, i18n.resolvedLanguage);
 
+  const [loaded, setLoaded] = useState(false);
+  const generation = useRef(0);
+  const clearAccess = () => {
+    setLoaded(false); setItems([]); setCategories([]); setSelectedId(null); setForm(blank());
+    setPanelMode(null); setEditingId(null); setAssignmentServiceId(null); setAssignmentsDirty(false);
+    setQuery(''); setCategoryFilter('all'); setSaved(''); setPanelError(''); formGuard.markClean(); formValidation.clear();
+  };
   const load = useCallback(async (preferredId?: number | null) => {
+    const current = ++generation.current; setLoaded(false);
     setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken();
@@ -103,6 +111,7 @@ function ServiceAdminForm() {
         fetch(`${api}/admin/catalogue-settings`, { headers }),
       ]);
       const [body, settingsBody] = await Promise.all([response.json(), settingsResponse.json()]);
+      if (current !== generation.current) return false;
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to load services.'));
       if (!settingsResponse.ok) throw new ApiError(settingsBody, settingsResponse.status, t('Unable to load service categories.'));
       const loadedItems = body.data.map(normalizeService);
@@ -112,10 +121,11 @@ function ServiceAdminForm() {
         const requested = Number(preferredId ?? current ?? 0) || null;
         return loadedItems.some((item: Service) => item.id === requested) ? requested : null;
       });
-    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load services.')); }
-    finally { setBusy(false); }
+      setLoaded(true); return true;
+    } catch (cause) { if (current !== generation.current) return false; clearAccess(); formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load services.')); return false; }
+    finally { if (current === generation.current) setBusy(false); }
   }, [getAccessToken, t]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { generation.current++; }; }, [load]);
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
   const serviceForm = (service: Service): Form => ({
@@ -157,15 +167,15 @@ function ServiceAdminForm() {
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save service.'));
       const savedId = Number(body.data?.id ?? editingId ?? 0) || null;
       const message = t('{{name}} was {{action}}.', { name: form.name, action: t(editingId ? 'updated' : 'created') });
-      formGuard.markClean(); setPanelMode(null); setEditingId(null); await load(savedId); setSaved(message);
-    } catch (cause) { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save service.')); }
+      formGuard.markClean(); setPanelMode(null); setEditingId(null); if (await load(savedId)) setSaved(message);
+    } catch (cause) { if (cause instanceof ApiError && [401,403,404].includes(cause.status)) { generation.current++; clearAccess(); setLoadError(cause.message); } else { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save service.')); } }
     finally { setBusy(false); }
   };
 
   return <Stack spacing={2}>
     <Paper variant="outlined" sx={{ p: 1.5 }}>
       <Stack component="nav" aria-label={t('Service actions')} direction={{ xs: 'column', md: 'row' }} gap={1} alignItems={{ md: 'center' }}>
-        <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New service')}</Button>
+        <Button variant="contained" startIcon={<Plus size={17}/>} disabled={!loaded || busy} onClick={startNew}>{t('New service')}</Button>
         <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: 0.5 }}/>
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
         <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
@@ -194,7 +204,7 @@ function ServiceAdminForm() {
             <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{service.name}</Typography><Chip size="small" variant="outlined" label={service.category_name ?? t('Uncategorized')}/><Chip size="small" color={Boolean(Number(service.published)) ? 'primary' : 'default'} label={t(Boolean(Number(service.published)) ? 'Published' : 'Not published')}/><Chip size="small" color={Boolean(Number(service.active)) ? 'success' : 'default'} label={t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')}/></Stack>} secondary={<>{serviceOptions.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')} · {t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')}</>} />
           </ListItemButton>;
         })}
-        {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching services' : 'No services yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different service name.' : 'Create the first service offered by the clinic.')}</Typography>{!query && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New service')}</Button>}</Box>}
+        {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching services' : 'No services yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different service name.' : 'Create the first service offered by the clinic.')}</Typography>{!query && <Button variant="contained" startIcon={<Plus size={17}/>} disabled={!loaded || busy} onClick={startNew}>{t('New service')}</Button>}</Box>}
       </List>
     </Paper>
 

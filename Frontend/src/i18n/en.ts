@@ -1,4 +1,5 @@
 const en = {
+  "API error: service_privacy_review": "This service change needs a privacy review before it can be saved.",
   "API error: room_relocation_review": "Moving this room requires a reviewed migration of its booking history or assignments.",
   "API error: room_privacy_review": "This room change needs a privacy review before it can be saved.",
   "API error: reminder_schedule_access_restricted": "This reminder change requires an authorized privacy review. No changes were saved.",
