@@ -155,4 +155,7 @@ $check($catalog===[['type'=>'service_category','id'=>71],['type'=>'tax','id'=>81
 $description=AccessAudit::describe(new Request('PUT','/api/v1/admin/services/22/assignments',[],[],[],'service-route'));
 $check($description['targets']===[['type'=>'service','id'=>22]],'Service assignment path keeps its routed service target');
 
+$settingsRoute=AccessAudit::describe(new Request('PATCH','/api/v1/admin/booking-settings',[],[],['default_lead_time_minutes'=>60],'booking-settings-audit'));
+$check($settingsRoute['entity']==='clinic'&&$settingsRoute['route']==='/api/v1/admin/booking-settings','Booking settings has an explicit canonical audit route, without treating defaults as patient records');
+
 echo "Access audit policy/response checks: $checks passed.\n";

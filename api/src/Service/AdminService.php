@@ -183,8 +183,32 @@ final class AdminService
     {
         $this->superAdmin($actor);$copy=$this->categoryCopy($body);$s=$this->database->connection()->prepare('UPDATE service_categories SET name=:name,name_fr=:name_fr,description=:description,description_fr=:description_fr WHERE id=:id AND clinic_id=:clinic');$s->execute($copy+['id'=>$id,'clinic'=>$actor->clinicId]);$check=$this->database->connection()->prepare('SELECT 1 FROM service_categories WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$id,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'category_not_found','Category not found.');$this->audit->write($actor->clinicId,$actor,$cid,'service_category.update','service_category',$id);return ['id'=>$id];
     }
-    public function createTax(AuthContext $actor,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['code','name','rate_basis_points']);$rate=(int)$body['rate_basis_points'];if($rate<0||$rate>10000)throw new ApiException(422,'validation_error','Tax rate must be between 0 and 100%.');$s=$this->database->connection()->prepare('INSERT INTO taxes(clinic_id,code,name,rate_basis_points) VALUES(:clinic,:code,:name,:rate)');$s->execute(['clinic'=>$actor->clinicId,'code'=>strtoupper(trim((string)$body['code'])),'name'=>trim((string)$body['name']),'rate'=>$rate]);return $this->created($actor,$cid,'tax',(int)$this->database->connection()->lastInsertId());}
-    public function updateBookingSettings(AuthContext $actor,array $body,string $cid): array{$this->superAdmin($actor);$this->required($body,['default_lead_time_minutes','default_booking_horizon_days','default_cancellation_window_minutes']);$s=$this->database->connection()->prepare("INSERT INTO clinic_booking_settings(clinic_id,default_lead_time_minutes,default_booking_horizon_days,default_cancellation_window_minutes,slot_increment_minutes,currency) VALUES(:clinic,:lead,:horizon,:cancel,15,'CAD') ON DUPLICATE KEY UPDATE default_lead_time_minutes=VALUES(default_lead_time_minutes),default_booking_horizon_days=VALUES(default_booking_horizon_days),default_cancellation_window_minutes=VALUES(default_cancellation_window_minutes)");$s->execute(['clinic'=>$actor->clinicId,'lead'=>(int)$body['default_lead_time_minutes'],'horizon'=>(int)$body['default_booking_horizon_days'],'cancel'=>(int)$body['default_cancellation_window_minutes']]);$this->audit->write($actor->clinicId,$actor,$cid,'booking.settings.update','clinic',$actor->clinicId);return ['updated'=>true];}
+    public function createTax(AuthContext $actor,array $body,string $cid): array
+    {return $this->clinicAdministration($actor,function()use($actor,$body,$cid){
+        $code=$body['code']??null;$name=$body['name']??null;$rate=$body['rate_basis_points']??null;
+        if(!is_string($code)||preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/D',trim($code))!==1)throw new ApiException(422,'validation_error','Enter a valid tax code.',['code'=>'Use 1 to 40 letters, numbers, underscores or hyphens']);
+        if(!is_string($name)||trim($name)===''||mb_strlen(trim($name))>100||preg_match('/[\x00-\x1f\x7f]/',$name))throw new ApiException(422,'validation_error','Enter a valid tax name.',['name'=>'Required; maximum 100 characters']);
+        if(!is_int($rate)||$rate<0||$rate>10000)throw new ApiException(422,'validation_error','Tax rate must be between 0 and 100%.',['rate_basis_points'=>'Integer from 0 to 10000 required']);
+        $pdo=$this->database->connection();$code=strtoupper(trim($code));
+        $q=$pdo->prepare('SELECT id FROM taxes WHERE clinic_id=? AND code=? FOR UPDATE');$q->execute([$actor->clinicId,$code]);
+        if($q->fetchColumn())throw new ApiException(409,'tax_already_exists','A tax with that code already exists in this clinic.');
+        try{$pdo->prepare('INSERT INTO taxes(clinic_id,code,name,rate_basis_points) VALUES(?,?,?,?)')->execute([$actor->clinicId,$code,trim($name),$rate]);}
+        catch(\PDOException $e){if(($e->errorInfo[1]??null)===1062)throw new ApiException(409,'tax_already_exists','A tax with that code already exists in this clinic.');throw $e;}
+        return $this->created($actor,$cid,'tax',(int)$pdo->lastInsertId());
+    },clinicWide:true);}
+
+    /** Stored defaults only: never propagates values into services, bookings or billing history. */
+    public function updateBookingSettings(AuthContext $actor,array $body,string $cid): array
+    {return $this->clinicAdministration($actor,function()use($actor,$body,$cid){
+        $limits=['default_lead_time_minutes'=>525600,'default_booking_horizon_days'=>3650,'default_cancellation_window_minutes'=>525600];
+        $changes=array_intersect_key($body,$limits);
+        if($changes===[])throw new ApiException(422,'validation_error','Supply at least one booking default.');
+        foreach($changes as $key=>$value)if(!is_int($value)||$value<0||$value>$limits[$key])throw new ApiException(422,'validation_error','Enter a valid booking default.',[$key=>'Integer from 0 to '.$limits[$key].' required']);
+        $pdo=$this->database->connection();$q=$pdo->prepare('SELECT default_lead_time_minutes,default_booking_horizon_days,default_cancellation_window_minutes FROM clinic_booking_settings WHERE clinic_id=? FOR UPDATE');$q->execute([$actor->clinicId]);$old=$q->fetch();
+        $values=array_replace($old?:['default_lead_time_minutes'=>60,'default_booking_horizon_days'=>90,'default_cancellation_window_minutes'=>1440],$changes);
+        $pdo->prepare("INSERT INTO clinic_booking_settings(clinic_id,default_lead_time_minutes,default_booking_horizon_days,default_cancellation_window_minutes,slot_increment_minutes,currency) VALUES(?,?,?,?,15,'CAD') ON DUPLICATE KEY UPDATE default_lead_time_minutes=VALUES(default_lead_time_minutes),default_booking_horizon_days=VALUES(default_booking_horizon_days),default_cancellation_window_minutes=VALUES(default_cancellation_window_minutes)")->execute([$actor->clinicId,$values['default_lead_time_minutes'],$values['default_booking_horizon_days'],$values['default_cancellation_window_minutes']]);
+        $this->audit->write($actor->clinicId,$actor,$cid,'booking.settings.update','clinic',$actor->clinicId,'success',['fields'=>array_keys($changes)]);return ['updated'=>true];
+    },clinicWide:true);}
 
     public function createLocation(AuthContext $actor,array $body,string $correlationId): array
     {

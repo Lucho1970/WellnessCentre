@@ -40,3 +40,5 @@ Completed local checks on 20 October 2026:
 Review base: `feature/consent-authorized-room-assignments` (`b57ac05`). This task builds on that unmerged checkpoint. No migration is required. Before deployment, rehearse current staff-role resolution, advisory locking and authorized assignment/approval revocation on the hosted database. Review any malformed legacy associations through the clinic's controlled process. Local checks do not establish hosted acceptance or PHIPA certification; the [readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md) still governs real-data release gates.
 
 Remaining conservative groups include tax creation, clinic profile, branding, themes and booking defaults. Client merges with any consent history still require reviewed reconciliation. Unknown staff routes retain the fallback.
+
+Subsequent configuration work: [tax creation and clinic booking defaults](CONSENT_AUTHORIZED_TAX_BOOKING_SETTINGS.md) now have current clinic authority, bounded validation and atomic audits, without propagating configuration into existing patient records. Clinic profile, branding, theme and welcome routes remain separately blocked.

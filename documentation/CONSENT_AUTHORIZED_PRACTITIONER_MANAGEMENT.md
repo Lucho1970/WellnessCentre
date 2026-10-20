@@ -45,3 +45,5 @@ Local validation on 19 October 2026:
 These are local checks; hosted acceptance and real-patient-data readiness remain outstanding.
 
 Subsequent service work: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have current clinic authority, complete booking/series and approval-effect checks, atomic replacement and individual approval revocation audits. Tax creation and clinic booking defaults remain separately blocked.
+
+Subsequent configuration work: [tax creation and clinic booking defaults](CONSENT_AUTHORIZED_TAX_BOOKING_SETTINGS.md) now have current clinic authority, bounded validation and atomic audits, without propagating configuration into existing patient records. Clinic profile, branding, theme and welcome routes remain separately blocked.

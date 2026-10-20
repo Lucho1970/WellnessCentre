@@ -51,3 +51,5 @@ Hosted database, identity-provider, concurrency, vendor and production performan
 The [PHIPA readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md) release gates remain open pending actual evidence and approval. Local authorization tests do not constitute hosted acceptance or compliance certification.
 
 Subsequent service work: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have current clinic authority, complete booking/series and approval-effect checks, atomic replacement and individual approval revocation audits. Tax creation and clinic booking defaults remain separately blocked.
+
+Subsequent configuration work: [tax creation and clinic booking defaults](CONSENT_AUTHORIZED_TAX_BOOKING_SETTINGS.md) now have current clinic authority, bounded validation and atomic audits, without propagating configuration into existing patient records. Clinic profile, branding, theme and welcome routes remain separately blocked.

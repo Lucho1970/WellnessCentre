@@ -90,3 +90,5 @@ Start with these two authoritative documents:
 - [Consent-authorized room capabilities and practitioner assignments](CONSENT_AUTHORIZED_ROOM_ASSIGNMENTS.md)
 
 - [Consent-authorized service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md)
+
+- [Consent-authorized tax creation and clinic booking settings](CONSENT_AUTHORIZED_TAX_BOOKING_SETTINGS.md)

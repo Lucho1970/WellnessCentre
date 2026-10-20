@@ -90,3 +90,5 @@ These are local checks. Hosted migration, identity, vendor, transport and organi
 Room capabilities and practitioner assignments now use [explicit clinic authority and booking-scope consent checks](CONSENT_AUTHORIZED_ROOM_ASSIGNMENTS.md); existing room selections require rollout review before deploying the corrected booking allowlist enforcement.
 
 Subsequent service work: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have current clinic authority, complete booking/series and approval-effect checks, atomic replacement and individual approval revocation audits. Tax creation and clinic booking defaults remain separately blocked.
+
+Subsequent configuration work: [tax creation and clinic booking defaults](CONSENT_AUTHORIZED_TAX_BOOKING_SETTINGS.md) now have current clinic authority, bounded validation and atomic audits, without propagating configuration into existing patient records. Clinic profile, branding, theme and welcome routes remain separately blocked.

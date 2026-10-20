@@ -4586,3 +4586,85 @@ for (const mode of ['403', 'reload'] as const) test(`service assignments ${mode}
   await expect(dialog.getByText('Synthetic assigned practitioner', { exact: true })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Edit assignments', exact: true })).toBeEnabled();
 });
+
+for (const action of ['tax', 'defaults'] as const) for (const mode of ['403', 'reload'] as const) test(`catalogue ${action} ${mode} refusal clears configuration and drafts until retry`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  const settings = { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 };
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { categories: [{ id: 31, name: 'Private synthetic category' }], taxes: [{ id: 41, code: 'SYNTHETIC', name: 'Private synthetic tax', rate_basis_points: 1300 }], settings } } }));
+  await page.route(action === 'tax' ? '**/api/v1/admin/taxes' : '**/api/v1/admin/booking-settings', route => {
+    denied = true;
+    return route.fulfill(mode === 'reload' ? { json: { data: action === 'tax' ? { id: 42 } : { updated: true } } } : { status: 403, json: { error: { code: 'forbidden' } } });
+  });
+  await page.goto(`${portalHost}/admin/settings`);
+  const lead = page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true });
+  await expect(lead).toHaveValue('60');
+  await lead.fill('125');
+  await page.getByRole('textbox', { name: 'Category name (English)', exact: true }).fill('Unapproved category');
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Unapproved tax name');
+  await page.getByRole('button', { name: action === 'tax' ? 'Add tax' : 'Save defaults', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByText('Private synthetic category', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Private synthetic tax (13.00%)', { exact: true })).toHaveCount(0);
+  await expect(lead).toHaveValue('');
+  await expect(lead).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Category name (English)', exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeDisabled();
+  await expect(page.getByText(action === 'tax' ? 'Tax added.' : 'Booking defaults saved.', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })))).toBe(false);
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(lead).toHaveValue('60');
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeEnabled();
+  await expect(page.getByText('Private synthetic category', { exact: true })).toBeVisible();
+});
+test('catalogue denied initial load disables configuration until authorized retry', async ({ page }) => {
+  await fixtures(page, ['super_admin']); let denied = true;
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeDisabled();
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true })).toHaveValue('60');
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeEnabled();
+});
+test('catalogue saves tax and only writable numeric booking defaults with authorized reload', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let taxes: unknown[] = [];
+  let settings = { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440, slot_increment_minutes: 30, currency: 'USD' };
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes, settings } } }));
+  await page.route('**/api/v1/admin/taxes', route => {
+    expect(route.request().postDataJSON()).toEqual({ code: 'TEST_TAX', name: 'Synthetic successful tax', rate_basis_points: 1300 });
+    taxes = [{ id: 41, code: 'TEST_TAX', name: 'Synthetic successful tax', rate_basis_points: 1300 }];
+    return route.fulfill({ status: 201, json: { data: { id: 41 } } });
+  });
+  await page.route('**/api/v1/admin/booking-settings', route => {
+    expect(route.request().postDataJSON()).toEqual({ default_lead_time_minutes: 125, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 });
+    settings = { ...settings, ...route.request().postDataJSON() }; return route.fulfill({ json: { data: { updated: true } } });
+  });
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Code', exact: true }).fill('TEST_TAX');
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Synthetic successful tax');
+  await page.getByRole('button', { name: 'Add tax', exact: true }).click();
+  await expect(page.getByText('Tax added.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic successful tax (13.00%)', { exact: true })).toBeVisible();
+  await page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true }).fill('125');
+  await page.getByRole('button', { name: 'Save defaults', exact: true }).click();
+  await expect(page.getByText('Booking defaults saved.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true })).toHaveValue('125');
+});
+test('catalogue duplicate tax conflict retains draft for correction', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/taxes', route => route.fulfill({ status: 409, json: { error: { code: 'tax_already_exists' } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Correctable tax draft');
+  await page.getByRole('button', { name: 'Add tax', exact: true }).click();
+  await expect(page.getByText('A tax with this code already exists in this clinic.', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Correctable tax draft');
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeEnabled();
+});
