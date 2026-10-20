@@ -12,16 +12,49 @@ final class AdminService
 {
     public function __construct(private readonly Database $database,private readonly AuditLogger $audit,private readonly bool $globalPractitionersEnabled=false) {}
 
+    /** Staff-account maintenance never bypasses clinical-record authorization. */
+    private function practitionerAdministration(AuthContext $actor,callable $work,array $roles=['super_admin']): array
+    {
+        if($actor->userType!=='staff'||!$actor->hasAnyRole(...$roles))throw new ApiException(403,'forbidden','Administrator access is required.');
+        $pdo=$this->database->connection();
+        if($pdo->inTransaction())throw new \LogicException('Practitioner administration requires its own transaction.');
+        $lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
+        try{
+            $pdo->beginTransaction();
+            $q=$pdo->prepare("SELECT id FROM clinics WHERE id=? AND status='active' FOR UPDATE");$q->execute([$actor->clinicId]);
+            if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Administrator access is required.');
+            $marks=implode(',',array_fill(0,count($roles),'?'));
+            $q=$pdo->prepare("SELECT u.id FROM users u WHERE u.id=? AND u.clinic_id=? AND u.user_type='staff' AND u.status='active'
+                AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code IN ($marks)) FOR UPDATE");
+            $q->execute([$actor->userId,$actor->clinicId,...$roles]);
+            if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Administrator access is required.');
+            $result=$work();$pdo->commit();return $result;
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$lock->release();}
+    }
+
     public function practitioners(AuthContext $actor): array
+    {return $this->practitionerAdministration($actor,fn()=>$this->practitionerDirectory($actor));}
+
+    public function onboardPractitioner(AuthContext $actor,array $body,string $cid): array
+    {return $this->practitionerAdministration($actor,fn()=>$this->onboardPractitionerRecord($actor,$body,$cid));}
+
+    public function updatePractitioner(AuthContext $actor,int $id,array $body,string $cid): array
+    {return $this->practitionerAdministration($actor,fn()=>$this->updatePractitionerRecord($actor,$id,$body,$cid));}
+
+    public function createPractitioner(AuthContext $actor,array $body,string $cid): array
+    {return $this->practitionerAdministration($actor,fn()=>$this->createPractitionerRecord($actor,$body,$cid),['super_admin','clinic_admin']);}
+
+    private function practitionerDirectory(AuthContext $actor): array
     {
         $this->superAdmin($actor);
-        $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.given_name,u.family_name,u.display_name,t.booking_name AS preferred_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,MIN(pl.location_id) AS location_id,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id LEFT JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=u.clinic_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.given_name,u.family_name,u.display_name,t.booking_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY COALESCE(t.booking_name,u.display_name)");
+        $statement=$this->database->connection()->prepare("SELECT p.id AS practitioner_id,u.id AS user_id,u.given_name,u.family_name,u.display_name,t.booking_name AS preferred_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active,MIN(l.id) AS location_id,GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ', ') AS locations FROM practitioners p JOIN users u ON u.id=p.user_id AND u.user_type='staff' LEFT JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=u.clinic_id LEFT JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.active=1 LEFT JOIN locations l ON l.id=pl.location_id AND l.clinic_id=u.clinic_id WHERE u.clinic_id=:clinic GROUP BY p.id,u.id,u.given_name,u.family_name,u.display_name,t.booking_name,u.email,u.status,p.discipline,p.credentials,p.booking_mode,p.active ORDER BY COALESCE(t.booking_name,u.display_name)");
         $statement->execute(['clinic'=>$actor->clinicId]);$items=$statement->fetchAll();
         if($this->globalPractitionersEnabled){$q=$this->database->connection()->prepare('SELECT practitioner_id FROM global_practitioner_clinics WHERE clinic_id=?');$q->execute([$actor->clinicId]);$registered=array_map('intval',$q->fetchAll(\PDO::FETCH_COLUMN));foreach($items as &$item)$item['global_registered']=in_array((int)$item['practitioner_id'],$registered,true);}
         return $items;
     }
 
-    public function onboardPractitioner(AuthContext $actor,array $body,string $correlationId): array
+    private function onboardPractitionerRecord(AuthContext $actor,array $body,string $correlationId): array
     {
         $this->superAdmin($actor);$this->required($body,['tenant_id','object_id','email','given_name','family_name','display_name','location_id','discipline']);$this->ownedLocation($actor,(int)$body['location_id']);
         $tenantId=strtolower(trim((string)$body['tenant_id']));$objectId=strtolower(trim((string)$body['object_id']));$email=strtolower(trim((string)$body['email']));$givenName=trim((string)$body['given_name']);$familyName=trim((string)$body['family_name']);$displayName=trim((string)$body['display_name']);$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)($body['booking_mode']??'practitioner_managed');
@@ -38,21 +71,20 @@ final class AdminService
         $pdo=$this->database->connection();
         $existing=$pdo->prepare("SELECT 1 FROM identity_links WHERE provider='microsoft' AND tenant_id=:tenant AND provider_subject=:subject");$existing->execute(['tenant'=>$tenantId,'subject'=>$objectId]);if($existing->fetchColumn())throw new ApiException(409,'identity_already_linked','This Entra identity is already linked to a local user.');
         $existing=$pdo->prepare('SELECT 1 FROM users WHERE clinic_id=:clinic AND email=:email');$existing->execute(['clinic'=>$actor->clinicId,'email'=>$email]);if($existing->fetchColumn())throw new ApiException(409,'email_already_exists','A user with this email already exists in the clinic.');
-        try{$pdo->beginTransaction();
-            $statement=$pdo->prepare("INSERT INTO users(clinic_id,email,given_name,family_name,display_name,user_type,status) VALUES(:clinic,:email,:given,:family,:name,'staff','active')");$statement->execute(['clinic'=>$actor->clinicId,'email'=>$email,'given'=>$givenName,'family'=>$familyName,'name'=>$displayName]);$userId=(int)$pdo->lastInsertId();
-            $statement=$pdo->prepare("INSERT INTO identity_links(user_id,provider,tenant_id,provider_subject,email_at_link_time) VALUES(:user,'microsoft',:tenant,:subject,:email)");$statement->execute(['user'=>$userId,'tenant'=>$tenantId,'subject'=>$objectId,'email'=>$email]);
-            $statement=$pdo->prepare("INSERT INTO user_roles(user_id,role_id,location_id,assigned_by) SELECT :user,id,:location,:actor FROM roles WHERE code='practitioner'");$statement->execute(['user'=>$userId,'location'=>(int)$body['location_id'],'actor'=>$actor->userId]);if($statement->rowCount()!==1)throw new ApiException(500,'role_not_configured','The practitioner role is not configured.');
-            $statement=$pdo->prepare('INSERT INTO staff_accounts(user_id,mfa_required) VALUES(:user,1)');$statement->execute(['user'=>$userId]);
-            $statement=$pdo->prepare('INSERT INTO practitioners(user_id,discipline,credentials,booking_mode) VALUES(:user,:discipline,:credentials,:mode)');$statement->execute(['user'=>$userId,'discipline'=>$discipline,'credentials'=>$credentials,'mode'=>$bookingMode]);$practitionerId=(int)$pdo->lastInsertId();
-            $statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id,active) VALUES(:practitioner,:location,1)');$statement->execute(['practitioner'=>$practitionerId,'location'=>(int)$body['location_id']]);
-            $this->audit->write($actor->clinicId,$actor,$correlationId,'practitioner.onboard','practitioner',$practitionerId,'success',['user_id'=>$userId,'location_id'=>(int)$body['location_id']]);$pdo->commit();return ['id'=>$practitionerId,'user_id'=>$userId,'status'=>'active'];
-        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+
+        $statement=$pdo->prepare("INSERT INTO users(clinic_id,email,given_name,family_name,display_name,user_type,status) VALUES(:clinic,:email,:given,:family,:name,'staff','active')");$statement->execute(['clinic'=>$actor->clinicId,'email'=>$email,'given'=>$givenName,'family'=>$familyName,'name'=>$displayName]);$userId=(int)$pdo->lastInsertId();
+        $statement=$pdo->prepare("INSERT INTO identity_links(user_id,provider,tenant_id,provider_subject,email_at_link_time) VALUES(:user,'microsoft',:tenant,:subject,:email)");$statement->execute(['user'=>$userId,'tenant'=>$tenantId,'subject'=>$objectId,'email'=>$email]);
+        $statement=$pdo->prepare("INSERT INTO user_roles(user_id,role_id,location_id,assigned_by) SELECT :user,id,:location,:actor FROM roles WHERE code='practitioner'");$statement->execute(['user'=>$userId,'location'=>(int)$body['location_id'],'actor'=>$actor->userId]);if($statement->rowCount()!==1)throw new ApiException(500,'role_not_configured','The practitioner role is not configured.');
+        $statement=$pdo->prepare('INSERT INTO staff_accounts(user_id,mfa_required) VALUES(:user,1)');$statement->execute(['user'=>$userId]);
+        $statement=$pdo->prepare('INSERT INTO practitioners(user_id,discipline,credentials,booking_mode) VALUES(:user,:discipline,:credentials,:mode)');$statement->execute(['user'=>$userId,'discipline'=>$discipline,'credentials'=>$credentials,'mode'=>$bookingMode]);$practitionerId=(int)$pdo->lastInsertId();
+        $statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id,active) VALUES(:practitioner,:location,1)');$statement->execute(['practitioner'=>$practitionerId,'location'=>(int)$body['location_id']]);
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'practitioner.onboard','practitioner',$practitionerId,'success',['user_id'=>$userId,'location_id'=>(int)$body['location_id']]);return ['id'=>$practitionerId,'user_id'=>$userId,'status'=>'active'];
     }
 
-    public function updatePractitioner(AuthContext $actor,int $practitionerId,array $body,string $correlationId): array
+    private function updatePractitionerRecord(AuthContext $actor,int $practitionerId,array $body,string $correlationId): array
     {
         $this->superAdmin($actor);$this->required($body,['given_name','family_name','display_name','email','location_id','discipline','booking_mode','status']);$this->ownedLocation($actor,(int)$body['location_id']);
-        $givenName=trim((string)$body['given_name']);$familyName=trim((string)$body['family_name']);$displayName=trim((string)$body['display_name']);$email=strtolower(trim((string)$body['email']));$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)$body['booking_mode'];$status=(string)$body['status'];$active=(bool)($body['active']??true);
+        $givenName=trim((string)$body['given_name']);$familyName=trim((string)$body['family_name']);$displayName=trim((string)$body['display_name']);$email=strtolower(trim((string)$body['email']));$discipline=trim((string)$body['discipline']);$credentials=$this->optional($body,'credentials');$bookingMode=(string)$body['booking_mode'];$status=(string)$body['status'];if(array_key_exists('active',$body)&&!is_bool($body['active']))throw new ApiException(422,'validation_error','active must be a boolean.');$active=$body['active']??true;
         if($givenName===''||strlen($givenName)>100)throw new ApiException(422,'validation_error','Enter a valid first name.',['given_name'=>'Required; maximum 100 characters']);
         if($familyName===''||strlen($familyName)>100)throw new ApiException(422,'validation_error','Enter a valid last name.',['family_name'=>'Required; maximum 100 characters']);
         if($displayName===''||strlen($displayName)>150)throw new ApiException(422,'validation_error','Enter a valid display name.',['display_name'=>'Required; maximum 150 characters']);
@@ -62,22 +94,21 @@ final class AdminService
         if(!in_array($bookingMode,['practitioner_managed','clinic_managed'],true))throw new ApiException(422,'validation_error','Invalid booking mode.',['booking_mode'=>'Invalid booking mode']);
         if(!in_array($status,['active','inactive'],true))throw new ApiException(422,'validation_error','Invalid account status.',['status'=>'Invalid status']);
         $pdo=$this->database->connection();
-        try{$pdo->beginTransaction();
-            $find=$pdo->prepare('SELECT p.user_id FROM practitioners p JOIN users u ON u.id=p.user_id WHERE p.id=:practitioner AND u.clinic_id=:clinic FOR UPDATE');$find->execute(['practitioner'=>$practitionerId,'clinic'=>$actor->clinicId]);$userId=$find->fetchColumn();if(!$userId)throw new ApiException(404,'practitioner_not_found','Practitioner not found.');
-            if($this->globalPractitionersEnabled){
-                $global=$pdo->prepare('SELECT a.status,p.discipline,p.credentials FROM global_practitioner_clinics a JOIN practitioners p ON p.id=a.practitioner_id WHERE a.practitioner_id=?');$global->execute([$practitionerId]);$registered=$global->fetch();
-                if($registered){
-                    if($registered['status']!=='active')throw new ApiException(409,'assignment_removed','This clinic assignment was removed centrally.');
-                    if($discipline!==$registered['discipline']||$credentials!==$registered['credentials'])throw new ApiException(403,'credential_owner_required','Only the practitioner can choose the credentials and discipline shared with this clinic.');
-                }
+
+        $find=$pdo->prepare('SELECT p.user_id FROM practitioners p JOIN users u ON u.id=p.user_id AND u.user_type=\'staff\' WHERE p.id=:practitioner AND u.clinic_id=:clinic FOR UPDATE');$find->execute(['practitioner'=>$practitionerId,'clinic'=>$actor->clinicId]);$userId=$find->fetchColumn();if(!$userId)throw new ApiException(404,'practitioner_not_found','Practitioner not found.');
+        if($this->globalPractitionersEnabled){
+            $global=$pdo->prepare('SELECT a.status,p.discipline,p.credentials FROM global_practitioner_clinics a JOIN practitioners p ON p.id=a.practitioner_id WHERE a.practitioner_id=?');$global->execute([$practitionerId]);$registered=$global->fetch();
+            if($registered){
+                if($registered['status']!=='active')throw new ApiException(409,'assignment_removed','This clinic assignment was removed centrally.');
+                if($discipline!==$registered['discipline']||$credentials!==$registered['credentials'])throw new ApiException(403,'credential_owner_required','Only the practitioner can choose the credentials and discipline shared with this clinic.');
             }
-            $duplicate=$pdo->prepare('SELECT 1 FROM users WHERE clinic_id=:clinic AND email=:email AND id<>:user');$duplicate->execute(['clinic'=>$actor->clinicId,'email'=>$email,'user'=>(int)$userId]);if($duplicate->fetchColumn())throw new ApiException(409,'email_already_exists','A user with this email already exists in the clinic.');
-            $statement=$pdo->prepare('UPDATE users SET given_name=:given,family_name=:family,display_name=:name,email=:email,status=:status WHERE id=:user');$statement->execute(['given'=>$givenName,'family'=>$familyName,'name'=>$displayName,'email'=>$email,'status'=>$status,'user'=>(int)$userId]);
-            $statement=$pdo->prepare('UPDATE practitioners SET discipline=:discipline,credentials=:credentials,booking_mode=:mode,active=:active WHERE id=:practitioner');$statement->execute(['discipline'=>$discipline,'credentials'=>$credentials,'mode'=>$bookingMode,'active'=>$active?1:0,'practitioner'=>$practitionerId]);
-            $statement=$pdo->prepare('UPDATE practitioner_locations SET active=0 WHERE practitioner_id=:practitioner');$statement->execute(['practitioner'=>$practitionerId]);
-            $statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id,active) VALUES(:practitioner,:location,1) ON DUPLICATE KEY UPDATE active=1');$statement->execute(['practitioner'=>$practitionerId,'location'=>(int)$body['location_id']]);
-            $this->audit->write($actor->clinicId,$actor,$correlationId,'practitioner.update','practitioner',$practitionerId,'success',['user_id'=>(int)$userId,'location_id'=>(int)$body['location_id']]);$pdo->commit();return ['id'=>$practitionerId,'status'=>$status,'active'=>$active];
-        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        }
+        $duplicate=$pdo->prepare('SELECT 1 FROM users WHERE clinic_id=:clinic AND email=:email AND id<>:user');$duplicate->execute(['clinic'=>$actor->clinicId,'email'=>$email,'user'=>(int)$userId]);if($duplicate->fetchColumn())throw new ApiException(409,'email_already_exists','A user with this email already exists in the clinic.');
+        $statement=$pdo->prepare('UPDATE users SET given_name=:given,family_name=:family,display_name=:name,email=:email,status=:status WHERE id=:user');$statement->execute(['given'=>$givenName,'family'=>$familyName,'name'=>$displayName,'email'=>$email,'status'=>$status,'user'=>(int)$userId]);
+        $statement=$pdo->prepare('UPDATE practitioners SET discipline=:discipline,credentials=:credentials,booking_mode=:mode,active=:active WHERE id=:practitioner');$statement->execute(['discipline'=>$discipline,'credentials'=>$credentials,'mode'=>$bookingMode,'active'=>$active?1:0,'practitioner'=>$practitionerId]);
+        $statement=$pdo->prepare('UPDATE practitioner_locations SET active=0 WHERE practitioner_id=:practitioner');$statement->execute(['practitioner'=>$practitionerId]);
+        $statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id,active) VALUES(:practitioner,:location,1) ON DUPLICATE KEY UPDATE active=1');$statement->execute(['practitioner'=>$practitionerId,'location'=>(int)$body['location_id']]);
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'practitioner.update','practitioner',$practitionerId,'success',['user_id'=>(int)$userId,'location_id'=>(int)$body['location_id']]);return ['id'=>$practitionerId,'status'=>$status,'active'=>$active];
     }
 
     public function updateClinic(AuthContext $actor,array $body,string $correlationId): array
@@ -293,10 +324,10 @@ final class AdminService
         return ['user_id'=>$userId,'published'=>$published];
     }
 
-    public function createPractitioner(AuthContext $actor,array $body,string $correlationId): array
+    private function createPractitionerRecord(AuthContext $actor,array $body,string $correlationId): array
     {
         $this->admin($actor);$this->required($body,['user_id','discipline','location_id']);$this->ownedLocation($actor,(int)$body['location_id']);$pdo=$this->database->connection();
-        try{$pdo->beginTransaction();$statement=$pdo->prepare('INSERT INTO practitioners(user_id,discipline,biography,credentials,booking_mode) SELECT id,:discipline,:bio,:credentials,:mode FROM users WHERE id=:user AND clinic_id=:clinic AND user_type=\'staff\'');$statement->execute(['discipline'=>$body['discipline'],'bio'=>$body['biography']??null,'credentials'=>$body['credentials']??null,'mode'=>$body['booking_mode']??'clinic_managed','user'=>(int)$body['user_id'],'clinic'=>$actor->clinicId]);if($statement->rowCount()!==1)throw new ApiException(422,'invalid_user','Practitioner user was not found in this clinic.');$id=(int)$pdo->lastInsertId();$statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id) VALUES(:p,:l)');$statement->execute(['p'=>$id,'l'=>(int)$body['location_id']]);$this->audit->write($actor->clinicId,$actor,$correlationId,'practitioner.create','practitioner',$id);$pdo->commit();return ['id'=>$id,'status'=>'active'];}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        $statement=$pdo->prepare('INSERT INTO practitioners(user_id,discipline,biography,credentials,booking_mode) SELECT id,:discipline,:bio,:credentials,:mode FROM users WHERE id=:user AND clinic_id=:clinic AND user_type=\'staff\' AND status=\'active\'');$statement->execute(['discipline'=>$body['discipline'],'bio'=>$body['biography']??null,'credentials'=>$body['credentials']??null,'mode'=>$body['booking_mode']??'clinic_managed','user'=>(int)$body['user_id'],'clinic'=>$actor->clinicId]);if($statement->rowCount()!==1)throw new ApiException(422,'invalid_user','Practitioner user was not found in this clinic.');$id=(int)$pdo->lastInsertId();$statement=$pdo->prepare('INSERT INTO practitioner_locations(practitioner_id,location_id) VALUES(:p,:l)');$statement->execute(['p'=>$id,'l'=>(int)$body['location_id']]);$this->audit->write($actor->clinicId,$actor,$correlationId,'practitioner.create','practitioner',$id);return ['id'=>$id,'status'=>'active'];
     }
 
     public function createService(AuthContext $actor,array $body,string $correlationId): array

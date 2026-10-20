@@ -81,6 +81,7 @@ final class ConsentAccess
             'qualificationTypes','myQualifications','submitMyQualification','globalCredentials','createGlobalCredential','shareGlobalCredential',
             'staffNotificationPreferences','saveStaffNotificationPreferences','sendStaffNotificationCode','verifyStaffNotificationEmail',
             'validateAddressCoverage','addressCoverageApproval','approveAddressCoverage','revokeAddressCoverage', // AddressCoverageService owns patient/recipient authorization.
+            'createPractitioner','onboardPractitioner','updatePractitioner', // AdminService rechecks current clinic authority; no patient-record or identity transfer.
             'createClient', // ClientService checks registration matches, consent and current creator scope.
             'bookingOptions','clientConsent','saveClientConsent','clients','practitionerClients','bookingClients','appointments','practitionerCalendar',
             'formTemplates','publishForm','publishFormVersion','formHistory','formDrafts','saveFormDraft','updateFormDraft','formDraftDetail','importFormDraft','validateFormSource',

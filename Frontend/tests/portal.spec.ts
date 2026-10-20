@@ -4221,3 +4221,33 @@ for (const action of ['toggle', 'restore'] as const) {
     await expect(page.getByRole('button', {name: 'Enable', exact: true})).toBeDisabled();
   });
 }
+
+for (const deniedStatus of [403, 404]) {
+  test(`practitioner administration clears cached records after ${deniedStatus} update denial`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    const practitioner = {
+      practitioner_id: 8, user_id: 18, given_name: 'Synthetic', family_name: 'Practitioner',
+      display_name: 'Synthetic Practitioner', preferred_name: null, email: 'private-staff@example.test',
+      status: 'active', discipline: 'Massage', credentials: 'Synthetic credentials',
+      booking_mode: 'practitioner_managed', active: true, location_id: 1, locations: 'Main clinic',
+    };
+    let denied = false;
+    await page.route('**/api/v1/admin/practitioners', route => route.fulfill({json: {data: [practitioner]}}));
+    await page.route('**/api/v1/admin/practitioners/8', route => {
+      denied = true;
+      return route.fulfill({status: deniedStatus, json: {error: {code: deniedStatus === 403 ? 'forbidden' : 'practitioner_not_found', message: 'Synthetic denial'}}});
+    });
+    await page.goto(`${portalHost}/admin/practitioners`);
+    await page.getByRole('button', {name: /Synthetic Practitioner.*Synthetic credentials/}).click();
+    await page.getByRole('button', {name: 'Edit', exact: true}).click();
+    await expect(page.getByRole('textbox', {name: 'Email', exact: true})).toHaveValue('private-staff@example.test');
+    await page.getByRole('textbox', {name: 'Credentials', exact: true}).fill('Updated synthetic credentials');
+    await page.getByRole('button', {name: 'Save changes', exact: true}).click();
+    await expect.poll(() => denied).toBe(true);
+    await expect(page.getByText('Unable to load practitioner administration.')).toBeVisible();
+    await expect(page.getByRole('textbox', {name: 'Email', exact: true})).toHaveCount(0);
+    await expect(page.getByRole('button', {name: /Synthetic Practitioner.*Synthetic credentials/})).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Edit', exact: true})).toBeDisabled();
+    await expect(page.getByRole('button', {name: 'New practitioner', exact: true})).toBeDisabled();
+  });
+}
