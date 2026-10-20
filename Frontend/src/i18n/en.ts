@@ -1,4 +1,6 @@
 const en = {
+  "API error: reminder_schedule_access_restricted": "This reminder change requires an authorized privacy review. No changes were saved.",
+  "Reload reminder settings": "Reload reminder settings",
   "Privacy-review permission updated.": "Privacy-review permission updated.",
   "Revoke privacy-review permission": "Revoke privacy-review permission",
   "Grant privacy-review permission": "Grant privacy-review permission",

@@ -56,6 +56,7 @@ function NotificationStatusAdminForm() {
   const [reminders, setReminders] = useState<ReminderSchedule[]>([]);
   const [newReminder, setNewReminder] = useState(1440);
   const [reminderBusy, setReminderBusy] = useState(false);
+  const [reminderReady, setReminderReady] = useState(false);
   const [reminderError, setReminderError] = useState('');
   const reminderRequest = useCallback(async (method = 'GET', path = '', payload?: object): Promise<ReminderSchedule[]> => {
     const token = await getAccessToken();
@@ -68,15 +69,15 @@ function NotificationStatusAdminForm() {
     return (normalizeNumericIds(body.data) as ReminderSchedule[]).map(row => ({ ...row, minutes_before: Number(row.minutes_before) }));
   }, [getAccessToken]);
   const openReminders = async () => {
-    setReminderOpen(true); setReminderBusy(true); (formValidation.clear(), setReminderError(''));
-    try { setReminders(await reminderRequest()); }
-    catch (cause) { formValidation.capture(cause); setReminderError(cause instanceof Error ? cause.message : t('Unable to load reminder settings.')); }
+    setReminderOpen(true); setReminderBusy(true); setReminderReady(false); setReminders([]); (formValidation.clear(), setReminderError(''));
+    try { setReminders(await reminderRequest()); setReminderReady(true); }
+    catch (cause) { formValidation.capture(cause); if(cause instanceof ApiError && [401,403,404].includes(cause.status)){setSelected(null);setData(null);void load();} setReminderError(cause instanceof Error ? cause.message : t('Unable to load reminder settings.')); }
     finally { setReminderBusy(false); }
   };
   const changeReminders = async (method: string, path: string, payload: object) => {
     setReminderBusy(true); (formValidation.clear(), setReminderError(''));
     try { setReminders(await reminderRequest(method, path, payload)); void load(); }
-    catch (cause) { formValidation.capture(cause); setReminderError(cause instanceof Error ? cause.message : t('Unable to save reminder settings.')); }
+    catch (cause) { formValidation.capture(cause); if(cause instanceof ApiError && [401,403,404].includes(cause.status)){setReminders([]);setReminderReady(false);setSelected(null);setData(null);void load();} setReminderError(cause instanceof Error ? cause.message : t('Unable to save reminder settings.')); }
     finally { setReminderBusy(false); }
   };
   const load = useCallback(async () => {
@@ -187,14 +188,15 @@ function NotificationStatusAdminForm() {
       <Divider />
       <Alert severity="info">{t('New reminder times apply to future bookings. Disabling a time cancels its pending emails; enabling it again does not recreate them.')}</Alert>
       {reminderError && <Alert severity="error">{reminderError}</Alert>}
-      {reminders.map(row => <FormControlLabel key={row.id} control={<Switch checked={reminderActive(row)} disabled={reminderBusy} onChange={event => void changeReminders('PATCH', `/${row.id}`, { active: event.target.checked })} />} label={t(reminderLabel[row.minutes_before] ?? `${row.minutes_before} minutes before`)} />)}
-      {!reminders.length && !reminderBusy && <Typography color="text.secondary">{t('No email reminders configured.')}</Typography>}
+      {!reminderReady && !reminderBusy && <Button onClick={() => void openReminders()}>{t('Reload reminder settings')}</Button>}
+      {reminders.map(row => <FormControlLabel key={row.id} control={<Switch checked={reminderActive(row)} disabled={reminderBusy || !reminderReady} onChange={event => void changeReminders('PATCH', `/${row.id}`, { active: event.target.checked })} />} label={t(reminderLabel[row.minutes_before] ?? `${row.minutes_before} minutes before`)} />)}
+      {reminderReady && !reminders.length && !reminderBusy && <Typography color="text.secondary">{t('No email reminders configured.')}</Typography>}
       <Divider />
       <Typography fontWeight={700}>{t('Add reminder time')}</Typography>
       <TextField name="selectedReminderTime" select label={t('Send before appointment')} size="small" value={selectedReminderTime} disabled={!availableReminderTimes.length} onChange={event => setNewReminder(Number(event.target.value))}>
         {availableReminderTimes.map(minutes => <MenuItem key={minutes} value={minutes}>{t(reminderLabel[minutes])}</MenuItem>)}
       </TextField>
-      <Button variant="contained" disabled={reminderBusy || !selectedReminderTime || reminders.filter(reminderActive).length >= 3} onClick={() => void changeReminders('POST', '', { minutes_before: selectedReminderTime })}>{t('Add email reminder')}</Button>
+      <Button variant="contained" disabled={reminderBusy || !reminderReady || !selectedReminderTime || reminders.filter(reminderActive).length >= 3} onClick={() => void changeReminders('POST', '', { minutes_before: selectedReminderTime })}>{t('Add email reminder')}</Button>
       <Typography variant="body2" color="text.secondary">{t('Up to three reminder times can be active. These are operational emails, not SMS.')}</Typography>
     </Stack></Box></Drawer>
   </Stack>;

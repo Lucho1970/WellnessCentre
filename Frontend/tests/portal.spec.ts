@@ -309,6 +309,28 @@ test('super admin explicitly grants and revokes another administrators privacy p
   await expect.poll(()=>methods.join(',')).toBe('PUT,DELETE');
 });
 
+for (const action of ['create','disable']) test(`reminder settings privacy denial requires reload after ${action}`, async ({page}) => {
+  await fixtures(page,['clinic_admin']);let denied=true;let mutation: Record<string,unknown> | null=null;
+  await page.route('**/api/v1/admin/notifications?**',route=>route.fulfill({json:{data:{items:[],counts:{queued:0,sending:0,sent:0,delivered:0,failed:0,canceled:0,needs_review:0,resolved:0},total:0,page:1,page_size:25}}}));
+  await page.route('**/api/v1/admin/reminder-schedules**',route=>{
+    if(route.request().method()!=='GET'){
+      mutation=route.request().postDataJSON();
+      if(denied)return route.fulfill({status:403,json:{error:{code:'reminder_schedule_access_restricted'}}});
+    }
+    return route.fulfill({json:{data:[{id:31,minutes_before:60,active:1}]}});
+  });
+  await page.goto(`${portalHost}/admin/notifications`);await page.getByRole('button',{name:'Reminder settings',exact:true}).click();
+  await expect(page.getByLabel('1 hour before',{exact:true})).toBeChecked();
+  if(action==='disable')await page.getByLabel('1 hour before',{exact:true}).click();else await page.getByRole('button',{name:'Add email reminder',exact:true}).click();
+  await expect(page.getByText('This reminder change requires an authorized privacy review. No changes were saved.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Add email reminder',exact:true})).toBeDisabled();
+  await expect(page.getByLabel('1 hour before',{exact:true})).toHaveCount(0);
+  expect(mutation).toEqual(action==='disable'?{active:false}:{minutes_before:1440});
+  denied=false;await page.getByRole('button',{name:'Reload reminder settings',exact:true}).click();
+  await expect(page.getByLabel('1 hour before',{exact:true})).toBeChecked();
+  await expect(page.getByRole('button',{name:'Add email reminder',exact:true})).toBeEnabled();
+});
+
 async function fixtures(
   page: Page,
   roles?: string[],

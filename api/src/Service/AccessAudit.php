@@ -35,7 +35,7 @@ final class AccessAudit
         'amendment_id'=>'form_amendment',
     ];
     private const ENTITIES = [
-        'reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
+        'reminder-schedules'=>'reminder_schedule','reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
         'next-onsite'=>'appointment','calendar'=>'appointment','receipts'=>'session_receipt','receipt'=>'session_receipt',
         'forms'=>'client_form_task','tasks'=>'client_form_task','templates'=>'form_template','drafts'=>'form_draft',
         'notifications'=>'notification','travel-enquiries'=>'travel_enquiry','messages'=>'travel_enquiry_message',

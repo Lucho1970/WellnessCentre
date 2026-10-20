@@ -67,6 +67,7 @@ final class ConsentAccess
         // These routes contain no patient records, or enforce their own filtered boundary below.
         if(in_array($route,[
             'privacyAuditHistory','grantPrivacyReview','revokePrivacyReview','adminStaff', // Minimal oversight history has separate, explicit authority in PrivacyAuditService.
+            'reminderSchedules','createReminderSchedule','toggleReminderSchedule', // ReminderScheduleService owns configuration and complete pending effects.
             'adminNotifications','practitionerNotifications','reviewNotification',
             'dashboard','practitionerToday','practitionerVisitSummary','practitionerNextOnsite',
             'availabilityRules','scheduleExceptions','timeOffImpact','previewTimeOffImpact','practitionerAvailabilityContext',

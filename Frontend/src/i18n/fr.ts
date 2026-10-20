@@ -1,4 +1,6 @@
 const fr: Record<string, string> = {
+  "API error: reminder_schedule_access_restricted": "Cette modification des rappels nécessite un examen de confidentialité autorisé. Aucune modification n’a été enregistrée.",
+  "Reload reminder settings": "Recharger les paramètres des rappels",
   "Privacy-review permission updated.": "Autorisation de contrôle de confidentialité mise à jour.",
   "Revoke privacy-review permission": "Révoquer l’autorisation de contrôle de confidentialité",
   "Grant privacy-review permission": "Accorder l’autorisation de contrôle de confidentialité",

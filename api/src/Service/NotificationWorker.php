@@ -132,13 +132,14 @@ final class NotificationWorker
         $status = (string)$event['appointment_status'];
         if ($code === 'appointment_reminder') {
             $payload = json_decode((string)($event['payload'] ?? ''), true);
-            if (!is_array($payload)
+            $minutes=ReminderScheduleService::payloadMinutes(is_array($payload)?($payload['minutes_before']??null):null);
+            if ($minutes===null || !is_array($payload)
                 || (int)($payload['appointment_version'] ?? 0) !== (int)$event['version']
                 || !in_array($status, ['requested','confirmed','rescheduled'], true)
                 || strtotime((string)$event['starts_at'] . ' UTC') <= time()
                 || strtotime((string)$event['scheduled_at'] . ' UTC') < time() - 3600) return true;
             $schedule = $this->pdo->prepare("SELECT 1 FROM reminder_schedules WHERE clinic_id=:clinic AND event_code='appointment_reminder' AND channel='email' AND minutes_before=:minutes AND active=1");
-            $schedule->execute(['clinic' => $event['clinic_id'], 'minutes' => (int)($payload['minutes_before'] ?? 0)]);
+            $schedule->execute(['clinic' => $event['clinic_id'], 'minutes' => $minutes]);
             if ($schedule->fetchColumn() === false) return true;
             $recipient = $this->pdo->prepare("SELECT 1 FROM users WHERE id=:user AND clinic_id=:clinic AND user_type='client' AND status='active' AND email=:address");
             $recipient->execute(['user' => $event['recipient_user_id'], 'clinic' => $event['clinic_id'], 'address' => $event['recipient_address']]);

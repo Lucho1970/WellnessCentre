@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Consent-authorized reminder schedules](CONSENT_AUTHORIZED_REMINDER_SCHEDULES.md): complete pending queue authorization, strict worker timing parsing, atomic cancellation audits and settings denial handling.
+
 - [Restricted privacy-audit review](PRIVACY_AUDIT_REVIEW.md): explicit clinic permissions, minimal searchable access history, audited reviews/grants and migration 051.
 
 - [19 October current application release](CURRENT_APP_RELEASE_2026-10-19.md): corrected Livin Lively portal destination, cumulative consent changes, archive destinations and migration prerequisites.
