@@ -12,20 +12,20 @@ final class AdminService
 {
     public function __construct(private readonly Database $database,private readonly AuditLogger $audit,private readonly bool $globalPractitionersEnabled=false) {}
 
-    /** Staff-account maintenance never bypasses clinical-record authorization. */
-    private function practitionerAdministration(AuthContext $actor,callable $work,array $roles=['super_admin']): array
+    /** Clinic administration never grants access to patient records. */
+    private function clinicAdministration(AuthContext $actor,callable $work,array $roles=['super_admin'],bool $clinicWide=false): array
     {
         if($actor->userType!=='staff'||!$actor->hasAnyRole(...$roles))throw new ApiException(403,'forbidden','Administrator access is required.');
         $pdo=$this->database->connection();
-        if($pdo->inTransaction())throw new \LogicException('Practitioner administration requires its own transaction.');
+        if($pdo->inTransaction())throw new \LogicException('Clinic administration requires its own transaction.');
         $lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
         try{
             $pdo->beginTransaction();
             $q=$pdo->prepare("SELECT id FROM clinics WHERE id=? AND status='active' FOR UPDATE");$q->execute([$actor->clinicId]);
             if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Administrator access is required.');
-            $marks=implode(',',array_fill(0,count($roles),'?'));
+            $marks=implode(',',array_fill(0,count($roles),'?'));$roleScope=$clinicWide?' AND ur.location_id IS NULL':'';
             $q=$pdo->prepare("SELECT u.id FROM users u WHERE u.id=? AND u.clinic_id=? AND u.user_type='staff' AND u.status='active'
-                AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code IN ($marks)) FOR UPDATE");
+                AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code IN ($marks)$roleScope) FOR UPDATE");
             $q->execute([$actor->userId,$actor->clinicId,...$roles]);
             if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Administrator access is required.');
             $result=$work();$pdo->commit();return $result;
@@ -34,16 +34,16 @@ final class AdminService
     }
 
     public function practitioners(AuthContext $actor): array
-    {return $this->practitionerAdministration($actor,fn()=>$this->practitionerDirectory($actor));}
+    {return $this->clinicAdministration($actor,fn()=>$this->practitionerDirectory($actor));}
 
     public function onboardPractitioner(AuthContext $actor,array $body,string $cid): array
-    {return $this->practitionerAdministration($actor,fn()=>$this->onboardPractitionerRecord($actor,$body,$cid));}
+    {return $this->clinicAdministration($actor,fn()=>$this->onboardPractitionerRecord($actor,$body,$cid));}
 
     public function updatePractitioner(AuthContext $actor,int $id,array $body,string $cid): array
-    {return $this->practitionerAdministration($actor,fn()=>$this->updatePractitionerRecord($actor,$id,$body,$cid));}
+    {return $this->clinicAdministration($actor,fn()=>$this->updatePractitionerRecord($actor,$id,$body,$cid));}
 
     public function createPractitioner(AuthContext $actor,array $body,string $cid): array
-    {return $this->practitionerAdministration($actor,fn()=>$this->createPractitionerRecord($actor,$body,$cid),['super_admin','clinic_admin']);}
+    {return $this->clinicAdministration($actor,fn()=>$this->createPractitionerRecord($actor,$body,$cid),['super_admin','clinic_admin']);}
 
     private function practitionerDirectory(AuthContext $actor): array
     {
@@ -178,34 +178,61 @@ final class AdminService
 
     public function createLocation(AuthContext $actor,array $body,string $correlationId): array
     {
-        $this->superAdmin($actor);$this->required($body,['name','timezone']);$this->validateLocation($body);
-        $sql='INSERT INTO locations(clinic_id,name,timezone,address_line1,address_line2,city,province,postal_code,phone) VALUES(:clinic,:name,:timezone,:line1,:line2,:city,:province,:postal,:phone)';
-        $statement=$this->database->connection()->prepare($sql);$statement->execute(['clinic'=>$actor->clinicId,'name'=>trim((string)$body['name']),'timezone'=>$body['timezone'],'line1'=>$this->optional($body,'address_line1'),'line2'=>$this->optional($body,'address_line2'),'city'=>$this->optional($body,'city'),'province'=>$this->optional($body,'province'),'postal'=>$this->optional($body,'postal_code'),'phone'=>$this->optional($body,'phone')]);
-        return $this->created($actor,$correlationId,'location',(int)$this->database->connection()->lastInsertId());
+        return $this->clinicAdministration($actor,function()use($actor,$body,$correlationId):array{
+            $this->required($body,['name','timezone']);$this->validateLocation($body);
+            $sql='INSERT INTO locations(clinic_id,name,timezone,address_line1,address_line2,city,province,postal_code,phone,is_bookable) VALUES(:clinic,:name,:timezone,:line1,:line2,:city,:province,:postal,:phone,:bookable)';
+            $statement=$this->database->connection()->prepare($sql);$statement->execute(['clinic'=>$actor->clinicId,'name'=>trim($body['name']),'timezone'=>$body['timezone'],'line1'=>$this->optional($body,'address_line1'),'line2'=>$this->optional($body,'address_line2'),'city'=>$this->optional($body,'city'),'province'=>$this->optional($body,'province'),'postal'=>$this->optional($body,'postal_code'),'phone'=>$this->optional($body,'phone'),'bookable'=>($body['is_bookable']??true)?1:0]);
+            return $this->created($actor,$correlationId,'location',(int)$this->database->connection()->lastInsertId());
+        },clinicWide:true);
     }
 
     public function locations(AuthContext $actor): array
     {
-        $this->superAdmin($actor);$statement=$this->database->connection()->prepare('SELECT id,name,timezone,address_line1,address_line2,city,province,postal_code,phone,is_bookable FROM locations WHERE clinic_id=:clinic ORDER BY name');$statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
+        return $this->clinicAdministration($actor,function()use($actor):array{
+            $statement=$this->database->connection()->prepare('SELECT id,name,timezone,address_line1,address_line2,city,province,postal_code,phone,is_bookable FROM locations WHERE clinic_id=:clinic ORDER BY name');$statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
+        },clinicWide:true);
     }
 
     public function updateLocation(AuthContext $actor,int $locationId,array $body,string $correlationId): array
     {
-        $this->superAdmin($actor);$this->required($body,['name','timezone']);$this->validateLocation($body);
-        $current=$this->database->connection()->prepare('SELECT address_line1,address_line2,city,province,postal_code FROM locations WHERE id=:id AND clinic_id=:clinic');
-        $current->execute(['id'=>$locationId,'clinic'=>$actor->clinicId]);$oldAddress=$current->fetch();
-        $statement=$this->database->connection()->prepare('UPDATE locations SET name=:name,timezone=:timezone,address_line1=:line1,address_line2=:line2,city=:city,province=:province,postal_code=:postal,phone=:phone,is_bookable=:bookable WHERE id=:id AND clinic_id=:clinic');
-        $statement->execute(['name'=>trim((string)$body['name']),'timezone'=>$body['timezone'],'line1'=>$this->optional($body,'address_line1'),'line2'=>$this->optional($body,'address_line2'),'city'=>$this->optional($body,'city'),'province'=>$this->optional($body,'province'),'postal'=>$this->optional($body,'postal_code'),'phone'=>$this->optional($body,'phone'),'bookable'=>(bool)($body['is_bookable']??true)?1:0,'id'=>$locationId,'clinic'=>$actor->clinicId]);
-        if($statement->rowCount()===0){$check=$this->database->connection()->prepare('SELECT 1 FROM locations WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$locationId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'location_not_found','Location not found.');}
-        if($oldAddress){
-            foreach(['address_line1','address_line2','city','province','postal_code'] as $field){
-                if(($oldAddress[$field]??null)!==$this->optional($body,$field)){
-                    $this->database->connection()->prepare('DELETE FROM onsite_area_approvals WHERE clinic_id=:clinic AND location_id=:location')->execute(['clinic'=>$actor->clinicId,'location'=>$locationId]);
-                    break;
-                }
+        return $this->clinicAdministration($actor,function()use($actor,$locationId,$body,$correlationId):array{
+            $this->required($body,['name','timezone']);$this->validateLocation($body);$pdo=$this->database->connection();
+            $current=$pdo->prepare('SELECT * FROM locations WHERE id=? AND clinic_id=? FOR UPDATE');$current->execute([$locationId,$actor->clinicId]);$old=$current->fetch();
+            if(!$old)throw new ApiException(404,'location_not_found','Location not found.');
+            // Optional fields omitted by a PATCH retain their stored values.
+            $body=array_replace($old,$body);
+            $addressChanged=false;
+            foreach(['address_line1','address_line2','city','province','postal_code'] as $field){if($this->optional($old,$field)!==$this->optional($body,$field))$addressChanged=true;}
+            // No preview limit or inner join may hide a restricted or malformed affected row.
+            $approvals=$addressChanged?$this->locationPatientEffects($actor,$locationId,'approvals'):[];
+            if($addressChanged||$old['timezone']!==$body['timezone'])$this->locationPatientEffects($actor,$locationId,'appointments');
+            $statement=$pdo->prepare('UPDATE locations SET name=:name,timezone=:timezone,address_line1=:line1,address_line2=:line2,city=:city,province=:province,postal_code=:postal,phone=:phone,is_bookable=:bookable WHERE id=:id AND clinic_id=:clinic');
+            $statement->execute(['name'=>trim($body['name']),'timezone'=>$body['timezone'],'line1'=>$this->optional($body,'address_line1'),'line2'=>$this->optional($body,'address_line2'),'city'=>$this->optional($body,'city'),'province'=>$this->optional($body,'province'),'postal'=>$this->optional($body,'postal_code'),'phone'=>$this->optional($body,'phone'),'bookable'=>($body['is_bookable']??true)?1:0,'id'=>$locationId,'clinic'=>$actor->clinicId]);
+            if($addressChanged){
+                $pdo->prepare('DELETE FROM onsite_area_approvals WHERE clinic_id=? AND location_id=?')->execute([$actor->clinicId,$locationId]);
+                foreach($approvals as $row)$this->audit->write($actor->clinicId,$actor,$correlationId,'onsite_area.revoke','client',(int)$row['client_id'],'success',['location_id'=>$locationId,'practitioner_id'=>(int)$row['practitioner_id'],'service_id'=>(int)$row['service_id'],'reason'=>'location_address_changed']);
             }
+            $this->audit->write($actor->clinicId,$actor,$correlationId,'location.update','location',$locationId);return ['id'=>$locationId];
+        },clinicWide:true);
+    }
+
+    /** Complete, locked effect set. Historical appointments also use the location's address and timezone. */
+    private function locationPatientEffects(AuthContext $actor,int $location,string $kind): array
+    {
+        $table=match($kind){'approvals'=>'onsite_area_approvals','appointments'=>'appointments',default=>throw new \LogicException('Invalid location effect kind.')};
+        $q=$this->database->connection()->prepare("SELECT x.id,x.clinic_id,x.client_id,x.practitioner_id,x.service_id,patient.id patient_user_id,staff.id staff_user_id,s.id owned_service_id
+            FROM $table x
+            LEFT JOIN users patient ON patient.id=x.client_id AND patient.clinic_id=x.clinic_id AND patient.user_type='client'
+            LEFT JOIN practitioners p ON p.id=x.practitioner_id
+            LEFT JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=x.clinic_id AND staff.user_type='staff'
+            LEFT JOIN services s ON s.id=x.service_id AND s.clinic_id=x.clinic_id
+            WHERE x.location_id=? ORDER BY x.id FOR UPDATE");$q->execute([$location]);$rows=$q->fetchAll();
+        $consent=new ConsentAccess($this->database->connection());
+        foreach($rows as $row){
+            if((int)$row['clinic_id']!==$actor->clinicId||!$row['patient_user_id']||!$row['staff_user_id']||!$row['owned_service_id'])throw new ApiException(409,'location_privacy_review','The location change requires privacy review.');
+            if($consent->restricted($actor->clinicId,(int)$row['client_id'],$actor->userId,true)||$consent->restricted($actor->clinicId,(int)$row['client_id'],(int)$row['staff_user_id'],true))throw new ApiException(403,'consent_restricted','Access is restricted by a patient privacy instruction.');
         }
-        $this->audit->write($actor->clinicId,$actor,$correlationId,'location.update','location',$locationId);return ['id'=>$locationId];
+        return $rows;
     }
 
     public function createRoom(AuthContext $actor,array $body,string $correlationId): array
@@ -594,7 +621,16 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
     private function clinic(int $clinicId): array{$statement=$this->database->connection()->prepare('SELECT name,legal_name,email,phone FROM clinics WHERE id=:clinic');$statement->execute(['clinic'=>$clinicId]);$clinic=$statement->fetch();if(!$clinic)throw new ApiException(404,'clinic_not_found','Clinic not found.');return $clinic;}
     private function ownedLocation(AuthContext $actor,int $locationId): void{$statement=$this->database->connection()->prepare('SELECT 1 FROM locations WHERE id=:id AND clinic_id=:clinic');$statement->execute(['id'=>$locationId,'clinic'=>$actor->clinicId]);if(!$statement->fetchColumn())throw new ApiException(404,'location_not_found','Location not found.');}
     private function ownedServiceCategory(AuthContext $actor,mixed $categoryId): ?int{if($categoryId===null||$categoryId==='')return null;if(filter_var($categoryId,FILTER_VALIDATE_INT)===false||(int)$categoryId<=0)throw new ApiException(422,'validation_error','Choose a valid service category.',['category_id'=>'Invalid category']);$statement=$this->database->connection()->prepare('SELECT 1 FROM service_categories WHERE id=:id AND clinic_id=:clinic');$statement->execute(['id'=>(int)$categoryId,'clinic'=>$actor->clinicId]);if(!$statement->fetchColumn())throw new ApiException(422,'validation_error','Choose a valid service category.',['category_id'=>'Category not found']);return (int)$categoryId;}
-    private function validateLocation(array $body): void{if(strlen(trim((string)$body['name']))>150)throw new ApiException(422,'validation_error','The location name is too long.',['name'=>'Maximum 150 characters']);if(!in_array((string)$body['timezone'],timezone_identifiers_list(),true))throw new ApiException(422,'validation_error','Enter a valid timezone.',['timezone'=>'Invalid timezone']);foreach(['address_line1'=>190,'address_line2'=>190,'city'=>100,'province'=>100,'postal_code'=>20,'phone'=>40] as $field=>$limit)if(strlen(trim((string)($body[$field]??'')))>$limit)throw new ApiException(422,'validation_error',"{$field} is too long.",[$field=>"Maximum {$limit} characters"]);}
+    private function validateLocation(array $body): void
+    {
+        foreach(['name'=>120,'timezone'=>64,'address_line1'=>190,'address_line2'=>190,'city'=>100,'province'=>100,'postal_code'=>20,'phone'=>40] as $field=>$limit){
+            $value=$body[$field]??'';
+            if(!is_string($value)||mb_strlen(trim($value))>$limit||preg_match('/[\x00-\x1f\x7f]/',$value))throw new ApiException(422,'validation_error','Check the location fields.',[$field=>"Maximum $limit characters; text only"]);
+        }
+        if(trim($body['name'])==='')throw new ApiException(422,'validation_error','name is required.',['name'=>'Required']);
+        if(!in_array($body['timezone'],timezone_identifiers_list(),true))throw new ApiException(422,'validation_error','Enter a valid timezone.',['timezone'=>'Invalid timezone']);
+        if(array_key_exists('is_bookable',$body)&&!is_bool($body['is_bookable']))throw new ApiException(422,'validation_error','Check the location fields.',['is_bookable'=>'Boolean required']);
+    }
     private function validateRoom(array $body): void{$name=trim((string)$body['name']);$turnover=(int)($body['turnover_minutes']??0);if($name===''||strlen($name)>100)throw new ApiException(422,'validation_error','Enter a valid room name.',['name'=>'Required; maximum 100 characters']);if(strlen(trim((string)($body['room_type']??'')))>80)throw new ApiException(422,'validation_error','The room type is too long.',['room_type'=>'Maximum 80 characters']);if($turnover<0||$turnover>240||$turnover%5!==0)throw new ApiException(422,'validation_error','Turnover time must be a 5-minute increment between 0 and 240.',['turnover_minutes'=>'Invalid turnover time']);}
     public static function durationOptions(array $body): array
     {

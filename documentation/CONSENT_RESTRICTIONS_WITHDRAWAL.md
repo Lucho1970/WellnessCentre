@@ -35,6 +35,7 @@ Policy updates, append-only `client_consent_events` evidence and the `consent.di
 
 ## Enforcement boundaries
 
+- [Clinic location administration](CONSENT_AUTHORIZED_LOCATIONS.md) now checks current clinic-wide Super Admin authority and all appointment/approval effects of address/timezone edits before atomic changes. Ordinary metadata edits and creation do not grant patient access.
 - [Practitioner enquiry review](CONSENT_AUTHORIZED_PRACTITIONER_ENQUIRIES.md) now rechecks current clinic or central authority for recruitment inbox review and audited notification claims. Recruitment submissions do not restore patient access or create staff/patient relationships.
 - [Receipt-template maintenance](CONSENT_AUTHORIZED_RECEIPT_TEMPLATES.md) now rechecks current clinic administrator authority for future issuer configuration, with atomic version/audit writes. Patient-scoped receipt access remains restricted.
 - [Staff avatar moderation](CONSENT_AUTHORIZED_STAFF_AVATARS.md) now authorizes current clinic Super Admin access to staff photos only, with separate self-service scope and atomic image/audit changes. Patient targets are excluded.

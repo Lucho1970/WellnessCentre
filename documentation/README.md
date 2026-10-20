@@ -1,5 +1,6 @@
 # Wellness Centre Documentation
 
+- [Consent-authorized clinic locations](CONSENT_AUTHORIZED_LOCATIONS.md): current clinic-wide authority, complete appointment/approval checks, atomic revocation audits and portal denial cleanup.
 - [Consent-authorized practitioner enquiries](CONSENT_AUTHORIZED_PRACTITIONER_ENQUIRIES.md): current clinic/central review authority, audited notification claims, clinic isolation and portal denial cleanup.
 - [Consent-authorized receipt templates](CONSENT_AUTHORIZED_RECEIPT_TEMPLATES.md): current clinic administrator checks, atomic versioned issuer configuration and preserved patient receipt restrictions.
 - [Consent-authorized staff avatars](CONSENT_AUTHORIZED_STAFF_AVATARS.md): staff-only moderation, current clinic authority, atomic image audits and profile/header denial cleanup.

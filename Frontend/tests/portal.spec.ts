@@ -4425,3 +4425,34 @@ for (const action of ['refresh', 'status', 'notify'] as const) test(`practitione
   await expect(page.getByText(item.email, { exact: false })).toBeVisible();
   expect(writes).toBe(action === 'refresh' ? 0 : 1);
 });
+
+for (const mode of ['403', '404', 'reload'] as const) test(`location ${mode} refusal clears cached configuration and waits for authorized reload`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false, writes = 0;
+  let item = { id: 11, name: 'Private synthetic site', timezone: 'America/Toronto', address_line1: '11 Synthetic Base', address_line2: null, city: 'Toronto', province: 'ON', postal_code: 'M5V 1A1', phone: '', is_bookable: 1 };
+  await page.route('**/api/v1/admin/locations**', route => {
+    if (route.request().method() === 'PATCH') {
+      writes++; denied = true;
+      expect(route.request().postDataJSON().name).toBe('Unapproved draft');
+      if (mode === 'reload') { item = { ...item, name: 'Unapproved draft' }; return route.fulfill({ json: { data: { id: 11 } } }); }
+      return route.fulfill({ status: Number(mode), json: { error: { code: mode === '403' ? 'consent_restricted' : 'location_not_found' } } });
+    }
+    return route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: [item] } });
+  });
+  await page.goto(`${portalHost}/admin/locations`);
+  await page.getByRole('button', { name: /Private synthetic site.*Bookable/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Location name', exact: true }).fill('Unapproved draft');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Location name', exact: true })).toHaveCount(0);
+  await expect(page.getByText('11 Synthetic Base', { exact: false })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Private synthetic site.*Bookable/ })).toHaveCount(0);
+  await expect(page.getByText('Unapproved draft was updated.', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New location', exact: true })).toBeDisabled();
+  denied = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('button', { name: new RegExp(`${item.name}.*Bookable`) })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New location', exact: true }).first()).toBeEnabled();
+  expect(writes).toBe(1);
+});
