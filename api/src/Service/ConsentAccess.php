@@ -66,6 +66,7 @@ final class ConsentAccess
             && in_array($r->method,['GET','POST'],true))return; // TravelEnquiryService owns row-level authorization.
         // These routes contain no patient records, or enforce their own filtered boundary below.
         if(in_array($route,[
+            'saveReceiptTemplate', // SessionReceiptService checks current clinic administration; future issuer configuration only.
             'privacyAuditHistory','grantPrivacyReview','revokePrivacyReview','adminStaff', // Minimal oversight history has separate, explicit authority in PrivacyAuditService.
             'reminderSchedules','createReminderSchedule','toggleReminderSchedule', // ReminderScheduleService authorizes pending effects.
             // Declarative configuration only; DashboardService rechecks current clinic Super Admin authority.

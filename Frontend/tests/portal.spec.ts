@@ -4367,3 +4367,33 @@ test('staff avatar upload normalizes an image and removal clears both displayed 
   await expect(page.getByText('Profile image removed.', {exact: true})).toBeVisible();
   await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(0);
 });
+
+for (const initiallyPermitted of [false, true]) test(`receipt template ${initiallyPermitted ? 'reports revoked save authority and refreshes permissions' : 'hides editing when the server denies template authority'}`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'clinic', destination_snapshot: null, travel_buffer_minutes: 0, base_price_cents: 10000, mobile_fee_cents: 0 };
+  let permitted = initiallyPermitted, saves = 0;
+  await page.route('**/api/v1/appointments?**', route => route.fulfill({ json: { data: [appointment] } }));
+  await page.route('**/api/v1/appointments/41', route => route.fulfill({ json: { data: appointment } }));
+  await page.route('**/api/v1/appointments/41/logistics-notes', route => route.fulfill({ json: { data: { notes: [], truncated: false } } }));
+  await page.route('**/api/v1/appointments/41/receipt', route => route.fulfill({ json: { data: { enabled: true, can_edit_template: permitted, template: { issuer_name: 'Current issuer', issuer_address: '123 Test Street', issuer_contact: 'issuer@example.test', clinic_logo: '' }, template_version: 7, profile: null, profile_version: 0, appointment: { ...appointment, base_cents: 10000, travel_cents: 0 }, items: [] } } }));
+  await page.route('**/api/v1/receipts/template', route => {
+    saves++; permitted = false;
+    expect(route.request().postDataJSON()).toMatchObject({ version: 7, issuer_name: 'Attempted replacement' });
+    return route.fulfill({ status: 403, json: { error: { code: 'forbidden', message: 'Only current clinic administrators may maintain the receipt template.' } } });
+  });
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await expect(page.getByRole('heading', { name: 'Session receipt', exact: true })).toBeVisible();
+  if (initiallyPermitted) {
+    await page.getByRole('button', { name: 'Clinic receipt template', exact: true }).click();
+    await page.getByLabel('Receipt issuer name').fill('Attempted replacement');
+    await page.getByRole('button', { name: 'Save clinic receipt template', exact: true }).click();
+    await expect(page.getByText('You do not have permission to perform this action.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Receipt issued and available in the client portal.', { exact: true })).toHaveCount(0);
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Refresh', exact: true }).last().click();
+  }
+  await expect(page.getByRole('button', { name: 'Clinic receipt template', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Receipt issuer name')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save clinic receipt template', exact: true })).toHaveCount(0);
+  expect(saves).toBe(initiallyPermitted ? 1 : 0);
+});

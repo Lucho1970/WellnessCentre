@@ -35,6 +35,7 @@ Policy updates, append-only `client_consent_events` evidence and the `consent.di
 
 ## Enforcement boundaries
 
+- [Receipt-template maintenance](CONSENT_AUTHORIZED_RECEIPT_TEMPLATES.md) now rechecks current clinic administrator authority for future issuer configuration, with atomic version/audit writes. Patient-scoped receipt access remains restricted.
 - [Staff avatar moderation](CONSENT_AUTHORIZED_STAFF_AVATARS.md) now authorizes current clinic Super Admin access to staff photos only, with separate self-service scope and atomic image/audit changes. Patient targets are excluded.
 - [Practitioner qualifications](CONSENT_AUTHORIZED_QUALIFICATIONS.md) now permit authorized credential review and revocation under unrelated restrictions, with current clinic roles, own-profile scope, independent verification and atomic audits.
 - [Staff invitations](CONSENT_AUTHORIZED_STAFF_INVITATIONS.md) now permit authorized invitation management and revocation despite unrelated patient restrictions; verified claims, least-privilege memberships, named/global directives and current local authority remain enforced.

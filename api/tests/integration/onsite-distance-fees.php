@@ -8,6 +8,8 @@ use Wellness\Http\ApiException;
 use Wellness\Service\{AddressCoverageService,AdminService,AuditLogger,BookingService,OnsiteFee,OnsiteFeeService,SessionReceiptService,RecurringBookingService};
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/038_practitioner_private_locations.sql'));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/043_session_receipts.sql'));
+// Current persisted clinic authority is required for issuer-template maintenance.
+$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='super_admin'");
 $checks=0;
 $assert=function(bool $ok,string $why)use(&$checks){if(!$ok)throw new RuntimeException($why);$checks++;};
 $deny=function(callable $action,string $code)use($assert){try{$action();}catch(ApiException $e){$assert($e->errorCode===$code,'Expected '.$code.', got '.$e->errorCode);return;}throw new RuntimeException('Expected '.$code);};

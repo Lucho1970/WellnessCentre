@@ -6,6 +6,8 @@ use Wellness\Auth\AuthContext;
 use Wellness\Http\ApiException;
 use Wellness\Service\{AuditLogger,SessionReceiptService};
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/043_session_receipts.sql'));
+// Current persisted clinic authority is required for issuer-template maintenance.
+$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='super_admin'");
 $receipts=new SessionReceiptService($database,new AuditLogger($database));$checks=0;
 set_error_handler(static function(int $severity,string $message,string $file,int $line): bool {if(!(error_reporting()&$severity))return false;throw new ErrorException($message,0,$severity,$file,$line);});
 $assert=function(bool $ok,string $why)use(&$checks){if(!$ok)throw new RuntimeException($why);$checks++;};

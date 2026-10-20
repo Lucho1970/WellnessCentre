@@ -31,4 +31,5 @@ $jwks=json_decode((string)getenv('ACCESS_AUDIT_TEST_JWKS'),true,32,JSON_THROW_ON
 (new ReflectionProperty(Api::class,'auth'))->setValue($api,new EntraAuthenticator($config,$db,static fn()=>$jwks));
 (new ReflectionProperty(Api::class,'customerAuth'))->setValue($api,new CustomerAuthenticator($config,static fn(bool $refresh)=>$jwks));
 $_ENV['CLIENT_FORMS_ENABLED']='true';
+$_ENV['SESSION_RECEIPTS_ENABLED']=getenv('ACCESS_AUDIT_TEST_RECEIPTS')==='synthetic-local-only'?'true':'false';
 $api->handle();

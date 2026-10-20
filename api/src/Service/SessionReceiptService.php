@@ -75,14 +75,30 @@ final class SessionReceiptService
     {
         if(!is_int($body['version']??null)||$body['version']<0)throw new ApiException(422,'validation_error','A saved settings version is required.');
         $pdo=$this->database->connection();$version=$body['version'];$json=json_encode($settings,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        // Template maintenance has no patient target. It needs its own current-authority
+        // boundary before it may bypass the conservative route consent block.
+        $lock=null;
+        if($a===null){
+            if($pdo->inTransaction())throw new \LogicException('Receipt template operations require their own transaction.');
+            $lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
+        }
         try{$pdo->beginTransaction();
             // Serialize first inserts and updates with receipt issuance in this clinic.
-            $q=$pdo->prepare('SELECT id FROM clinics WHERE id=? FOR UPDATE');$q->execute([$actor->clinicId]);
+            $q=$pdo->prepare('SELECT id FROM clinics WHERE id=?'.($a===null?" AND status='active'":'').' FOR UPDATE');$q->execute([$actor->clinicId]);
+            if($a===null){
+                if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Only current clinic administrators may maintain the receipt template.');
+                $q=$pdo->prepare("SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id
+                    WHERE u.id=? AND u.clinic_id=? AND u.user_type='staff' AND u.status='active'
+                    AND r.code IN ('super_admin','clinic_admin') LIMIT 1 FOR UPDATE");
+                $q->execute([$actor->userId,$actor->clinicId]);
+                if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Only current clinic administrators may maintain the receipt template.');
+            }
             $current=$this->settings($actor,$a);if($current[$a?'profile_version':'template_version']!==$version)throw new ApiException(409,'receipt_settings_changed','Receipt settings changed. Refresh and try again.');
             if($a){$q=$pdo->prepare('INSERT INTO practitioner_receipt_profiles(clinic_id,practitioner_id,service_id,settings,updated_by) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE settings=VALUES(settings),version=version+1,updated_by=VALUES(updated_by),updated_at=UTC_TIMESTAMP()');$q->execute([$actor->clinicId,$a['practitioner_id'],$a['service_id'],$json,$actor->userId]);}
             else{$q=$pdo->prepare('INSERT INTO receipt_templates(clinic_id,settings,updated_by) VALUES(?,?,?) ON DUPLICATE KEY UPDATE settings=VALUES(settings),version=version+1,updated_by=VALUES(updated_by),updated_at=UTC_TIMESTAMP()');$q->execute([$actor->clinicId,$json,$actor->userId]);}
-            $this->audit->write($actor->clinicId,$actor,$correlation,$a?'receipt.profile_save':'receipt.template_save',$a?'practitioner':'clinic',$a?(int)$a['practitioner_id']:$actor->clinicId);$pdo->commit();return ['version'=>$version+1];
+            $this->audit->write($actor->clinicId,$actor,$correlation,$a?'receipt.profile_save':'receipt.template_save',$a?'practitioner':'clinic',$a?(int)$a['practitioner_id']:$actor->clinicId);$pdo->commit();return ($a===null?['clinic_id'=>$actor->clinicId]:[])+['version'=>$version+1];
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$lock?->release();}
     }
     public function context(AuthContext $actor,int $appointmentId): array
     {

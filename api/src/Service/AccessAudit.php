@@ -84,7 +84,7 @@ final class AccessAudit
             'dashboard','preferences','visit-summary','travel-estimate','qualifications','types','public-card',
             'avatar','work-location','travel-settings','global-credentials','discovery-preferences','discovery',
             'form-library','library','source','versions','review','copy','submit','amendments','draft','notify',
-            'practitioner-enquiries','settings','health','database','public','site-config',
+            'practitioner-enquiries','settings','template','health','database','public','site-config',
         ]);
         $segments = explode('/', trim($request->path, '/')); $safe = []; $targets = []; $entity = 'record';
         foreach ($segments as $index=>$segment) {
