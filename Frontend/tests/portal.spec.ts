@@ -4188,3 +4188,36 @@ test('practitioner travel settings support French mobile forms and field validat
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('practitioner-travel-settings-mobile-fr.png'), fullPage: true });
 });
+
+for (const action of ['toggle', 'restore'] as const) {
+  test(`widget management clears cached configuration after ${action} authorization denial`, async ({ page }) => {
+    await fixtures(page, ['super_admin']);
+    const definition = {
+      id: 'appointments_today', schemaVersion: 1, workspaces: ['admin'], renderer: 'metric',
+      dataProjection: 'appointment_count', requiredCapability: 'appointments.view.clinic',
+      title: { en: 'Synthetic widget configuration', fr: 'Configuration' },
+      description: { en: 'Synthetic widget description', fr: 'Description' },
+      icon: 'calendar-check', sizes: ['small'], defaultSize: 'small', parameters: {},
+    };
+    await page.route('**/api/v1/admin/dashboard-widgets', route => route.fulfill({json: {data: [
+      {id: definition.id, source: 'built_in', enabled: true, active_version: 2, has_override: true, definition},
+    ]}}));
+    await page.route('**/api/v1/admin/dashboard-widgets/appointments_today/versions', route => route.fulfill({json: {data: {
+      built_in: false, versions: [{version_number: 1, definition_hash: 'abc', created_at: '2026-10-19T12:00:00Z', created_by: 'Synthetic administrator', active: false, definition}],
+    }}}));
+    const denied = {status: 403, json: {error: {code: 'forbidden', message: 'Widget authority was revoked.'}}};
+    await page.route('**/api/v1/admin/dashboard-widgets/appointments_today', route => route.fulfill(denied));
+    await page.route('**/api/v1/admin/dashboard-widgets/appointments_today/versions/1/restore', route => route.fulfill(denied));
+    await page.goto(`${portalHost}/admin/dashboard-widgets`);
+    await expect(page.getByRole('heading', {name: 'Synthetic widget configuration'})).toBeVisible();
+    if(action === 'restore') {
+      await page.getByRole('button', {name: 'Versions', exact: true}).click();
+      await page.getByRole('button', {name: 'Restore', exact: true}).click();
+    } else await page.getByRole('button', {name: 'Disable', exact: true}).click();
+    await expect(page.getByText('You do not have permission to perform this action.')).toBeVisible();
+    await expect(page.getByText('Synthetic widget description', {exact: true})).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Versions', exact: true})).toBeDisabled();
+    await expect(page.getByRole('button', {name: 'Enable', exact: true})).toBeDisabled();
+  });
+}

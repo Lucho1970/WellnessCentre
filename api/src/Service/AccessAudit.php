@@ -17,14 +17,14 @@ final class AccessAudit
     private ?int $actorId = null;
     private ?int $actorClinic = null;
     private const CONTAINERS = [
-        'data','items','appointments','appointment','clients','client','practitioners','practitioner',
+        'data','items','versions','appointments','appointment','clients','client','practitioners','practitioner',
         'users','user','profile','events','notes','note','messages','forms','tasks','receipts','notifications',
         'invitations','claims','entries','series','history','changes','widgets','results','records','amendments',
         'upcoming','recent','next_appointment','follow_ups','time_off_follow_ups','combinations','locations','services',
         'staff','qualifications','types','clinics','credentials','customer_links','survivor','duplicate','memberships',
     ];
     private const IDS = [
-        'target_staff_id'=>'user','client_id'=>'client','user_id'=>'user','practitioner_id'=>'practitioner','appointment_id'=>'appointment',
+        'widget_id'=>'dashboard_widget','target_staff_id'=>'user','client_id'=>'client','user_id'=>'user','practitioner_id'=>'practitioner','appointment_id'=>'appointment',
         'form_template_id'=>'form_template','submission_id'=>'form_submission','task_id'=>'client_form_task',
         'receipt_id'=>'session_receipt','invoice_id'=>'invoice','payment_id'=>'payment','enquiry_id'=>'travel_enquiry',
         'notification_id'=>'notification','series_id'=>'recurring_series','recurring_series_id'=>'recurring_series',
@@ -35,7 +35,7 @@ final class AccessAudit
         'amendment_id'=>'form_amendment',
     ];
     private const ENTITIES = [
-        'reminder-schedules'=>'reminder_schedule','reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
+        'dashboard-widgets'=>'dashboard_widget','reminder-schedules'=>'reminder_schedule','reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
         'next-onsite'=>'appointment','calendar'=>'appointment','receipts'=>'session_receipt','receipt'=>'session_receipt',
         'forms'=>'client_form_task','tasks'=>'client_form_task','templates'=>'form_template','drafts'=>'form_draft',
         'notifications'=>'notification','travel-enquiries'=>'travel_enquiry','messages'=>'travel_enquiry_message',
@@ -94,7 +94,8 @@ final class AccessAudit
                 $safe[] = ':id';
                 $type = self::ENTITIES[$segments[$index-1] ?? ''] ?? $entity;
                 if ($type === 'practitioner' && str_starts_with($request->path,'/api/v1/application/practitioners/')) $type = 'global_practitioner';
-                $targets[$type.':'.$id] = ['type'=>$type,'id'=>$id];
+                // A widget restore URL contains a version ordinal, not a resource ID.
+                if(!(str_contains($request->path,'/dashboard-widgets/')&&($segments[$index-1]??'')==='versions'))$targets[$type.':'.$id] = ['type'=>$type,'id'=>$id];
             } else $safe[] = in_array($segment,$words,true) ? $segment : ':value';
         }
         // Calendar mixes appointments and time off; nested response kinds refine the type.
@@ -132,7 +133,7 @@ final class AccessAudit
                     $recordType = $key === 'id' ? $type : self::IDS[$key];
                     if ($id !== null) $found[$recordType.':'.$id] = ['type'=>$recordType,'id'=>$id];
                 }
-                if (is_array($value) && in_array($key,self::CONTAINERS,true)) {
+                if (is_array($value) && in_array($key,self::CONTAINERS,true) && ($key!=='versions'||$type==='dashboard_widget')) {
                     $next = self::ENTITIES[$key] ?? match($key) {
                         'client'=>'client','appointment'=>'appointment','practitioner'=>'practitioner',
                         'user','profile','staff'=>'user','notes','note'=>'appointment_logistics_note','events'=>'event',

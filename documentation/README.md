@@ -1,5 +1,6 @@
 # Wellness Centre Documentation
 
+- [Consent-authorized dashboard widget management](CONSENT_AUTHORIZED_DASHBOARD_WIDGETS.md): current clinic Super Admin checks, stored-definition validation, atomic configuration audits and denial cleanup.
 - [Consent-authorized reminder schedules](CONSENT_AUTHORIZED_REMINDER_SCHEDULES.md): complete pending queue authorization, strict worker timing parsing, atomic cancellation audits and settings denial handling.
 
 - [Restricted privacy-audit review](PRIVACY_AUDIT_REVIEW.md): explicit clinic permissions, minimal searchable access history, audited reviews/grants and migration 051.

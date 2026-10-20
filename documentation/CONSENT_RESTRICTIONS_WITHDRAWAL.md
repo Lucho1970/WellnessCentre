@@ -35,6 +35,7 @@ Policy updates, append-only `client_consent_events` evidence and the `consent.di
 
 ## Enforcement boundaries
 
+- [Dashboard widget management](CONSENT_AUTHORIZED_DASHBOARD_WIDGETS.md) now permits patient-free declarative configuration with current clinic Super Admin authority, stored-definition revalidation and atomic audit writes. Published widgets retain viewer-specific consent and practitioner filters.
 - [Reminder settings](CONSENT_AUTHORIZED_REMINDER_SCHEDULES.md) now separate patient-free configuration reads from complete authorization of matching pending queue effects. Worker communication restrictions remain independent; malformed timing payloads cannot bypass the authorization predicate through numeric coercion.
 - [Privacy-audit review](PRIVACY_AUDIT_REVIEW.md) has separate, explicit clinic oversight authority for minimal access-history references. It preserves ordinary clinical restrictions; narrowly scoped permission revocation remains available under those restrictions.
 - Client searches/directories, booking contacts, appointment lists and practitioner calendars filter restricted clients in SQL before ordering, pagination or `has_more` calculation.
