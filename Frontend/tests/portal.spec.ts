@@ -4456,3 +4456,44 @@ for (const mode of ['403', '404', 'reload'] as const) test(`location ${mode} ref
   await expect(page.getByRole('button', { name: 'New location', exact: true }).first()).toBeEnabled();
   expect(writes).toBe(1);
 });
+
+for (const mode of ['403', '404', 'reload', 'review'] as const) test(`room ${mode} refusal preserves the authorization boundary and supports recovery`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false, writes = 0;
+  let item = { id: 21, location_id: 11, location_name: 'Test site', name: 'Private synthetic room', room_type: 'Treatment room', equipment_notes: 'Private equipment notes', turnover_minutes: 0, is_bookable: 1 };
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 11, name: 'Test site' }] } }));
+  await page.route('**/api/v1/admin/rooms**', route => {
+    if (route.request().method() === 'PATCH') {
+      writes++;
+      expect(route.request().postDataJSON()).toMatchObject({ location_id: 11, name: 'Unapproved room draft', turnover_minutes: 0 });
+      if (mode === 'review') return route.fulfill({ status: 409, json: { error: { code: 'room_relocation_review' } } });
+      denied = true;
+      if (mode === 'reload') { item = { ...item, name: 'Unapproved room draft' }; return route.fulfill({ json: { data: { id: 21 } } }); }
+      return route.fulfill({ status: Number(mode), json: { error: { code: mode === '403' ? 'consent_restricted' : 'room_not_found' } } });
+    }
+    return route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: [item] } });
+  });
+  await page.goto(`${portalHost}/admin/rooms`);
+  await page.getByRole('button', { name: /Private synthetic room.*Bookable/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Room name', exact: true }).fill('Unapproved room draft');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  if (mode === 'review') {
+    await expect(page.getByText('Moving this room requires a reviewed migration of its booking history or assignments.', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Room name', exact: true })).toHaveValue('Unapproved room draft');
+    await expect(page.getByRole('textbox', { name: 'Equipment and room notes', exact: true })).toHaveValue(item.equipment_notes);
+  } else {
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Room name', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Equipment and room notes', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Private synthetic room.*Bookable/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'New room', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Capabilities', exact: true })).toBeDisabled();
+    denied = false;
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByRole('button', { name: new RegExp(`${item.name}.*Bookable`) })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New room', exact: true })).toBeEnabled();
+  }
+  await expect(page.getByText('Unapproved room draft was updated.', { exact: true })).toHaveCount(0);
+  expect(writes).toBe(1);
+});

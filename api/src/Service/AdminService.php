@@ -237,13 +237,71 @@ final class AdminService
 
     public function createRoom(AuthContext $actor,array $body,string $correlationId): array
     {
-        $this->superAdmin($actor);$this->required($body,['location_id','name']);$this->ownedLocation($actor,(int)$body['location_id']);$this->validateRoom($body);
-        $statement=$this->database->connection()->prepare('INSERT INTO rooms(location_id,name,room_type,equipment_notes,turnover_minutes,is_bookable) VALUES(:location,:name,:type,:notes,:turnover,:bookable)');$statement->execute(['location'=>(int)$body['location_id'],'name'=>trim((string)$body['name']),'type'=>$this->optional($body,'room_type'),'notes'=>$this->optional($body,'equipment_notes'),'turnover'=>(int)($body['turnover_minutes']??0),'bookable'=>(bool)($body['is_bookable']??true)?1:0]);
-        return $this->created($actor,$correlationId,'room',(int)$this->database->connection()->lastInsertId());
+        return $this->clinicAdministration($actor,function()use($actor,$body,$correlationId):array{
+            $this->required($body,['location_id','name']);$this->validateRoom($body);$this->roomLocation($actor,(int)$body['location_id']);
+            $statement=$this->database->connection()->prepare('INSERT INTO rooms(location_id,name,room_type,equipment_notes,turnover_minutes,is_bookable) VALUES(:location,:name,:type,:notes,:turnover,:bookable)');
+            $statement->execute(['location'=>(int)$body['location_id'],'name'=>trim($body['name']),'type'=>$this->optional($body,'room_type'),'notes'=>$this->optional($body,'equipment_notes'),'turnover'=>$body['turnover_minutes']??0,'bookable'=>($body['is_bookable']??true)?1:0]);
+            return $this->created($actor,$correlationId,'room',(int)$this->database->connection()->lastInsertId());
+        },clinicWide:true);
     }
 
-    public function rooms(AuthContext $actor): array{$this->superAdmin($actor);$statement=$this->database->connection()->prepare('SELECT r.id,r.location_id,r.name,r.room_type,r.equipment_notes,r.turnover_minutes,r.is_bookable,l.name AS location_name FROM rooms r JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic ORDER BY l.name,r.name');$statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();}
-    public function updateRoom(AuthContext $actor,int $roomId,array $body,string $correlationId): array{$this->superAdmin($actor);$this->required($body,['location_id','name']);$this->ownedLocation($actor,(int)$body['location_id']);$this->validateRoom($body);$statement=$this->database->connection()->prepare('UPDATE rooms r JOIN locations current_location ON current_location.id=r.location_id SET r.location_id=:location,r.name=:name,r.room_type=:type,r.equipment_notes=:notes,r.turnover_minutes=:turnover,r.is_bookable=:bookable WHERE r.id=:id AND current_location.clinic_id=:clinic');$statement->execute(['location'=>(int)$body['location_id'],'name'=>trim((string)$body['name']),'type'=>$this->optional($body,'room_type'),'notes'=>$this->optional($body,'equipment_notes'),'turnover'=>(int)($body['turnover_minutes']??0),'bookable'=>(bool)($body['is_bookable']??true)?1:0,'id'=>$roomId,'clinic'=>$actor->clinicId]);if($statement->rowCount()===0){$check=$this->database->connection()->prepare('SELECT 1 FROM rooms r JOIN locations l ON l.id=r.location_id WHERE r.id=:id AND l.clinic_id=:clinic');$check->execute(['id'=>$roomId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'room_not_found','Room not found.');}$this->audit->write($actor->clinicId,$actor,$correlationId,'room.update','room',$roomId);return ['id'=>$roomId];}
+    public function rooms(AuthContext $actor): array
+    {
+        return $this->clinicAdministration($actor,function()use($actor):array{
+            $statement=$this->database->connection()->prepare('SELECT r.id,r.location_id,r.name,r.room_type,r.equipment_notes,r.turnover_minutes,r.is_bookable,l.name AS location_name FROM rooms r JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic ORDER BY l.name,r.name');$statement->execute(['clinic'=>$actor->clinicId]);return $statement->fetchAll();
+        },clinicWide:true);
+    }
+
+    public function updateRoom(AuthContext $actor,int $roomId,array $body,string $correlationId): array
+    {
+        return $this->clinicAdministration($actor,function()use($actor,$roomId,$body,$correlationId):array{
+            $this->required($body,['location_id','name']);$this->validateRoom($body);$pdo=$this->database->connection();
+            $q=$pdo->prepare('SELECT r.* FROM rooms r JOIN locations l ON l.id=r.location_id WHERE r.id=? AND l.clinic_id=? FOR UPDATE');$q->execute([$roomId,$actor->clinicId]);$old=$q->fetch();
+            if(!$old)throw new ApiException(404,'room_not_found','Room not found.');
+            $this->roomLocation($actor,(int)$body['location_id']);$body=array_replace($old,$body);
+            $relocated=(int)$old['location_id']!==(int)$body['location_id'];$turnoverChanged=(int)$old['turnover_minutes']!==(int)$body['turnover_minutes'];
+            if($relocated)$this->roomRelocation($actor,$roomId);
+            if($turnoverChanged)$this->roomAppointmentEffects($actor,$roomId,(int)$old['location_id']);
+            $q=$pdo->prepare('UPDATE rooms SET location_id=?,name=?,room_type=?,equipment_notes=?,turnover_minutes=?,is_bookable=? WHERE id=?');
+            $q->execute([(int)$body['location_id'],trim($body['name']),$this->optional($body,'room_type'),$this->optional($body,'equipment_notes'),(int)$body['turnover_minutes'],$body['is_bookable']?1:0,$roomId]);
+            $this->audit->write($actor->clinicId,$actor,$correlationId,'room.update','room',$roomId,'success',['location_id'=>(int)$body['location_id'],'relocated'=>$relocated,'turnover_changed'=>$turnoverChanged]);return ['id'=>$roomId];
+        },clinicWide:true);
+    }
+
+    private function roomLocation(AuthContext $actor,int $location): void
+    {
+        $q=$this->database->connection()->prepare('SELECT id FROM locations WHERE id=? AND clinic_id=? FOR UPDATE');$q->execute([$location,$actor->clinicId]);
+        if(!$q->fetchColumn())throw new ApiException(404,'location_not_found','Location not found.');
+    }
+
+    /** Relocation cannot rewrite the venue of an existing booking or its historical room. */
+    private function roomRelocation(AuthContext $actor,int $room): void
+    {
+        $pdo=$this->database->connection();$q=$pdo->prepare('SELECT id FROM appointments WHERE room_id=? LIMIT 1 FOR UPDATE');$q->execute([$room]);
+        if($q->fetchColumn())throw new ApiException(409,'room_relocation_review','The room change requires review.');
+        $q=$pdo->prepare('SELECT a.room_id FROM room_capability_assignments a LEFT JOIN room_capabilities c ON c.id=a.capability_id AND c.clinic_id=? WHERE a.room_id=? AND c.id IS NULL LIMIT 1 FOR UPDATE');$q->execute([$actor->clinicId,$room]);
+        if($q->fetchColumn())throw new ApiException(409,'room_relocation_review','The room change requires review.');
+        $q=$pdo->prepare("SELECT a.room_id FROM room_practitioner_restrictions a LEFT JOIN practitioners p ON p.id=a.practitioner_id LEFT JOIN users u ON u.id=p.user_id AND u.clinic_id=? AND u.user_type='staff' WHERE a.room_id=? AND u.id IS NULL LIMIT 1 FOR UPDATE");$q->execute([$actor->clinicId,$room]);
+        if($q->fetchColumn())throw new ApiException(409,'room_relocation_review','The room change requires review.');
+    }
+
+    /** Mirrors room conflict eligibility: canceled bookings have no turnover effect. No preview cap. */
+    private function roomAppointmentEffects(AuthContext $actor,int $room,int $location): void
+    {
+        $q=$this->database->connection()->prepare("SELECT a.id,a.clinic_id,a.location_id,a.client_id,patient.id patient_user_id,staff.id staff_user_id,s.id owned_service_id
+            FROM appointments a
+            LEFT JOIN users patient ON patient.id=a.client_id AND patient.clinic_id=a.clinic_id AND patient.user_type='client'
+            LEFT JOIN practitioners p ON p.id=a.practitioner_id
+            LEFT JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=a.clinic_id AND staff.user_type='staff'
+            LEFT JOIN services s ON s.id=a.service_id AND s.clinic_id=a.clinic_id
+            WHERE a.room_id=? AND a.status NOT IN('canceled_by_client','canceled_by_clinic') ORDER BY a.id FOR UPDATE");$q->execute([$room]);
+        $consent=new ConsentAccess($this->database->connection());
+        foreach($q->fetchAll() as $row){
+            if((int)$row['clinic_id']!==$actor->clinicId||(int)$row['location_id']!==$location||!$row['patient_user_id']||!$row['staff_user_id']||!$row['owned_service_id'])throw new ApiException(409,'room_privacy_review','The room change requires review.');
+            if($consent->restricted($actor->clinicId,(int)$row['client_id'],$actor->userId,true)||$consent->restricted($actor->clinicId,(int)$row['client_id'],(int)$row['staff_user_id'],true))throw new ApiException(403,'consent_restricted','Access is restricted by a patient privacy instruction.');
+        }
+    }
+
     public function roomCapabilities(AuthContext $actor): array{$this->superAdmin($actor);$pdo=$this->database->connection();$c=$pdo->prepare('SELECT id,code,name FROM room_capabilities WHERE clinic_id=:clinic ORDER BY name');$c->execute(['clinic'=>$actor->clinicId]);$r=$pdo->prepare('SELECT a.room_id,a.capability_id FROM room_capability_assignments a JOIN rooms r ON r.id=a.room_id JOIN locations l ON l.id=r.location_id WHERE l.clinic_id=:clinic');$r->execute(['clinic'=>$actor->clinicId]);$s=$pdo->prepare('SELECT a.service_id,a.capability_id FROM service_room_capability_requirements a JOIN services s ON s.id=a.service_id WHERE s.clinic_id=:clinic');$s->execute(['clinic'=>$actor->clinicId]);return ['capabilities'=>$c->fetchAll(),'rooms'=>$r->fetchAll(),'services'=>$s->fetchAll()];}
     public function createRoomCapability(AuthContext $actor,array $body,string $correlationId): array{$this->superAdmin($actor);$this->required($body,['name']);$name=trim((string)$body['name']);if(strlen($name)>120)throw new ApiException(422,'validation_error','Capability name is too long.');$code=strtolower(trim((string)preg_replace('/[^a-z0-9]+/i','_',$name),'_'));if($code==='')throw new ApiException(422,'validation_error','Enter a valid capability name.');$s=$this->database->connection()->prepare('INSERT INTO room_capabilities(clinic_id,code,name) VALUES(:clinic,:code,:name)');$s->execute(['clinic'=>$actor->clinicId,'code'=>$code,'name'=>$name]);return $this->created($actor,$correlationId,'room_capability',(int)$this->database->connection()->lastInsertId());}
     public function updateRoomCapabilityAssignments(AuthContext $actor,array $body,string $correlationId): array{$this->superAdmin($actor);$roomId=(int)($body['room_id']??0);$serviceId=(int)($body['service_id']??0);$roomIds=array_unique(array_map('intval',$body['room_capability_ids']??[]));$serviceIds=array_unique(array_map('intval',$body['service_capability_ids']??[]));$pdo=$this->database->connection();try{$pdo->beginTransaction();if($roomId){$check=$pdo->prepare('SELECT 1 FROM rooms r JOIN locations l ON l.id=r.location_id WHERE r.id=:id AND l.clinic_id=:clinic');$check->execute(['id'=>$roomId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'room_not_found','Room not found.');$pdo->prepare('DELETE FROM room_capability_assignments WHERE room_id=:id')->execute(['id'=>$roomId]);$i=$pdo->prepare('INSERT INTO room_capability_assignments(room_id,capability_id) SELECT :room,id FROM room_capabilities WHERE id=:capability AND clinic_id=:clinic');foreach($roomIds as $cap)$i->execute(['room'=>$roomId,'capability'=>$cap,'clinic'=>$actor->clinicId]);}if($serviceId){$check=$pdo->prepare('SELECT 1 FROM services WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$serviceId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'service_not_found','Service not found.');$pdo->prepare('DELETE FROM service_room_capability_requirements WHERE service_id=:id')->execute(['id'=>$serviceId]);$i=$pdo->prepare('INSERT INTO service_room_capability_requirements(service_id,capability_id) SELECT :service,id FROM room_capabilities WHERE id=:capability AND clinic_id=:clinic');foreach($serviceIds as $cap)$i->execute(['service'=>$serviceId,'capability'=>$cap,'clinic'=>$actor->clinicId]);}$this->audit->write($actor->clinicId,$actor,$correlationId,'room.capabilities.update','clinic',$actor->clinicId);$pdo->commit();return ['updated'=>true];}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}}
@@ -631,7 +689,18 @@ $up->execute(['service'=>$serviceId,'mobile'=>(bool)($p['offers_mobile']??false)
         if(!in_array($body['timezone'],timezone_identifiers_list(),true))throw new ApiException(422,'validation_error','Enter a valid timezone.',['timezone'=>'Invalid timezone']);
         if(array_key_exists('is_bookable',$body)&&!is_bool($body['is_bookable']))throw new ApiException(422,'validation_error','Check the location fields.',['is_bookable'=>'Boolean required']);
     }
-    private function validateRoom(array $body): void{$name=trim((string)$body['name']);$turnover=(int)($body['turnover_minutes']??0);if($name===''||strlen($name)>100)throw new ApiException(422,'validation_error','Enter a valid room name.',['name'=>'Required; maximum 100 characters']);if(strlen(trim((string)($body['room_type']??'')))>80)throw new ApiException(422,'validation_error','The room type is too long.',['room_type'=>'Maximum 80 characters']);if($turnover<0||$turnover>240||$turnover%5!==0)throw new ApiException(422,'validation_error','Turnover time must be a 5-minute increment between 0 and 240.',['turnover_minutes'=>'Invalid turnover time']);}
+    private function validateRoom(array $body): void
+    {
+        $location=$body['location_id']??null;
+        if(is_bool($location)||filter_var($location,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])===false)throw new ApiException(422,'validation_error','Select a valid location.',['location_id'=>'Required']);
+        foreach(['name'=>100,'room_type'=>80] as $field=>$limit){$value=$body[$field]??'';if(!is_string($value)||mb_strlen(trim($value))>$limit||preg_match('/[\x00-\x1f\x7f]/',$value))throw new ApiException(422,'validation_error','Enter valid room details.',[$field=>"Maximum $limit characters; text only"]);}
+        if(trim($body['name'])==='')throw new ApiException(422,'validation_error','Enter a valid room name.',['name'=>'Required; maximum 100 characters']);
+        $turnover=$body['turnover_minutes']??0;
+        if(!is_int($turnover)||$turnover<0||$turnover>240||$turnover%5!==0)throw new ApiException(422,'validation_error','Turnover time must be a 5-minute increment between 0 and 240.',['turnover_minutes'=>'Invalid turnover time']);
+        $notes=$body['equipment_notes']??'';
+        if(!is_string($notes)||strlen($notes)>65535||preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/',$notes))throw new ApiException(422,'validation_error','Enter valid room details.',['equipment_notes'=>'Text only; maximum 65535 bytes']);
+        if(array_key_exists('is_bookable',$body)&&!is_bool($body['is_bookable']))throw new ApiException(422,'validation_error','Enter valid room details.',['is_bookable'=>'Boolean required']);
+    }
     public static function durationOptions(array $body): array
     {
         $raw=$body['duration_options']??null;
