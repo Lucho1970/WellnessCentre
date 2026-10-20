@@ -77,6 +77,7 @@ final class ConsentAccess
             'createTimeOff','updateTimeOff','deleteTimeOff', // AdminService authorizes complete old/new affected sets.
             'me','dashboardPreferences','saveDashboardPreferences','resetDashboardPreferences',
             'myTravelSettings','saveMyTravelSettings','myWorkLocation','saveMyWorkLocation',
+            'adminAvatar','adminSaveAvatar','adminDeleteAvatar', // ProfileService permits only current clinic Super Admin moderation of staff photos.
             'profileAvatar','saveProfileAvatar','deleteProfileAvatar','myPublicCard','updateMyPublicCard',
             'createQualificationType','practitionerQualifications','submitPractitionerQualification','reviewQualification', // Qualification service owns current authority and independent review; no patient data.
             'qualificationTypes','myQualifications','submitMyQualification','globalCredentials','createGlobalCredential','shareGlobalCredential',

@@ -35,6 +35,7 @@ Policy updates, append-only `client_consent_events` evidence and the `consent.di
 
 ## Enforcement boundaries
 
+- [Staff avatar moderation](CONSENT_AUTHORIZED_STAFF_AVATARS.md) now authorizes current clinic Super Admin access to staff photos only, with separate self-service scope and atomic image/audit changes. Patient targets are excluded.
 - [Practitioner qualifications](CONSENT_AUTHORIZED_QUALIFICATIONS.md) now permit authorized credential review and revocation under unrelated restrictions, with current clinic roles, own-profile scope, independent verification and atomic audits.
 - [Staff invitations](CONSENT_AUTHORIZED_STAFF_INVITATIONS.md) now permit authorized invitation management and revocation despite unrelated patient restrictions; verified claims, least-privilege memberships, named/global directives and current local authority remain enforced.
 - [Practitioner account management](CONSENT_AUTHORIZED_PRACTITIONER_MANAGEMENT.md) now permits authorized local account deactivation, reactivation and onboarding despite unrelated restrictions, with current authority checks and atomic audits. It does not transfer identities or clear patient directives.

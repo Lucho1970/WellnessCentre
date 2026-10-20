@@ -4325,3 +4325,45 @@ for (const action of ['Verify', 'Revoke'] as const) {
     await expect(page.getByRole('button', {name: 'Add type', exact: true})).toBeEnabled();
   });
 }
+
+for (const status of [401, 403]) {
+  test(`staff avatar ${status} denial clears profile and header photos until reload`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    let denied = false;
+    const image = 'UklGRiIAAABXRUJQVlA4TBYAAAAvP8APAAdQwChg/wNAQvj/Xovof+oH';
+    await page.route('**/api/v1/profile/avatar', route => {
+      if(route.request().method() === 'DELETE') denied = true;
+      return denied ? route.fulfill({status, json: {error: {code: status === 401 ? 'unauthorized' : 'forbidden'}}})
+        : route.fulfill({json: {data: {user_id: 1, mime_type: 'image/webp', image_base64: image}}});
+    });
+    await page.goto(`${portalHost}/profile`);
+    await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(2);
+    await page.getByRole('button', {name: 'Remove', exact: true}).click();
+    await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Choose image', exact: true})).toBeDisabled();
+    denied = false;
+    await page.getByRole('button', {name: 'Retry', exact: true}).click();
+    await expect(page.getByRole('button', {name: 'Choose image', exact: true})).toBeEnabled();
+    await expect(page.getByRole('button', {name: 'Remove', exact: true})).toBeVisible();
+  });
+}
+
+test('staff avatar upload normalizes an image and removal clears both displayed copies', async ({page}) => {
+  await fixtures(page, ['super_admin']);
+  let image: string|null = null, submitted: string|undefined;
+  await page.route('**/api/v1/profile/avatar', route => {
+    const method = route.request().method();
+    if(method === 'PUT') {image = submitted = route.request().postDataJSON().image_base64; return route.fulfill({json: {data: {user_id: 1, updated: true}}});}
+    if(method === 'DELETE') {image = null; return route.fulfill({json: {data: {user_id: 1, deleted: true}}});}
+    return route.fulfill({json: {data: {user_id: 1, mime_type: image ? 'image/webp' : null, image_base64: image}}});
+  });
+  await page.goto(`${portalHost}/profile`);
+  await expect(page.getByRole('button', {name: 'Choose image', exact: true})).toBeEnabled();
+  await page.locator('input[type="file"]').setInputFiles({name: 'synthetic.webp', mimeType: 'image/webp', buffer: Buffer.from('UklGRiIAAABXRUJQVlA4TBYAAAAvP8APAAdQwChg/wNAQvj/Xovof+oH', 'base64')});
+  await expect(page.getByText('Profile image updated.', {exact: true})).toBeVisible();
+  expect(Buffer.from(submitted!, 'base64').subarray(0,4).toString()).toBe('RIFF');
+  await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(2);
+  await page.getByRole('button', {name: 'Remove', exact: true}).click();
+  await expect(page.getByText('Profile image removed.', {exact: true})).toBeVisible();
+  await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(0);
+});

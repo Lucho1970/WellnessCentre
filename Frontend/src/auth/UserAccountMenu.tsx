@@ -60,8 +60,9 @@ export function UserAccountMenu() {
         r = await fetch(
           `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1"}/profile/avatar`,
           { headers: { Authorization: `Bearer ${token}` } },
-        ),
-        b = await r.json();
+        );
+      if ([401, 403, 404].includes(r.status) && request === avatarRequest.current) setAvatar(undefined);
+      const b = await r.json();
       if (r.ok && request === avatarRequest.current)
         setAvatar(
           b.data.image_base64
