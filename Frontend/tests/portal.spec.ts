@@ -4397,3 +4397,31 @@ for (const initiallyPermitted of [false, true]) test(`receipt template ${initial
   await expect(page.getByRole('button', { name: 'Save clinic receipt template', exact: true })).toHaveCount(0);
   expect(saves).toBe(initiallyPermitted ? 1 : 0);
 });
+
+for (const action of ['refresh', 'status', 'notify'] as const) test(`practitioner enquiry ${action} denial removes cached applicant details until retry`, async ({ page }) => {
+  await fixtures(page, ['clinic_admin']);
+  let denied = false, writes = 0;
+  const item = { id: 31, reference: 'synthetic-enquiry', full_name: 'Private synthetic applicant', email: 'private-applicant@example.test', phone: '555-0100', discipline: 'Test discipline', credentials: 'Private synthetic credentials', service_area: 'Test area', message: 'Private synthetic recruitment message', status: 'new', revision: 1, notification_status: 'failed', created_at: '2026-10-20 10:00:00' };
+  await page.route('**/api/v1/admin/practitioner-enquiries**', route => {
+    if (route.request().method() !== 'GET') {
+      writes++; denied = true;
+      if (action === 'status') expect(route.request().postDataJSON()).toEqual({ status: 'closed', revision: 1 });
+    }
+    return route.fulfill(denied ? { status: action === 'notify' ? 404 : 403, json: { error: { code: action === 'notify' ? 'enquiry_not_found' : 'forbidden' } } }
+      : { json: { data: { items: [item], has_more: false, settings: { recipient_email: 'recipient@example.test', enabled: true, revision: 1, mail_configured: true } } } });
+  });
+  await page.goto(`${portalHost}/admin/enquiries`);
+  await expect(page.getByText(item.email, { exact: false })).toBeVisible();
+  if (action === 'refresh') { denied = true; await page.getByRole('button', { name: 'Refresh', exact: true }).click(); }
+  else if (action === 'notify') await page.getByRole('button', { name: 'Send email notification', exact: true }).click();
+  else { await page.getByLabel('Enquiry status', { exact: true }).click(); await page.getByRole('option', { name: /closed/i }).click(); }
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  for (const text of [item.full_name, item.email, item.credentials, item.message]) await expect(page.getByText(text, { exact: false })).toHaveCount(0);
+  await expect(page.getByLabel('Enquiry status', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send email notification', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Enquiry changes saved.', { exact: true })).toHaveCount(0);
+  denied = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByText(item.email, { exact: false })).toBeVisible();
+  expect(writes).toBe(action === 'refresh' ? 0 : 1);
+});

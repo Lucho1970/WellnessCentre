@@ -12,6 +12,8 @@ $config=new Config('test',false,'synthetic-key',[],'127.0.0.1',(int)getenv('RECU
     'audit-tenant','audit-api','access_as_user',300,
     customerTenantId:'11111111-1111-1111-1111-111111111111',customerSubdomain:'synthetic',
     customerApiClientId:'22222222-2222-2222-2222-222222222222',customerSpaClientId:'33333333-3333-3333-3333-333333333333',
+    applicationAdminEnabled:getenv('ACCESS_AUDIT_TEST_ENQUIRIES')==='synthetic-local-only',
+    clinicManagementEnabled:getenv('ACCESS_AUDIT_TEST_ENQUIRIES')==='synthetic-local-only',
     staffInvitationsEnabled:getenv('ACCESS_AUDIT_TEST_STAFF_INVITATIONS')==='synthetic-local-only',
     customerOnboardingEnabled:true,customerClinicId:1,clientPortalUrl:'https://audit-a.test/',
     clinicHostMap:['audit-a.test'=>1,'audit-b.test'=>2],
@@ -30,6 +32,7 @@ if($coverageTest){
 $jwks=json_decode((string)getenv('ACCESS_AUDIT_TEST_JWKS'),true,32,JSON_THROW_ON_ERROR);
 (new ReflectionProperty(Api::class,'auth'))->setValue($api,new EntraAuthenticator($config,$db,static fn()=>$jwks));
 (new ReflectionProperty(Api::class,'customerAuth'))->setValue($api,new CustomerAuthenticator($config,static fn(bool $refresh)=>$jwks));
+$_ENV['MAIL_ENABLED']='false'; // Never contact a mail provider from this local HTTP fixture.
 $_ENV['CLIENT_FORMS_ENABLED']='true';
 $_ENV['SESSION_RECEIPTS_ENABLED']=getenv('ACCESS_AUDIT_TEST_RECEIPTS')==='synthetic-local-only'?'true':'false';
 $api->handle();

@@ -8,11 +8,41 @@ use Throwable;
 
 final class PractitionerEnquiryService
 {
-    public function __construct(private readonly Database $database) {}
-    private function admin(AuthContext|ApplicationAdminContext $actor,int $clinic): void
+    private readonly ?\Closure $send;
+    public function __construct(private readonly Database $database,?callable $send=null)
+    {$this->send=$send===null?null:\Closure::fromCallable($send);}
+
+    /** Called inside our transaction; system delivery has no caller-supplied principal. */
+    private function authorize(AuthContext|ApplicationAdminContext|null $actor,int $clinic): void
     {
-        if ($actor instanceof AuthContext && ($actor->clinicId!==$clinic||$actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin'))) throw new ApiException(403,'forbidden','Clinic administrator access is required.');
-        if(PHP_SAPI!=='cli')header('Cache-Control: no-store');
+        $pdo=$this->database->connection();
+        $q=$pdo->prepare("SELECT id FROM clinics WHERE id=? AND status='active' FOR UPDATE");$q->execute([$clinic]);
+        if(!$q->fetchColumn())throw new ApiException(404,'clinic_not_found','Clinic unavailable.');
+        if($actor instanceof AuthContext){
+            if($actor->clinicId!==$clinic||$actor->userType!=='staff'||!$actor->hasAnyRole('super_admin','clinic_admin'))throw new ApiException(403,'forbidden','Clinic administrator access is required.');
+            $q=$pdo->prepare("SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id
+                WHERE u.id=? AND u.clinic_id=? AND u.user_type='staff' AND u.status='active'
+                AND r.code IN ('super_admin','clinic_admin') LIMIT 1 FOR UPDATE");$q->execute([$actor->userId,$clinic]);
+            if(!$q->fetchColumn())throw new ApiException(403,'forbidden','Clinic administrator access is required.');
+        }elseif($actor instanceof ApplicationAdminContext){
+            $q=$pdo->prepare("SELECT id FROM application_administrators WHERE id=? AND issuer=? AND subject=? AND status='active' FOR UPDATE");
+            $q->execute([$actor->id,$actor->identity->issuer,$actor->identity->subject]);
+            if(!$q->fetchColumn())throw new ApiException(403,'application_admin_required','Application administrator access is required.');
+        }
+    }
+    private function access(AuthContext|ApplicationAdminContext $actor,int $clinic,callable $work): array
+    {
+        $pdo=$this->database->connection();
+        if($pdo->inTransaction())throw new \LogicException('Enquiry operations require their own transaction.');
+        $lock=new ConsentLock($pdo);$lock->acquire($clinic);
+        try{$pdo->beginTransaction();$this->authorize($actor,$clinic);$result=$work($pdo);$pdo->commit();return $result;}
+        catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$lock->release();}
+    }
+    private function audit(AuthContext|ApplicationAdminContext|null $actor,int $clinic,string $cid,string $action,string $entity,int $id,array $metadata=[]): void
+    {
+        if($actor instanceof ApplicationAdminContext)$metadata['application_admin_id']=$actor->id;
+        (new AuditLogger($this->database))->write($clinic,$actor instanceof AuthContext?$actor:null,$cid,$action,$entity,$id,'success',$metadata);
     }
     private function settings(int $clinic): array
     {
@@ -38,6 +68,7 @@ final class PractitionerEnquiryService
         $fields['email']=strtolower($fields['email']);
         if(!filter_var($fields['email'],FILTER_VALIDATE_EMAIL))throw new ApiException(422,'validation_error','Enter a valid email address.');
         $hash=hash('sha256',json_encode($fields,JSON_THROW_ON_ERROR));$pdo=$this->database->connection();
+        if($pdo->inTransaction())throw new \LogicException('Enquiry submission requires its own transaction.');
         try{
             $pdo->beginTransaction();
             $q=$pdo->prepare("SELECT id FROM clinics WHERE id=? AND status='active' FOR UPDATE");$q->execute([$clinic]);if(!$q->fetchColumn())throw new ApiException(404,'clinic_not_found','Clinic unavailable.');
@@ -64,62 +95,79 @@ final class PractitionerEnquiryService
     }
     public function list(AuthContext|ApplicationAdminContext $actor,int $clinic,array $query=[]): array
     {
-        $this->admin($actor,$clinic);$page=filter_var($query['page']??1,FILTER_VALIDATE_INT,['options'=>['min_range'=>1,'max_range'=>100000]]);
-        if($page===false)throw new ApiException(422,'validation_error','Invalid page.');
-        $offset=($page-1)*25;
-        $q=$this->database->connection()->prepare("SELECT id,reference,full_name,email,phone,discipline,credentials,service_area,message,status,revision,notification_status,created_at FROM practitioner_enquiries WHERE clinic_id=? ORDER BY id DESC LIMIT 26 OFFSET $offset");$q->execute([$clinic]);$items=$q->fetchAll();$more=count($items)>25;
-        return ['items'=>array_slice($items,0,25),'page'=>$page,'has_more'=>$more,'settings'=>$this->settings($clinic)];
+        return $this->access($actor,$clinic,function($pdo)use($clinic,$query):array{
+            $page=filter_var($query['page']??1,FILTER_VALIDATE_INT,['options'=>['min_range'=>1,'max_range'=>100000]]);
+            if($page===false)throw new ApiException(422,'validation_error','Invalid page.');
+            $offset=($page-1)*25;
+            $q=$pdo->prepare("SELECT id,reference,full_name,email,phone,discipline,credentials,service_area,message,status,revision,notification_status,created_at FROM practitioner_enquiries WHERE clinic_id=? ORDER BY id DESC LIMIT 26 OFFSET $offset");$q->execute([$clinic]);$items=$q->fetchAll();
+            return ['items'=>array_slice($items,0,25),'page'=>$page,'has_more'=>count($items)>25,'settings'=>$this->settings($clinic)];
+        });
     }
     public function saveSettings(ApplicationAdminContext $actor,int $clinic,array $body,string $cid): array
     {
-        $recipient=$body['recipient_email']??'';$enabled=$body['enabled']??null;$revision=$body['revision']??null;
-        if(!is_string($recipient)||strlen($recipient)>254||!is_bool($enabled)||!is_int($revision)||($recipient!==''&&!filter_var($recipient,FILTER_VALIDATE_EMAIL)))throw new ApiException(422,'validation_error','Enter a valid enquiry notification email.');
-        $pdo=$this->database->connection();
-        try{
-            $pdo->beginTransaction();$q=$pdo->prepare("SELECT id FROM clinics WHERE id=? AND status='active' FOR UPDATE");$q->execute([$clinic]);if(!$q->fetchColumn())throw new ApiException(404,'clinic_not_found','Clinic unavailable.');
+        return $this->access($actor,$clinic,function($pdo)use($actor,$clinic,$body,$cid):array{
+            $recipient=$body['recipient_email']??'';$enabled=$body['enabled']??null;$revision=$body['revision']??null;
+            if(!is_string($recipient)||strlen($recipient)>254||!is_bool($enabled)||!is_int($revision)||$revision<0||($recipient!==''&&!filter_var($recipient,FILTER_VALIDATE_EMAIL)))throw new ApiException(422,'validation_error','Enter a valid enquiry notification email.');
             if($this->settings($clinic)['revision']!==$revision)throw new ApiException(409,'settings_changed','Settings changed. Refresh and try again.');
             $pdo->prepare('INSERT INTO practitioner_enquiry_settings(clinic_id,recipient_email,enabled,revision) VALUES(?,?,?,1) ON DUPLICATE KEY UPDATE recipient_email=VALUES(recipient_email),enabled=VALUES(enabled),revision=revision+1')->execute([$clinic,$recipient===''?null:strtolower($recipient),$enabled?1:0]);
-            (new AuditLogger($this->database))->write($clinic,null,$cid,'practitioner_enquiry.settings','clinic',$clinic,'success',['application_admin_id'=>$actor->id,'enabled'=>$enabled]);
-            $pdo->commit();return $this->settings($clinic);
-        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+            $this->audit($actor,$clinic,$cid,'practitioner_enquiry.settings','clinic',$clinic,['enabled'=>$enabled]);
+            return $this->settings($clinic);
+        });
     }
     public function update(AuthContext|ApplicationAdminContext $actor,int $clinic,int $id,array $body,string $cid): array
     {
-        $this->admin($actor,$clinic);$status=$body['status']??null;$revision=$body['revision']??null;
-        if(!in_array($status,['new','contacted','closed'],true)||!is_int($revision))throw new ApiException(422,'validation_error','Choose a valid enquiry status.');
-        $pdo=$this->database->connection();
-        try{
-            $pdo->beginTransaction();
-            $q=$pdo->prepare('UPDATE practitioner_enquiries SET status=?,revision=revision+1 WHERE id=? AND clinic_id=? AND revision=?');$q->execute([$status,$id,$clinic,$revision]);
-            if($q->rowCount()!==1)throw new ApiException(409,'enquiry_changed','Enquiry changed or is unavailable. Refresh and try again.');
-            (new AuditLogger($this->database))->write($clinic,$actor instanceof AuthContext?$actor:null,$cid,'practitioner_enquiry.status','practitioner_enquiry',$id,'success',['status'=>$status,'application_admin_id'=>$actor instanceof ApplicationAdminContext?$actor->id:null]);
-            $pdo->commit();
-        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
-        return ['id'=>$id,'status'=>$status,'revision'=>$revision+1];
+        return $this->access($actor,$clinic,function($pdo)use($actor,$clinic,$id,$body,$cid):array{
+            $status=$body['status']??null;$revision=$body['revision']??null;
+            if(!in_array($status,['new','contacted','closed'],true)||!is_int($revision)||$revision<1)throw new ApiException(422,'validation_error','Choose a valid enquiry status.');
+            $q=$pdo->prepare('SELECT revision FROM practitioner_enquiries WHERE id=? AND clinic_id=? FOR UPDATE');$q->execute([$id,$clinic]);$current=$q->fetchColumn();
+            if($current===false)throw new ApiException(404,'enquiry_not_found','Enquiry not found.');
+            if((int)$current!==$revision)throw new ApiException(409,'enquiry_changed','Enquiry changed or is unavailable. Refresh and try again.');
+            $pdo->prepare('UPDATE practitioner_enquiries SET status=?,revision=revision+1 WHERE id=? AND clinic_id=?')->execute([$status,$id,$clinic]);
+            $this->audit($actor,$clinic,$cid,'practitioner_enquiry.status','practitioner_enquiry',$id,['status'=>$status]);
+            return ['id'=>$id,'status'=>$status,'revision'=>$revision+1];
+        });
     }
-    public function retryNotification(AuthContext|ApplicationAdminContext $actor,int $clinic,int $id): array
-    {
-        $this->admin($actor,$clinic);return $this->notify($clinic,$id);
-    }
+    public function retryNotification(AuthContext|ApplicationAdminContext $actor,int $clinic,int $id,string $cid): array
+    {return $this->deliver($actor,$clinic,$id,$cid,$this->send);}
+
+    /** Trusted saved-enquiry delivery, called after public submission. Not an HTTP entry point. */
     public function notify(int $clinic,int $id,?callable $send=null): array
+    {return $this->deliver(null,$clinic,$id,'enquiry-'.bin2hex(random_bytes(12)),$send??$this->send);}
+
+    private function deliver(AuthContext|ApplicationAdminContext|null $actor,int $clinic,int $id,string $cid,?callable $send): array
     {
-        $settings=$this->settings($clinic);$pdo=$this->database->connection();
-        if(!$settings['mail_configured']||!$settings['recipient_email']){
-            $pdo->prepare("UPDATE practitioner_enquiries SET notification_status='disabled' WHERE id=? AND clinic_id=? AND notification_status IN ('pending','failed','disabled')")->execute([$id,$clinic]);return ['notification_status'=>'disabled'];
-        }
-        $q=$pdo->prepare("UPDATE practitioner_enquiries SET notification_status='sending' WHERE id=? AND clinic_id=? AND notification_status IN ('pending','failed','disabled')");$q->execute([$id,$clinic]);
-        if($q->rowCount()!==1)return ['notification_status'=>'unchanged'];
+        $pdo=$this->database->connection();
+        if($pdo->inTransaction())throw new \LogicException('Enquiry notification requires its own transaction.');
+        $lock=new ConsentLock($pdo);$lock->acquire($clinic);
         try{
-            $q=$pdo->prepare('SELECT e.reference,c.name FROM practitioner_enquiries e JOIN clinics c ON c.id=e.clinic_id WHERE e.id=? AND e.clinic_id=?');$q->execute([$id,$clinic]);$row=$q->fetch();
-            $text="A practitioner enquiry was saved for {$row['name']}.\nReference: {$row['reference']}\n\nSign in to Application administration or the clinic portal and open Practitioner enquiries to review it. No application has been approved automatically.";
-            if($send!==null)$send($settings['recipient_email'],'New practitioner enquiry',$text);
-            else{
-                $env=static fn($key)=>(string)($_ENV[$key]??getenv($key)?:'');
-                (new GraphMailClient($env('MAIL_TENANT_ID'),$env('MAIL_CLIENT_ID'),$env('MAIL_CLIENT_SECRET'),$env('MAIL_FROM_ADDRESS')))->send($settings['recipient_email'],'New practitioner enquiry',$text);
-            }
-            $status='sent';
-        }catch(MailSendException $e){$status=$e->ambiguous?'needs_review':'failed';}catch(Throwable){$status='failed';}
-        $pdo->prepare('UPDATE practitioner_enquiries SET notification_status=? WHERE id=? AND clinic_id=?')->execute([$status,$id,$clinic]);
-        return ['notification_status'=>$status];
+            $pdo->beginTransaction();$this->authorize($actor,$clinic);
+            $q=$pdo->prepare('SELECT e.reference,e.notification_status,c.name FROM practitioner_enquiries e JOIN clinics c ON c.id=e.clinic_id WHERE e.id=? AND e.clinic_id=? FOR UPDATE');$q->execute([$id,$clinic]);$row=$q->fetch();
+            if(!$row)throw new ApiException(404,'enquiry_not_found','Enquiry not found.');
+            $settings=$this->settings($clinic);
+            $status=!in_array($row['notification_status'],['pending','failed','disabled'],true)?'unchanged':(!$settings['mail_configured']||!$settings['recipient_email']?'disabled':'sending');
+            if($status!=='unchanged')$pdo->prepare('UPDATE practitioner_enquiries SET notification_status=? WHERE id=? AND clinic_id=?')->execute([$status,$id,$clinic]);
+            // Commit an attributed claim before any provider call. Uncertain outcomes are never resent.
+            $this->audit($actor,$clinic,$cid,'practitioner_enquiry.notification_claim','practitioner_enquiry',$id,['notification_status'=>$status]);
+            $pdo->commit();
+            if($status!=='sending')return ['id'=>$id,'notification_status'=>$status];
+            $attempted=false;
+            try{
+                $text="A practitioner enquiry was saved for {$row['name']}.\nReference: {$row['reference']}\n\nSign in to Application administration or the clinic portal and open Practitioner enquiries to review it. No application has been approved automatically.";
+                if($send!==null){$attempted=true;$send($settings['recipient_email'],'New practitioner enquiry',$text);}
+                else{
+                    $env=static fn($key)=>(string)($_ENV[$key]??getenv($key)?:'');
+                    $mailer=new GraphMailClient($env('MAIL_TENANT_ID'),$env('MAIL_CLIENT_ID'),$env('MAIL_CLIENT_SECRET'),$env('MAIL_FROM_ADDRESS'));
+                    $attempted=true;$mailer->send($settings['recipient_email'],'New practitioner enquiry',$text);
+                }
+                $status='sent';
+            }catch(MailSendException $e){$status=$e->ambiguous?'needs_review':'failed';}
+            catch(Throwable){$status=$attempted?'needs_review':'failed';}
+            $pdo->beginTransaction();
+            $q=$pdo->prepare("UPDATE practitioner_enquiries SET notification_status=? WHERE id=? AND clinic_id=? AND notification_status='sending'");$q->execute([$status,$id,$clinic]);
+            if($q->rowCount()!==1)throw new ApiException(409,'enquiry_changed','Enquiry changed or is unavailable. Refresh and try again.');
+            $this->audit($actor,$clinic,$cid,'practitioner_enquiry.notification_result','practitioner_enquiry',$id,['notification_status'=>$status]);
+            $pdo->commit();return ['id'=>$id,'notification_status'=>$status];
+        }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$lock->release();}
     }
 }
