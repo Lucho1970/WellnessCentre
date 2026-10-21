@@ -1,5 +1,8 @@
 export default {
   en: {
+    'Use Wellnexa palette': 'Use Wellnexa palette',
+    'Wellnexa colour palette': 'Wellnexa colour palette',
+    'Choose the preset, then save to apply the full Wellnexa palette to this clinic portal.': 'Choose the preset, then save to apply the full Wellnexa palette to this clinic portal.',
     'Application administration': 'Application administration',
     'Portal home': 'Portal home',
     'Sign in with your organization Microsoft account. Application administrator access is required.': 'Sign in with your organization Microsoft account. Application administrator access is required.',
@@ -9,6 +12,9 @@ export default {
     'Unable to sign out. Please try again.': 'Unable to sign out. Please try again.',
   },
   fr: {
+    'Use Wellnexa palette': 'Utiliser la palette Wellnexa',
+    'Wellnexa colour palette': 'Palette de couleurs Wellnexa',
+    'Choose the preset, then save to apply the full Wellnexa palette to this clinic portal.': 'Choisissez le préréglage, puis enregistrez pour appliquer toute la palette Wellnexa au portail de cette clinique.',
     'Application administration': 'Administration de l’application',
     'Portal home': 'Accueil du portail',
     'Sign in with your organization Microsoft account. Application administrator access is required.': 'Connectez-vous avec le compte Microsoft de votre organisation. Un accès administrateur de l’application est requis.',
