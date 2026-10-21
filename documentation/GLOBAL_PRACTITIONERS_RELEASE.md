@@ -9,13 +9,10 @@ Extract each archive and upload **its contents**, without adding another enclosi
 | ZIP | Destination |
 | --- | --- |
 | `wellness-api-private.zip` | The existing private `wellness-api` directory. Overwrite `src`, `bin`, `vendor` and Composer files; preserve `.env` and private runtime data. |
-| `livinlively-portal.zip` | The `livinlively-portal` document root serving `livinlively.copihue.ca`. |
-| `wellnexa-portal.zip` | The `wellnexa-portal` document root serving `wellnexa.copihue.ca`. |
+| `wellness-common-portal.zip` | `/public_html/wellness-common-portal`, shared by both clinic hosts. |
 | `copihue-portal-landing.zip` | The existing document root serving `portal.copihue.ca`. This includes `admin/index.html`, its `assets`, the neutral landing files, `.htaccess` and the thin `api` entry point. |
 
-The two clinic ZIPs deliberately contain the same compiled portal application. Clinic records and branding come from the shared API's host resolution. They are separately labeled to make copying easier. Include hidden `.htaccess` files when uploading. Preserve previously uploaded assets until active browser sessions have refreshed; new HTML refers to the new hashed assets.
-
-Upload the shared API first, then both clinic portals and central administration as one maintenance update. Refresh each portal with Ctrl+F5 afterward. The manifest records the exact committed source revision, ZIP hashes, entries and included features. Packages do not contain private `.env` files or database dumps.
+The clinic hosts serve the same compiled application from one directory. Clinic records and branding come from the API's hostname resolution. Include hidden `.htaccess` files and retain old hashed assets through rollout. Upload the shared API first, then the common portal once and central administration if included. Refresh and verify both clinic portals. New manifests record the source revision, destinations and ZIP hashes; old release archives remain unchanged. See [Deployment layout](DEPLOYMENT_LAYOUT.md).
 
 Acceptance after upload:
 

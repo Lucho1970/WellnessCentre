@@ -73,6 +73,16 @@ function StaffAdminForm() {
   };
   const setEdit = <K extends keyof Staff>(key: K, value: Staff[K]) => setEditing(current => current ? { ...current, [key]: value } : null);
   const setNew = <K extends keyof NewStaff>(key: K, value: NewStaff[K]) => setNewStaff(current => ({ ...current, [key]: value }));
+  const changePrivacyPermission = async (member: Staff) => {
+    setBusy(true); setPanelError('');
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`${api}/admin/privacy-audit/reviewers/${member.id}`, {method:member.permissions.includes('review_privacy_audit') ? 'DELETE' : 'PUT',headers:{Authorization:`Bearer ${token}`}});
+      const body = await response.json(); if(!response.ok)throw new ApiError(body,response.status,t('Unable to save staff member.'));
+      setPanelMode(null); await load(member.id); setSaved(t('Privacy-review permission updated.'));
+    } catch(cause) {setPanelError(cause instanceof Error ? cause.message : t('Unable to save staff member.'));}
+    finally {setBusy(false);}
+  };
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (panelMode === 'edit' && !editing) return;
@@ -116,7 +126,8 @@ function StaffAdminForm() {
     {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <StaffInvitations/>}
     <Drawer anchor="right" open={panelMode !== null} onClose={closePanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'new' ? 'New staff member' : panelMode === 'details' ? 'Staff details' : 'Edit staff access')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Add staff access') : selected?.display_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={closePanel}><X/></IconButton></Stack>
-      {panelMode === 'details' && selected && <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{[[t('Email'), selected.email], [t('Status'), t(selected.status === 'active' ? 'Active' : selected.status === 'inactive' ? 'Inactive' : 'Locked')], [t('Local roles'), selected.roles.join(', ') || t('No role')], [t('Additional permissions'), selected.permissions.join(', ') || t('None')]].map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} disabled={isSelf(selected)} onClick={() => startEdit(selected)}>{t('Edit')}</Button></Stack>}
+      {panelError && <Alert severity="error" sx={{mx:3}}>{panelError}</Alert>}
+      {panelMode === 'details' && selected && <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{[[t('Email'), selected.email], [t('Status'), t(selected.status === 'active' ? 'Active' : selected.status === 'inactive' ? 'Inactive' : 'Locked')], [t('Local roles'), selected.roles.join(', ') || t('No role')], [t('Additional permissions'), selected.permissions.join(', ') || t('None')]].map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack>{(selected.permissions.includes('review_privacy_audit') || (!isSelf(selected) && selected.status === 'active' && selected.roles.some(role => ['super_admin','clinic_admin'].includes(role)))) && <Button disabled={busy} onClick={() => void changePrivacyPermission(selected)}>{t(selected.permissions.includes('review_privacy_audit') ? 'Revoke privacy-review permission' : 'Grant privacy-review permission')}</Button>}<Button variant="contained" startIcon={<Pencil size={17}/>} disabled={isSelf(selected)} onClick={() => startEdit(selected)}>{t('Edit')}</Button></Stack>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={event => void save(event)} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Stack spacing={2}>
           {panelMode === 'new' && <>
@@ -134,8 +145,10 @@ function StaffAdminForm() {
             <Typography fontWeight={700}>{t('Local roles')}</Typography>
             {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => {
               const roles = event.target.checked ? [...editing.roles, role] : editing.roles.filter(item => item !== role);
-              setEditing({ ...editing, roles, permissions: roles.includes('practitioner') ? editing.permissions : [] });
+              setEditing({ ...editing, roles, permissions: editing.permissions.filter(permission => permission === 'manage_client_consent' || (permission === 'review_privacy_audit' ? roles.some(role => ['super_admin','clinic_admin'].includes(role)) : roles.includes('practitioner'))) });
             }}/>} label={role.replaceAll('_', ' ')}/>)}
+            <FormControlLabel control={<Checkbox checked={editing.permissions.includes('manage_client_consent')} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, 'manage_client_consent'] : editing.permissions.filter(item => item !== 'manage_client_consent'))}/>} label={t('Record verified consent instructions')}/>
+            {editing.roles.some(role => ['super_admin','clinic_admin'].includes(role)) && <FormControlLabel control={<Checkbox checked={editing.permissions.includes('review_privacy_audit')} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, 'review_privacy_audit'] : editing.permissions.filter(item => item !== 'review_privacy_audit'))}/>} label={t('Review clinic privacy audit')}/>}
             {editing.roles.includes('practitioner') && <>
               <Typography fontWeight={700}>{t('Additional permissions')}</Typography>
               <FormControlLabel control={<Checkbox checked={editing.permissions.includes(scheduleOthers)} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, scheduleOthers] : editing.permissions.filter(item => item !== scheduleOthers))}/>} label={t('Schedule for other practitioners')}/>
@@ -146,7 +159,6 @@ function StaffAdminForm() {
               <Typography variant="body2" color="text.secondary">{t('Allows this practitioner to approve a client visit address for future bookings with the selected service and base location.')}</Typography>
             </>}
           </>}
-          {panelError && <Alert severity="error">{panelError}</Alert>}
         </Stack></Box>
         <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}><Button disabled={busy} onClick={closePanel}>{t('Cancel')}</Button><Button type="submit" variant="contained" disabled={busy} startIcon={<Save size={17}/>}>{t(busy ? 'Saving…' : panelMode === 'new' ? 'Add staff member' : 'Save changes')}</Button></Stack>
       </Box>}

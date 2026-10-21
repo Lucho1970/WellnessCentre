@@ -38,18 +38,23 @@ final class NotificationReviewService
     public function review(AuthContext $actor, int $id, array $body, string $correlationId): array
     {
         self::authorize($actor);
-        $choice = self::choice($body);
         $pdo = $this->database->connection();
+        $lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
         try {
             $pdo->beginTransaction();
-            $query = $pdo->prepare('SELECT n.id,n.appointment_id,n.recipient_user_id,n.recipient_address,n.event_code,n.channel,n.status,n.scheduled_at,n.attempt_count,n.provider_message_id,n.sent_at,a.status appointment_status FROM notification_events n LEFT JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id WHERE n.id=:id AND n.clinic_id=:clinic FOR UPDATE');
-            $query->execute(['id' => $id, 'clinic' => $actor->clinicId]);
+            $params=['id'=>$id,'clinic'=>$actor->clinicId];
+            $visible=ConsentAccess::notificationCondition($actor,$params);
+            $query = $pdo->prepare('SELECT n.clinic_id,a.client_id,n.id,n.appointment_id,n.recipient_user_id,n.recipient_address,n.event_code,n.channel,n.status,n.scheduled_at,n.attempt_count,n.provider_message_id,n.sent_at,a.status appointment_status FROM notification_events n LEFT JOIN appointments a ON a.id=n.appointment_id AND a.clinic_id=n.clinic_id WHERE n.id=:id AND n.clinic_id=:clinic'.$visible.' FOR UPDATE');
+            $query->execute($params);
             $event = $query->fetch(PDO::FETCH_ASSOC);
             if (!$event) throw new ApiException(404, 'notification_not_found', 'Notification not found.');
+            $choice = self::choice($body);
             if ($event['status'] !== 'needs_review') throw new ApiException(409, 'notification_changed', 'This notification is no longer awaiting review. Refresh the list.');
 
             if ($choice['decision'] === 'retry') {
                 $this->assertRetryableSms($pdo, $event);
+                if (!(new ConsentAccess($pdo))->notificationAllowed($event) || !StaffNotificationRecipient::allowed($pdo,$event))
+                    throw new ApiException(409,'retry_unavailable','This notification cannot be retried automatically.');
                 $update = $pdo->prepare("UPDATE notification_events SET status='queued',scheduled_at=UTC_TIMESTAMP(),next_attempt_at=NULL,leased_until=NULL,lease_token=NULL WHERE id=:id AND clinic_id=:clinic AND status='needs_review'");
             } else {
                 $update = $pdo->prepare("UPDATE notification_events SET status='resolved',next_attempt_at=NULL WHERE id=:id AND clinic_id=:clinic AND status='needs_review'");
@@ -62,6 +67,7 @@ final class NotificationReviewService
             $pdo->commit();
             return ['id' => $id, 'status' => $choice['decision'] === 'retry' ? 'queued' : 'resolved', 'review' => $choice];
         } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+        finally { $lock->release(); }
     }
 
     private function assertRetryableSms(PDO $pdo, array $event): void
@@ -75,8 +81,8 @@ final class NotificationReviewService
         $appointmentStatus = (string)($event['appointment_status'] ?? '');
         if ($cancellation ? !in_array($appointmentStatus, ['canceled_by_client','canceled_by_clinic'], true) : !in_array($appointmentStatus, ['requested','confirmed','rescheduled'], true))
             throw new ApiException(409, 'notification_superseded', 'The appointment has changed; do not resend this notice.');
-        $newer = $pdo->prepare("SELECT 1 FROM notification_events WHERE appointment_id=:appointment AND id>:id AND recipient_user_id=:recipient AND recipient_address=:address AND channel='sms' AND event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation') LIMIT 1");
-        $newer->execute(['appointment' => $event['appointment_id'], 'id' => $event['id'], 'recipient' => $event['recipient_user_id'], 'address' => $event['recipient_address']]);
+        $newer = $pdo->prepare("SELECT 1 FROM notification_events WHERE clinic_id=:clinic AND appointment_id=:appointment AND id>:id AND recipient_user_id=:recipient AND recipient_address=:address AND channel='sms' AND event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation') LIMIT 1");
+        $newer->execute(['clinic'=>$event['clinic_id'],'appointment' => $event['appointment_id'], 'id' => $event['id'], 'recipient' => $event['recipient_user_id'], 'address' => $event['recipient_address']]);
         if ($newer->fetchColumn() !== false) throw new ApiException(409, 'notification_superseded', 'A newer notice exists for this appointment.');
     }
 }

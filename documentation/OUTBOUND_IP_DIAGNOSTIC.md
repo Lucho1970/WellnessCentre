@@ -1,6 +1,6 @@
 # Temporary Netfirms outbound IP diagnostic
 
-Upload `api/tests/hosted/outbound-ip-test-web.php` as `outbound-ip-test.php` in the Willow portal's public `api` folder (alongside its API entry point). The script uses the same private `wellness-api` directory layout as the existing Netfirms entry point. It is not included automatically in normal deployment.
+Upload `api/tests/hosted/outbound-ip-test-web.php` as `outbound-ip-test.php` in the Livin’ Lively portal's public `api` folder (alongside its API entry point). The script uses the same private `wellness-api` directory layout as the existing Netfirms entry point. It is not included automatically in normal deployment.
 
 Add to the private `wellness-api/.env`:
 
@@ -9,7 +9,7 @@ OUTBOUND_IP_TEST_ENABLED=true
 OUTBOUND_IP_TEST_SECRET=replace-with-a-random-secret-at-least-32-characters
 ```
 
-Generate a secret privately with `php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"`. Do not post it in chat. Open `https://willowwellness.copihue.ca/api/outbound-ip-test.php`, enter the secret in the password field, and click **Run one IP test**. Each click makes one IPv4 HTTPS request to ipify and one to AWS Check IP. The providers see the server's network IP; no application keys, client addresses or identity values are transmitted. TLS verification stays enabled.
+Generate a secret privately with `php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"`. Do not post it in chat. Open `https://livinlively.copihue.ca/api/outbound-ip-test.php`, enter the secret in the password field, and click **Run one IP test**. Each click makes one IPv4 HTTPS request to ipify and one to AWS Check IP. The providers see the server's network IP; no application keys, client addresses or identity values are transmitted. TLS verification stays enabled.
 
 Results show on the page and in the existing PHP error log:
 

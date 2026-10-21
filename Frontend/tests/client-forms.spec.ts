@@ -1,4 +1,80 @@
 import { expect, test, type Page } from '@playwright/test';
+const libraryDefinition = { instructions: 'Library instructions', instructions_fr: 'Instructions du modèle', sections: [{ id: 's1', title: 'First section', title_fr: 'Première section' }, { id: 's2', title: 'Second section', title_fr: 'Deuxième section' }], questions: [{ id: 'a', section_id: 's1', label: 'First question', label_fr: 'Première question', type: 'text', required: true }, { id: 'b', section_id: 's1', label: 'Second question', label_fr: 'Deuxième question', type: 'text', required: false }, { id: 'c', section_id: 's2', label: 'Third question', label_fr: 'Troisième question', type: 'yes_no', required: false }] };
+const libraryItem = { id: 91, entry_id: 20, version: 1, revision: 2, scope: 'global', name: 'Library starter', description: 'A reusable starter for testing', form_type: 'intake', definition: libraryDefinition, status: 'approved', review_note: '', can_use: true, can_review: false, can_revise: false, can_retire: false };
+async function libraryFixture(page: Page, admin = false) {
+  await fixture(page, admin ? 'admin' : 'practitioner');
+  await page.route('**/api/v1/forms/templates?**', route => route.fulfill({ json: { data: { items: [], practitioners: [{ id: 7, display_name: 'Esther' }], services: [{ id: 4, name: 'Massage' }], can_author: true, has_more: false, drafts_enabled: true, library_enabled: true, max_questions: 100 } } }));
+  await page.route('**/api/v1/forms/library?**', route => route.fulfill({ json: { data: { items: [libraryItem], has_more: false, can_review: admin, max_questions: 100 } } }));
+  await page.route('**/api/v1/forms/library/91', route => route.fulfill({ json: { data: libraryItem } }));
+}
+test('an existing working form can be submitted to a clinic library without publishing it', async ({ page }) => {
+  await libraryFixture(page); let submitted: any; let publications = 0;
+  await page.route('**/api/v1/forms/library', route => { submitted = route.request().postDataJSON(); return route.fulfill({ json: { data: { ...libraryItem, status: 'pending' } } }); });
+  await page.route('**/api/v1/forms/templates', route => { publications++; return route.fulfill({ json: { data: { id: 99 } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create form', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Form name', exact: true }).fill('My working form');
+  await page.getByRole('textbox', { name: 'Question (English)', exact: true }).fill('A working question');
+  await page.getByRole('button', { name: 'Submit to library', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('textbox', { name: 'Form name', exact: true })).toHaveValue('My working form');
+  await dialog.getByRole('textbox', { name: 'Template description', exact: true }).fill('Clinic reusable starter');
+  await dialog.getByRole('combobox', { name: /^Submit to library/ }).click(); await page.getByRole('option', { name: 'Clinic library', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Submit for approval', exact: true }).click();
+  await expect(dialog).toHaveCount(0); expect(submitted.scope).toBe('clinic'); expect(submitted.definition.questions[0].label).toBe('A working question');
+  expect(submitted).not.toHaveProperty('service_ids'); expect(publications).toBe(0);
+  await expect(page.getByRole('textbox', { name: 'Form name', exact: true })).toHaveValue('My working form');
+});
+test('form library preview fits French mobile screens', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await libraryFixture(page);
+  await page.goto(`${host}/practitioner/forms?lang=fr`);
+  await page.getByRole('button', { name: 'Prévisualiser le modèle', exact: true }).click();
+  await expect(page.getByRole('dialog').getByText('Première section', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('library-preview-mobile-fr.png'), animations: 'disabled' });
+});
+test('form library previews bilingual questions and creates an independently editable draft', async ({ page }) => {
+  await libraryFixture(page); let copies = 0;
+  await page.route('**/api/v1/forms/library/91/copy', route => { copies++; expect(Object.keys(route.request().postDataJSON()).sort()).toEqual(['idempotency_key', 'owner_practitioner_id']); return route.fulfill({ json: { data: { id: 61, version: 1, status: 'draft' } } }); });
+  await page.route('**/api/v1/forms/drafts/61', route => route.fulfill({ json: { data: { id: 61, version: 1, status: 'draft', payload: { name: libraryItem.name, form_type: 'intake', owner_practitioner_id: 7, service_ids: [], previous_template_id: null, expected_version: 0, definition: libraryDefinition } } } }));
+  await page.goto(`${host}/practitioner/forms`);
+  await page.getByRole('button', { name: 'Preview template', exact: true }).click();
+  const preview = page.getByRole('dialog');
+  await preview.getByRole('textbox', { name: 'First question', exact: true }).fill('Preview only'); expect(copies).toBe(0);
+  await preview.getByRole('button', { name: 'FR', exact: true }).click(); await expect(preview.getByText('Première section', { exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: 'EN', exact: true }).click(); await preview.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Use template', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Form name', exact: true })).toHaveValue('Library starter');
+  await expect(page.getByRole('checkbox', { name: 'Massage', exact: true })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Move question down', exact: true }).first().click(); await expect(page.getByRole('textbox', { name: 'Question (English)', exact: true }).first()).toHaveValue('Second question');
+  await page.getByRole('button', { name: 'Insert question after', exact: true }).first().click(); await expect(page.getByRole('textbox', { name: 'Question (English)', exact: true })).toHaveCount(4);
+  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Remove question', exact: true }).nth(1).click(); await expect(page.getByRole('textbox', { name: 'Question (English)', exact: true })).toHaveCount(4);
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Remove question', exact: true }).nth(1).click(); await expect(page.getByRole('textbox', { name: 'Question (English)', exact: true })).toHaveCount(3);
+  await page.getByRole('button', { name: 'Insert section after', exact: true }).first().click(); await expect(page.getByLabel('Section 2 title (English)')).toHaveValue('');
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Delete section and questions', exact: true }).first().click(); await expect(page.getByRole('textbox', { name: 'Question (English)', exact: true })).toHaveCount(1);
+  expect(copies).toBe(1); await page.screenshot({ path: test.info().outputPath('library-copy-editor.png'), fullPage: true });
+});
+test('clinic form library submissions require review and a rejection reason', async ({ page }) => {
+  await libraryFixture(page, true); const pending = { ...libraryItem, scope: 'clinic', status: 'pending', revision: 1, can_use: false, can_review: true };
+  await page.route('**/api/v1/forms/library?**', route => route.fulfill({ json: { data: { items: [pending], can_review: true, has_more: false, max_questions: 100 } } }));
+  await page.route('**/api/v1/forms/library/91', route => route.fulfill({ json: { data: pending } })); let review: any;
+  await page.route('**/api/v1/forms/library/91/review', route => { review = route.request().postDataJSON(); return route.fulfill({ json: { data: { ...pending, status: 'rejected' } } }); });
+  await page.goto(`${host}/admin/forms`);
+  await page.getByRole('combobox', { name: /^Library Global library/ }).click(); await page.getByRole('option', { name: 'Clinic library', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Library view/ }).click(); await page.getByRole('option', { name: 'Awaiting approval', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview template', exact: true }).click(); const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('button', { name: 'Reject template', exact: true })).toBeDisabled();
+  await dialog.getByLabel('Review note').fill('Please clarify this question'); await dialog.getByRole('button', { name: 'Reject template', exact: true }).click();
+  await expect(page.getByText('Library review saved.')).toBeVisible(); expect(review).toEqual({ action: 'reject', revision: 1, review_note: 'Please clarify this question' });
+});
+test('practitioner submits a clinic library template without self-approval', async ({ page }) => {
+  await libraryFixture(page); let submitted: any;
+  await page.route('**/api/v1/forms/library', route => { submitted = route.request().postDataJSON(); return route.fulfill({ json: { data: { ...libraryItem, status: 'pending' } } }); });
+  await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create library template', exact: true }).click(); const dialog = page.getByRole('dialog');
+  await dialog.getByRole('combobox', { name: /^Submit to library/ }).click(); await page.getByRole('option', { name: 'Clinic library', exact: true }).click();
+  await dialog.getByRole('textbox', { name: 'Form name', exact: true }).fill('My clinic starter'); await dialog.getByRole('textbox', { name: 'Template description', exact: true }).fill('A starter for our clinic'); await dialog.getByRole('textbox', { name: 'Question (English)', exact: true }).fill('Example question');
+  await dialog.getByRole('button', { name: 'Submit for approval', exact: true }).click(); await expect(page.getByText('Template submitted for approval.')).toBeVisible();
+  expect(submitted.scope).toBe('clinic'); expect(submitted).not.toHaveProperty('status'); expect(submitted).not.toHaveProperty('owner_practitioner_id'); await expect(page.getByRole('button', { name: 'Approve template', exact: true })).toHaveCount(0);
+});
 const host = 'http://localhost:5184';
 const definition = { instructions: 'Synthetic questions only', instructions_fr: 'Questions fictives uniquement', questions: [{ id: 'q1', label: 'Synthetic answer', label_fr: 'Réponse fictive', type: 'text', required: true }, { id: 'yes', label: 'Synthetic yes/no', label_fr: 'Oui ou non fictif', type: 'yes_no', required: true }, { id: 'consent', label: 'Synthetic consent', label_fr: 'Consentement fictif', type: 'consent', required: true }] };
 const task = { id: 19, name: 'Synthetic intake', status: 'pending', version: 1, template_version: 1, practitioner_name: 'Esther', practitioner_id: 7, required: 1, appointment_id: null, can_read_answers: true };

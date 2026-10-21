@@ -336,3 +336,256 @@ CREATE TABLE client_form_answer_requests (
     PRIMARY KEY(task_id,request_key),
     FOREIGN KEY(task_id) REFERENCES client_form_tasks(id)
 ) ENGINE=InnoDB;
+-- Apply once after the existing invoice/payment foundations. Default-off feature.
+CREATE TABLE receipt_templates (
+ clinic_id BIGINT UNSIGNED PRIMARY KEY,
+ version INT UNSIGNED NOT NULL DEFAULT 1,
+ settings JSON NOT NULL,
+ updated_by BIGINT UNSIGNED NOT NULL,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE practitioner_receipt_profiles (
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ practitioner_id BIGINT UNSIGNED NOT NULL,
+ service_id BIGINT UNSIGNED NOT NULL,
+ version INT UNSIGNED NOT NULL DEFAULT 1,
+ settings JSON NOT NULL,
+ updated_by BIGINT UNSIGNED NOT NULL,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(clinic_id,practitioner_id,service_id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),
+ FOREIGN KEY(service_id) REFERENCES services(id),
+ FOREIGN KEY(updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE session_receipts (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ appointment_id BIGINT UNSIGNED NOT NULL,
+ client_id BIGINT UNSIGNED NOT NULL,
+ practitioner_id BIGINT UNSIGNED NOT NULL,
+ invoice_id BIGINT UNSIGNED NOT NULL,
+ payment_id BIGINT UNSIGNED NOT NULL,
+ receipt_number VARCHAR(40) NOT NULL,
+ request_key VARCHAR(100) NOT NULL,
+ request_hash CHAR(64) NOT NULL,
+ snapshot JSON NOT NULL,
+ pdf_data MEDIUMBLOB NOT NULL,
+ status ENUM('issued','void') NOT NULL DEFAULT 'issued',
+ active_appointment_id BIGINT UNSIGNED GENERATED ALWAYS AS (CASE WHEN status='issued' THEN appointment_id ELSE NULL END) STORED,
+ issued_by BIGINT UNSIGNED NOT NULL,
+ issued_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ voided_by BIGINT UNSIGNED NULL,
+ voided_at DATETIME NULL,
+ void_reason VARCHAR(500) NULL,
+ UNIQUE KEY uq_session_receipt_active(clinic_id,active_appointment_id),
+ UNIQUE KEY uq_session_receipt_request(clinic_id,request_key),
+ UNIQUE KEY uq_session_receipt_number(receipt_number),
+ INDEX ix_session_receipt_client(clinic_id,client_id,id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(appointment_id) REFERENCES appointments(id),
+ FOREIGN KEY(client_id) REFERENCES users(id),
+ FOREIGN KEY(practitioner_id) REFERENCES practitioners(id),
+ FOREIGN KEY(invoice_id) REFERENCES invoices(id),
+ FOREIGN KEY(payment_id) REFERENCES payments(id),
+ FOREIGN KEY(issued_by) REFERENCES users(id),
+ FOREIGN KEY(voided_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Apply once to the selected portal database after migration 043.
+-- NULL preserves the legacy flat fee for existing assignments.
+ALTER TABLE practitioner_services
+  ADD COLUMN mobile_free_radius_km SMALLINT UNSIGNED NULL AFTER mobile_radius_km;
+ALTER TABLE appointments
+  ADD COLUMN mobile_distance_meters INT UNSIGNED NULL,
+  ADD COLUMN mobile_assessed_fee_cents INT UNSIGNED NULL,
+  ADD COLUMN mobile_fee_waived_by BIGINT UNSIGNED NULL,
+  ADD COLUMN mobile_fee_waived_at DATETIME NULL,
+  ADD COLUMN mobile_fee_waiver_reason VARCHAR(300) NULL;
+
+-- Host storage is needed by the later practitioner-enquiry seed.
+CREATE TABLE IF NOT EXISTS clinic_hosts (
+ host VARCHAR(253) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_clinic_portal(clinic_id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id)
+) ENGINE=InnoDB;
+
+-- Central administrator identity storage must precede library references.
+-- No existing clinic role receives central access automatically.
+CREATE TABLE IF NOT EXISTS application_administrators (
+ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ issuer VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ subject VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ display_name VARCHAR(160) NOT NULL,
+ email VARCHAR(254) NOT NULL,
+ status ENUM('active','revoked') NOT NULL DEFAULT 'active',
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_application_administrator(issuer,subject)
+) ENGINE=InnoDB;
+
+-- 045 Form library
+-- Apply once after 037 (drafts), 040 (application administrators) and 044.
+CREATE TABLE form_library_entries (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ scope ENUM('global','clinic') NOT NULL,
+ clinic_id BIGINT UNSIGNED NULL,
+ created_by_user_id BIGINT UNSIGNED NULL,
+ created_by_admin_id BIGINT UNSIGNED NULL,
+ creation_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ creation_actor VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ creation_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ latest_version INT UNSIGNED NOT NULL DEFAULT 1,
+ approved_version_id BIGINT UNSIGNED NULL,
+ archived BOOLEAN NOT NULL DEFAULT FALSE,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_library_creation(creation_actor,creation_key),
+ KEY ix_library_scope(scope,clinic_id,archived),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(created_by_user_id) REFERENCES users(id),
+ FOREIGN KEY(created_by_admin_id) REFERENCES application_administrators(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE form_library_versions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ entry_id BIGINT UNSIGNED NOT NULL,
+ version INT UNSIGNED NOT NULL,
+ revision INT UNSIGNED NOT NULL DEFAULT 1,
+ name VARCHAR(190) NOT NULL,
+ description TEXT NOT NULL,
+ form_type ENUM('intake','consent','follow_up','questionnaire') NOT NULL,
+ definition LONGTEXT NOT NULL,
+ status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+ request_key VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ review_note VARCHAR(1000) NOT NULL DEFAULT '',
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_library_version(entry_id,version),
+ UNIQUE KEY uq_library_request(entry_id,request_key),
+ FOREIGN KEY(entry_id) REFERENCES form_library_entries(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE form_library_entries ADD FOREIGN KEY(approved_version_id) REFERENCES form_library_versions(id);
+CREATE TABLE form_library_events (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ version_id BIGINT UNSIGNED NOT NULL,
+ clinic_id BIGINT UNSIGNED NULL,
+ actor_user_id BIGINT UNSIGNED NULL,
+ actor_admin_id BIGINT UNSIGNED NULL,
+ action VARCHAR(50) NOT NULL,
+ correlation_id VARCHAR(100) NOT NULL,
+ metadata LONGTEXT NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(version_id) REFERENCES form_library_versions(id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+ FOREIGN KEY(actor_user_id) REFERENCES users(id),
+ FOREIGN KEY(actor_admin_id) REFERENCES application_administrators(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Apply once before deploying the social-links API code. Existing profiles stay empty.
+ALTER TABLE public_team_profiles ADD COLUMN social_links TEXT NULL;
+CREATE TABLE practitioner_enquiry_settings (
+ clinic_id BIGINT UNSIGNED PRIMARY KEY,
+ recipient_email VARCHAR(254) NULL,
+ enabled BOOLEAN NOT NULL DEFAULT TRUE,
+ revision INT UNSIGNED NOT NULL DEFAULT 1,
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE practitioner_enquiries (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ reference CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ full_name VARCHAR(160) NOT NULL,
+ email VARCHAR(254) NOT NULL,
+ phone VARCHAR(40) NOT NULL DEFAULT '',
+ discipline VARCHAR(190) NOT NULL,
+ credentials VARCHAR(500) NOT NULL DEFAULT '',
+ service_area VARCHAR(190) NOT NULL,
+ message TEXT NOT NULL,
+ consent_version VARCHAR(40) NOT NULL DEFAULT 'joining-contact-v1',
+ status ENUM('new','contacted','closed') NOT NULL DEFAULT 'new',
+ revision INT UNSIGNED NOT NULL DEFAULT 1,
+ notification_status ENUM('pending','sending','sent','failed','disabled','needs_review') NOT NULL DEFAULT 'pending',
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_enquiry_reference(clinic_id,reference),
+ KEY ix_enquiry_inbox(clinic_id,id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE practitioner_enquiry_limits (
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ bucket CHAR(10) CHARACTER SET ascii NOT NULL,
+ key_hash CHAR(64) CHARACTER SET ascii NOT NULL,
+ attempts INT UNSIGNED NOT NULL DEFAULT 1,
+ PRIMARY KEY(clinic_id,bucket,key_hash),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id)
+) ENGINE=InnoDB;
+-- Initial recipient requested by the owner; change it later in Application administration.
+INSERT INTO practitioner_enquiry_settings(clinic_id,recipient_email)
+ SELECT clinic_id,'info@copihue.ca' FROM clinic_hosts WHERE host='wellnexa.copihue.ca';
+
+-- Apply before deploying response-boundary access auditing. No patient data is copied.
+CREATE TABLE access_audit_events (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    event_group CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    part_number INT UNSIGNED NOT NULL,
+    part_count INT UNSIGNED NOT NULL,
+    clinic_id BIGINT UNSIGNED NULL,
+    actor_type ENUM('staff','client','customer_identity','application_admin','anonymous') NOT NULL,
+    actor_id BIGINT UNSIGNED NULL,
+    correlation_id VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    action VARCHAR(40) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    route_key VARCHAR(240) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    http_method VARCHAR(8) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    http_status SMALLINT UNSIGNED NOT NULL,
+    outcome ENUM('success','denied','failure') NOT NULL,
+    ip_address VARBINARY(16) NULL,
+    metadata JSON NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY uq_access_event_part(event_group,part_number),
+    KEY ix_access_clinic_time(clinic_id,created_at),
+    KEY ix_access_actor(actor_type,actor_id,created_at),
+    KEY ix_access_correlation(correlation_id),
+    KEY ix_access_route_outcome(route_key,outcome,created_at),
+    FOREIGN KEY(clinic_id) REFERENCES clinics(id)
+) ENGINE=InnoDB;
+
+-- Explicit negative directives. Existing form consent is not an access grant.
+CREATE TABLE client_consent_directives (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    clinic_id BIGINT UNSIGNED NOT NULL,
+    client_id BIGINT UNSIGNED NOT NULL,
+    scope ENUM('staff_access','patient_communications') NOT NULL,
+    target_staff_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    restricted TINYINT(1) NOT NULL,
+    version INT UNSIGNED NOT NULL,
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY uq_client_consent(client_id,scope,target_staff_id),
+    KEY ix_consent_enforcement(clinic_id,scope,restricted,target_staff_id,client_id),
+    FOREIGN KEY(clinic_id) REFERENCES clinics(id),
+    FOREIGN KEY(client_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Immutable application history; no contact data or form answers belong here.
+CREATE TABLE client_consent_events (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    directive_id BIGINT UNSIGNED NOT NULL,
+    version INT UNSIGNED NOT NULL,
+    restricted TINYINT(1) NOT NULL,
+    actor_user_id BIGINT UNSIGNED NOT NULL,
+    source ENUM('patient_portal','verified_instruction') NOT NULL,
+    instruction_reference VARCHAR(120) NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    recorded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY uq_consent_event_version(directive_id,version),
+    FOREIGN KEY(directive_id) REFERENCES client_consent_directives(id),
+    FOREIGN KEY(actor_user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+INSERT INTO permissions(code,name,description) VALUES
+('manage_client_consent','Record verified consent instructions','Record verified patient instructions without granting access to patient records.');
+
+-- Explicit clinic privacy-review permission; no automatic grants.
+INSERT INTO permissions(code,name,description) VALUES
+('review_privacy_audit','Review clinic privacy audit','Review minimal access history for this clinic for authorized privacy oversight. Does not grant clinical-record access.');
+CREATE INDEX ix_access_clinic_id ON access_audit_events(clinic_id,id);

@@ -1,5 +1,7 @@
 # Temporary browser backfill for Esther (local user 2)
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 No SSH is required. This runner uses the private backfill service and is restricted to the owner-confirmed local user ID 2. It does not change the identity provider, local grants, client records or practitioner record. Membership login must remain disabled throughout. No extra SQL migration is needed after migration 032.
 
 ## Files to upload
@@ -9,9 +11,9 @@ For the dry-run, only upload:
 | Local source | Netfirms destination |
 | --- | --- |
 | `api/src/Service/StaffMembershipBackfill.php` | `/wellness-api/src/Service/StaffMembershipBackfill.php` |
-| `api/tests/hosted/staff-membership-backfill.php` | `/public_html/willow-wellness-portal/api/staff-membership-backfill.php` |
+| `api/tests/hosted/staff-membership-backfill.php` | `/public_html/wellness-common-portal/api/staff-membership-backfill.php` |
 
-Keep the public filename unchanged. Confirm Willow's actual domain document root if it differs; the runner belongs beside the existing public API `index.php`. The current live `Config.php` is sufficient for the dry-run; full pilot login code need not be deployed yet. The runner also supports the newer Config and refuses to run while its pilot switch is on.
+Keep the public filename unchanged. Confirm Livin’ Lively's actual domain document root if it differs; the runner belongs beside the existing public API `index.php`. The current live `Config.php` is sufficient for the dry-run; full pilot login code need not be deployed yet. The runner also supports the newer Config and refuses to run while its pilot switch is on.
 
 ## Private configuration
 
@@ -27,7 +29,7 @@ STAFF_MEMBERSHIP_PILOT_USER_IDS=
 
 Generate the secret privately, for example with `php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"`. Do not send it in chat, put it in a URL or reuse the former IP-test secret.
 
-Open `https://willowwellness.copihue.ca/api/staff-membership-backfill.php`, enter the secret and click **Run dry-run for user 2**. Send the displayed account/clinic/action report for review. Expected: exactly user 2, the verified Willow clinic, and `would_import` (or `already_imported` on a later run). Conflicts stop the operation; do not repair them by matching email.
+Open `https://livinlively.copihue.ca/api/staff-membership-backfill.php`, enter the secret and click **Run dry-run for user 2**. Send the displayed account/clinic/action report for review. Expected: exactly user 2, the verified Livin’ Lively clinic, and `would_import` (or `already_imported` on a later run). Conflicts stop the operation; do not repair them by matching email.
 
 ## Apply after reviewed report
 

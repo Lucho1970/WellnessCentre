@@ -22,7 +22,54 @@ final class AddressCoverageService
         $this->transport = $transport ?? $this->request(...);
     }
 
-    public function validate(AuthContext $actor, array $body): array
+    public function validate(AuthContext $actor,array $body): array
+    {
+        return $this->withAccess($actor,$body,fn()=>$this->validateAllowed($actor,$body));
+    }
+    public function verifyBooking(AuthContext $actor,array $body,array $destination): array
+    {
+        return $this->withAccess($actor,$body,fn()=>$this->verifyBookingAllowed($actor,$body,$destination));
+    }
+    public function approvalStatus(AuthContext $actor,array $body,?array $destination=null): array
+    {
+        return $this->withAccess($actor,$body,fn()=>$this->approvalStatusAllowed($actor,$body,$destination));
+    }
+    public function approve(AuthContext $actor,array $body,string $correlationId): array
+    {
+        $this->assertCanApprove($actor);
+        return $this->withAccess($actor,$body,fn()=>$this->approveAllowed($actor,$body,$correlationId),true);
+    }
+    public function revoke(AuthContext $actor,array $body,string $correlationId): array
+    {
+        $this->assertCanApprove($actor);
+        return $this->withAccess($actor,$body,fn()=>$this->revokeAllowed($actor,$body,$correlationId),true);
+    }
+
+    /** Authorization precedes configuration errors, private-origin reads, provider calls and writes. */
+    private function withAccess(AuthContext $actor,array $body,Closure $work,bool $mutate=false): array
+    {
+        $this->assertCanBook($actor);$client=$this->clientId($actor,$body);
+        foreach(['location_id','service_id','practitioner_id'] as $field)if(is_bool($body[$field]??null)||filter_var($body[$field]??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])===false)
+            throw new ApiException(422,'validation_error',"{$field} is required.",[$field=>'Required']);
+        $pdo=$this->database->connection();
+        if($mutate&&$pdo->inTransaction())throw new \LogicException('Coverage approval mutations require their own transaction.');
+        $lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
+        try{
+            if($mutate){$pdo->beginTransaction();$q=$pdo->prepare("SELECT id FROM clinics WHERE id=? AND status='active' FOR UPDATE");$q->execute([$actor->clinicId]);if(!$q->fetchColumn())throw new ApiException(403,'forbidden','The clinic is unavailable.');}
+            $params=['client'=>$client,'clinic'=>$actor->clinicId];
+            $scope=$actor->userType==='staff'?BookingClientAccess::condition($actor,$params):'';
+            $q=$pdo->prepare("SELECT 1 FROM users u JOIN clinics clinic ON clinic.id=u.clinic_id AND clinic.status='active'
+                WHERE u.id=:client AND u.clinic_id=:clinic AND u.user_type='client' AND u.status='active'
+                  AND NOT EXISTS(SELECT 1 FROM client_merge_records merged WHERE merged.duplicate_client_id=u.id) $scope".($pdo->inTransaction()?' FOR UPDATE':''));
+            $q->execute($params);if(!$q->fetchColumn())throw new ApiException(404,'client_not_found','The active client was not found.');
+            if($actor->userType==='staff'&&(new ConsentAccess($pdo))->restricted($actor->clinicId,$client,$actor->userId,$pdo->inTransaction()))
+                throw new ApiException(403,'consent_restricted','Access is restricted by a patient privacy instruction.');
+            $result=$work();if($mutate)$pdo->commit();return $result;
+        }catch(\Throwable $e){if($mutate&&$pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$lock->release();}
+    }
+
+    private function validateAllowed(AuthContext $actor, array $body): array
     {
         $this->assertCanBook($actor);
         foreach (['location_id', 'service_id', 'practitioner_id'] as $field) {
@@ -50,12 +97,15 @@ final class AddressCoverageService
         $proof = [
             'clinic_id' => $actor->clinicId,
             'user_id' => $actor->userId,
+            'client_id' => $this->clientId($actor,$body),
             'location_id' => (int)$body['location_id'],
             'service_id' => (int)$body['service_id'],
             'practitioner_id' => (int)$body['practitioner_id'],
             'destination_hash' => self::destinationHash($destination),
             'origin_hash' => $this->originFingerprint($rule),
             'radius_meters' => $radiusMeters,
+            'distance_quote' => $this->sealDistance($distanceMeters),
+            'fee_policy' => OnsiteFee::fingerprint($rule),
             'iat' => time(),
             'exp' => time() + $this->config->addressValidationTokenTtlSeconds,
         ];
@@ -63,6 +113,7 @@ final class AddressCoverageService
         return [
             ...($actor->userType === 'staff' ? ['distance_km' => round($distanceMeters / 1000, 1)] : []),
             'covered' => true,
+            'mobile_fee_cents' => OnsiteFee::quote($rule, $distanceMeters),
             'destination' => $destination,
             'radius_km' => round($radius, 1),
             'token' => $this->sign($proof),
@@ -70,7 +121,7 @@ final class AddressCoverageService
         ];
     }
 
-    public function verifyBooking(AuthContext $actor, array $body, array $destination): array
+    private function verifyBookingAllowed(AuthContext $actor, array $body, array $destination): array
     {
         $token = $body['address_validation_token'] ?? null;
         if (!is_string($token) || $token === '') {
@@ -80,10 +131,13 @@ final class AddressCoverageService
         $proof = $this->verifyToken($actor, $body, $destination, $token);
         $rule = $this->rule($actor, $body);
         if (($proof['origin_hash'] ?? null) !== $this->originFingerprint($rule) || ($proof['radius_meters'] ?? null) !== (int)round((float)$rule['mobile_radius_km'] * 1000)) throw new ApiException(422, 'coverage_validation_mismatch', 'The base address or service area changed. Validate the address again.');
+        if (isset($rule['mobile_free_radius_km']) && ($proof['fee_policy'] ?? null) !== OnsiteFee::fingerprint($rule)) throw new ApiException(422, 'coverage_validation_mismatch', 'Travel pricing changed. Validate the address again.');
+        $proof['distance_meters'] = isset($proof['distance_quote']) ? $this->openDistance($proof['distance_quote']) : null;
+        OnsiteFee::quote($rule, $proof['distance_meters']);
         return $proof;
     }
 
-    public function approvalStatus(AuthContext $actor, array $body, ?array $destination = null): array
+    private function approvalStatusAllowed(AuthContext $actor, array $body, ?array $destination = null): array
     {
         $this->assertCanBook($actor);
         $clientId = $this->clientId($actor, $body);
@@ -92,10 +146,10 @@ final class AddressCoverageService
         $origin = $this->origin($rule);
         $statement = $this->database->connection()->prepare('SELECT 1 FROM onsite_area_approvals WHERE clinic_id=:clinic AND client_id=:client AND location_id=:location AND practitioner_id=:practitioner AND service_id=:service AND destination_hash=:destination AND origin_hash=:origin AND radius_km=:radius LIMIT 1');
         $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => $this->originFingerprint($rule), 'radius' => (int)$rule['mobile_radius_km']]);
-        return ['approved' => (bool)$statement->fetchColumn()];
+        return ['approved' => (bool)$statement->fetchColumn() && !isset($rule['mobile_free_radius_km'])];
     }
 
-    public function approve(AuthContext $actor, array $body, string $correlationId): array
+    private function approveAllowed(AuthContext $actor, array $body, string $correlationId): array
     {
         $this->assertCanApprove($actor);
         $clientId = $this->clientId($actor, $body);
@@ -112,10 +166,10 @@ final class AddressCoverageService
         $statement = $this->database->connection()->prepare('INSERT INTO onsite_area_approvals(clinic_id,client_id,location_id,practitioner_id,service_id,destination_hash,origin_hash,radius_km,approved_by) VALUES(:clinic,:client,:location,:practitioner,:service,:destination,:origin,:radius,:staff) ON DUPLICATE KEY UPDATE approved_by=VALUES(approved_by),approved_at=UTC_TIMESTAMP()');
         $statement->execute(['clinic' => $actor->clinicId, 'client' => $clientId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id'], 'destination' => self::addressHash($destination), 'origin' => $this->originFingerprint($rule), 'radius' => (int)$rule['mobile_radius_km'], 'staff' => $actor->userId]);
         (new AuditLogger($this->database))->write($actor->clinicId, $actor, $correlationId, 'onsite_area.approve', 'client', $clientId, 'success', ['location_id' => (int)$body['location_id'], 'practitioner_id' => (int)$body['practitioner_id'], 'service_id' => (int)$body['service_id']]);
-        return ['approved' => true];
+        return ['approved' => !isset($rule['mobile_free_radius_km'])];
     }
 
-    public function revoke(AuthContext $actor, array $body, string $correlationId): array
+    private function revokeAllowed(AuthContext $actor, array $body, string $correlationId): array
     {
         $this->assertCanApprove($actor);
         $clientId = $this->clientId($actor, $body);
@@ -144,6 +198,7 @@ final class AddressCoverageService
         $expectedValues = [
             'clinic_id' => $actor->clinicId,
             'user_id' => $actor->userId,
+            'client_id' => $this->clientId($actor,$body),
             'location_id' => (int)($body['location_id'] ?? 0),
             'service_id' => (int)($body['service_id'] ?? 0),
             'practitioner_id' => (int)($body['practitioner_id'] ?? 0),
@@ -156,16 +211,35 @@ final class AddressCoverageService
         return $proof;
     }
 
+    // Keep distance from a private starting location opaque in client-held signed tokens.
+    private function sealDistance(int $meters): string
+    {
+        $nonce = random_bytes(12);
+        $cipher = openssl_encrypt((string)$meters, 'aes-256-gcm', hash('sha256', $this->config->addressValidationSigningKey, true), OPENSSL_RAW_DATA, $nonce, $tag);
+        if ($cipher === false) throw new \RuntimeException('Unable to secure distance quote.');
+        return base64_encode($nonce.$tag.$cipher);
+    }
+
+    private function openDistance(string $quote): int
+    {
+        $bytes = base64_decode($quote, true);
+        $value = is_string($bytes) && strlen($bytes)>28 ? openssl_decrypt(substr($bytes,28), 'aes-256-gcm', hash('sha256', $this->config->addressValidationSigningKey, true), OPENSSL_RAW_DATA, substr($bytes,0,12), substr($bytes,12,16)) : false;
+        if (!is_string($value) || !ctype_digit($value)) throw new ApiException(422, 'invalid_coverage_validation', 'Validate the address again.');
+        return (int)$value;
+    }
+
     private function rule(AuthContext $actor, array $body): array
     {
-        $sql = "SELECT p.id practitioner_id,ps.mobile_radius_km,l.address_line1,l.address_line2,l.city,l.province,l.postal_code,p.user_id,p.booking_mode
+        $sql = "SELECT p.id practitioner_id,ps.mobile_radius_km,ps.mobile_free_radius_km,ps.mobile_fee_cents,l.address_line1,l.address_line2,l.city,l.province,l.postal_code,p.user_id,p.booking_mode
                   FROM practitioner_services ps
                   JOIN services s ON s.id=ps.service_id AND s.clinic_id=:clinic AND s.active=1
                   JOIN service_locations sl ON sl.service_id=s.id AND sl.location_id=:location AND sl.active=1
                   JOIN locations l ON l.id=sl.location_id AND l.clinic_id=s.clinic_id AND l.is_bookable=1
                   JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1
+                  JOIN users practitioner_user ON practitioner_user.id=p.user_id AND practitioner_user.clinic_id=s.clinic_id AND practitioner_user.user_type='staff' AND practitioner_user.status='active'
+                  JOIN practitioner_locations pl ON pl.practitioner_id=p.id AND pl.location_id=l.id AND pl.active=1
                  WHERE ps.practitioner_id=:practitioner AND ps.service_id=:service AND ps.active=1 AND ps.offers_mobile=1";
-        $statement = $this->database->connection()->prepare($sql);
+        $statement = $this->database->connection()->prepare($sql.($this->database->connection()->inTransaction()?' FOR UPDATE':''));
         $statement->execute(['clinic' => $actor->clinicId, 'location' => (int)$body['location_id'], 'practitioner' => (int)$body['practitioner_id'], 'service' => (int)$body['service_id']]);
         $rule = $statement->fetch();
         if (!$rule) throw new ApiException(422, 'delivery_unavailable', 'This practitioner does not offer On-Site visits for the selected service and location.');
@@ -173,6 +247,9 @@ final class AddressCoverageService
         if ($practitionerOnly && ((int)$rule['user_id'] !== $actor->userId || $rule['booking_mode'] !== 'practitioner_managed')) {
             throw new ApiException(403, 'forbidden', 'Practitioners can only validate addresses for their own practitioner-managed appointments.');
         }
+        $pdo=$this->database->connection();
+        if((new ConsentAccess($pdo))->restricted($actor->clinicId,$this->clientId($actor,$body),(int)$rule['user_id'],$pdo->inTransaction()))
+            throw new ApiException(403,'consent_restricted','Access is restricted by a patient privacy instruction.');
         $private = $this->database->connection()->prepare('SELECT home_address,work_address,work_same_as_home,version FROM practitioner_private_locations WHERE practitioner_id=:id');
         $private->execute(['id' => (int)$rule['practitioner_id']]);
         $row = $private->fetch();
@@ -185,12 +262,14 @@ final class AddressCoverageService
 
     private function clientId(AuthContext $actor, array $body): int
     {
+        if(array_key_exists('client_id',$body)&&(is_bool($body['client_id'])||filter_var($body['client_id'],FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])===false))
+            throw new ApiException(422,'validation_error','Select an active client before checking coverage.');
         if ($actor->userType === 'client') {
             if (array_key_exists('client_id', $body) && (int)$body['client_id'] !== $actor->userId) throw new ApiException(403, 'forbidden', 'Clients can only check their own address.');
             return $actor->userId;
         }
         $id = (int)($body['client_id'] ?? 0);
-        if ($id < 1) throw new ApiException(422, 'validation_error', 'Select a client before checking a saved service-area approval.');
+        if ($id < 1) throw new ApiException(422,'validation_error','Select an active client before checking coverage.');
         return $id;
     }
 

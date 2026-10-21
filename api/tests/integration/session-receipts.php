@@ -1,0 +1,66 @@
+<?php
+declare(strict_types=1);
+// Reuse a random localhost-only synthetic schema. Never load private .env or hosted records.
+require __DIR__.'/recurring-bookings.php';
+use Wellness\Auth\AuthContext;
+use Wellness\Http\ApiException;
+use Wellness\Service\{AuditLogger,SessionReceiptService};
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/043_session_receipts.sql'));
+// Current persisted clinic authority is required for issuer-template maintenance.
+$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='super_admin'");
+$receipts=new SessionReceiptService($database,new AuditLogger($database));$checks=0;
+set_error_handler(static function(int $severity,string $message,string $file,int $line): bool {if(!(error_reporting()&$severity))return false;throw new ErrorException($message,0,$severity,$file,$line);});
+$assert=function(bool $ok,string $why)use(&$checks){if(!$ok)throw new RuntimeException($why);$checks++;};
+$deny=function(callable $action,string $code)use($assert){try{$action();}catch(ApiException $e){$assert($e->errorCode===$code,'Expected '.$code.', got '.$e->errorCode);return;}throw new RuntimeException('Expected '.$code);};
+$practitioner=new AuthContext(2,1,'','','','staff',['practitioner']);$other=new AuthContext(9,1,'','','','client',[]);$foreign=new AuthContext(10,2,'','','','client',[]);$colleague=new AuthContext(1,1,'','','','staff',['practitioner']);
+$assert($receipts->list($client,[])['enabled']===false,'Disabled feature must not query its tables.');
+$_ENV['SESSION_RECEIPTS_ENABLED']='true';
+$pdo->exec("INSERT INTO appointments(id,clinic_id,location_id,client_id,practitioner_id,service_id,duration_option_id,starts_at,ends_at,buffer_starts_at,buffer_ends_at,status,source,base_price_cents,mobile_fee_cents,created_by) VALUES(90001,1,1,8,3,4,8,'2026-01-02 15:00:00','2026-01-02 16:00:00','2026-01-02 15:00:00','2026-01-02 16:00:00','completed','practitioner',10000,1500,2)");
+$template=['version'=>0,'issuer_name'=>'Clinique Étoile','issuer_address'=>'123 Test Street, Toronto ON','issuer_contact'=>'clinic@example.test','clinic_logo'=>''];
+$profile=['version'=>0,'practitioner_name'=>'Practitioner Élodie','designation'=>'Registered Massage Therapist','registration_number'=>'TEST123','practitioner_logo'=>''];
+$deny(fn()=>$receipts->saveTemplate($practitioner,$template,'receipt-test'),'forbidden');
+$receipts->saveTemplate($admin,$template,'receipt-test');$receipts->saveProfile($practitioner,90001,$profile,'receipt-test');
+$deny(fn()=>$receipts->saveTemplate($admin,$template,'receipt-test'),'receipt_settings_changed');
+$deny(fn()=>$receipts->context($colleague,90001),'receipt_not_found');
+$body=['version'=>1,'template_version'=>1,'profile_version'=>1,'tax_cents'=>1495,'amount_cents'=>12995,'method'=>'etransfer','paid_on'=>'2026-01-02','confirmed'=>true,'language'=>'en','idempotency_key'=>'synthetic-receipt-key-001'];
+$deny(fn()=>$receipts->issue($client,90001,$body,'receipt-test'),'forbidden');
+$deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['amount_cents'=>12000]),'receipt-test'),'receipt_full_payment_required');
+$deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['template_version'=>0]),'receipt-test'),'receipt_settings_changed');
+$deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['paid_on'=>'2026-02-30']),'receipt-test'),'validation_error');
+$r=$receipts->issue($practitioner,90001,$body,'receipt-test');$id=$r['id'];
+$assert($r['total_cents']===12995,'Receipt totals must include historical travel and explicit tax.');
+$assert($receipts->issue($practitioner,90001,$body,'receipt-test')['id']===$id,'An identical retry must return the original receipt.');
+$deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['tax_cents'=>0]),'receipt-test'),'receipt_request_changed');
+$deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['idempotency_key'=>'synthetic-receipt-key-002']),'receipt-test'),'receipt_session_changed');
+$assert((int)$pdo->query("SELECT COUNT(*) FROM payments WHERE invoice_id=".(int)$pdo->query("SELECT invoice_id FROM session_receipts WHERE id=$id")->fetchColumn())->fetchColumn()===1,'Retries must never duplicate payments.');
+$pdf=$receipts->pdf($client,$id,'receipt-test');$original=base64_decode($pdf['pdf_base64']);$assert(str_starts_with($original,'%PDF-'),'Download must be a PDF.');
+$assert($receipts->list($client,[])['items'][0]['id']===$id,'Client portal must deliver the receipt.');
+$assert($receipts->list($other,[])['items']===[],'Other clients cannot list receipts.');
+$assert($receipts->list($foreign,[])['items']===[],'Other clinics cannot list receipts.');
+$deny(fn()=>$receipts->pdf($other,$id,'receipt-test'),'receipt_not_found');$deny(fn()=>$receipts->pdf($foreign,$id,'receipt-test'),'receipt_not_found');$deny(fn()=>$receipts->pdf($colleague,$id,'receipt-test'),'receipt_not_found');
+$template['version']=1;$template['issuer_name']='Changed clinic';$receipts->saveTemplate($admin,$template,'receipt-test');
+$profile['version']=1;$profile['designation']='Changed designation';$receipts->saveProfile($practitioner,90001,$profile,'receipt-test');
+$assert(base64_decode($receipts->pdf($client,$id,'receipt-test')['pdf_base64'])===$original,'Template and credential edits must not change an issued PDF.');
+$assert($receipts->issue($practitioner,90001,$body,'receipt-test')['id']===$id,'Original retries must work after template edits.');
+$deny(fn()=>$receipts->void($client,$id,['reason'=>'Synthetic correction','kind'=>'recording_error','confirmed'=>true],'receipt-test'),'forbidden');
+$receipts->void($practitioner,$id,['reason'=>'Synthetic payment entered by mistake','kind'=>'recording_error','confirmed'=>true],'receipt-test');
+$receipts->void($practitioner,$id,['reason'=>'Synthetic payment entered by mistake','kind'=>'recording_error','confirmed'=>true],'receipt-test');
+$deny(fn()=>$receipts->pdf($client,$id,'receipt-test'),'receipt_void');
+$assert($receipts->list($client,[])['items'][0]['status']==='void','Client must see void status.');
+$body=array_replace($body,['version'=>3,'template_version'=>2,'profile_version'=>2,'idempotency_key'=>'synthetic-receipt-key-003']);$r2=$receipts->issue($practitioner,90001,$body,'receipt-test');
+$assert($r2['id']!==$id,'A correction must issue a new immutable receipt.');
+$receipts->void($practitioner,$r2['id'],['reason'=>'Synthetic full refund already made','kind'=>'refunded','confirmed'=>true],'receipt-test');
+$assert((int)$pdo->query('SELECT COUNT(*) FROM refunds')->fetchColumn()===1,'Full refund must be recorded exactly once.');
+$pdo->exec("INSERT INTO appointments(id,clinic_id,location_id,client_id,practitioner_id,service_id,duration_option_id,starts_at,ends_at,buffer_starts_at,buffer_ends_at,status,source,base_price_cents,mobile_fee_cents,created_by) VALUES(90002,1,1,8,3,4,8,'2026-01-03 15:00:00','2026-01-03 16:00:00','2026-01-03 15:00:00','2026-01-03 16:00:00','completed','practitioner',10000,1500,2)");
+$raceBody=array_replace($body,['version'=>1,'paid_on'=>'2026-01-03','idempotency_key'=>'synthetic-receipt-race-001']);$processes=[];
+for($i=0;$i<2;$i++){
+    $pipes=[];$process=proc_open([PHP_BINARY,__DIR__.'/session-receipt-worker.php',(string)$port,$name,base64_encode(json_encode($raceBody,JSON_THROW_ON_ERROR))],[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
+    if(!is_resource($process))throw new RuntimeException('Cannot start synthetic receipt worker.');fclose($pipes[0]);$processes[]=[$process,$pipes];
+}
+$raceIds=[];foreach($processes as [$process,$pipes]){$output=stream_get_contents($pipes[1]);$error=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$exit=proc_close($process);if($exit!==0)throw new RuntimeException('Receipt worker failed: '.$error);$raceIds[]=json_decode($output,true,32,JSON_THROW_ON_ERROR)['id'];}
+$assert($raceIds[0]===$raceIds[1],'Simultaneous retries must return one receipt.');
+$assert((int)$pdo->query('SELECT COUNT(*) FROM session_receipts WHERE appointment_id=90002')->fetchColumn()===1,'Simultaneous retries must persist one receipt.');
+$assert((int)$pdo->query('SELECT COUNT(*) FROM payments p JOIN invoices i ON i.id=p.invoice_id WHERE i.appointment_id=90002')->fetchColumn()===1,'Simultaneous retries must persist one payment.');
+$clientService=new \Wellness\Service\ClientService($database,new AuditLogger($database));$tables=(new ReflectionMethod($clientService,'relationshipTables'))->invoke($clientService);$assert(in_array('session_receipts',$tables,true),'Reviewed client merges must include receipt ownership.');
+$path=dirname(__DIR__,3).'/.tmp/session-receipt-sample.pdf';file_put_contents($path,$original);
+echo "$checks session receipt SQL checks passed. Synthetic PDF: $path\n";

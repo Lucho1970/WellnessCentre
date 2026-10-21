@@ -41,6 +41,7 @@ final class NotificationStatusService
         $pdo = $this->database->connection();
         $filters = 'n.clinic_id=:clinic';
         $filterParams = ['clinic' => $actor->clinicId];
+        $filters .= ConsentAccess::notificationCondition($actor,$filterParams);
         if ($channel !== '') { $filters .= ' AND n.channel=:channel'; $filterParams['channel'] = $channel; }
         if ($period !== '') {
             $timezoneQuery = $pdo->prepare('SELECT timezone FROM locations WHERE clinic_id=:clinic AND is_bookable=1 ORDER BY id LIMIT 1');
@@ -62,7 +63,7 @@ final class NotificationStatusService
         if ($status !== '') $sql .= ' AND n.status=:status';
         $sql .= ' ORDER BY n.id DESC LIMIT :limit OFFSET :offset';
         $statement = $pdo->prepare($sql);
-        foreach ($filterParams as $key => $value) $statement->bindValue(':'.$key, $value, $key === 'clinic' ? PDO::PARAM_INT : PDO::PARAM_STR);
+        foreach ($filterParams as $key => $value) $statement->bindValue(':'.$key, $value, in_array($key,['clinic','consent_actor','consent_clinic'],true) ? PDO::PARAM_INT : PDO::PARAM_STR);
         if ($status !== '') $statement->bindValue(':status', $status);
         $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
         $statement->bindValue(':offset', ($page - 1) * $limit, PDO::PARAM_INT);
@@ -102,6 +103,8 @@ final class NotificationStatusService
         $pdo = $this->database->connection();
         $where = "n.clinic_id=:clinic AND n.recipient_user_id=:recipient AND n.event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation','staff_booking_reassigned_away')";
         $params = ['clinic' => $actor->clinicId, 'recipient' => $actor->userId];
+        $where .= ConsentAccess::notificationCondition($actor,$params);
+        $where .= " AND EXISTS(SELECT 1 FROM practitioners notification_practitioner JOIN users notification_recipient ON notification_recipient.id=notification_practitioner.user_id WHERE notification_practitioner.user_id=n.recipient_user_id AND notification_practitioner.active=1 AND notification_recipient.clinic_id=n.clinic_id AND notification_recipient.user_type='staff' AND notification_recipient.status='active')";
         if ($status !== '') { $where .= ' AND n.status=:status'; $params['status'] = $status; }
         if ($channel !== '') { $where .= ' AND n.channel=:channel'; $params['channel'] = $channel; }
         if ($period !== '') {
@@ -121,7 +124,7 @@ final class NotificationStatusService
         $total = (int)$totalQuery->fetchColumn();
         $limit = 25;
         $statement = $pdo->prepare("SELECT n.id,n.appointment_id,n.recipient_address,n.event_code,n.channel,n.status,n.scheduled_at,n.sent_at FROM notification_events n WHERE {$where} ORDER BY n.id DESC LIMIT :limit OFFSET :offset");
-        foreach ($params as $key => $value) $statement->bindValue(':'.$key, $value, in_array($key, ['clinic', 'recipient'], true) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        foreach ($params as $key => $value) $statement->bindValue(':'.$key, $value, in_array($key, ['clinic', 'recipient','consent_actor','consent_clinic'], true) ? PDO::PARAM_INT : PDO::PARAM_STR);
         $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
         $statement->bindValue(':offset', ($page - 1) * $limit, PDO::PARAM_INT);
         $statement->execute();

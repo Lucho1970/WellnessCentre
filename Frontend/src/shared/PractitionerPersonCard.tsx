@@ -8,7 +8,7 @@ import { initials, localized, type PublicPractitioner } from '../guest/catalogue
 
 type Person = Omit<Pick<PublicPractitioner, 'slug' | 'public_name' | 'public_title' | 'public_title_fr' | 'summary' | 'summary_fr' | 'discipline' | 'credentials' | 'has_image' | 'image_version' | 'public_website_url' | 'public_contact_email' | 'public_contact_phone' | 'public_contact_sms'>, 'has_image'> & { has_image: boolean | number };
 
-export function PractitionerContactActions({ person }: { person: Pick<Person, 'public_website_url' | 'public_contact_email' | 'public_contact_phone' | 'public_contact_sms'> }) {
+export function PractitionerContactActions({ person }: { person: Pick<Person, 'public_website_url' | 'public_contact_email' | 'public_contact_phone' | 'public_contact_sms'> & {social_links?:{label:string;url:string}[]} }) {
   const { t } = useTranslation();
   const email = person.public_contact_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.public_contact_email) ? person.public_contact_email : null;
   const phone = person.public_contact_phone && /^\+[1-9][0-9]{7,14}$/.test(person.public_contact_phone) ? person.public_contact_phone : null;
@@ -17,12 +17,14 @@ export function PractitionerContactActions({ person }: { person: Pick<Person, 'p
     const url = new URL(person.public_website_url ?? '');
     if (['https:', 'http:'].includes(url.protocol) && !url.username && !url.password) website = url.href;
   } catch { /* Empty or invalid links are omitted. */ }
-  if (!email && !phone && !website) return null;
+  const socials = (person.social_links ?? []).filter(link => {try {const u=new URL(link.url);return u.protocol==='https:'&&!u.username&&!u.password;} catch{return false;}});
+  if (!email && !phone && !website && !socials.length) return null;
   return <Stack direction="row" gap={0.5} flexWrap="wrap">
     {website && <Button size="small" href={website} target="_blank" rel="noopener noreferrer" startIcon={<Globe size={15}/>}>{t('Website / social page')}</Button>}
     {phone && <Button size="small" href={`tel:${phone}`} startIcon={<Phone size={15}/>}>{t('Call')}</Button>}
     {phone && Boolean(Number(person.public_contact_sms)) && <Button size="small" href={`sms:${phone}`} startIcon={<MessageSquare size={15}/>}>{t('Text')}</Button>}
     {email && <Button size="small" href={`mailto:${email}`} startIcon={<Mail size={15}/>}>{t('Email')}</Button>}
+    {socials.map(link=><Button key={link.url} size="small" href={link.url} target="_blank" rel="noopener noreferrer" startIcon={<Globe size={15}/>}>{link.label}</Button>)}
   </Stack>;
 }
 

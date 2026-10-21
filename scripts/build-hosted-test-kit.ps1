@@ -6,7 +6,7 @@ $destination = Join-Path $repo "deployments/$ReleaseName"
 if (Test-Path -LiteralPath $destination) { throw "Release already exists: $destination" }
 $stage = Join-Path $repo ('.tmp/hosted-tests-' + [guid]::NewGuid().ToString('N'))
 $private = Join-Path $stage 'wellness-api'
-$public = Join-Path $stage 'public_html/wellness/api'
+$public = Join-Path $stage 'public_html/livinlively.ca/api'
 New-Item -ItemType Directory -Path (Join-Path $private 'tests/hosted'),(Join-Path $private 'tests/integration'),$public -Force | Out-Null
 try {
     Get-ChildItem -LiteralPath (Join-Path $repo 'api/tests') -Filter '*.php' -File | Copy-Item -Destination (Join-Path $private 'tests') -ErrorAction Stop
@@ -40,9 +40,9 @@ try {
     try {
         $entries = @($archive.Entries | ForEach-Object FullName)
         if (@($entries | Where-Object { $_ -match '(^|/)(\.env[^/]*|vendor|src)(/|$)' }).Count -ne 0) { throw 'Test archive includes application secrets or code.' }
-        if ($entries -notcontains 'public_html/wellness/api/test-suite.php') { throw 'Public test endpoint is missing.' }
+        if ($entries -notcontains 'public_html/livinlively.ca/api/test-suite.php') { throw 'Public test endpoint is missing.' }
         if ($entries -notcontains 'wellness-api/tests/hosted/Suite.php') { throw 'Private runner is missing.' }
-        $manifest = [ordered]@{ built_at_utc=[DateTime]::UtcNow.ToString('o'); archive='hosted-test-kit.zip'; sha256=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant(); entries=$entries.Count; public_entry='public_html/wellness/api/test-suite.php'; private_root='wellness-api/tests'; deployment_guide='documentation/HOSTED_TEST_SUITE.md' }
+        $manifest = [ordered]@{ source_commit=(git -C $repo rev-parse HEAD); built_at_utc=[DateTime]::UtcNow.ToString('o'); archive='hosted-test-kit.zip'; sha256=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant(); entries=$entries.Count; public_entry='public_html/livinlively.ca/api/test-suite.php'; private_root='wellness-api/tests'; deployment_guide='documentation/HOSTED_TEST_SUITE.md' }
         $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
     } finally { $archive.Dispose() }
     Write-Output "Hosted test kit: $zip"

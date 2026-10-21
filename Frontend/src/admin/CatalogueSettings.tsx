@@ -1,6 +1,6 @@
 import { ApiError } from '../shared/api';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Grid, Paper, Stack, Typography } from '@mui/material';
 import { Plus, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -11,9 +11,9 @@ import { useUnsavedForm } from '../shared/UnsavedChanges';
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
 type Settings = {
-  default_lead_time_minutes: number;
-  default_booking_horizon_days: number;
-  default_cancellation_window_minutes: number;
+  default_lead_time_minutes: number | '';
+  default_booking_horizon_days: number | '';
+  default_cancellation_window_minutes: number | '';
 };
 
 const settingLabels: Record<keyof Settings, string> = {
@@ -29,9 +29,9 @@ function CatalogueSettingsForm() {
   const [categories, setCategories] = useState<{ id: number; name: string; name_fr: string | null; description: string | null; description_fr: string | null }[]>([]);
   const [taxes, setTaxes] = useState<{ id: number; code: string; name: string; rate_basis_points: number }[]>([]);
   const [settings, setSettings] = useState<Settings>({
-    default_lead_time_minutes: 60,
-    default_booking_horizon_days: 90,
-    default_cancellation_window_minutes: 1440,
+    default_lead_time_minutes: '',
+    default_booking_horizon_days: '',
+    default_cancellation_window_minutes: '',
   });
   const [category, setCategory] = useState({ name: '', name_fr: '', description: '', description_fr: '' });
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
@@ -54,31 +54,49 @@ function CatalogueSettingsForm() {
     return normalizeNumericIds(responseBody.data);
   };
 
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const generation = useRef(0);
+  const clearAccess = () => {
+    setLoaded(false); setCategories([]); setTaxes([]);
+    setSettings({ default_lead_time_minutes: '', default_booking_horizon_days: '', default_cancellation_window_minutes: '' });
+    setCategory({ name: '', name_fr: '', description: '', description_fr: '' }); setEditingCategoryId(null);
+    setTax({ code: '', name: '', rate: '' }); setMessage(''); formValidation.clear();
+    settingsGuard.markClean(); categoryGuard.markClean(); taxGuard.markClean();
+  };
   const load = async () => {
+    const current = ++generation.current; setLoaded(false); setBusy(true); setMessage(''); setError('');
     try {
       const data = await request('/admin/catalogue-settings');
-      setCategories(data.categories);
-      setTaxes(data.taxes);
-      if (data.settings) setSettings(data.settings);
-    } catch (cause) { formValidation.capture(cause);
-      setError(cause instanceof Error ? cause.message : t('Unable to load settings.'));
-    }
+      if (current !== generation.current) return false;
+      setCategories(data.categories); setTaxes(data.taxes);
+      setSettings({
+        default_lead_time_minutes: Number(data.settings?.default_lead_time_minutes ?? 60),
+        default_booking_horizon_days: Number(data.settings?.default_booking_horizon_days ?? 90),
+        default_cancellation_window_minutes: Number(data.settings?.default_cancellation_window_minutes ?? 1440),
+      });
+      setLoaded(true); return true;
+    } catch (cause) {
+      if (current !== generation.current) return false;
+      clearAccess(); formValidation.capture(cause);
+      setError(cause instanceof Error ? cause.message : t('Unable to load settings.')); return false;
+    } finally { if (current === generation.current) setBusy(false); }
   };
-
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); return () => { generation.current++; }; }, []);
 
   const done = async (action: () => Promise<unknown>, text: string, markClean: () => void) => {
-    (formValidation.clear(), setError(''));
+    const current = ++generation.current; setBusy(true); formValidation.clear(); setError(''); setMessage('');
     try {
       await action();
+      if (current !== generation.current) return false;
       markClean();
-      await load();
-      setMessage(text);
-      return true;
-    } catch (cause) { formValidation.capture(cause);
-      setError(cause instanceof Error ? cause.message : t('Unable to save settings.'));
-      return false;
-    }
+      if (!await load()) return false;
+      setMessage(text); return true;
+    } catch (cause) {
+      if (current !== generation.current) return false;
+      if (cause instanceof ApiError && [401,403,404].includes(cause.status)) clearAccess();
+      formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to save settings.')); return false;
+    } finally { if (current === generation.current) setBusy(false); }
   };
   const saveCategory = async () => {
     const saved=await done(() => request(editingCategoryId ? `/admin/service-categories/${editingCategoryId}` : '/admin/service-categories', editingCategoryId ? 'PATCH' : 'POST', category), t(editingCategoryId ? 'Category updated.' : 'Category added.'), categoryGuard.markClean);
@@ -87,16 +105,17 @@ function CatalogueSettingsForm() {
 
   return (
     <Stack spacing={3} mt={3}>
+      <Stack component="fieldset" disabled={!loaded || busy} spacing={3} sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}>
       <Paper variant="outlined" sx={{ p: 3 }} onChange={settingsGuard.markDirty}>
         <Typography variant="h5">{t('Booking defaults')}</Typography>
         <Grid container spacing={2} mt={0.5}>
           {(Object.keys(settingLabels) as (keyof Settings)[]).map((key) => (
             <Grid size={{ xs: 12, md: 4 }} key={key}>
-              <TextField name={key} fullWidth type="number" label={t(settingLabels[key])} value={settings[key]} onChange={(event) => setSettings((current) => ({ ...current, [key]: Number(event.target.value) }))} />
+              <TextField name={key} fullWidth type="number" label={t(settingLabels[key])} value={settings[key]} inputProps={{ min: 0, max: key === 'default_booking_horizon_days' ? 3650 : 525600, step: 1 }} onChange={(event) => setSettings((current) => ({ ...current, [key]: event.target.value === '' ? '' : Number(event.target.value) }))} />
             </Grid>
           ))}
         </Grid>
-        <Button variant="contained" startIcon={<Save size={17} />} sx={{ mt: 2 }} onClick={() => done(() => request('/admin/booking-settings', 'PATCH', settings), t('Booking defaults saved.'), settingsGuard.markClean)}>
+        <Button variant="contained" startIcon={<Save size={17} />} sx={{ mt: 2 }} disabled={Object.values(settings).some(value => value === '')} onClick={() => done(() => request('/admin/booking-settings', 'PATCH', settings), t('Booking defaults saved.'), settingsGuard.markClean)}>
           {t('Save defaults')}
         </Button>
       </Paper>
@@ -120,17 +139,18 @@ function CatalogueSettingsForm() {
           <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
             <Typography variant="h5">{t('Taxes')}</Typography>
             <Stack spacing={1} my={2} onChange={taxGuard.markDirty}>
-              <TextField name="code" label={t('Code')} value={tax.code} onChange={(event) => setTax((current) => ({ ...current, code: event.target.value }))} />
-              <TextField name="name" label={t('Name')} value={tax.name} onChange={(event) => setTax((current) => ({ ...current, name: event.target.value }))} />
-              <TextField name="rate" type="number" label={t('Rate %')} value={tax.rate} onChange={(event) => setTax((current) => ({ ...current, rate: event.target.value }))} />
-              <Button startIcon={<Plus size={16} />} onClick={() => done(() => request('/admin/taxes', 'POST', { code: tax.code, name: tax.name, rate_basis_points: Math.round(Number(tax.rate) * 100) }), t('Tax added.'), taxGuard.markClean)}>{t('Add tax')}</Button>
+              <TextField name="code" inputProps={{ maxLength: 40 }} label={t('Code')} value={tax.code} onChange={(event) => setTax((current) => ({ ...current, code: event.target.value }))} />
+              <TextField name="name" inputProps={{ maxLength: 100 }} label={t('Name')} value={tax.name} onChange={(event) => setTax((current) => ({ ...current, name: event.target.value }))} />
+              <TextField name="rate" type="number" inputProps={{ min: 0, max: 100, step: 0.01 }} label={t('Rate %')} value={tax.rate} onChange={(event) => setTax((current) => ({ ...current, rate: event.target.value }))} />
+              <Button disabled={!tax.code.trim() || !tax.name.trim() || tax.rate.trim() === ''} startIcon={<Plus size={16} />} onClick={() => done(() => request('/admin/taxes', 'POST', { code: tax.code, name: tax.name, rate_basis_points: Math.round(Number(tax.rate) * 100) }), t('Tax added.'), taxGuard.markClean)}>{t('Add tax')}</Button>
             </Stack>
             {taxes.map((item) => <Typography key={item.id}>{item.name} ({(item.rate_basis_points / 100).toFixed(2)}%)</Typography>)}
           </Paper>
         </Grid>
       </Grid>
 
-      {error && <Alert severity="error">{error}</Alert>}
+      </Stack>
+      {error && <Alert severity="error">{error}{!loaded && <Button disabled={busy} onClick={() => void load()}>{t('Retry')}</Button>}</Alert>}
       {message && <Alert severity="success">{message}</Alert>}
     </Stack>
   );

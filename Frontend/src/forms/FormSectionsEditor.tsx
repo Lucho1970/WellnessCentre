@@ -12,9 +12,9 @@ export function FormSectionsEditor({ definition, setDefinition, disabled }: { de
     [next[index], next[index + delta]] = [next[index + delta], next[index]];
     return { ...current, sections: next };
   });
-  const remove = (id: string) => {
-    if (!window.confirm(t('Remove this section? Its questions will move to Questions without a section.'))) return;
-    setDefinition(current => ({ ...current, sections: current.sections?.filter(section => section.id !== id), questions: current.questions.map(question => {
+  const remove = (id: string, deleteQuestions = false) => {
+    if (!window.confirm(t(deleteQuestions ? 'Delete this section and all its questions?' : 'Remove this section? Its questions will move to Questions without a section.'))) return;
+    setDefinition(current => ({ ...current, sections: current.sections?.filter(section => section.id !== id), questions: current.questions.filter(question => !deleteQuestions || question.section_id !== id).map(question => {
       if (question.section_id !== id) return question;
       const { section_id: removed, ...rest } = question; void removed; return rest;
     }) }));
@@ -30,6 +30,8 @@ export function FormSectionsEditor({ definition, setDefinition, disabled }: { de
         <Button disabled={disabled || index === 0} onClick={() => move(index, -1)}>{t('Move section up')}</Button>
         <Button disabled={disabled || index === sections.length - 1} onClick={() => move(index, 1)}>{t('Move section down')}</Button>
         <Button disabled={disabled} onClick={() => remove(section.id)}>{t('Remove section')}</Button>
+        <Button disabled={disabled || sections.length >= 15} onClick={() => setDefinition(current => { const next = [...(current.sections ?? [])]; next.splice(index + 1, 0, { id: 's' + crypto.randomUUID().replaceAll('-', '').slice(0, 20), title: '', title_fr: '' }); return { ...current, sections: next }; })}>{t('Insert section after')}</Button>
+        <Button disabled={disabled || definition.questions.every(q => q.section_id === section.id)} onClick={() => remove(section.id, true)}>{t('Delete section and questions')}</Button>
       </Stack>
     </Stack></Paper>)}
     <Button disabled={disabled || sections.length >= 15} onClick={() => setDefinition(current => ({ ...current, sections: [...(current.sections ?? []), { id: `s${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`, title: '', title_fr: '' }] }))}>{t('Add section')}</Button>

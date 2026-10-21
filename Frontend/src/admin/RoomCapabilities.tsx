@@ -1,6 +1,6 @@
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Checkbox, Grid, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { Plus, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -41,7 +41,17 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
     JSON.stringify([...serviceCaps].sort((a, b) => a - b)) !== JSON.stringify(savedServiceCaps);
   useUnsavedChanges(dirty);
   useEffect(() => { onDirtyChange?.(dirty); return () => onDirtyChange?.(false); }, [dirty, onDirtyChange]);
+  const [loaded, setLoaded] = useState(false);
+  const generation = useRef(0);
+  const clearAccess = () => {
+    setLoaded(false); setCatalog({ capabilities: [], rooms: [], services: [] });
+    setRooms([]); setServices([]); setRoom(""); setService("");
+    setRoomCaps([]); setServiceCaps([]); setName(""); setMessage(""); formValidation.clear();
+  };
   const load = async () => {
+    const current = ++generation.current;
+    setLoaded(false); setMessage("");
+    try {
     const token = await getAccessToken(),
       h = { Authorization: `Bearer ${token}` },
       rs = await Promise.all([
@@ -50,6 +60,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
         fetch(`${api}/admin/services`, { headers: h }),
       ]),
       b = await Promise.all(rs.map((r) => r.json()));
+    if (current !== generation.current) return false;
     const failed = rs.findIndex((r) => !r.ok);
     if (failed >= 0)
       throw new ApiError(b[failed], rs[failed].status, t("Unable to load room capabilities."));
@@ -60,9 +71,12 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
     setServices(loadedServices);
     setRoom((v) => v || String(loadedRooms[0]?.id ?? ""));
     setService((v) => v || String(loadedServices[0]?.id ?? ""));
+    setLoaded(true); setError(""); return true;
+    } catch (c) { if (current !== generation.current) return false; clearAccess(); throw c; }
   };
   useEffect(() => {
     void load().catch((c) => setError(c.message));
+    return () => { generation.current++; };
   }, []);
   useEffect(
     () =>
@@ -105,9 +119,11 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
       if (!r.ok)
         throw new ApiError(b, r.status, t("Unable to add capability."));
       setName("");
-      await load();
+      if (!await load()) return;
       setMessage(t("Capability added."));
-    } catch (c) { formValidation.capture(c);
+    } catch (c) {
+      if (c instanceof ApiError && [401, 403, 404].includes(c.status)) { generation.current++; clearAccess(); }
+      formValidation.capture(c);
       setError(c instanceof Error ? c.message : t("Unable to add capability."));
     } finally {
       setBusy(false);
@@ -134,9 +150,11 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
         b = await r.json();
       if (!r.ok)
         throw new ApiError(b, r.status, t("Unable to save requirements."));
-      await load();
+      if (!await load()) return;
       setMessage(t("Room capabilities and service requirements saved."));
-    } catch (c) { formValidation.capture(c);
+    } catch (c) {
+      if (c instanceof ApiError && [401, 403, 404].includes(c.status)) { generation.current++; clearAccess(); }
+      formValidation.capture(c);
       setError(
         c instanceof Error ? c.message : t("Unable to save requirements."),
       );
@@ -155,6 +173,8 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
         <TextField name="name"
           fullWidth
+          disabled={!loaded || busy}
+          slotProps={{ htmlInput: { maxLength: 120 } }}
           label={t("New capability")}
           placeholder={t("e.g. Massage table")}
           value={name}
@@ -163,7 +183,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
         <Button
           variant="outlined"
           startIcon={<Plus size={17} />}
-          disabled={busy || !name.trim()}
+          disabled={!loaded || busy || !name.trim()}
           onClick={add}
         >
           {t("Add")}
@@ -173,6 +193,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
         <Grid size={{ xs: 12, md: 6 }}>
           <TextField name="room"
             select
+            disabled={!loaded || busy}
             fullWidth
             label={t("Room")}
             value={room}
@@ -192,6 +213,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
               key={c.id}
               control={
                 <Checkbox
+                  disabled={!loaded || busy}
                   checked={roomCaps.includes(c.id)}
                   onChange={(e) =>
                     toggle(roomCaps, setRoomCaps, c.id, e.target.checked)
@@ -205,6 +227,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
         <Grid size={{ xs: 12, md: 6 }}>
           <TextField name="service"
             select
+            disabled={!loaded || busy}
             fullWidth
             label={t("Service")}
             value={service}
@@ -224,6 +247,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
               key={c.id}
               control={
                 <Checkbox
+                  disabled={!loaded || busy}
                   checked={serviceCaps.includes(c.id)}
                   onChange={(e) =>
                     toggle(serviceCaps, setServiceCaps, c.id, e.target.checked)
@@ -238,6 +262,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
       {error && (
         <Alert severity="error" sx={{ mt: 2 }}>
           {error}
+          {!loaded && <Button disabled={busy} onClick={() => void load().catch((c) => setError(c.message))}>{t("Retry")}</Button>}
         </Alert>
       )}
       {message && (
@@ -248,7 +273,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
       <Button
         variant="contained"
         startIcon={<Save size={17} />}
-        disabled={busy || !room || !service}
+        disabled={!loaded || busy || !room || !service}
         onClick={save}
         sx={{ mt: 2 }}
       >

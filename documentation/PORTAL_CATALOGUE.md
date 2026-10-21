@@ -1,6 +1,6 @@
 # Portal treatment catalogue and welcome page
 
-After the October 2026 host cutover, this clinic catalogue belongs to `willowwellness.copihue.ca`. The separate `portal.copihue.ca` root is a neutral Copihue landing page, not Willow's catalogue.
+After the October 2026 host cutover, this clinic catalogue belongs to `livinlively.copihue.ca`. The separate `portal.copihue.ca` root is a neutral Copihue landing page, not Livin’ Lively's catalogue.
 
 The portal root is a public, continuously scrolling catalogue. It uses the already published treatment and practitioner data rather than duplicating descriptions in another CMS. The clinic's welcome title and message are the only new portal-specific editorial copy; a Super Admin edits both languages in Operations → Business settings → Portal welcome message. If not configured, the portal shows translated default copy.
 

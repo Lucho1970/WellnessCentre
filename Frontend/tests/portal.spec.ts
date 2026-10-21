@@ -9,6 +9,118 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+
+for (const unavailable of [false, true]) test(`notification review ${unavailable ? 'clears stale contact details after access denial' : 'closes a permitted notice and refreshes the list'}`, async ({ page }) => {
+  await fixtures(page, ['clinic_admin']);
+  let finished = false, attempts = 0;
+  const notice = { id: 31, appointment_id: 12, recipient_address: 'private-notice@example.test', event_code: 'staff_booking_confirmation', channel: 'email', status: 'needs_review', scheduled_at: '2026-09-28 13:00:00', sent_at: null, next_attempt_at: null, attempt_count: 1, last_error: null, review_outcome: null };
+  await page.route('**/api/v1/admin/notifications?**', route => route.fulfill({ json: { data: { items: finished ? [] : [notice], counts: { needs_review: finished ? 0 : 1 }, total: finished ? 0 : 1, page: 1, page_size: 25 } } }));
+  await page.route('**/api/v1/admin/notifications/31/review', route => {
+    attempts++; finished = true;
+    expect(route.request().postDataJSON()).toEqual({ decision: 'resolve', outcome: 'no_longer_needed', checked_provider_history: true, checked_recipient: true });
+    return route.fulfill(unavailable ? { status: 404, json: { error: { code: 'notification_not_found', message: 'Notification not found.' } } } : { json: { data: { id: 31, status: 'resolved' } } });
+  });
+  await page.goto(`${portalHost}/admin/notifications`);
+  await page.getByText('#31 · Staff booking notice').click();
+  await expect(page.getByRole('button', { name: 'Close after review', exact: true })).toBeDisabled();
+  await page.getByLabel('I checked provider message history.', { exact: true }).check();
+  await page.getByLabel('I checked whether the recipient received the notice.', { exact: true }).check();
+  await page.getByRole('button', { name: 'Close after review', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Notification #31', exact: true })).toHaveCount(0);
+  await expect(page.getByText('private-notice@example.test', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('No notifications match this status.', { exact: true })).toBeVisible();
+  if (unavailable) await expect(page.getByText('This notification is no longer available. Refresh the list.', { exact: true })).toBeVisible();
+  expect(attempts).toBe(1);
+});
+
+test('notification history removes cached contacts when a refresh is denied', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let denied = false;
+  await page.route('**/api/v1/practitioner/notifications?**', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden', message: 'Access denied.' } } } : { json: { data: { items: [{ id: 31, appointment_id: 12, recipient_address: 'private-history@example.test', event_code: 'staff_booking_confirmation', channel: 'email', status: 'sent', scheduled_at: '2026-09-28 13:00:00', sent_at: '2026-09-28 13:00:01' }], total: 1, page: 1, page_size: 25 } } }));
+  await page.goto(`${portalHost}/practitioner/notifications`);
+  await expect(page.getByText(/private-history@example.test/)).toBeVisible();
+  denied = true;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByText(/private-history@example.test/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+});
+test('session travel fee can be waived before issuing a receipt', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'mobile', destination_snapshot: null, travel_buffer_minutes: 30, base_price_cents: 10000, mobile_fee_cents: 1500 };
+  let waived = false;
+  await page.route('**/api/v1/appointments?**', route => route.fulfill({ json: { data: [appointment] } }));
+  await page.route('**/api/v1/appointments/41', route => route.fulfill({ json: { data: appointment } }));
+  await page.route('**/api/v1/appointments/41/logistics-notes', route => route.fulfill({ json: { data: { notes: [], truncated: false } } }));
+  await page.route('**/api/v1/appointments/41/travel-fee', route => route.fulfill({ json: { data: { version: waived ? 2 : 1, fee_cents: waived ? 0 : 1500, assessed_fee_cents: 1500, waived, reason: waived ? 'Nearby repeat client' : null, can_waive: !waived } } }));
+  await page.route('**/api/v1/appointments/41/travel-fee/waive', route => {
+    expect(route.request().postDataJSON()).toEqual({ version: 1, reason: 'Nearby repeat client' });
+    waived = true;
+    return route.fulfill({ json: { data: { version: 2, fee_cents: 0, assessed_fee_cents: 1500, waived: true, reason: 'Nearby repeat client', can_waive: false } } });
+  });
+  await page.route('**/api/v1/appointments/41/receipt', route => route.fulfill({ json: { data: { enabled: true, can_edit_template: true, template: null, profile: null, template_version: 0, profile_version: 0, appointment: { ...appointment, version: waived ? 2 : 1, base_cents: 10000, travel_cents: waived ? 0 : 1500 }, items: [] } } }));
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await expect(page.getByText('Travel fee for this session: $15.00 CAD')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Waive travel fee for this session' })).toBeDisabled();
+  await page.getByLabel('Reason for waiving travel fee').fill('Nearby repeat client');
+  await page.getByRole('button', { name: 'Waive travel fee for this session' }).click();
+  await expect(page.getByText(/Travel fee waived for this session/)).toBeVisible();
+  await expect(page.getByText('Travel fee for this session: $0.00 CAD')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Waive travel fee for this session' })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('travel-fee-waived.png'), fullPage: true });
+});
+test('clinic template and service credentials feed a manual session receipt', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'clinic', destination_snapshot: null, travel_buffer_minutes: 0, base_price_cents: 10000, mobile_fee_cents: 0 };
+  const context: any = { enabled: true, can_edit_template: true, template: null, profile: null, template_version: 0, profile_version: 0, appointment: { ...appointment, base_cents: 10000, travel_cents: 0 }, items: [] };
+  let issued: any;
+  await page.route('**/api/v1/appointments?**', route => route.fulfill({ json: { data: [appointment] } }));
+  await page.route('**/api/v1/appointments/41', route => route.fulfill({ json: { data: appointment } }));
+  await page.route('**/api/v1/appointments/41/logistics-notes', route => route.fulfill({ json: { data: { notes: [], truncated: false } } }));
+  await page.route('**/api/v1/receipts/template', route => { context.template = route.request().postDataJSON(); context.template_version = 1; return route.fulfill({ json: { data: { version: 1 } } }); });
+  await page.route('**/api/v1/appointments/41/receipt-profile', route => { context.profile = route.request().postDataJSON(); context.profile_version = 1; return route.fulfill({ json: { data: { version: 1 } } }); });
+  await page.route('**/api/v1/appointments/41/receipt', route => {
+    if (route.request().method() === 'POST') {
+      issued = route.request().postDataJSON();
+      context.items = [{ id: 5, number: 'R-TEST', appointment_id: 41, status: 'issued', service_name: 'Massage', practitioner_name: 'Practitioner', total_cents: 11300 }];
+      context.appointment.status = 'paid';
+      return route.fulfill({ json: { data: context.items[0] } });
+    }
+    return route.fulfill({ json: { data: context } });
+  });
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await expect(page.getByText('Save the clinic template and practitioner service details before issuing a receipt.')).toBeVisible();
+  await page.getByRole('button', { name: 'Clinic receipt template', exact: true }).click();
+  await page.getByLabel('Receipt issuer name').fill('Wellnexa');
+  await page.getByLabel('Receipt business address').fill('123 Test Street, Toronto');
+  await page.getByLabel('Receipt contact details').fill('clinic@example.test');
+  await page.getByRole('button', { name: 'Save clinic receipt template' }).click();
+  await page.getByRole('button', { name: 'Practitioner receipt details', exact: true }).click();
+  await page.getByLabel('Professional designation').fill('Registered Massage Therapist');
+  await page.getByLabel('Registration number if applicable').fill('TEST123');
+  await page.getByRole('button', { name: 'Save practitioner receipt details' }).click();
+  await page.getByLabel('Tax amount CAD').fill('13.00');
+  await page.getByLabel('Amount received CAD').fill('100.00');
+  await page.getByLabel('I confirm the issuer, service credentials, tax and full payment received are correct.').check();
+  await expect(page.getByRole('button', { name: 'Record payment and issue receipt' })).toBeDisabled();
+  await page.getByLabel('Amount received CAD').fill('113.00');
+  await page.getByLabel('Payment date').fill('2026-01-02');
+  await page.getByRole('button', { name: 'Record payment and issue receipt' }).click();
+  await expect(page.getByText('Receipt issued and available in the client portal.')).toBeVisible();
+  expect(issued).toMatchObject({ amount_cents: 11300, tax_cents: 1300, template_version: 1, profile_version: 1, confirmed: true });
+  expect(issued.issuer_name).toBeUndefined(); // Issuer and professional details come from server settings.
+  await expect(page.getByRole('button', { name: 'Download receipt PDF' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('session-receipt-issued.png'), fullPage: true });
+  let voids = 0;
+  await page.route('**/api/v1/receipts/5/void', route => { voids++; expect(route.request().postDataJSON()).toMatchObject({ kind: 'recording_error', confirmed: true }); context.items[0].status = 'void'; context.appointment.status = 'completed'; context.appointment.version = 3; return route.fulfill({ json: { data: { void: true } } }); });
+  await page.getByRole('button', { name: 'Void receipt', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Confirm void', exact: true })).toBeDisabled();
+  await page.getByLabel('Correction reason').fill('Payment entered by mistake');
+  await page.getByLabel('I confirm this is a recording correction or that the full refund has already been made.').check();
+  await page.getByRole('button', { name: 'Confirm void', exact: true }).click();
+  await expect(page.getByText('Voided receipt', { exact: true })).toBeVisible();
+  expect(voids).toBe(1);
+  await expect(page.getByRole('button', { name: 'Download receipt PDF' })).toHaveCount(0);
+});
 test('clinic administrators use central assignment and cannot edit practitioner-owned credentials', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   await page.route('**/api/v1/admin/practitioner-directory-options', route => route.fulfill({ json: { data: { central_enabled: true, url: 'https://portal.example.test/admin/' } } }));
@@ -151,6 +263,74 @@ test("staff portal does not start authentication inside a silent refresh iframe"
   await expect(page.frameLocator('#silent-auth-probe').locator('#root')).toBeEmpty();
 });
 
+for (const roles of [['super_admin'], ['clinic_admin'], ['reception'], ['practitioner']]) test(`privacy audit requires explicit authority for ${roles[0]}`, async ({page}) => {
+  await fixtures(page,roles,roles[0] === 'practitioner' || roles[0] === 'reception' ? ['review_privacy_audit'] : []);
+  let reads=0; await page.route('**/api/v1/admin/privacy-audit**',route=>{reads++;return route.fulfill({json:{data:{items:[],next_before:null}}});});
+  await page.goto(`${portalHost}/admin/privacy-audit`);
+  await expect(page.getByText('You do not have permission to access this page.',{exact:true})).toBeVisible();
+  expect(reads).toBe(0);
+});
+
+test('privacy audit filters, pagination and revocation clear previous results', async ({page}) => {
+  await fixtures(page,['clinic_admin'],['review_privacy_audit']);
+  const queries: URL[]=[]; let revoked=false;
+  await page.route('**/api/v1/admin/privacy-audit**',route=>{
+    const url=new URL(route.request().url());queries.push(url);
+    if(revoked)return route.fulfill({status:403,json:{error:{code:'privacy_review_required'}}});
+    const id=url.searchParams.has('before')?49:81;
+    return route.fulfill({json:{data:{items:[{id,event_group:'a'.repeat(32),part_number:1,part_count:1,created_at:'2026-10-19 14:00:00',actor_type:'staff',actor_id:23,action:'access.denied',route:'/api/v1/clients/:id',http_method:'GET',http_status:403,outcome:'denied',resources:[],attempted_resources:[{type:'client',id:101}],requested_resources:[]}],next_before:id===81?81:null,filters:{}}}});
+  });
+  await page.goto(`${portalHost}/admin/privacy-audit`);
+  await expect(page.getByRole('table',{name:'Clinic access history'})).toContainText('#81');
+  await page.getByText('Recorded references',{exact:true}).click();
+  await expect(page.getByText('Attempted: client #101',{exact:true})).toBeVisible();
+  await page.getByLabel('From date (UTC)').fill('2026-10-01');await page.getByLabel('Before date (UTC)').fill('2026-10-20');
+  await page.getByLabel('Actor type').click();await page.getByRole('option',{name:'staff',exact:true}).click();await page.getByLabel('Actor ID',{exact:true}).fill('23');
+  await page.getByLabel('Resource type').click();await page.getByRole('option',{name:'client',exact:true}).click();await page.getByLabel('Resource ID').fill('101');
+  await page.getByLabel('Outcome',{exact:true}).click();await page.getByRole('option',{name:'denied',exact:true}).click();
+  await page.getByRole('button',{name:'Search access history'}).click();
+  await expect.poll(()=>queries.at(-1)?.searchParams.get('resource_id')).toBe('101');
+  expect(queries.at(-1)?.searchParams.get('actor_id')).toBe('23');expect(queries.at(-1)?.searchParams.get('outcome')).toBe('denied');
+  await page.getByRole('button',{name:'Older results'}).click();await expect(page.getByRole('table')).toContainText('#49');
+  expect(queries.at(-1)?.searchParams.get('before')).toBe('81');
+  revoked=true;await page.getByRole('button',{name:'Newest results'}).click();
+  await expect(page.getByText('Clinic privacy-review permission is required.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);await expect(page.getByText('client #101',{exact:false})).toHaveCount(0);
+});
+
+test('super admin explicitly grants and revokes another administrators privacy permission', async ({page}) => {
+  await fixtures(page,['super_admin']);
+  const member={id:9,display_name:'Privacy Reviewer',email:'reviewer@example.test',status:'active',roles:['clinic_admin'],permissions:[] as string[]};const methods: string[]=[];
+  await page.route('**/api/v1/admin/staff',route=>route.fulfill({json:{data:[member]}}));
+  await page.route('**/api/v1/admin/privacy-audit/reviewers/9',route=>{methods.push(route.request().method());member.permissions=route.request().method()==='PUT'?['review_privacy_audit']:[];return route.fulfill({json:{data:{id:9}}});});
+  await page.goto(`${portalHost}/admin/users`);await page.getByRole('button',{name:/Privacy Reviewer.*reviewer@example.test/}).click();await page.getByRole('button',{name:'Details',exact:true}).click();
+  await page.getByRole('button',{name:'Grant privacy-review permission',exact:true}).click();await expect(page.getByText('Privacy-review permission updated.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Details',exact:true}).click();await page.getByRole('button',{name:'Revoke privacy-review permission',exact:true}).click();
+  await expect.poll(()=>methods.join(',')).toBe('PUT,DELETE');
+});
+
+for (const action of ['create','disable']) test(`reminder settings privacy denial requires reload after ${action}`, async ({page}) => {
+  await fixtures(page,['clinic_admin']);let denied=true;let mutation: Record<string,unknown> | null=null;
+  await page.route('**/api/v1/admin/notifications?**',route=>route.fulfill({json:{data:{items:[],counts:{queued:0,sending:0,sent:0,delivered:0,failed:0,canceled:0,needs_review:0,resolved:0},total:0,page:1,page_size:25}}}));
+  await page.route('**/api/v1/admin/reminder-schedules**',route=>{
+    if(route.request().method()!=='GET'){
+      mutation=route.request().postDataJSON();
+      if(denied)return route.fulfill({status:403,json:{error:{code:'reminder_schedule_access_restricted'}}});
+    }
+    return route.fulfill({json:{data:[{id:31,minutes_before:60,active:1}]}});
+  });
+  await page.goto(`${portalHost}/admin/notifications`);await page.getByRole('button',{name:'Reminder settings',exact:true}).click();
+  await expect(page.getByLabel('1 hour before',{exact:true})).toBeChecked();
+  if(action==='disable')await page.getByLabel('1 hour before',{exact:true}).click();else await page.getByRole('button',{name:'Add email reminder',exact:true}).click();
+  await expect(page.getByText('This reminder change requires an authorized privacy review. No changes were saved.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Add email reminder',exact:true})).toBeDisabled();
+  await expect(page.getByLabel('1 hour before',{exact:true})).toHaveCount(0);
+  expect(mutation).toEqual(action==='disable'?{active:false}:{minutes_before:1440});
+  denied=false;await page.getByRole('button',{name:'Reload reminder settings',exact:true}).click();
+  await expect(page.getByLabel('1 hour before',{exact:true})).toBeChecked();
+  await expect(page.getByRole('button',{name:'Add email reminder',exact:true})).toBeEnabled();
+});
+
 async function fixtures(
   page: Page,
   roles?: string[],
@@ -184,6 +364,7 @@ async function fixtures(
         phone: "905-555-0100",
       };
     if (path === "/auth/me") data = { id:1, display_name:"Test Staff", email:"staff@example.test", roles: roles ?? [], permissions };
+    if (path === "/profile/travel-settings") data = { clinic_id: 1, items: [] };
     if (path === "/profile/work-location") data = {home_address:null,work_address:null,work_same_as_home:false,version:0};
     if (path === "/profile/avatar") data = { image_base64: null };
     if (path === "/profile/public-card") data = { public_name: "Test Practitioner", booking_name: "Test", summary: "", summary_fr: "", public_website_url: "", public_contact_email: "", public_contact_phone: "", public_contact_sms: false, slug: "test-practitioner", published: true };
@@ -482,11 +663,14 @@ test("services use a list-first command bar and selected services can be assigne
   await page
     .getByRole("checkbox", { name: "Test location", exact: true })
     .check();
+  await page.getByRole('spinbutton', { name: 'Maximum driving distance (km)' }).fill('50');
+  await page.getByRole('spinbutton', { name: 'Free travel distance (km)' }).fill('20');
+  await page.getByRole('spinbutton', { name: 'Flat extra travel fee CAD' }).fill('15');
   await page.getByRole("button", { name: "Save assignments" }).click();
   await expect(page.getByText("Service assignments saved.")).toBeVisible();
   expect(savedAssignment).toMatchObject({
     location_ids: [1],
-    practitioners: [{ practitioner_id: 3, service_id: 3 }],
+    practitioners: [{ practitioner_id: 3, service_id: 3, mobile_radius_km: 50, mobile_free_radius_km: 20, mobile_fee_cents: 1500 }],
   });
 });
 
@@ -854,6 +1038,30 @@ test("clients use list-first actions with details and edit panels", async ({
   });
 });
 
+test('registration review removes stale duplicate suggestions and disables confirmation bypass',async({page})=>{
+  await fixtures(page,['super_admin']);
+  let attempts=0;
+  await page.route('**/api/v1/clients',route=>{
+    if(route.request().method()!=='POST')return route.fulfill({json:{data:{items:[],has_more:false}}});
+    attempts++;
+    if(attempts===1)return route.fulfill({status:409,json:{error:{code:'possible_duplicate',fields:{candidates:[{id:77,display_name:'Previously permitted patient',email:'old@example.test'}]}}}});
+    expect(route.request().postDataJSON().confirm_possible_duplicate).toBe(true);
+    return route.fulfill({status:409,json:{error:{code:'client_registration_review'}}});
+  });
+  await page.goto(`${portalHost}/admin/clients`);
+  await page.getByRole('button',{name:'New client',exact:true}).click();
+  await page.getByRole('textbox',{name:'First name',exact:true}).fill('Same');await page.getByRole('textbox',{name:'Last name',exact:true}).fill('Patient');
+  await page.getByRole('textbox',{name:'Email',exact:true}).fill('new@example.test');
+  await page.getByRole('button',{name:'Save client',exact:true}).click();
+  await expect(page.getByText(/Previously permitted patient/)).toBeVisible();
+  await page.getByRole('button',{name:'Create anyway',exact:true}).click();
+  await expect(page.getByText('This registration requires an authorized review. No changes were saved.',{exact:true})).toBeVisible();
+  await expect(page.getByText(/Previously permitted patient/)).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Create anyway',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('textbox',{name:'Email',exact:true})).toHaveValue('new@example.test');
+  expect(attempts).toBe(2);
+});
+
 test("possible duplicates require acknowledgement and Super Admin can merge with a preview", async ({
   page,
 }) => {
@@ -1105,6 +1313,7 @@ test("mobile-only booking captures destination and price without requesting a ro
   await page.route("**/api/v1/address-coverage/validate", (route) => {
     const body = route.request().postDataJSON();
     expect(body).toMatchObject({
+      client_id: 5,
       location_id: 1,
       service_id: 2,
       practitioner_id: 3,
@@ -1214,6 +1423,13 @@ test("mobile-only booking captures destination and price without requesting a ro
   await expect(page.getByText(/No new distance check is needed/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Validate address and coverage" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Find a time", exact: true })).toBeEnabled();
+  await page.route('**/api/v1/address-coverage/revoke',route=>route.fulfill({status:403,json:{error:{code:'consent_restricted'}}}));
+  await page.getByRole('button',{name:'Remove On-Site approval',exact:true}).click();
+  await expect(page.getByText('Access is restricted by a patient privacy instruction.',{exact:true})).toBeVisible();
+  await expect(page.getByText(/No new distance check is needed/)).toHaveCount(0);
+  await expect(page.getByText(/Address confirmed: 8.4 km/)).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Find a time',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Validate address and coverage',exact:true})).toBeEnabled();
 });
 
 test("appointment client finder filters by exact birthdate and debounced contact details", async ({
@@ -1332,6 +1548,7 @@ test("role policies preserve current access without broadening permissions", () 
     "clients",
     "forms",
     "my_notifications",
+    "travel",
     "calendar",
     "profile",
   ]);
@@ -2350,7 +2567,7 @@ test("super admin deliberately publishes a bilingual public team profile", async
     });
 });
 
-test("guest portal prepares a booking handoff without reserving or creating an appointment", async ({
+for (const configuredPortal of [portalHost + '/', 'https://livinlively.copihue.ca/']) test(`guest portal prepares a booking handoff with configured portal ${configuredPortal}`, async ({
   page,
 }) => {
   const writes: string[] = [];
@@ -2359,6 +2576,13 @@ test("guest portal prepares a booking handoff without reserving or creating an a
     if (request.method() !== "GET") writes.push(request.url());
   });
   await fixtures(page);
+  // Simulate a portable build still carrying another clinic's public-site target.
+  await page.route('**/src/shared/urls.ts', async route => {
+    const response = await route.fetch();
+    const body = (await response.text()).replaceAll(portalHost + '/', configuredPortal);
+    expect(body).toContain(configuredPortal);
+    await route.fulfill({ response, body });
+  });
   await page.route("**/api/v1/availability?**", (route) => {
     availabilityQueries.push(new URL(route.request().url()));
     const availability = Array.from({ length: 25 }, (_, index) => {
@@ -2695,6 +2919,32 @@ test("clinic welcome and category translations can be edited without rebuilding"
   await expect.poll(()=>category?.name_fr).toBe('Massothérapie');
 });
 
+test('guest availability keeps location hints and removes enquiry-only practitioners from booking choices',async({page})=>{
+  await fixtures(page);
+  await page.route('**/api/v1/locations',route=>route.fulfill({json:{data:[{id:1,name:'First base'},{id:5,name:'Selected base'}]}}));
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/discovery/search',route=>route.fulfill({json:{data:{point:{latitude:43.6,longitude:-79.4},label:'Synthetic area',settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:3,service_id:2,location_id:5,practitioner_slug:'test',service_slug:'massage',status:'enquiry_only',token:'ZXh0cmE=',starting_price_cents:10000}]}}}));
+  await page.goto(`${portalHost}/services/massage/book?practitioner_id=3&location_id=5`);
+  await expect(page.getByRole('combobox',{name:/^Base location \/ service area/})).toContainText('Selected base');
+  await page.getByLabel('City, postal code or address').fill('Toronto');await page.getByRole('button',{name:'Search this area',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:/^Practitioner\b/})).toHaveAttribute('aria-disabled','true');
+  await expect(page.getByRole('link',{name:'Ask about travel',exact:true})).toHaveAttribute('href','/client#travel=ZXh0cmE%3D');
+});
+
+test('guest location search filters services and offers enquiry instead of booking beyond normal coverage',async({page})=>{
+  await fixtures(page);
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/services',route=>route.fulfill({json:{data:[{slug:'massage',name:'Massage',category_id:3,category:'Bodywork',durations:[{minutes:60,price_cents:7500}],offers_mobile:true},{slug:'nutrition',name:'Nutrition',category_id:4,category:'Nutrition',durations:[{minutes:60,price_cents:9500}]}]}}));
+  await page.route('**/api/v1/public/practitioners',route=>route.fulfill({json:{data:[{slug:'esther',public_name:'Esther',booking_practitioner_id:8,services:[{slug:'massage'}]}]}}));
+  await page.route('**/api/v1/public/discovery/search',route=>route.fulfill({json:{data:{point:{latitude:43.6,longitude:-79.4},label:'Synthetic area',settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:8,service_id:13,location_id:8,practitioner_slug:'esther',service_slug:'massage',status:'enquiry_only',token:'ZXh0cmE=',starting_price_cents:8500}]}}}));
+  await page.goto(portalHost);
+  await page.getByLabel('City, postal code or address').fill('Toronto');await page.getByRole('button',{name:'Search this area',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Nutrition',exact:true})).toHaveCount(0);
+  await expect(page.getByText('Starting price: $85.00',{exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Ask about travel',exact:true})).toHaveAttribute('href','/client#travel=ZXh0cmE%3D');
+  await expect(page.getByRole('link',{name:'Book this treatment',exact:true})).toHaveCount(0);
+});
+
 test("guest catalogue groups multilingual treatments and links public practitioner profiles",async({page})=>{
   await fixtures(page);
   await page.route('**/api/v1/site-config',route=>route.fulfill({json:{data:{name:'Willow',welcome_title_en:'Welcome to Willow',welcome_title_fr:'Bienvenue chez Willow',welcome_body_en:'Care at your pace.',welcome_body_fr:'Des soins à votre rythme.'}}}));
@@ -2709,8 +2959,12 @@ test("guest catalogue groups multilingual treatments and links public practition
   await page.screenshot({path:'test-results/portal-catalogue-category.png'});
   await expect(page.getByText('60 min — $120.00')).toBeVisible();
   await expect(page.getByText('90 min — $160.00')).toBeVisible();
-  await page.getByRole('link',{name:'Esther'}).hover();
-  await expect(page.getByText('Experienced practitioner.')).toBeVisible();
+  // Category scrolling can move the card away from the pointer during the tooltip delay.
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await page.getByRole('link',{name:'Esther'}).hover();
+    await expect(page.getByText('Experienced practitioner.')).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 10000 });
   await page.getByRole('link',{name:'Esther'}).click();
   await expect(page).toHaveURL(`${portalHost}/practitioners/esther`);
   await expect(page.getByRole('heading',{name:'Esther'})).toBeVisible();
@@ -3329,6 +3583,68 @@ test("availability is practitioner-first with selectable hours, changes, and tim
   await expect.poll(() => update).toMatchObject({ practitioner_id: 8, location_id: 1, weekday: 1, end_time: "18:00" });
 });
 
+for (const kind of ['rule', 'override']) test(`availability ${kind} privacy denial preserves the schedule`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const rule = { id: 31, practitioner_id: 8, location_id: 1, weekday: 1, start_time: '09:00:00', end_time: '17:00:00', valid_from: '2026-09-01', valid_until: null, recurrence_interval_weeks: 1, active: 1 };
+  const override = { id: 42, practitioner_id: 8, location_id: 1, starts_at: '2026-10-05 13:00:00', ends_at: '2026-10-05 21:00:00', type: 'blocked', reason: 'Synthetic change', kind: 'override' };
+  await page.route('**/api/v1/admin/practitioners', route => route.fulfill({ json: { data: [{ practitioner_id: 8, display_name: 'Esther', location_id: 1, active: 1 }] } }));
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 1, name: 'Holland Landing', timezone: 'America/Toronto' }] } }));
+  await page.route('**/api/v1/admin/availability-rules**', route => route.request().method() === 'GET'
+    ? route.fulfill({ json: { data: [rule] } })
+    : route.fulfill({ status: 403, json: { error: { code: 'schedule_access_restricted' } } }));
+  await page.route('**/api/v1/admin/schedule-exceptions', route => route.fulfill({ json: { data: [override] } }));
+  await page.route('**/api/v1/admin/availability-overrides/**', route => route.fulfill({ status: 403, json: { error: { code: 'schedule_access_restricted' } } }));
+  await page.goto(`${portalHost}/admin/availability`);
+  await page.getByRole('button', { name: /Esther.*1 hour rules.*1 changes/ }).click();
+  if (kind === 'rule') {
+    await page.getByRole('button', { name: /Monday.*09:00–17:00/ }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.getByLabel('Ends').fill('18:00');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByLabel('Ends')).toHaveValue('18:00');
+  } else {
+    await page.getByRole('button', { name: /Synthetic change/ }).click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Details', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Synthetic change/ })).toBeVisible();
+  }
+  await expect(page.getByText('This schedule change requires an authorized privacy review. No changes were saved.', { exact: true })).toBeVisible();
+});
+
+for(const action of ['save','delete'])test(`time off privacy denial clears stale impact after ${action}`,async({page})=>{
+  await page.clock.setFixedTime(new Date('2026-10-01T12:00:00Z'));
+  await fixtures(page,['super_admin']);
+  const affected={id:71,starts_at:'2026-10-06 14:00:00',ends_at:'2026-10-06 15:00:00',status:'confirmed',client_name:'Private preview patient',service_name:'Massage',location_name:'Holland Landing',timezone:'America/Toronto'};
+  const existing={id:42,practitioner_id:8,location_id:1,practitioner_name:'Esther',location_name:'Holland Landing',starts_at:'2026-10-05 13:00:00',ends_at:'2026-10-09 21:00:00',type:'vacation',reason:null,kind:'time_off',affected_appointment_count:1};
+  await page.route('**/api/v1/admin/practitioners',route=>route.fulfill({json:{data:[{practitioner_id:8,display_name:'Esther',location_id:1,active:1}]}}));
+  await page.route('**/api/v1/admin/locations',route=>route.fulfill({json:{data:[{id:1,name:'Holland Landing',timezone:'America/Toronto'}]}}));
+  await page.route('**/api/v1/admin/availability-rules',route=>route.fulfill({json:{data:[]}}));
+  await page.route('**/api/v1/admin/schedule-exceptions',route=>route.fulfill({json:{data:[existing]}}));
+  await page.route('**/api/v1/admin/time-off/**',route=>route.request().url().endsWith('/impact')?route.fulfill({json:{data:{appointments:[affected]}}}):route.fulfill({status:403,json:{error:{code:'time_off_access_restricted'}}}));
+  await page.route('**/api/v1/admin/time-off',route=>route.fulfill({status:403,json:{error:{code:'time_off_access_restricted'}}}));
+  await page.goto(`${portalHost}/admin/availability`);
+  await page.getByRole('button',{name:/Esther.*1 time off/}).click();
+  if(action==='save'){
+    await page.getByRole('button',{name:'Add time off',exact:true}).first().click();
+    await page.getByLabel('Starts').fill('2026-10-06T09:00');await page.getByLabel('Ends').fill('2026-10-06T17:00');
+    await page.getByRole('button',{name:'Review affected appointments'}).click();
+    await expect(page.getByText('Private preview patient · Massage')).toBeVisible();
+    await page.getByRole('button',{name:'Add time off',exact:true}).last().click();
+    await expect(page.getByRole('button',{name:'Review affected appointments'})).toBeEnabled();
+  }else{
+    await page.getByRole('button',{name:/Vacation.*1 need follow-up/}).click();
+    await page.getByRole('button',{name:'Details',exact:true}).click();
+    await expect(page.getByText('Private preview patient · Massage')).toBeVisible();
+    await page.getByRole('button',{name:'Close panel',exact:true}).click();
+    page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Remove',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Details',exact:true})).toBeDisabled();
+  }
+  await expect(page.getByText('This schedule change requires an authorized privacy review. No changes were saved.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Private preview patient · Massage')).toHaveCount(0);
+  await expect(page.getByText('Time off added.',{exact:true})).toHaveCount(0);
+});
+
 test("time off previews booked appointments before save and retains a follow-up list", async ({ page }) => {
   // Keep this fixture's appointment in the future without freezing network/UI timers.
   await page.clock.setFixedTime(new Date('2026-10-01T12:00:00Z'));
@@ -3365,6 +3681,7 @@ test("time off previews booked appointments before save and retains a follow-up 
   await page.goto(`${portalHost}/admin/availability`);
   await page.getByRole("button", { name: /Esther.*1 time off/ }).click();
   await page.getByRole("button", { name: "Add time off", exact: true }).first().click();
+  await expect(page.getByText("Time off applies only to this clinic. Add it separately in each clinic where you want to be unavailable.")).toBeVisible();
   await page.getByLabel("Starts").fill("2026-10-06T09:00");
   await page.getByLabel("Ends").fill("2026-10-06T17:00");
   await page.getByRole("button", { name: "Review affected appointments" }).click();
@@ -3497,6 +3814,41 @@ test("clinic-managed practitioner availability is read-only", async ({ page }) =
   await expect(page.getByRole("button", { name: "Add hours", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Add change", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Add time off", exact: true })).toBeDisabled();
+});
+
+test('clinic admin reviews practitioner enquiries while recipient settings stay in central admin',async({page})=>{
+  await fixtures(page,['clinic_admin']);
+  await page.route('**/api/v1/admin/practitioner-enquiries**',route=>route.fulfill({json:{data:{items:[],has_more:false,settings:{recipient_email:'info@copihue.ca',enabled:true,revision:1,mail_configured:false}}}}));
+  await page.goto(`${portalHost}/admin/enquiries`);
+  await expect(page.getByText('No practitioner enquiries yet.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Manage the notification address in Application administration.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Enquiry notification email'})).toHaveCount(0);
+});
+
+test('practitioner saves multiple public social links and removes them', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let card = { public_name: 'Grace', booking_name: 'Grace', summary: '', summary_fr: '', public_contact_email: '', public_contact_phone: '', public_contact_sms: false, public_website_url: '', slug: 'grace', published: true, social_links: [] as {label:string;url:string}[] };
+  await page.route('**/api/v1/profile/public-card', route => {
+    if(route.request().method()==='PUT') card={...card,...route.request().postDataJSON()};
+    return route.fulfill({json:{data:card}});
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole('button',{name:'Add social link',exact:true}).click();
+  await page.getByRole('textbox',{name:'Platform name',exact:true}).fill('Instagram');
+  await page.getByRole('textbox',{name:'Social profile URL',exact:true}).fill('https://www.instagram.com/synthetic');
+  await page.getByRole('button',{name:'Add social link',exact:true}).click();
+  await page.getByRole('textbox',{name:'Platform name',exact:true}).nth(1).fill('Other network');
+  await page.getByRole('textbox',{name:'Social profile URL',exact:true}).nth(1).fill('https://example.test/synthetic');
+  await page.getByRole('button',{name:'Save public card',exact:true}).click();
+  await expect(page.getByText('Public card saved.',{exact:true})).toBeVisible();
+  expect(card.social_links).toHaveLength(2);
+  await page.reload();
+  await expect(page.getByRole('textbox',{name:'Platform name',exact:true}).first()).toHaveValue('Instagram');
+  await page.getByRole('button',{name:'Remove social link 2',exact:true}).click();
+  await page.getByRole('button',{name:'Remove social link 1',exact:true}).click();
+  await page.getByRole('button',{name:'Save public card',exact:true}).click();
+  await expect(page.getByText('Public card saved.',{exact:true})).toBeVisible();
+  expect(card.social_links).toEqual([]);
 });
 
 test('practitioner saves and clears their public website URL', async ({ page }) => {
@@ -3712,4 +4064,669 @@ test('French mobile field errors stay accessible with reduced motion', async ({p
   await expect(phone).toHaveAccessibleDescription('Utilisez + suivi de 8 à 15 chiffres');
   await expect(phone).toBeFocused();
   await expect(phone).toBeInViewport();
+});
+
+
+for(const action of ['reply','more','read','close'])test(`travel inbox clears private details after denied ${action}`,async({page})=>{
+  await fixtures(page,['practitioner']);
+  await page.route('**/api/v1/travel-enquiries',route=>route.fulfill({json:{data:{items:[{id:91,status:'open',service_name:'Massage',client_name:'Private patient',practitioner_name:'Esther',unread:1}],unread_count:1,next_before:null}}}));
+  await page.route('**/api/v1/travel-enquiries/91**',route=>{
+    const url=new URL(route.request().url());
+    const denied=url.pathname.endsWith(`/${action}`)||(action==='more'&&url.searchParams.has('after'));
+    if(denied)return route.fulfill({status:404,json:{error:{code:'enquiry_not_found',message:'Travel enquiry unavailable.'}}});
+    if(url.pathname.endsWith('/read'))return route.fulfill({json:{data:{saved:true}}});
+    return route.fulfill({json:{data:{id:91,status:'open',search_label:'Private visit area',practitioner_name:'Esther',service_name:'Massage',messages:[{id:201,body:'Private travel message',created_at:'2026-10-18 16:00:00',sender_name:'Client'}],next_after:201}}});
+  });
+  await page.goto(`${portalHost}/practitioner/travel-enquiries`);
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  if(action!=='read'){
+    await expect(page.getByText('Private travel message',{exact:true})).toBeVisible();
+    if(action==='reply'){
+      await page.getByLabel('Your reply',{exact:true}).fill('Private draft');
+      await page.getByRole('button',{name:'Send reply',exact:true}).click();
+    }else if(action==='more')await page.getByRole('button',{name:'More messages',exact:true}).click();
+    else {page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Close enquiry',exact:true}).click();}
+  }
+  await expect(page.getByRole('alert')).toContainText('This travel enquiry is no longer available. Refresh your inbox.');
+  await expect(page.getByText('Private travel message',{exact:true})).toHaveCount(0);
+  await expect(page.getByText(/Private visit area/)).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Private patient/})).toHaveCount(0);
+  await expect(page.getByRole('textbox',{name:'Your reply',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Refresh inbox',exact:true})).toBeEnabled();
+});
+
+test('practitioner controls extra-distance enquiries and replies privately through the travel inbox',async({page})=>{
+  await fixtures(page,['practitioner']);
+  let allow=true;
+  await page.route('**/api/v1/profile/discovery-preferences',route=>{
+    if(route.request().method()==='PUT'){expect(route.request().postDataJSON()).toEqual({service_id:13,allow_extra:false});allow=false;}
+    return route.fulfill({json:{data:{items:[{service_id:13,name:'Synthetic travel preference',allow_extra:allow}]}}});
+  });
+  await page.route('**/api/v1/travel-enquiries',route=>route.fulfill({json:{data:{items:[{id:91,status:'open',service_name:'Massage',client_name:'Synthetic client',practitioner_name:'Esther',unread:1}],unread_count:1,next_before:null}}}));
+  const messages=[{id:201,body:'Could you travel to my area?',created_at:'2026-10-18 16:00:00',sender_name:'Client'}];
+  await page.route('**/api/v1/travel-enquiries/91',route=>route.fulfill({json:{data:{id:91,status:'open',search_label:'Synthetic area',practitioner_name:'Esther',service_name:'Massage',messages,next_after:null}}}));
+  await page.route('**/api/v1/travel-enquiries/91/read',route=>route.fulfill({json:{data:{saved:true}}}));
+  await page.route('**/api/v1/travel-enquiries/91/reply',route=>{expect(route.request().postDataJSON()).toMatchObject({message:'Please ask the clinic to arrange this.'});messages.push({id:202,body:'Please ask the clinic to arrange this.',created_at:'2026-10-18 16:01:00',sender_name:'Clinic team'});return route.fulfill({json:{data:{saved:true}}});});
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByLabel('Synthetic travel preference',{exact:true}).uncheck();
+  await expect(page.getByLabel('Synthetic travel preference',{exact:true})).not.toBeChecked();
+  await page.goto(`${portalHost}/practitioner/travel-enquiries`);
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  await page.getByLabel('Your reply',{exact:true}).fill('Please ask the clinic to arrange this.');
+  await page.getByRole('button',{name:'Send reply',exact:true}).click();
+  await expect(page.getByText('Please ask the clinic to arrange this.',{exact:true})).toBeVisible();
+});
+
+test('practitioner travel settings save only the selected assigned service and persist on reload', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  const rows = [
+    { service_id: 13, name: 'Deep Tissue Massage', name_fr: 'Massage profond', revision: 'a'.repeat(64), mobile_radius_km: 50, mobile_free_radius_km: 20, travel_buffer_minutes: 15, mobile_fee_cents: 1500 },
+    { service_id: 14, name: 'Reflexology', name_fr: 'Réflexologie', revision: 'c'.repeat(64), mobile_radius_km: 40, mobile_free_radius_km: null, travel_buffer_minutes: 0, mobile_fee_cents: 500 },
+  ];
+  await page.route('**/api/v1/profile/travel-settings', route => route.fulfill({ json: { data: { clinic_id: 4, items: rows } } }));
+  const saves: unknown[] = [];
+  await page.route('**/api/v1/profile/travel-settings/13', route => {
+    const body = route.request().postDataJSON(); saves.push(body);
+    expect(body).toEqual({ revision: 'a'.repeat(64), mobile_radius_km: 60, mobile_free_radius_km: 25, travel_buffer_minutes: 30, mobile_fee_cents: 1250 });
+    rows[0] = { ...rows[0], ...body, revision: 'b'.repeat(64) };
+    return route.fulfill({ json: { data: rows[0] } });
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await expect(page.getByRole('heading', { name: 'My travel settings' })).toBeVisible();
+  const form = page.getByRole('form', { name: 'Deep Tissue Massage', exact: true });
+  await form.getByLabel('Maximum driving distance (km)').fill('60');
+  await form.getByLabel('Free travel distance (km)').fill('25');
+  await form.getByLabel('Travel minutes each way').fill('30');
+  await form.getByLabel('Flat extra travel fee CAD').fill('12.50');
+  await form.getByRole('button', { name: 'Save travel settings', exact: true }).click();
+  await expect(page.getByText('Travel settings saved for this clinic.')).toBeVisible();
+  expect(saves).toHaveLength(1);
+  const other = page.getByRole('form', { name: 'Reflexology', exact: true });
+  await expect(other.getByLabel('Flat extra travel fee CAD')).toHaveValue('5.00');
+  await expect(other.getByLabel('Free travel distance (km)')).toHaveValue('');
+  await page.reload();
+  await expect(form.getByLabel('Flat extra travel fee CAD')).toHaveValue('12.50');
+  await expect(form.getByLabel('Maximum driving distance (km)')).toHaveValue('60');
+  await page.screenshot({ path: test.info().outputPath('practitioner-travel-settings.png'), fullPage: true });
+});
+
+test('practitioner travel settings show concurrent changes and reload the latest values', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let item = { service_id: 13, name: 'Massage', name_fr: '', revision: 'a'.repeat(64), mobile_radius_km: 50, mobile_free_radius_km: 20, travel_buffer_minutes: 15, mobile_fee_cents: 1500 };
+  await page.route('**/api/v1/profile/travel-settings', route => route.fulfill({ json: { data: { clinic_id: 4, items: [item] } } }));
+  await page.route('**/api/v1/profile/travel-settings/13', route => {
+    item = { ...item, revision: 'b'.repeat(64), mobile_fee_cents: 3000 };
+    return route.fulfill({ status: 409, json: { error: { code: 'travel_settings_changed', message: 'Your travel settings changed. Reload them before saving.' } } });
+  });
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await page.getByRole('form', { name: 'Massage', exact: true }).getByRole('button', { name: 'Save travel settings', exact: true }).click();
+  await expect(page.getByText('Your travel settings changed. Reload them before saving.')).toBeVisible();
+  await page.getByRole('button', { name: 'Reload travel settings', exact: true }).click();
+  await expect(page.getByRole('form', { name: 'Massage', exact: true }).getByLabel('Flat extra travel fee CAD')).toHaveValue('30.00');
+});
+
+test('practitioner travel settings show empty assignments and do not appear for administrator-only accounts', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  await page.goto(`${portalHost}/practitioner/profile`);
+  await expect(page.getByText('No active On-Site services are assigned to you in this clinic. Ask an administrator to configure your service assignments.')).toBeVisible();
+  await fixtures(page, ['super_admin']);
+  await page.goto(`${portalHost}/admin/profile`);
+  await expect(page.getByRole('heading', { name: 'Account profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My travel settings' })).toHaveCount(0);
+});
+
+test('practitioner travel settings support French mobile forms and field validation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixtures(page, ['practitioner']);
+  const item = { service_id: 13, name: 'Massage', name_fr: 'Massage profond', revision: 'a'.repeat(64), mobile_radius_km: 50, mobile_free_radius_km: 20, travel_buffer_minutes: 15, mobile_fee_cents: 1500 };
+  await page.route('**/api/v1/profile/travel-settings', route => route.fulfill({ json: { data: { clinic_id: 4, items: [item] } } }));
+  await page.route('**/api/v1/profile/travel-settings/13', route => route.fulfill({ status: 422, json: { error: { code: 'validation_error', message: 'Check your travel settings.', fields: { mobile_free_radius_km: 'Free distance cannot exceed the maximum distance.' } } } }));
+  await page.goto(`${portalHost}/practitioner/profile?lang=fr`);
+  await expect(page.getByRole('heading', { name: 'Mes paramètres de déplacement' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Massage profond', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Enregistrer les paramètres de déplacement', exact: true }).click();
+  await expect(page.getByText('La distance gratuite ne peut pas dépasser la distance maximale.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('practitioner-travel-settings-mobile-fr.png'), fullPage: true });
+});
+
+for (const action of ['toggle', 'restore'] as const) {
+  test(`widget management clears cached configuration after ${action} authorization denial`, async ({ page }) => {
+    await fixtures(page, ['super_admin']);
+    const definition = {
+      id: 'appointments_today', schemaVersion: 1, workspaces: ['admin'], renderer: 'metric',
+      dataProjection: 'appointment_count', requiredCapability: 'appointments.view.clinic',
+      title: { en: 'Synthetic widget configuration', fr: 'Configuration' },
+      description: { en: 'Synthetic widget description', fr: 'Description' },
+      icon: 'calendar-check', sizes: ['small'], defaultSize: 'small', parameters: {},
+    };
+    await page.route('**/api/v1/admin/dashboard-widgets', route => route.fulfill({json: {data: [
+      {id: definition.id, source: 'built_in', enabled: true, active_version: 2, has_override: true, definition},
+    ]}}));
+    await page.route('**/api/v1/admin/dashboard-widgets/appointments_today/versions', route => route.fulfill({json: {data: {
+      built_in: false, versions: [{version_number: 1, definition_hash: 'abc', created_at: '2026-10-19T12:00:00Z', created_by: 'Synthetic administrator', active: false, definition}],
+    }}}));
+    const denied = {status: 403, json: {error: {code: 'forbidden', message: 'Widget authority was revoked.'}}};
+    await page.route('**/api/v1/admin/dashboard-widgets/appointments_today', route => route.fulfill(denied));
+    await page.route('**/api/v1/admin/dashboard-widgets/appointments_today/versions/1/restore', route => route.fulfill(denied));
+    await page.goto(`${portalHost}/admin/dashboard-widgets`);
+    await expect(page.getByRole('heading', {name: 'Synthetic widget configuration'})).toBeVisible();
+    if(action === 'restore') {
+      await page.getByRole('button', {name: 'Versions', exact: true}).click();
+      await page.getByRole('button', {name: 'Restore', exact: true}).click();
+    } else await page.getByRole('button', {name: 'Disable', exact: true}).click();
+    await expect(page.getByText('You do not have permission to perform this action.')).toBeVisible();
+    await expect(page.getByText('Synthetic widget description', {exact: true})).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Versions', exact: true})).toBeDisabled();
+    await expect(page.getByRole('button', {name: 'Enable', exact: true})).toBeDisabled();
+  });
+}
+
+for (const deniedStatus of [403, 404]) {
+  test(`practitioner administration clears cached records after ${deniedStatus} update denial`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    const practitioner = {
+      practitioner_id: 8, user_id: 18, given_name: 'Synthetic', family_name: 'Practitioner',
+      display_name: 'Synthetic Practitioner', preferred_name: null, email: 'private-staff@example.test',
+      status: 'active', discipline: 'Massage', credentials: 'Synthetic credentials',
+      booking_mode: 'practitioner_managed', active: true, location_id: 1, locations: 'Main clinic',
+    };
+    let denied = false;
+    await page.route('**/api/v1/admin/practitioners', route => route.fulfill({json: {data: [practitioner]}}));
+    await page.route('**/api/v1/admin/practitioners/8', route => {
+      denied = true;
+      return route.fulfill({status: deniedStatus, json: {error: {code: deniedStatus === 403 ? 'forbidden' : 'practitioner_not_found', message: 'Synthetic denial'}}});
+    });
+    await page.goto(`${portalHost}/admin/practitioners`);
+    await page.getByRole('button', {name: /Synthetic Practitioner.*Synthetic credentials/}).click();
+    await page.getByRole('button', {name: 'Edit', exact: true}).click();
+    await expect(page.getByRole('textbox', {name: 'Email', exact: true})).toHaveValue('private-staff@example.test');
+    await page.getByRole('textbox', {name: 'Credentials', exact: true}).fill('Updated synthetic credentials');
+    await page.getByRole('button', {name: 'Save changes', exact: true}).click();
+    await expect.poll(() => denied).toBe(true);
+    await expect(page.getByText('Unable to load practitioner administration.')).toBeVisible();
+    await expect(page.getByRole('textbox', {name: 'Email', exact: true})).toHaveCount(0);
+    await expect(page.getByRole('button', {name: /Synthetic Practitioner.*Synthetic credentials/})).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Edit', exact: true})).toBeDisabled();
+    await expect(page.getByRole('button', {name: 'New practitioner', exact: true})).toBeDisabled();
+  });
+}
+
+for (const action of ['approve', 'revoke', 'success'] as const) {
+  test(`staff invitation ${action} retains authorization and clears denied claim details`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    // Mount the optional pilot component under the real guarded staff page without enabling it for unrelated tests.
+    await page.route('**/src/admin/StaffAdmin.tsx*', route => route.fulfill({contentType: 'application/javascript', body: 'export { StaffInvitations as StaffAdmin } from "/src/admin/StaffInvitations.tsx";'}));
+    const invitation = {id: 51, recipient_email: 'private-invite@example.test', given_name: 'Synthetic', family_name: 'Invitee',
+      expires_at: '2099-01-01 00:00:00', revoked_at: null as string|null, accepted_at: null as string|null,
+      claimant_name: 'Synthetic claimant', claim_status: 'pending', verification_code: 'ABCDEF123456'};
+    await page.route('**/api/v1/admin/staff-invitations', route => route.fulfill({json: {data: {items: [invitation]}}}));
+    await page.route('**/api/v1/admin/locations', route => route.fulfill({json: {data: [{id: 1, name: 'Main clinic', is_bookable: 1}]}}));
+    let submitted: unknown;
+    await page.route('**/api/v1/admin/staff-invitations/51/*', route => {
+      submitted = route.request().postDataJSON();
+      if(action === 'success') {invitation.accepted_at = '2026-10-19 12:00:00'; return route.fulfill({json: {data: {status: 'approved'}}});}
+      return route.fulfill({status: action === 'approve' ? 403 : 404, json: {error: {code: action === 'approve' ? 'forbidden' : 'invitation_not_found'}}});
+    });
+    await page.goto(`${portalHost}/admin/users`);
+    await expect(page.getByText('private-invite@example.test', {exact: true})).toBeVisible();
+    if(action !== 'revoke') {
+      await page.getByRole('button', {name: 'Review claim', exact: true}).click();
+      await expect(page.getByRole('button', {name: 'Approve practitioner', exact: true})).toBeDisabled();
+      await page.getByRole('textbox', {name: 'Verification code', exact: true}).fill('ABCDEF123456');
+      await page.getByRole('checkbox', {name: 'I verified this claim with the intended recipient.'}).check();
+      await page.getByRole('button', {name: 'Approve practitioner', exact: true}).click();
+    } else await page.getByRole('button', {name: 'Revoke invitation', exact: true}).click();
+    await expect.poll(() => submitted).toBeTruthy();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    if(action === 'success') {
+      expect(submitted).toEqual({recipient_verified: true, verification_code: 'ABCDEF123456'});
+      await expect(page.getByText('Synthetic Invitee · Approved')).toBeVisible();
+      await expect(page.getByRole('button', {name: 'Review claim', exact: true})).toHaveCount(0);
+    } else {
+      await expect(page.getByText('private-invite@example.test', {exact: true})).toHaveCount(0);
+      await expect(page.getByRole('button', {name: 'Create practitioner invitation', exact: true})).toBeDisabled();
+      await expect(page.getByRole('button', {name: 'Revoke invitation', exact: true})).toHaveCount(0);
+    }
+  });
+}
+
+for (const action of ['Verify', 'Revoke'] as const) {
+  test(`qualification ${action} denial clears credential details until successful reload`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    await page.route('**/api/v1/admin/practitioners', route => route.fulfill({json: {data: [{
+      practitioner_id: 2, user_id: 12, given_name: 'Synthetic', family_name: 'Practitioner', display_name: 'Synthetic Practitioner',
+      email: 'synthetic@example.test', status: 'active', discipline: 'Massage', credentials: 'Synthetic registration',
+      booking_mode: 'practitioner_managed', active: 1, location_id: 1, locations: 'Main clinic',
+    }]}}));
+    await page.route('**/api/v1/qualifications/types', route => route.fulfill({json: {data: [{id: 2, name: 'Synthetic registration', requires_expiry: true, active: true}]}}));
+    await page.route('**/api/v1/admin/practitioners/2/qualifications', route => route.fulfill({json: {data: [{
+      id: 81, qualification_type_id: 2, qualification_name: 'Synthetic registration', issuer: 'Private synthetic issuer',
+      issued_on: '2026-01-01', expires_on: '2099-01-01', status: action === 'Verify' ? 'pending' : 'verified',
+      days_until_expiry: 1000, renewal_warning: false, review_note: null,
+    }]}}));
+    let submitted: unknown;
+    await page.route('**/api/v1/admin/qualifications/81/review', route => {
+      submitted = route.request().postDataJSON();
+      return route.fulfill({status: action === 'Verify' ? 403 : 404, json: {error: {code: action === 'Verify' ? 'self_review_forbidden' : 'qualification_not_found'}}});
+    });
+    await page.goto(`${portalHost}/admin/practitioners`);
+    await page.getByRole('button', {name: /Synthetic Practitioner.*Synthetic registration/}).click();
+    await page.getByRole('button', {name: 'Details', exact: true}).click();
+    await expect(page.getByText(/Private synthetic issuer/)).toBeVisible();
+    if(action === 'Revoke') {await page.getByRole('textbox', {name: 'Review note', exact: true}).fill('Synthetic revocation');page.once('dialog', dialog => dialog.accept());}
+    await page.getByRole('button', {name: action, exact: true}).click();
+    await expect.poll(() => submitted).toBeTruthy();
+    await expect(page.getByText(/Private synthetic issuer/)).toHaveCount(0);
+    await expect(page.getByRole('textbox', {name: 'Review note', exact: true})).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Add type', exact: true})).toBeDisabled();
+    await page.getByRole('button', {name: 'Retry', exact: true}).click();
+    await expect(page.getByText(/Private synthetic issuer/)).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Add type', exact: true})).toBeEnabled();
+  });
+}
+
+for (const status of [401, 403]) {
+  test(`staff avatar ${status} denial clears profile and header photos until reload`, async ({page}) => {
+    await fixtures(page, ['super_admin']);
+    let denied = false;
+    const image = 'UklGRiIAAABXRUJQVlA4TBYAAAAvP8APAAdQwChg/wNAQvj/Xovof+oH';
+    await page.route('**/api/v1/profile/avatar', route => {
+      if(route.request().method() === 'DELETE') denied = true;
+      return denied ? route.fulfill({status, json: {error: {code: status === 401 ? 'unauthorized' : 'forbidden'}}})
+        : route.fulfill({json: {data: {user_id: 1, mime_type: 'image/webp', image_base64: image}}});
+    });
+    await page.goto(`${portalHost}/profile`);
+    await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(2);
+    await page.getByRole('button', {name: 'Remove', exact: true}).click();
+    await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(0);
+    await expect(page.getByRole('button', {name: 'Choose image', exact: true})).toBeDisabled();
+    denied = false;
+    await page.getByRole('button', {name: 'Retry', exact: true}).click();
+    await expect(page.getByRole('button', {name: 'Choose image', exact: true})).toBeEnabled();
+    await expect(page.getByRole('button', {name: 'Remove', exact: true})).toBeVisible();
+  });
+}
+
+test('staff avatar upload normalizes an image and removal clears both displayed copies', async ({page}) => {
+  await fixtures(page, ['super_admin']);
+  let image: string|null = null, submitted: string|undefined;
+  await page.route('**/api/v1/profile/avatar', route => {
+    const method = route.request().method();
+    if(method === 'PUT') {image = submitted = route.request().postDataJSON().image_base64; return route.fulfill({json: {data: {user_id: 1, updated: true}}});}
+    if(method === 'DELETE') {image = null; return route.fulfill({json: {data: {user_id: 1, deleted: true}}});}
+    return route.fulfill({json: {data: {user_id: 1, mime_type: image ? 'image/webp' : null, image_base64: image}}});
+  });
+  await page.goto(`${portalHost}/profile`);
+  await expect(page.getByRole('button', {name: 'Choose image', exact: true})).toBeEnabled();
+  await page.locator('input[type="file"]').setInputFiles({name: 'synthetic.webp', mimeType: 'image/webp', buffer: Buffer.from('UklGRiIAAABXRUJQVlA4TBYAAAAvP8APAAdQwChg/wNAQvj/Xovof+oH', 'base64')});
+  await expect(page.getByText('Profile image updated.', {exact: true})).toBeVisible();
+  expect(Buffer.from(submitted!, 'base64').subarray(0,4).toString()).toBe('RIFF');
+  await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(2);
+  await page.getByRole('button', {name: 'Remove', exact: true}).click();
+  await expect(page.getByText('Profile image removed.', {exact: true})).toBeVisible();
+  await expect(page.locator('img[src^="data:image/webp;base64,"]')).toHaveCount(0);
+});
+
+for (const initiallyPermitted of [false, true]) test(`receipt template ${initiallyPermitted ? 'reports revoked save authority and refreshes permissions' : 'hides editing when the server denies template authority'}`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'clinic', destination_snapshot: null, travel_buffer_minutes: 0, base_price_cents: 10000, mobile_fee_cents: 0 };
+  let permitted = initiallyPermitted, saves = 0;
+  await page.route('**/api/v1/appointments?**', route => route.fulfill({ json: { data: [appointment] } }));
+  await page.route('**/api/v1/appointments/41', route => route.fulfill({ json: { data: appointment } }));
+  await page.route('**/api/v1/appointments/41/logistics-notes', route => route.fulfill({ json: { data: { notes: [], truncated: false } } }));
+  await page.route('**/api/v1/appointments/41/receipt', route => route.fulfill({ json: { data: { enabled: true, can_edit_template: permitted, template: { issuer_name: 'Current issuer', issuer_address: '123 Test Street', issuer_contact: 'issuer@example.test', clinic_logo: '' }, template_version: 7, profile: null, profile_version: 0, appointment: { ...appointment, base_cents: 10000, travel_cents: 0 }, items: [] } } }));
+  await page.route('**/api/v1/receipts/template', route => {
+    saves++; permitted = false;
+    expect(route.request().postDataJSON()).toMatchObject({ version: 7, issuer_name: 'Attempted replacement' });
+    return route.fulfill({ status: 403, json: { error: { code: 'forbidden', message: 'Only current clinic administrators may maintain the receipt template.' } } });
+  });
+  await page.goto(`${portalHost}/admin/appointments?appointment_id=41`);
+  await expect(page.getByRole('heading', { name: 'Session receipt', exact: true })).toBeVisible();
+  if (initiallyPermitted) {
+    await page.getByRole('button', { name: 'Clinic receipt template', exact: true }).click();
+    await page.getByLabel('Receipt issuer name').fill('Attempted replacement');
+    await page.getByRole('button', { name: 'Save clinic receipt template', exact: true }).click();
+    await expect(page.getByText('You do not have permission to perform this action.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Receipt issued and available in the client portal.', { exact: true })).toHaveCount(0);
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Refresh', exact: true }).last().click();
+  }
+  await expect(page.getByRole('button', { name: 'Clinic receipt template', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Receipt issuer name')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save clinic receipt template', exact: true })).toHaveCount(0);
+  expect(saves).toBe(initiallyPermitted ? 1 : 0);
+});
+
+for (const action of ['refresh', 'status', 'notify'] as const) test(`practitioner enquiry ${action} denial removes cached applicant details until retry`, async ({ page }) => {
+  await fixtures(page, ['clinic_admin']);
+  let denied = false, writes = 0;
+  const item = { id: 31, reference: 'synthetic-enquiry', full_name: 'Private synthetic applicant', email: 'private-applicant@example.test', phone: '555-0100', discipline: 'Test discipline', credentials: 'Private synthetic credentials', service_area: 'Test area', message: 'Private synthetic recruitment message', status: 'new', revision: 1, notification_status: 'failed', created_at: '2026-10-20 10:00:00' };
+  await page.route('**/api/v1/admin/practitioner-enquiries**', route => {
+    if (route.request().method() !== 'GET') {
+      writes++; denied = true;
+      if (action === 'status') expect(route.request().postDataJSON()).toEqual({ status: 'closed', revision: 1 });
+    }
+    return route.fulfill(denied ? { status: action === 'notify' ? 404 : 403, json: { error: { code: action === 'notify' ? 'enquiry_not_found' : 'forbidden' } } }
+      : { json: { data: { items: [item], has_more: false, settings: { recipient_email: 'recipient@example.test', enabled: true, revision: 1, mail_configured: true } } } });
+  });
+  await page.goto(`${portalHost}/admin/enquiries`);
+  await expect(page.getByText(item.email, { exact: false })).toBeVisible();
+  if (action === 'refresh') { denied = true; await page.getByRole('button', { name: 'Refresh', exact: true }).click(); }
+  else if (action === 'notify') await page.getByRole('button', { name: 'Send email notification', exact: true }).click();
+  else { await page.getByLabel('Enquiry status', { exact: true }).click(); await page.getByRole('option', { name: /closed/i }).click(); }
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  for (const text of [item.full_name, item.email, item.credentials, item.message]) await expect(page.getByText(text, { exact: false })).toHaveCount(0);
+  await expect(page.getByLabel('Enquiry status', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send email notification', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Enquiry changes saved.', { exact: true })).toHaveCount(0);
+  denied = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByText(item.email, { exact: false })).toBeVisible();
+  expect(writes).toBe(action === 'refresh' ? 0 : 1);
+});
+
+for (const mode of ['403', '404', 'reload'] as const) test(`location ${mode} refusal clears cached configuration and waits for authorized reload`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false, writes = 0;
+  let item = { id: 11, name: 'Private synthetic site', timezone: 'America/Toronto', address_line1: '11 Synthetic Base', address_line2: null, city: 'Toronto', province: 'ON', postal_code: 'M5V 1A1', phone: '', is_bookable: 1 };
+  await page.route('**/api/v1/admin/locations**', route => {
+    if (route.request().method() === 'PATCH') {
+      writes++; denied = true;
+      expect(route.request().postDataJSON().name).toBe('Unapproved draft');
+      if (mode === 'reload') { item = { ...item, name: 'Unapproved draft' }; return route.fulfill({ json: { data: { id: 11 } } }); }
+      return route.fulfill({ status: Number(mode), json: { error: { code: mode === '403' ? 'consent_restricted' : 'location_not_found' } } });
+    }
+    return route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: [item] } });
+  });
+  await page.goto(`${portalHost}/admin/locations`);
+  await page.getByRole('button', { name: /Private synthetic site.*Bookable/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Location name', exact: true }).fill('Unapproved draft');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Location name', exact: true })).toHaveCount(0);
+  await expect(page.getByText('11 Synthetic Base', { exact: false })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Private synthetic site.*Bookable/ })).toHaveCount(0);
+  await expect(page.getByText('Unapproved draft was updated.', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New location', exact: true })).toBeDisabled();
+  denied = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('button', { name: new RegExp(`${item.name}.*Bookable`) })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New location', exact: true }).first()).toBeEnabled();
+  expect(writes).toBe(1);
+});
+
+for (const mode of ['403', '404', 'reload', 'review'] as const) test(`room ${mode} refusal preserves the authorization boundary and supports recovery`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false, writes = 0;
+  let item = { id: 21, location_id: 11, location_name: 'Test site', name: 'Private synthetic room', room_type: 'Treatment room', equipment_notes: 'Private equipment notes', turnover_minutes: 0, is_bookable: 1 };
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 11, name: 'Test site' }] } }));
+  await page.route('**/api/v1/admin/rooms**', route => {
+    if (route.request().method() === 'PATCH') {
+      writes++;
+      expect(route.request().postDataJSON()).toMatchObject({ location_id: 11, name: 'Unapproved room draft', turnover_minutes: 0 });
+      if (mode === 'review') return route.fulfill({ status: 409, json: { error: { code: 'room_relocation_review' } } });
+      denied = true;
+      if (mode === 'reload') { item = { ...item, name: 'Unapproved room draft' }; return route.fulfill({ json: { data: { id: 21 } } }); }
+      return route.fulfill({ status: Number(mode), json: { error: { code: mode === '403' ? 'consent_restricted' : 'room_not_found' } } });
+    }
+    return route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: [item] } });
+  });
+  await page.goto(`${portalHost}/admin/rooms`);
+  await page.getByRole('button', { name: /Private synthetic room.*Bookable/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Room name', exact: true }).fill('Unapproved room draft');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  if (mode === 'review') {
+    await expect(page.getByText('Moving this room requires a reviewed migration of its booking history or assignments.', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Room name', exact: true })).toHaveValue('Unapproved room draft');
+    await expect(page.getByRole('textbox', { name: 'Equipment and room notes', exact: true })).toHaveValue(item.equipment_notes);
+  } else {
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Room name', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Equipment and room notes', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Private synthetic room.*Bookable/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'New room', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Capabilities', exact: true })).toBeDisabled();
+    denied = false;
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByRole('button', { name: new RegExp(`${item.name}.*Bookable`) })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New room', exact: true })).toBeEnabled();
+  }
+  await expect(page.getByText('Unapproved room draft was updated.', { exact: true })).toHaveCount(0);
+  expect(writes).toBe(1);
+});
+
+for (const mode of ['403', 'reload'] as const) test(`room capabilities ${mode} denial clears cached assignments and drafts`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  await page.route('**/api/v1/admin/rooms', route => route.fulfill({ json: { data: [{ id: 21, location_id: 11, name: 'Test room', is_bookable: 1 }] } }));
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 11, name: 'Test site' }] } }));
+  await page.route('**/api/v1/admin/services', route => route.fulfill({ json: { data: [{ id: 31, name: 'Test service' }] } }));
+  await page.route('**/api/v1/admin/room-capabilities', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { capabilities: [{ id: 41, name: 'Synthetic equipment' }], rooms: [], services: [] } } }));
+  await page.route('**/api/v1/admin/room-capability-assignments', route => {
+    denied = true;
+    return route.fulfill(mode === 'reload' ? { json: { data: { updated: true } } } : { status: 403, json: { error: { code: 'consent_restricted' } } });
+  });
+  await page.goto(`${portalHost}/admin/rooms`);
+  await page.getByRole('button', { name: 'Capabilities', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Synthetic equipment' }).first()).toBeVisible();
+  await page.getByRole('textbox', { name: 'New capability', exact: true }).fill('Unsaved equipment');
+  await page.getByRole('button', { name: 'Save requirements', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Synthetic equipment' })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'New capability', exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Save requirements', exact: true })).toBeDisabled();
+  await expect(page.getByText('Room capabilities and service requirements saved.', { exact: true })).toHaveCount(0);
+  denied = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Synthetic equipment' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save requirements', exact: true })).toBeEnabled();
+});
+
+for (const mode of ['403', 'reload', 'review'] as const) test(`service ${mode} refusal preserves privacy and supports recovery`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  const item = { id: 21, name: 'Private synthetic service', slug: 'synthetic', category_id: null, price_cents: 5000, duration_options: [{ minutes: 60, price_cents: 5000 }], durations: [60], description: 'Private service draft notes', active: 1, requires_room: 0, recurrence_allowed: 0, published: 0, display_order: 100, lead_time_minutes: 0, booking_horizon_days: 365, cancellation_window_minutes: 1440, cancellation_fee_type: 'none', cancellation_fee_value: 0, buffer_before_minutes: 0, buffer_after_minutes: 0 };
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [] } } }));
+  await page.route('**/api/v1/admin/services**', route => {
+    if (route.request().method() === 'PATCH') {
+      if (mode === 'review') return route.fulfill({ status: 409, json: { error: { code: 'service_privacy_review' } } });
+      denied = true;
+      return route.fulfill(mode === 'reload' ? { json: { data: { id: 21 } } } : { status: 403, json: { error: { code: 'consent_restricted' } } });
+    }
+    return route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: [item] } });
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  await page.getByRole('button', { name: /Private synthetic service.*50\.00/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Service name', exact: true }).fill('Unsaved service name');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  if (mode === 'review') {
+    await expect(page.getByText('This service change needs a privacy review before it can be saved.', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Service name', exact: true })).toHaveValue('Unsaved service name');
+  } else {
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Service name', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Private synthetic service.*50\.00/ })).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Service actions' }).getByRole('button', { name: 'New service', exact: true })).toBeDisabled();
+    await expect(page.getByText('Unsaved service name was updated.', { exact: true })).toHaveCount(0);
+    denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(page.getByRole('button', { name: /Private synthetic service.*50\.00/ })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Service actions' }).getByRole('button', { name: 'New service', exact: true })).toBeEnabled();
+  }
+});
+for (const mode of ['403', 'reload'] as const) test(`service assignments ${mode} refusal clears cached configuration and drafts`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  await page.route('**/api/v1/admin/services', route => route.fulfill({ json: { data: [{ id: 21, name: 'Synthetic service', price_cents: 5000, durations: [60], active: 1 }] } }));
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [] } } }));
+  await page.route('**/api/v1/admin/locations', route => route.fulfill({ json: { data: [{ id: 11, name: 'Synthetic assignment site' }] } }));
+  await page.route('**/api/v1/admin/practitioners', route => route.fulfill({ json: { data: [{ practitioner_id: 31, display_name: 'Synthetic assigned practitioner' }] } }));
+  await page.route('**/api/v1/admin/service-assignments', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { practitioners: [{ service_id: 21, practitioner_id: 31, active: 1, offers_mobile: 0, offers_clinic: 1, mobile_radius_km: null, mobile_free_radius_km: null, travel_buffer_minutes: 0, mobile_fee_cents: 0 }], locations: [{ service_id: 21, location_id: 11, active: 1 }] } } }));
+  await page.route('**/api/v1/admin/services/21/assignments', route => {
+    denied = true;
+    return route.fulfill(mode === 'reload' ? { json: { data: { id: 21 } } } : { status: 403, json: { error: { code: 'consent_restricted' } } });
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  await page.getByRole('button', { name: /Synthetic service.*50\.00/ }).click();
+  await page.getByRole('button', { name: 'Assignments', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Synthetic assigned practitioner', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Edit assignments', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'Synthetic assignment site', exact: true }).uncheck();
+  await dialog.getByRole('button', { name: 'Save assignments', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(dialog.getByText('Synthetic assigned practitioner', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('Synthetic assignment site', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('Service assignments saved.', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Add assignment', exact: true })).toBeDisabled();
+  denied = false; await dialog.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(dialog.getByText('Synthetic assigned practitioner', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Edit assignments', exact: true })).toBeEnabled();
+});
+
+for (const action of ['tax', 'defaults'] as const) for (const mode of ['403', 'reload'] as const) test(`catalogue ${action} ${mode} refusal clears configuration and drafts until retry`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  const settings = { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 };
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { categories: [{ id: 31, name: 'Private synthetic category' }], taxes: [{ id: 41, code: 'SYNTHETIC', name: 'Private synthetic tax', rate_basis_points: 1300 }], settings } } }));
+  await page.route(action === 'tax' ? '**/api/v1/admin/taxes' : '**/api/v1/admin/booking-settings', route => {
+    denied = true;
+    return route.fulfill(mode === 'reload' ? { json: { data: action === 'tax' ? { id: 42 } : { updated: true } } } : { status: 403, json: { error: { code: 'forbidden' } } });
+  });
+  await page.goto(`${portalHost}/admin/settings`);
+  const lead = page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true });
+  await expect(lead).toHaveValue('60');
+  await lead.fill('125');
+  await page.getByRole('textbox', { name: 'Category name (English)', exact: true }).fill('Unapproved category');
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Unapproved tax name');
+  await page.getByRole('button', { name: action === 'tax' ? 'Add tax' : 'Save defaults', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByText('Private synthetic category', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Private synthetic tax (13.00%)', { exact: true })).toHaveCount(0);
+  await expect(lead).toHaveValue('');
+  await expect(lead).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Category name (English)', exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeDisabled();
+  await expect(page.getByText(action === 'tax' ? 'Tax added.' : 'Booking defaults saved.', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })))).toBe(false);
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(lead).toHaveValue('60');
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeEnabled();
+  await expect(page.getByText('Private synthetic category', { exact: true })).toBeVisible();
+});
+test('catalogue denied initial load disables configuration until authorized retry', async ({ page }) => {
+  await fixtures(page, ['super_admin']); let denied = true;
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeDisabled();
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true })).toHaveValue('60');
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeEnabled();
+});
+test('catalogue saves tax and only writable numeric booking defaults with authorized reload', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let taxes: unknown[] = [];
+  let settings = { default_lead_time_minutes: 60, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440, slot_increment_minutes: 30, currency: 'USD' };
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes, settings } } }));
+  await page.route('**/api/v1/admin/taxes', route => {
+    expect(route.request().postDataJSON()).toEqual({ code: 'TEST_TAX', name: 'Synthetic successful tax', rate_basis_points: 1300 });
+    taxes = [{ id: 41, code: 'TEST_TAX', name: 'Synthetic successful tax', rate_basis_points: 1300 }];
+    return route.fulfill({ status: 201, json: { data: { id: 41 } } });
+  });
+  await page.route('**/api/v1/admin/booking-settings', route => {
+    expect(route.request().postDataJSON()).toEqual({ default_lead_time_minutes: 125, default_booking_horizon_days: 90, default_cancellation_window_minutes: 1440 });
+    settings = { ...settings, ...route.request().postDataJSON() }; return route.fulfill({ json: { data: { updated: true } } });
+  });
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Save defaults', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Code', exact: true }).fill('TEST_TAX');
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Synthetic successful tax');
+  await page.getByRole('button', { name: 'Add tax', exact: true }).click();
+  await expect(page.getByText('Tax added.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic successful tax (13.00%)', { exact: true })).toBeVisible();
+  await page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true }).fill('125');
+  await page.getByRole('button', { name: 'Save defaults', exact: true }).click();
+  await expect(page.getByText('Booking defaults saved.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Default lead time minutes', exact: true })).toHaveValue('125');
+});
+test('catalogue duplicate tax conflict retains draft for correction', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/taxes', route => route.fulfill({ status: 409, json: { error: { code: 'tax_already_exists' } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Correctable tax draft');
+  await page.getByRole('button', { name: 'Add tax', exact: true }).click();
+  await expect(page.getByText('A tax with this code already exists in this clinic.', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Correctable tax draft');
+  await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeEnabled();
+});
+
+for (const action of ['profile', 'theme', 'welcome', 'upload', 'remove', 'reload', 'public-refresh', '404'] as const) test(`clinic presentation ${action} refusal clears editable content until authorized retry`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const publicConfig = { name: 'Synthetic public clinic', legal_name: 'Synthetic Legal', email: 'clinic@example.test', phone: '905-555-0100', logo_version: 'logo-current', favicon_version: 'favicon-current', theme_primary_color: '#176b62', theme_secondary_color: '#d8754c', theme_font_family: 'Inter', welcome_title_en: 'Welcome to our clinic', welcome_title_fr: 'Bienvenue', welcome_body_en: 'Public English welcome', welcome_body_fr: 'Accueil public' };
+  await page.route('**/api/v1/site-config', route => route.fulfill(denied && action === 'public-refresh' ? { status: 503, json: { error: { code: 'clinic_not_configured' } } } : { json: { data: publicConfig } }));
+  await page.route('**/api/v1/brand/*', route => route.fulfill({ body: pixel, contentType: 'image/png' }));
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/clinic**', route => {
+    if (route.request().method() === 'GET') return route.fulfill(denied && action !== 'public-refresh' ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { logo: { content_hash: 'logo-current' }, favicon: { content_hash: 'favicon-current' } } } });
+    denied = true;
+    return route.fulfill(action === 'reload' || action === 'public-refresh' ? { json: { data: {} } } : { status: action === '404' ? 404 : 403, json: { error: { code: 'forbidden' } } });
+  });
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Operating name', exact: true }).fill('Unsaved clinic name');
+  await page.getByRole('textbox', { name: 'Welcome title (English)', exact: true }).fill('Unsaved welcome');
+  await page.locator('input[type="color"]').first().fill('#123456');
+  if (action === 'upload') await page.getByRole('button', { name: 'Replace image', exact: true }).first().locator('input').setInputFiles({ name: 'synthetic-logo.png', mimeType: 'image/png', buffer: pixel });
+  else await page.getByRole('button', { name: action === 'theme' ? 'Save portal appearance' : action === 'welcome' ? 'Save welcome message' : action === 'remove' ? 'Remove' : 'Save settings', exact: true }).first().click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Business email', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Welcome title (English)', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save portal appearance', exact: true })).toBeDisabled();
+  await expect(page.getByRole('img', { name: 'Current business logo', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('img', { name: 'Current favicon', exact: true })).toHaveCount(0);
+  for (const message of ['Business settings saved.', 'Portal theme saved.', 'Portal welcome message saved.', 'Business logo updated.', 'Business logo removed.']) await expect(page.getByText(message, { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })))).toBe(false);
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue(publicConfig.name);
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await expect(page.getByRole('img', { name: 'Current business logo', exact: true })).toBeVisible();
+});
+test('clinic presentation initial authorization denial cannot populate public data into editor', async ({ page }) => {
+  await fixtures(page, ['super_admin']); let denied = true;
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/clinic/branding', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { logo: null, favicon: null } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeDisabled();
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('Test Wellness');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+});
+test('clinic profile validation retains editable draft without reporting save success', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/clinic', route => route.fulfill({ status: 422, json: { error: { code: 'validation_error', message: 'Check public contact details.' } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Operating name', exact: true }).fill('Correctable public clinic draft');
+  await page.getByRole('button', { name: 'Save settings', exact: true }).click();
+  await expect(page.getByText('Unable to save business settings.', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('Correctable public clinic draft');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await expect(page.getByText('Business settings saved.', { exact: true })).toHaveCount(0);
 });

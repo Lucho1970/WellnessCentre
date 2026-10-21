@@ -1,3 +1,4 @@
+import { StaffTravelEnquiries, TravelEnquiryNotice, useTravelRequest } from '../discovery/TravelEnquiries';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { legacyPage, pageAt, pagePath, pagesFor, workspacesFor, type PortalPage, type Workspace } from './access';
@@ -37,6 +38,7 @@ import {
   MailCheck,
   X,
 } from "lucide-react";
+function TravelNotice({workspace}:{workspace:Workspace}){const request=useTravelRequest();return <TravelEnquiryNotice request={request} open={()=>{window.location.href=pagePath(workspace,'travel');}}/>;}
 const BusinessSettings = lazy(() => import('../admin/BusinessSettings').then(module => ({ default: module.BusinessSettings })));
 const PractitionerAdmin = lazy(() => import('../admin/PractitionerAdmin').then(module => ({ default: module.PractitionerAdmin })));
 const LocationAdmin = lazy(() => import('../admin/LocationAdmin').then(module => ({ default: module.LocationAdmin })));
@@ -45,6 +47,7 @@ const RoomAdmin = lazy(() => import('../admin/RoomAdmin').then(module => ({ defa
 const ServiceAdmin = lazy(() => import('../admin/ServiceAdmin').then(module => ({ default: module.ServiceAdmin })));
 const CatalogueSettings = lazy(() => import('../admin/CatalogueSettings').then(module => ({ default: module.CatalogueSettings })));
 const StaffAdmin = lazy(() => import('../admin/StaffAdmin').then(module => ({ default: module.StaffAdmin })));
+const PractitionerEnquiries = lazy(() => import('../admin/PractitionerEnquiries').then(module => ({default:module.PractitionerEnquiries})));
 const TeamAdmin = lazy(() => import('../admin/TeamAdmin').then(module => ({ default: module.TeamAdmin })));
 const AvailabilityAdmin = lazy(() => import('../scheduling/AvailabilityAdmin').then(module => ({ default: module.AvailabilityAdmin })));
 const ClientManagement = lazy(() => import('../clients/ClientManagement').then(module => ({ default: module.ClientManagement })));
@@ -53,6 +56,7 @@ const FormTemplates = lazy(() => import('../forms/FormTemplates').then(module =>
 const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then(module => ({ default: module.StaffAppointments })));
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
+const PrivacyAuditReview = lazy(() => import('../admin/PrivacyAuditReview').then(module => ({default:module.PrivacyAuditReview})));
 const NotificationStatusAdmin = lazy(() => import('../admin/NotificationStatusAdmin').then(module => ({ default: module.NotificationStatusAdmin })));
 const PractitionerNotifications = lazy(() => import('./PractitionerNotifications').then(module => ({ default: module.PractitionerNotifications })));
 const PractitionerCalendar = lazy(() => import('../scheduling/PractitionerCalendar').then(module => ({ default: module.PractitionerCalendar })));
@@ -79,8 +83,11 @@ const navigation: NavigationItem[] = [
   { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} /> },
   { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} /> },
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
+  { id: "travel", label: "Travel enquiries", description: "Private client travel enquiries", icon: <MailCheck size={20} /> },
+  { id: "enquiries", label: "Practitioner enquiries", description: "Review interest in joining the clinic", icon: <MailCheck size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
   { id: "widgets", label: "Dashboard widgets", description: "Upload, version, and publish dashboard cards", icon: <PanelsTopLeft size={20} /> },
+  { id: "privacy_audit", label: "Privacy audit", description: "Review clinic access history", icon: <Users size={20} /> },
   { id: "notifications", label: "Notification status", description: "Review appointment notification delivery", icon: <MailCheck size={20} /> },
   { id: "my_notifications", label: "My notifications", description: "Booking notices sent to you", icon: <MailCheck size={20} /> },
   { id: "forms", label: "Intake and consent forms", description: "Questionnaires, consent and template versions", icon: <PanelsTopLeft size={20} /> },
@@ -120,7 +127,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
   try { remembered = sessionStorage.getItem(preferenceKey); } catch { /* Storage may be disabled. */ }
   const defaultWorkspace = workspaces.find(item => item === remembered) ?? workspaces[0];
   const workspace = location.pathname.split('/')[1] as Workspace;
-  const allowedPages = pagesFor(roles, workspace);
+  const allowedPages = pagesFor(roles, workspace, permissions);
   const allowedNavigation = navigation.filter(item => allowedPages.includes(item.id));
   const page = pageAt(location.pathname, workspace);
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
@@ -147,6 +154,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
       </Stack>
       <Divider sx={{ mb: 1.5 }} />
       {workspaces.length > 1 && <Stack spacing={1} mb={2} aria-label={t('Switch workspace')}>{workspaces.map(item => <Button key={item} component={Link} to={pagePath(item, 'dashboard')} onClick={() => rememberWorkspace(item)} variant={workspace === item ? 'contained' : 'outlined'}>{t(item === 'admin' ? 'Operations' : 'Practitioner')}</Button>)}</Stack>}
+      {allowedPages.includes('travel')&&<TravelNotice workspace={workspace}/>}
       <List aria-label={t('Staff portal navigation')}>
         {allowedNavigation.map((item) => (
           <ListItemButton component={Link} to={pagePath(workspace, item.id)} aria-current={page === item.id ? 'page' : undefined} key={item.id} selected={page === item.id} sx={{ borderRadius: 2, mb: 0.75, alignItems: "flex-start" }}>
@@ -185,7 +193,10 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
         {page === "team" && <TeamAdmin />}
+        {page === "travel" && <StaffTravelEnquiries />}
+        {page === "enquiries" && <PractitionerEnquiries />}
         {page === "widgets" && <DashboardWidgetAdmin />}
+        {page === "privacy_audit" && <PrivacyAuditReview />}
         {page === "notifications" && <NotificationStatusAdmin />}
         {page === "my_notifications" && <PractitionerNotifications />}
         {page === "calendar" && <AvailabilityAdmin practitionerMode={workspace === 'practitioner'} />}

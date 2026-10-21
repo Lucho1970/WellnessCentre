@@ -1,2 +1,4 @@
 RewriteEngine On
-RewriteRule ^public/(services|practitioners)/?$ catalogue.php?resource=$1 [QSA,L]
+RewriteRule ^public/discovery/(options|search)/?$ discovery.php?action=$1 [L]
+RewriteRule ^public/practitioner-enquiries/?$ practitioner-enquiries.php [L]
+RewriteRule ^public/(services|practitioners|contact)/?$ catalogue.php?resource=$1 [QSA,L]

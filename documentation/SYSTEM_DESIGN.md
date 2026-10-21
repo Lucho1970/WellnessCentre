@@ -247,7 +247,7 @@ The model must support clinic-managed practitioners, independently managed pract
 
 Departure and coverage are first-class transitions. Before deactivation, produce an impact review for future appointments, waitlists, outstanding forms/messages, active care plans, claims, balances, packages, calendar connections and record/export obligations. Reassignment, temporary coverage, client communication and permitted record transfer are explicit audited operations; deactivation must not orphan or silently re-own data. Historical appointments, authorship, ledger entries and audit events retain the original responsible parties.
 
-**Virtual-clinic implementation shape (target, not deployed).** Add a clinic-level operating mode with a safe default preserving the existing Willow workflow; `independent_practitioners` activates narrower practitioner-specific policy rather than a second API codebase. Keep a verified identity separate from clinic membership and from practitioner-specific client profiles. Model a stable practitioner/client relationship with its own contact overrides, lifecycle, responsible practitioner, stewardship metadata and access policy. Existing `users`, `client_profiles`, customer links, appointments, notes, invitations and exports need an additive migration/backfill plan that preserves IDs and never merges records based on email. Clinic-level shared data should contain only what the approved portal and delegated administration require; public discovery contains no client relationship data.
+**Virtual-clinic implementation shape (target, not deployed).** Add a clinic-level operating mode with a safe default preserving the existing Livin’ Lively workflow; `independent_practitioners` activates narrower practitioner-specific policy rather than a second API codebase. Keep a verified identity separate from clinic membership and from practitioner-specific client profiles. Model a stable practitioner/client relationship with its own contact overrides, lifecycle, responsible practitioner, stewardship metadata and access policy. Existing `users`, `client_profiles`, customer links, appointments, notes, invitations and exports need an additive migration/backfill plan that preserves IDs and never merges records based on email. Clinic-level shared data should contain only what the approved portal and delegated administration require; public discovery contains no client relationship data.
 
 Use one server policy for a resource request that checks, in order, the authenticated identity, active clinic membership, clinic operating mode, practitioner relationship or delegated duty, resource owner, any explicit grant, purpose and effective period. Apply it before lists, counts, search, detail, writes, attachments, notifications, analytics and exports. In virtual mode, today's clinic-wide booking-client search and saved-address endpoint cannot expose another practitioner's client simply because both are in the same clinic. Duplicate prevention may use a privacy-preserving match/review workflow; it must not reveal another practice's client details to a searcher. The client portal may aggregate only that signed-in client's own relationships while retaining separate practitioner-specific profile and consent state.
 
@@ -372,17 +372,18 @@ The host must provide evidence of supported software, TLS/database transport, en
 
 ## 10. Hosting, configuration and release packaging
 
-Current development site: `https://wellness.copihue.ca/`. Existing layout:
+Current hosting layout (16 October 2026):
 
 ```text
-account-private-root/wellness-api/       .env, src, vendor, bin, private data
-public_html/wellness/                   frontend static assets
-public_html/wellness/api/               index.php, .htaccess
+/public_html/livinlively.ca/          Livin' Lively marketing site
+/public_html/wellnexa.ca/             Wellnexa marketing site
+/public_html/wellness-common-portal/  shared clinic SPA and thin api/ entries
+/public_html/wellness-portal/         general landing, admin/ and thin api/ entries
+/wellness-api/                       private shared PHP application
 ```
 
-Target adds a separate portal document root/host while retaining one PHP application and database. A sibling `public_html/wellness-portal/` is a possible layout, subject to DNS/document-root confirmation. Configure the front controller's private root explicitly; do not assume a changed subdomain has the same relative filesystem depth. Do not duplicate private API state or business logic per host.
+Both active clinic hostnames serve the common portal folder without redirecting to each other. The request hostname resolves the clinic; branding, membership, records and sessions remain clinic-scoped. Public/portal/central thin entries load the same private backend at the established filesystem depth. Production frontend API calls use same-origin `/api/v1`; exact CORS origins cover intentional cross-origin access. Register each active clinic callback/logout URL and keep secrets private. See [Deployment layout](DEPLOYMENT_LAYOUT.md) for package destinations and rollout checks.
 
-Deployment decision (16 September 2026): expose `/api/v1` on both the public and portal hosts using identical thin PHP entry points. Both load the one private `/wellness-api` application, configuration, vendor directory and database. The confirmed sibling document roots are `/public_html/wellness` and `/public_html/wellness-portal`; both API entry points resolve the same private directory at the same filesystem depth. Production portal builds use relative `/api/v1`, avoiding the Netfirms cross-origin OPTIONS failure. This is not an HTTP proxy or a second backend. Retain exact CORS allowlists for intentional cross-origin development; do not bypass token validation or authorization. Avoid domain-wide cookies and wildcard credentialed CORS. Register exact callbacks/logout URLs for each enabled identity environment; frontend build configuration contains public identifiers, never secrets.
 
 Maintain environment settings for public URL, portal URL, API base URL, accepted token issuers/audiences/scopes, CORS origins, database credentials, private paths and worker/provider credentials. Map names to actual `.env`/build configuration when implemented rather than inventing live variable names here. Business display settings belong in the database; secrets and infrastructure settings do not.
 

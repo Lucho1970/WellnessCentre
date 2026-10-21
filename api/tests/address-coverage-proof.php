@@ -18,15 +18,19 @@ $config = new Config('test', false, 'test', [], '', 3306, '', '', '', '', '', ''
 $service = new AddressCoverageService(new Database($config), $config);
 $actor = new AuthContext(7, 1, 'object', 'staff@example.test', 'Staff', 'staff', ['reception']);
 $destination = ['address_line1' => '123 Test Street', 'address_line2' => '', 'city' => 'Test City', 'province' => 'Ontario', 'postal_code' => 'A1A 1A1', 'country' => 'Canada', 'instructions' => 'Side entrance'];
-$body = ['location_id' => 2, 'service_id' => 3, 'practitioner_id' => 4, 'address_validation_token' => ''];
+$body = ['client_id'=>42, 'location_id' => 2, 'service_id' => 3, 'practitioner_id' => 4, 'address_validation_token' => ''];
 
 $hash = new ReflectionMethod(AddressCoverageService::class, 'destinationHash');
 $sign = new ReflectionMethod(AddressCoverageService::class, 'sign');
 $verify = new ReflectionMethod(AddressCoverageService::class, 'verifyToken');
-$proof = ['clinic_id' => 1, 'user_id' => 7, 'location_id' => 2, 'service_id' => 3, 'practitioner_id' => 4, 'destination_hash' => $hash->invoke(null, $destination), 'distance_meters' => 8400, 'radius_meters' => 25000, 'iat' => time(), 'exp' => time() + 900];
+$proof = ['clinic_id' => 1, 'user_id' => 7, 'client_id'=>42, 'location_id' => 2, 'service_id' => 3, 'practitioner_id' => 4, 'destination_hash' => $hash->invoke(null, $destination), 'distance_meters' => 8400, 'radius_meters' => 25000, 'iat' => time(), 'exp' => time() + 900];
 $body['address_validation_token'] = $sign->invoke($service, $proof);
 
 coverageCheck($verify->invoke($service, $actor, $body, $destination, $body['address_validation_token'])['distance_meters'] === 8400);
+$otherPatient=array_replace($body,['client_id'=>43]);
+coverageRejected(fn() => $verify->invoke($service,$actor,$otherPatient,$destination,$body['address_validation_token']),'coverage_validation_mismatch');
+$legacyProof=$proof;unset($legacyProof['client_id']);
+coverageRejected(fn() => $verify->invoke($service,$actor,$body,$destination,$sign->invoke($service,$legacyProof)),'coverage_validation_mismatch');
 $changed = $destination; $changed['postal_code'] = 'B2B 2B2';
 coverageRejected(fn() => $verify->invoke($service, $actor, $body, $changed, $body['address_validation_token']), 'coverage_validation_mismatch');
 $wrongService = $body; $wrongService['service_id'] = 99;
@@ -44,6 +48,6 @@ coverageCheck($addressHash->invoke(null, $destination) !== $addressHash->invoke(
 $clientActor = new AuthContext(42, 1, 'client', 'client@example.test', 'Client', 'client', []);
 coverageRejected(fn() => $service->approve($clientActor, $body, 'test'), 'forbidden');
 coverageRejected(fn() => $service->revoke($clientActor, $body, 'test'), 'forbidden');
-coverageRejected(fn() => $service->approvalStatus($clientActor, $body + ['client_id' => 43]), 'forbidden');
+coverageRejected(fn() => $service->approvalStatus($clientActor, array_replace($body,['client_id'=>43])), 'forbidden');
 
 echo "{$checks} address coverage proof checks passed.\n";

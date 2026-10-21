@@ -68,7 +68,30 @@ final class CatalogService
             GROUP BY s.id,s.slug,s.name,s.name_fr,s.public_summary,s.public_summary_fr,s.description,s.description_fr,s.preparation_instructions,s.preparation_instructions_fr,c.id,c.name,c.name_fr,c.description,c.description_fr,s.display_order
             ORDER BY c.name IS NULL,c.name,s.display_order,s.name";
         $rows=$this->database->connection()->query($sql)->fetchAll();
-        foreach($rows as &$row){$row['durations']=self::sortedDurations($row['durations']);$row['offers_clinic']=(bool)$row['offers_clinic'];$row['offers_mobile']=(bool)$row['offers_mobile'];}
+        if ($rows===[]) return [];
+        // Keep practitioner aggregation separate from JSON_ARRAYAGG. Combining a
+        // correlated MIN with the outer JSON aggregate is not portable across
+        // hosted MySQL versions and SQL modes.
+        $prices=$this->database->connection()->query("SELECT s.slug,d.duration_minutes,
+                    MIN(COALESCE(ps.price_override_cents,d.price_cents,s.price_cents)) price_cents
+                FROM services s JOIN service_duration_options d ON d.service_id=s.id AND d.active=1
+                JOIN practitioner_services ps ON ps.service_id=s.id AND ps.active=1
+                JOIN practitioners p ON p.id=ps.practitioner_id AND p.active=1
+                JOIN users u ON u.id=p.user_id AND u.clinic_id=s.clinic_id AND u.status='active'
+                JOIN public_team_profiles t ON t.user_id=u.id AND t.clinic_id=s.clinic_id
+                    AND t.published=1 AND t.section='practitioner' AND t.show_booking_action=1
+                WHERE s.clinic_id={$this->clinicId} AND s.active=1 AND s.published=1
+                GROUP BY s.id,s.slug,d.id,d.duration_minutes")->fetchAll();
+        $startingPrices=[];
+        foreach ($prices as $price) $startingPrices[$price['slug']][(int)$price['duration_minutes']]=(int)$price['price_cents'];
+        foreach($rows as &$row){
+            $row['durations']=self::sortedDurations($row['durations']);
+            foreach($row['durations'] as &$duration){
+                if(isset($startingPrices[$row['slug']][(int)$duration['minutes']])) $duration['price_cents']=$startingPrices[$row['slug']][(int)$duration['minutes']];
+            }
+            unset($duration);
+            $row['offers_clinic']=(bool)$row['offers_clinic'];$row['offers_mobile']=(bool)$row['offers_mobile'];
+        }
         return $rows;
     }
 
@@ -96,7 +119,7 @@ final class CatalogService
 
     public function publicPractitioners(): array
     {
-        $sql = "SELECT t.slug,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.public_website_url,t.public_contact_email,t.public_contact_phone,t.public_contact_sms,
+        $sql = "SELECT t.slug,t.public_name,t.booking_name,t.public_title,t.public_title_fr,t.summary,t.summary_fr,t.public_website_url,t.public_contact_email,t.public_contact_phone,t.public_contact_sms,t.social_links,
                        p.discipline,p.credentials,t.display_order,
                        CASE WHEN i.user_id IS NULL THEN 0 ELSE 1 END has_image,
                        i.content_hash image_version,
@@ -129,6 +152,7 @@ final class CatalogService
         foreach ($practitioners as &$practitioner) {
             $practitioner['has_image'] = (bool)$practitioner['has_image'];
             $practitioner['public_contact_sms'] = (bool)$practitioner['public_contact_sms'];
+            $practitioner['social_links'] = PublicSocialLinks::decode($practitioner['social_links']);
             $practitioner['services'] = $servicesByPractitioner[(string)$practitioner['slug']] ?? [];
         }
         return $practitioners;

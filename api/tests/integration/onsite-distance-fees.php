@@ -1,0 +1,167 @@
+<?php
+declare(strict_types=1);
+// Random isolated localhost database; includes recurrence regression and migration 044 rehearsal.
+require __DIR__.'/recurring-bookings.php';
+use Wellness\Auth\AuthContext;
+use Wellness\Config;
+use Wellness\Http\ApiException;
+use Wellness\Service\{AddressCoverageService,AdminService,AuditLogger,BookingService,OnsiteFee,OnsiteFeeService,SessionReceiptService,RecurringBookingService};
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/038_practitioner_private_locations.sql'));
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/043_session_receipts.sql'));
+// Current persisted clinic authority is required for issuer-template maintenance.
+$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='super_admin'");
+$checks=0;
+$assert=function(bool $ok,string $why)use(&$checks){if(!$ok)throw new RuntimeException($why);$checks++;};
+$deny=function(callable $action,string $code)use($assert){try{$action();}catch(ApiException $e){$assert($e->errorCode===$code,'Expected '.$code.', got '.$e->errorCode);return;}throw new RuntimeException('Expected '.$code);};
+foreach(['onsite-distance-fees-preflight.sql','onsite-distance-fees-postflight.sql'] as $file){
+ $sql=str_replace("'wellness_centre'","'$name'",file_get_contents(dirname(__DIR__,2).'/database/maintenance/'.$file));
+ $sql=preg_replace('/^--.*$/m','',$sql);$sets=[];
+ foreach(explode(';',$sql) as $statement)if(trim($statement)!==''){$q=$pdo->query($statement);$sets[]=$q->fetchAll();$q->closeCursor();}
+ if(str_contains($file,'preflight'))$assert(count($sets[0])===9&&array_unique(array_column($sets[0],'prerequisite'))===['OK']&&(int)$sets[1][0]['new_columns_present']===6,'Packaged preflight detects installed migration');
+ else $assert(count($sets[0])===6&&array_unique(array_column($sets[0],'result'))===['OK'],'Packaged postflight verifies columns');
+}
+set_error_handler(static function(int $severity,string $message,string $file,int $line): bool {if(!(error_reporting()&$severity))return false;throw new ErrorException($message,0,$severity,$file,$line);});
+$policy=['mobile_free_radius_km'=>20,'mobile_radius_km'=>50,'mobile_fee_cents'=>1500];
+foreach([0=>0,19999=>0,20000=>0,20001=>1500,50000=>1500] as $distance=>$fee)$assert(OnsiteFee::quote($policy,$distance)===$fee,'Exact distance boundary');
+$deny(fn()=>OnsiteFee::quote($policy,50001),'outside_mobile_coverage');
+$deny(fn()=>OnsiteFee::quote($policy,null),'coverage_validation_required');
+$assert(OnsiteFee::quote(array_replace($policy,['mobile_free_radius_km'=>null]),null)===1500,'Legacy flat fee retained');
+$pdo->exec("UPDATE locations SET address_line1='1 Test Street',city='Toronto',province='Ontario',postal_code='M1M 1M1' WHERE id=1;
+ UPDATE practitioner_services SET offers_mobile=1,mobile_radius_km=50,mobile_free_radius_km=20,mobile_fee_cents=1500 WHERE practitioner_id=3 AND service_id=4");
+$config=new Config('test',false,'test',[],'127.0.0.1',$port,$name,'','','','','',300,googleMapsApiKey:'synthetic',addressValidationSigningKey:str_repeat('k',32));
+$meters=20000;
+$transport=function(string $url,array $headers,array $payload)use(&$meters):array {
+ if(str_contains($url,'computeRoutes'))return ['routes'=>[['distanceMeters'=>$meters]]];
+ return ['result'=>['verdict'=>['addressComplete'=>true],'address'=>['postalAddress'=>['addressLines'=>['2 Test Street'],'locality'=>'Toronto','administrativeArea'=>'Ontario','postalCode'=>'M2M 2M2']],'geocode'=>['location'=>['latitude'=>43.7,'longitude'=>-79.4]]]];
+};
+$coverage=new AddressCoverageService($database,$config,$transport);
+$bookings=new BookingService($database,new AuditLogger($database),$coverage);
+$waivers=new OnsiteFeeService($database);
+$practitioner=new AuthContext(2,1,'','','','staff',['practitioner']);
+$colleague=new AuthContext(1,1,'','','','staff',['practitioner']);
+$destination=['address_line1'=>'2 Test Street','address_line2'=>'','city'=>'Toronto','province'=>'Ontario','postal_code'=>'M2M 2M2','country'=>'Canada','instructions'=>''];
+$request=['client_id'=>8,'location_id'=>1,'service_id'=>4,'practitioner_id'=>3,'duration_option_id'=>8,'delivery_mode'=>'mobile','destination'=>$destination,'quoted_base_price_cents'=>10000];
+$quote=$coverage->validate($client,$request);
+$assert($quote['mobile_fee_cents']===0&&!isset($quote['distance_km']),'Free quote; client origin distance remains private');
+$request['starts_at']=(new DateTimeImmutable('now',new DateTimeZone('America/Toronto')))->modify('+80 days')->setTime(11,0)->format('Y-m-d\TH:i:sP');
+$request['idempotency_key']='free-onsite-distance-session';$request['quoted_mobile_fee_cents']=0;$request['address_validation_token']=$coverage->validate($practitioner,$request)['token'];
+$free=$bookings->create($practitioner,$request,'onsite-test');
+$assert((int)$free['mobile_fee_cents']===0,'Free fee saved');
+$assert((int)$pdo->query('SELECT mobile_distance_meters FROM appointments WHERE id='.(int)$free['id'])->fetchColumn()===20000,'Verified distance snapshot');
+$meters=20001;$quote=$coverage->validate($practitioner,$request);
+$assert($quote['mobile_fee_cents']===1500,'Flat fee immediately above free threshold');
+$request['address_validation_token']=$quote['token'];
+$request['starts_at']=(new DateTimeImmutable($request['starts_at']))->modify('+1 day')->format('Y-m-d\TH:i:sP');
+$request['idempotency_key']='paid-onsite-distance-session';
+$deny(fn()=>$bookings->create($practitioner,$request,'onsite-test'),'price_changed');
+$request['quoted_mobile_fee_cents']=1500;$paid=$bookings->create($practitioner,$request,'onsite-test');
+$assert((int)$paid['mobile_fee_cents']===1500,'Extended-distance fee saved');
+$assert($bookings->create($practitioner,$request,'onsite-test')['id']===$paid['id'],'Confirmation retry stays idempotent');
+$deny(fn()=>$waivers->waive($client,(int)$paid['id'],['version'=>1,'reason'=>'Local courtesy'],'test'),'forbidden');
+$deny(fn()=>$waivers->waive($colleague,(int)$paid['id'],['version'=>1,'reason'=>'Local courtesy'],'test'),'receipt_not_found');
+$deny(fn()=>$waivers->context(new AuthContext(2,2,'','','','staff',['super_admin']),(int)$paid['id']),'appointment_not_found');
+$deny(fn()=>$waivers->waive($practitioner,(int)$paid['id'],['version'=>0,'reason'=>'Local courtesy'],'test'),'appointment_changed');
+$waived=$waivers->waive($practitioner,(int)$paid['id'],['version'=>1,'reason'=>'Local courtesy'],'test');
+$assert($waived['fee_cents']===0&&$waived['assessed_fee_cents']===1500&&$waived['waived']&&$waived['version']===2,'Waiver keeps original fee and advances version');
+$assert((int)$pdo->query('SELECT mobile_fee_cents FROM appointments WHERE id='.(int)$free['id'])->fetchColumn()===0,'Other session unchanged');
+$assert((int)$pdo->query("SELECT COUNT(*) FROM audit_logs WHERE action='appointment.travel_fee_waive'")->fetchColumn()===1,'Waiver audit');
+$deny(fn()=>$waivers->waive($practitioner,(int)$paid['id'],['version'=>2,'reason'=>'Again'],'test'),'travel_fee_locked');
+$pdo->exec('UPDATE practitioner_services SET mobile_fee_cents=2500 WHERE practitioner_id=3 AND service_id=4');
+$deny(fn()=>$coverage->verifyBooking($practitioner,$request,$destination),'coverage_validation_mismatch');
+$assert((int)$pdo->query('SELECT mobile_assessed_fee_cents FROM appointments WHERE id='.(int)$paid['id'])->fetchColumn()===1500,'Assignment changes preserve appointment price');
+$meters=50001;$deny(fn()=>$coverage->validate($practitioner,$request),'outside_mobile_coverage');
+$meters=50000;$quote=$coverage->validate($practitioner,$request);
+$assert($quote['mobile_fee_cents']===2500,'Maximum distance included');
+$request['address_validation_token']=$quote['token'];
+$coverage->approve($admin,array_replace($request,['address_validation_token'=>$coverage->validate($admin,$request)['token']]),'test');
+$assert(!$coverage->approvalStatus($practitioner,$request)['approved'],'Coverage-only approval cannot bypass tier pricing');
+$without=$request;unset($without['address_validation_token']);
+$deny(fn()=>$coverage->verifyBooking($practitioner,$without,$destination),'coverage_validation_required');
+// New quotes price every occurrence; waiving one occurrence never affects its siblings.
+$request['starts_at']=(new DateTimeImmutable($request['starts_at']))->modify('+10 days')->format('Y-m-d\TH:i:sP');
+$request['idempotency_key']='tiered-recurring-series';$request['quoted_mobile_fee_cents']=2500;$request['recurrence']=['frequency'=>'weekly','count'=>2];
+$series=new RecurringBookingService($database,$bookings);$preview=$series->create($practitioner,$request,'test',false);
+$saved=$series->create($practitioner,$request+['preview_token'=>$preview['preview_token']],'test',true);
+$assert($saved['applied']&&$saved['items'][0]['subtotal_cents']===12500&&$saved['items'][1]['subtotal_cents']===12500,'Recurring fee preview and saved totals agree');
+$first=(int)$saved['items'][0]['appointment_id'];$second=(int)$saved['items'][1]['appointment_id'];
+$waivers->waive($practitioner,$first,['version'=>1,'reason'=>'One visit only'],'test');
+$assert((int)$pdo->query("SELECT mobile_fee_cents FROM appointments WHERE id=$second")->fetchColumn()===2500,'Sibling recurring fee unchanged');
+// Persist and validate the actual admin assignment API, including rollback on invalid thresholds.
+$administration=new AdminService($database,new AuditLogger($database));
+$assignment=['location_ids'=>[1],'practitioners'=>[['practitioner_id'=>3,'offers_mobile'=>1,'offers_clinic'=>1,'mobile_radius_km'=>50,'mobile_free_radius_km'=>20,'mobile_fee_cents'=>1500,'travel_buffer_minutes'=>15]]];
+$administration->updateServiceAssignments($admin,4,$assignment,'test');
+$link=$administration->serviceAssignments($admin)['practitioners'][0];
+$assert((int)$link['mobile_free_radius_km']===20&&(int)$link['mobile_fee_cents']===1500,'Admin saves and retrieves fee thresholds');
+$invalid=$assignment;$invalid['practitioners'][0]['mobile_free_radius_km']=51;
+$deny(fn()=>$administration->updateServiceAssignments($admin,4,$invalid,'test'),'validation_error');
+$assert((int)$pdo->query('SELECT mobile_free_radius_km FROM practitioner_services WHERE practitioner_id=3 AND service_id=4')->fetchColumn()===20,'Invalid assignment rolled back');
+// An active invoice blocks a waiver even before paid status is set.
+$pdo->exec("INSERT INTO invoices(clinic_id,appointment_id,client_id,invoice_number,subtotal_cents,tax_cents,total_cents,balance_cents,status) VALUES(1,$second,8,'SYNTHETIC-TRAVEL',12500,0,12500,12500,'draft')");
+$deny(fn()=>$waivers->waive($practitioner,$second,['version'=>1,'reason'=>'Already invoiced'],'test'),'travel_fee_locked');
+// A waived completed session issues a zero-travel receipt and locks further changes.
+$id=(int)$paid['id'];$pdo->exec("UPDATE appointments SET status='completed',starts_at='2026-01-02 15:00:00',ends_at='2026-01-02 16:00:00',buffer_starts_at='2026-01-02 15:00:00',buffer_ends_at='2026-01-02 16:00:00' WHERE id=$id");
+$_ENV['SESSION_RECEIPTS_ENABLED']='true';$receipts=new SessionReceiptService($database,new AuditLogger($database));
+$receipts->saveTemplate($admin,['version'=>0,'issuer_name'=>'Test clinic','issuer_address'=>'1 Test Street','issuer_contact'=>'clinic@example.test'],'test');
+$receipts->saveProfile($practitioner,$id,['version'=>0,'practitioner_name'=>'Test practitioner','designation'=>'Test designation','registration_number'=>''],'test');
+$r=$receipts->issue($practitioner,$id,['version'=>2,'template_version'=>1,'profile_version'=>1,'tax_cents'=>0,'amount_cents'=>10000,'method'=>'cash','paid_on'=>'2026-01-02','confirmed'=>true,'idempotency_key'=>'onsite-waived-receipt'],'test');
+$snapshot=json_decode($pdo->query('SELECT snapshot FROM session_receipts WHERE id='.(int)$r['id'])->fetchColumn(),true);
+$assert($snapshot['travel_cents']===0&&$snapshot['travel_assessed_cents']===1500&&$snapshot['travel_fee_waived']&&$r['total_cents']===10000,'Receipt reflects waived fee and preserves original assessment');
+$assert(str_starts_with(base64_decode($receipts->pdf($client,(int)$r['id'],'test')['pdf_base64']),'%PDF-'),'Waived PDF available in client portal');
+$deny(fn()=>$waivers->waive($practitioner,$id,['version'=>3,'reason'=>'After payment'],'test'),'travel_fee_locked');
+// Practitioner-owned travel edits use clinic-local assignments, never global identity IDs.
+$travel=new \Wellness\Service\PractitionerTravelSettingsService($database);
+$pdo->exec("INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(11,2,'second-membership@example.test','Same practitioner at B','staff','active');
+ INSERT INTO practitioners(id,user_id,discipline,booking_mode) VALUES(4,1,'Colleague','practitioner_managed'),(5,11,'Massage','practitioner_managed');
+ INSERT INTO services(id,clinic_id,slug,name,price_cents) VALUES(5,1,'colleague-only','Colleague service',10000),(6,2,'clinic-b-service','Clinic B service',10000);
+ INSERT INTO practitioner_services(practitioner_id,service_id,offers_mobile,mobile_radius_km,mobile_free_radius_km,mobile_fee_cents,travel_buffer_minutes) VALUES(4,4,1,40,10,700,15),(4,5,1,40,10,700,15),(5,6,1,80,30,3000,45)");
+$secondClinic=new AuthContext(11,2,'','','','staff',['practitioner']);
+$deny(fn()=>$travel->get($client),'forbidden');
+$deny(fn()=>$travel->get($admin),'forbidden'); // Administrator role alone is not practitioner ownership.
+$mine=$travel->get($practitioner);
+$assert(count($mine['items'])===1&&$mine['items'][0]['service_id']===4&&$mine['clinic_id']===1,'Only own active assignments are listed');
+$before=$pdo->query('SELECT id,travel_buffer_minutes,mobile_fee_cents,mobile_assessed_fee_cents FROM appointments ORDER BY id')->fetchAll();
+$row=$mine['items'][0];
+$body=['revision'=>$row['revision'],'mobile_radius_km'=>60,'mobile_free_radius_km'=>25,'travel_buffer_minutes'=>30,'mobile_fee_cents'=>2000];
+$freshQuote=$coverage->validate($practitioner,$request);
+$savedTravel=$travel->save($practitioner,4,$body,'self-travel-test');
+$assert($savedTravel['mobile_radius_km']===60&&$savedTravel['mobile_free_radius_km']===25&&$savedTravel['mobile_fee_cents']===2000&&$savedTravel['travel_buffer_minutes']===30,'Own travel settings persisted');
+$assert($savedTravel['revision']!==$row['revision'],'Revision advances when travel settings change');
+$assert($before===$pdo->query('SELECT id,travel_buffer_minutes,mobile_fee_cents,mobile_assessed_fee_cents FROM appointments ORDER BY id')->fetchAll(),'Previously booked appointments are unchanged');
+$assert((int)$pdo->query('SELECT mobile_fee_cents FROM practitioner_services WHERE practitioner_id=4 AND service_id=4')->fetchColumn()===700,'Colleague assignment on same service is unchanged');
+$assert($travel->get($secondClinic)['items'][0]['mobile_fee_cents']===3000,'Separate clinic assignment is unchanged');
+$assert($travel->get(new AuthContext(2,2,'','','','staff',['practitioner']))['items']===[],'Foreign local user cannot list assignments');
+$deny(fn()=>$travel->save($practitioner,6,$body,'test'),'assignment_not_found');
+$deny(fn()=>$travel->save($practitioner,5,$body,'test'),'assignment_not_found');
+$deny(fn()=>$travel->save($secondClinic,4,$body,'test'),'assignment_not_found');
+$deny(fn()=>$travel->save($practitioner,4,$body,'test'),'travel_settings_changed');
+$body['revision']=$savedTravel['revision'];
+foreach ([['mobile_radius_km',0],['mobile_radius_km',501],['mobile_radius_km',12.5],['mobile_free_radius_km',61],['mobile_free_radius_km',-1],['travel_buffer_minutes',14],['travel_buffer_minutes',255],['mobile_fee_cents',-1],['mobile_fee_cents',10000001],['mobile_fee_cents',true],['mobile_radius_km',null]] as [$field,$value]) {
+ $deny(fn()=>$travel->save($practitioner,4,array_replace($body,[$field=>$value]),'test'),'validation_error');
+}
+$deny(fn()=>$travel->save($practitioner,4,$body+['practitioner_id'=>4],'test'),'validation_error');
+$deny(fn()=>$travel->save($practitioner,4,$body+['offers_mobile'=>0],'test'),'validation_error');
+$assert($travel->get($practitioner)['items'][0]===$savedTravel,'Invalid edits change no settings');
+$oldProof=array_replace($request,['address_validation_token'=>$freshQuote['token']]);
+$deny(fn()=>$coverage->verifyBooking($practitioner,$oldProof,$destination),'coverage_validation_mismatch');
+$assert($coverage->validate($practitioner,$request)['mobile_fee_cents']===2000,'Fresh coverage quote uses practitioner fee');
+$options=$bookings->options($practitioner)['combinations'][0];
+$assert((int)$options['travel_buffer_minutes']===30&&(int)$options['mobile_free_radius_km']===25,'Booking options use practitioner buffer and threshold');
+$pdo->exec('UPDATE practitioner_services SET mobile_fee_cents=2100 WHERE practitioner_id=3 AND service_id=4');
+$deny(fn()=>$travel->save($practitioner,4,$body,'test'),'travel_settings_changed');
+$body['revision']=$travel->get($practitioner)['items'][0]['revision'];
+$body['mobile_free_radius_km']=null;$body['travel_buffer_minutes']=0;$body['mobile_fee_cents']=0;
+$legacy=$travel->save($practitioner,4,$body,'test');
+$assert($legacy['mobile_free_radius_km']===null&&$legacy['travel_buffer_minutes']===0&&$legacy['mobile_fee_cents']===0,'Legacy null threshold and zero fee/buffer supported');
+$pdo->exec('UPDATE practitioner_services SET active=0 WHERE practitioner_id=3 AND service_id=4');
+$assert($travel->get($practitioner)['items']===[],'Removed assignment disappears');
+$body['revision']=$legacy['revision'];
+$deny(fn()=>$travel->save($practitioner,4,$body,'test'),'assignment_not_found');
+$pdo->exec('UPDATE practitioner_services SET active=1,offers_mobile=0 WHERE practitioner_id=3 AND service_id=4');
+$deny(fn()=>$travel->save($practitioner,4,$body,'test'),'assignment_not_found');
+$assert($travel->get($practitioner)['items']===[],'Clinic-only service is not editable');
+$pdo->exec('UPDATE practitioner_services SET offers_mobile=1 WHERE practitioner_id=3 AND service_id=4; UPDATE practitioners SET active=0 WHERE id=3');
+$deny(fn()=>$travel->save($practitioner,4,$body,'test'),'assignment_not_found');
+$assert((int)$pdo->query("SELECT COUNT(*) FROM audit_logs WHERE action='practitioner.travel_settings.update'")->fetchColumn()===2,'Only successful edits audited');
+$metadata=json_decode($pdo->query("SELECT metadata FROM audit_logs WHERE action='practitioner.travel_settings.update' ORDER BY id LIMIT 1")->fetchColumn(),true);
+$assert($metadata['practitioner_id']===3&&$metadata['before']['mobile_fee_cents']===1500&&$metadata['after']['mobile_fee_cents']===2000,'Audit records owner and before/after settings');
+echo "$checks On-Site distance and waiver checks passed.\n";

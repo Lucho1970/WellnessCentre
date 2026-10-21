@@ -44,6 +44,7 @@ const fr: Record<string, string> = {
   'API error: appointments_require_review': 'Réattribuez ou annulez les rendez-vous futurs avant de retirer cette clinique.',
   'API error: series_require_review': 'Terminez les séries récurrentes actives avant de retirer cette clinique.',
   'API error: assignment_changed': 'Actualisez l’attribution de clinique avant de réessayer.',
+  'API error: self_review_forbidden': 'Une autre personne administratrice doit vérifier votre qualification ou une qualification que vous avez soumise.',
   'API error: qualification_policy': 'Cette clinique exige un type de qualification actif et sa date d’expiration requise.',
 };
 const en = Object.fromEntries(Object.keys(fr).map(key => [key, key]));
@@ -60,6 +61,7 @@ Object.assign(en, {
   'API error: appointments_require_review': 'Reassign or cancel future appointments before removing this clinic assignment.',
   'API error: series_require_review': 'End active recurring series before removing this clinic assignment.',
   'API error: assignment_changed': 'Refresh the clinic assignment before trying again.',
+  'API error: self_review_forbidden': 'Another administrator must verify your qualification or a record you submitted.',
   'API error: qualification_policy': 'This clinic requires an active qualification type and its required expiry date.',
 });
 export default { en, fr };

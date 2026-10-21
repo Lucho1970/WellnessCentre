@@ -9,7 +9,11 @@ function appUrl(configured: string | undefined, fallback: string) {
   return url;
 }
 export const publicUrl = appUrl(runtimePublicWebsiteUrl() ?? import.meta.env.VITE_PUBLIC_URL, import.meta.env.DEV ? 'http://localhost:5173/' : '/');
-export const portalUrl = appUrl(import.meta.env.VITE_PORTAL_URL, import.meta.env.DEV ? 'http://localhost:5174/' : '/portal/');
+// The same portal build serves several clinics. Keep its links on the current
+// clinic host and base path even when the public website targets another portal.
+export const portalUrl = appUrl(__APP_SURFACE__ === 'portal'
+  ? new URL(import.meta.env.BASE_URL, window.location.origin).href
+  : import.meta.env.VITE_PORTAL_URL, import.meta.env.DEV ? 'http://localhost:5174/' : '/portal/');
 
 function localizedLink(path: string, base: URL) {
   const url = new URL(path.replace(/^\/+/, ''), base);

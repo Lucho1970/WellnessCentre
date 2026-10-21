@@ -39,6 +39,12 @@ function PractitionerAdminForm() {
   const [saved, setSaved] = useState('');
   const [central, setCentral] = useState<{ central_enabled: boolean; url: string } | null>(null);
   const formGuard = useUnsavedForm();
+  const clearDenied = useCallback((status: number) => {
+    if (![401, 403, 404].includes(status)) return;
+    setItems([]); setLocations([]); setSelectedId(null); setEditing(null); setAddForm(newForm());
+    setPanelMode(null); setSaved(''); formGuard.markClean();
+    setLoadError(t('Unable to load practitioner administration.'));
+  }, [formGuard.markClean, t]);
   const selected = items.find(item => item.practitioner_id === selectedId) ?? null;
   const filteredItems = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
@@ -50,6 +56,7 @@ function PractitionerAdminForm() {
     try {
       const token = await getAccessToken();
       const [locationResponse, practitionerResponse] = await Promise.all([fetch(`${api}/locations`), fetch(`${api}/admin/practitioners`, { headers: { Authorization: `Bearer ${token}` } })]);
+      clearDenied(practitionerResponse.status);
       const [locationBody, practitionerBody] = await Promise.all([locationResponse.json(), practitionerResponse.json()]);
       if (!locationResponse.ok) throw new ApiError(locationBody, locationResponse.status, t('Unable to load locations.'));
       if (!practitionerResponse.ok) throw new ApiError(practitionerBody, practitionerResponse.status, t('Unable to load practitioners.'));
@@ -59,7 +66,7 @@ function PractitionerAdminForm() {
       setSelectedId(current => { const requested = Number(preferredId ?? current ?? 0) || null; return loadedItems.some(item => item.practitioner_id === requested) ? requested : null; });
     } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load practitioner administration.')); }
     finally { setLoading(false); }
-  }, [getAccessToken, t]);
+  }, [getAccessToken, t, clearDenied]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { let cancelled=false; void getAccessToken().then(token => fetch(`${api}/admin/practitioner-directory-options`,{headers:{Authorization:`Bearer ${token}`}})).then(response => response.ok?response.json():null).then(body=>{if(!cancelled && body?.data?.central_enabled===true && typeof body.data.url==='string')setCentral(body.data);}).catch(()=>{});return()=>{cancelled=true;}; },[getAccessToken]);
 
@@ -75,6 +82,7 @@ function PractitionerAdminForm() {
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/practitioners/onboard`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...addForm, location_id: Number(addForm.location_id) }) });
+      clearDenied(response.status);
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to add practitioner.'));
       const savedId = Number(body.data?.id ?? 0) || null; const name = addForm.display_name;
@@ -87,6 +95,7 @@ function PractitionerAdminForm() {
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/practitioners/${editing.practitioner_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...editing, location_id: Number(editing.location_id) }) });
+      clearDenied(response.status);
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to update practitioner.'));
       const id = editing.practitioner_id, name = editing.display_name;

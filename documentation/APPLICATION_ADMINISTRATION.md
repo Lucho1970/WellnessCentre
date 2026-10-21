@@ -1,5 +1,7 @@
 # Central application administration
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 The public landing page stays at `portal.copihue.ca`. Its Administration sign-in link opens `/admin/`. The central application is a separate frontend build, uses only workforce Microsoft authentication and never loads a clinic catalogue or clinical record. Clinic portals retain their own business settings, locations and other operational screens. Clinic creation and portal hostname registration now belong to central administration; old clinic `/admin/clinics` APIs deny access.
 
 ## Authorization
@@ -40,12 +42,12 @@ UPDATE application_administrators SET status='revoked' WHERE id=EXPLICIT_APPLICA
 
 1. Apply 040 once; do not reapply 039. Keep application administration disabled until files and the reviewed initial grant are in place.
 2. Deploy matching private API and clinic portal builds. The clinic portal update removes the former Clinics navigation.
-3. Deploy the expanded `copihue-portal-landing.zip` at the existing `portal.copihue.ca` document root. It includes the public landing files, `admin/index.html`, administration assets and thin `api` entries. Its document root must be at the same level as clinic portal roots so the entries resolve the shared `/wellness-api`. Replace the landing `.htaccess`, which previously redirected `/admin` to Willow and rejected APIs.
+3. Deploy the expanded `copihue-portal-landing.zip` at the existing `portal.copihue.ca` document root. It includes the public landing files, `admin/index.html`, administration assets and thin `api` entries. Its document root must be at the same level as clinic portal roots so the entries resolve the shared `/wellness-api`. Replace the landing `.htaccess`, which previously redirected `/admin` to Livin’ Lively and rejected APIs.
 4. Add `https://portal.copihue.ca/admin/` as a SPA redirect URI in the existing workforce portal registration (application ID `d5c68a6f-cde5-40f5-843f-eac5a3160065`). The central build returns and logs out to `/admin/`; it ignores the clinic redirect setting and never uses the invited practitioner provider.
 5. Set `APPLICATION_ADMIN_ENABLED=true`, `APPLICATION_ADMIN_HOST=portal.copihue.ca` and `CLINIC_MANAGEMENT_ENABLED=true` in the shared private `.env`.
-6. Sign in centrally, register existing clinic 1 as Livin' Lively at `livinlively.copihue.ca`, remove any obsolete Willow-to-1 fallback alias, and create **Wellnexa — Virtual Wellness Collective** at `willowwellness.copihue.ca`. Records remain in their existing clinics. Existing clinic hosts and callbacks remain separate configuration. If the virtual clinic already exists, edit that clinic's name rather than creating a duplicate.
+6. Sign in centrally and verify the existing Livin' Lively clinic at `livinlively.copihue.ca` and Wellnexa at `wellnexa.copihue.ca`. Remove retired hostname aliases without deleting clinic records. Both hosts serve `/public_html/wellness-common-portal`; do not create duplicate clinics.
 
-**Working brand decision, 13 October 2026:** use **Wellnexa** as the primary brand and **Virtual Wellness Collective** as its descriptive line. The owner purchased `wellnexa.ca`; hosting and SSL remain pending. Keep existing portal hosts, API routing, website destinations and identity callbacks until a separately prepared domain cutover is accepted. The neutral landing now displays the working name while its links retain the existing host. Clinic portal names come from clinic-scoped business settings; deploying the landing alone does not rename a hosted clinic record. Historical Willow references and synthetic test fixtures may retain the former name.
+**Current brand and hosting:** Wellnexa — Virtual Wellness Collective uses `wellnexa.ca` with HTTPS and `wellnexa.copihue.ca` for its clinic portal. The landing links both active clinics. Portal names and public website URLs come from clinic configuration; deploying files does not rename or recreate database records.
 
 The shared `.env` remains infrastructure configuration. Clinic business settings remain clinic-scoped database records. This slice provides central clinic registration, not an editor exposing global secrets or every future clinic override.
 

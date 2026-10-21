@@ -21,4 +21,7 @@ foreach ([0, 15, 10080, 'bad', null] as $minutes) {
     try { ReminderScheduleService::minutes(['minutes_before' => $minutes]); throw new RuntimeException('Invalid reminder time was accepted.'); }
     catch (ApiException $e) { if ($e->status !== 422) throw $e; }
 }
-echo "Reminder schedule authorization and validation tests passed.\n";
+$payloadChecks=0;
+foreach([60,180,1440,2880,4320] as $minutes)foreach([$minutes,(string)$minutes] as $value){if(ReminderScheduleService::payloadMinutes($value)!==$minutes)throw new RuntimeException('Canonical reminder payload rejected');$payloadChecks++;}
+foreach([null,true,false,60.0,[],['60'],'6e1','60.0','060','+60',' 60','60 ','60junk',0,1,10080] as $value){if(ReminderScheduleService::payloadMinutes($value)!==null)throw new RuntimeException('Ambiguous reminder payload accepted');$payloadChecks++;}
+echo "Reminder schedule authorization/validation passed; $payloadChecks strict payload checks passed.\n";

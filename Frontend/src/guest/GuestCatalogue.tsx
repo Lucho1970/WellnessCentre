@@ -1,3 +1,5 @@
+import { LocationSearch, TravelMatchActions, type SearchResult } from '../discovery/LocationSearch';
+import { publicDiscoveryRequest } from '../discovery/publicRequest';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress, Container, Grid, Paper, Stack, Typography } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
@@ -19,6 +21,7 @@ export function GuestCatalogue() {
   const { config } = useClinicConfig();
   const location = useLocation();
   const language = i18n.resolvedLanguage ?? 'en';
+  const [search,setSearch]=useState<SearchResult|null>(null);
   const [services, setServices] = useState<PublicService[]>([]);
   const [practitioners, setPractitioners] = useState<PublicPractitioner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,13 +45,13 @@ export function GuestCatalogue() {
 
   const categories = useMemo(() => {
     const groups = new Map<string, { id: number | null; name: string | null; name_fr: string | null; description: string | null; description_fr: string | null; services: PublicService[] }>();
-    for (const service of services) {
+    for (const service of services.filter(service=>!search||search.matches.some(row=>row.service_slug===service.slug))) {
       const key = categoryAnchor(service.category_id);
       const group = groups.get(key) ?? { id: service.category_id, name: service.category, name_fr: service.category_fr, description: service.category_description, description_fr: service.category_description_fr, services: [] };
       group.services.push(service); groups.set(key, group);
     }
     return [...groups.values()];
-  }, [services]);
+  }, [search, services]);
 
   useEffect(() => {
     if (!categories.length) return;
@@ -86,6 +89,7 @@ export function GuestCatalogue() {
       ['Explore treatments', 'Compare descriptions, appointment lengths, and prices before choosing care.'],
       ['Meet practitioners', 'Read public practitioner profiles and see who offers each treatment.'],
     ].map(([heading, description]) => <Grid key={heading} size={{ xs: 12, md: 6 }}><Paper variant="outlined" sx={{ p: 3, height: '100%' }}><Typography variant="h6">{t(heading)}</Typography><Typography color="text.secondary" mt={1}>{t(description)}</Typography></Paper></Grid>)}</Grid></Container>
+    <Container maxWidth="lg"><LocationSearch request={publicDiscoveryRequest} onResult={setSearch} savedAddressLink="/client#discover=1" t={t}/></Container>
     <Box id="treatments" component="section" sx={{ scrollMarginTop: 16 }}>
       <Container maxWidth="lg" sx={{ pb: 2 }}><Typography variant="overline" color="primary">{t('Treatments')}</Typography><Typography variant="h3" component="h2">{t('Find the care that fits.')}</Typography></Container>
       {loading && <Container maxWidth="lg"><CircularProgress aria-label={t('Loading treatments')}/></Container>}
@@ -99,7 +103,7 @@ export function GuestCatalogue() {
         <Typography variant="h4" component="h3">{localized(category.name, category.name_fr, language) || t('Other treatments')}</Typography>
         {localized(category.description, category.description_fr, language) && <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 850, whiteSpace: 'pre-line' }}>{localized(category.description, category.description_fr, language)}</Typography>}
         <Stack spacing={3} mt={3}>{category.services.map(service => {
-          const people = practitioners.filter(person => person.services.some(item => item.slug === service.slug));
+          const people = practitioners.filter(person => person.services.some(item => item.slug === service.slug) && (!search||search.matches.some(row=>row.practitioner_slug===person.slug&&row.service_slug===service.slug)));
           const serviceName = localized(service.name, service.name_fr, language);
           return <Card key={service.slug} variant="outlined" sx={{ borderRadius: 3 }}><CardContent sx={{ p: { xs: 2.5, md: 4 } }}><Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 7 }}>
@@ -107,9 +111,11 @@ export function GuestCatalogue() {
               <Typography sx={{ mt: 1.5, whiteSpace: 'pre-line' }} color="text.secondary">{localized(service.public_summary, service.public_summary_fr, language) || localized(service.description, service.description_fr, language)}</Typography>
               {localized(service.public_summary, service.public_summary_fr, language) && localized(service.description, service.description_fr, language) && <Typography sx={{ mt: 1.5, whiteSpace: 'pre-line' }} color="text.secondary">{localized(service.description, service.description_fr, language)}</Typography>}
               <Stack direction="row" gap={1} mt={2} flexWrap="wrap">{service.offers_clinic && <Chip size="small" label={t('In clinic')}/>} {service.offers_mobile && <Chip size="small" label={t('On-Site')}/>}</Stack>
-              <Stack direction="row" gap={1} mt={2} flexWrap="wrap">{[...service.durations].sort((a, b) => a.minutes - b.minutes).map(option => <Button key={option.minutes} component={Link} to={serviceBookingPath(service.slug, Number(option.minutes))} size="small" variant="outlined" aria-label={t('Book {{minutes}} minutes of {{service}}', { minutes: Number(option.minutes), service: serviceName })}>{t('{{minutes}} min — {{price}}', { minutes: Number(option.minutes), price: formatCad(Number(option.price_cents), language) })}</Button>)}</Stack>
+              <Stack direction="row" gap={1} mt={2} flexWrap="wrap">{!search&&[...service.durations].sort((a, b) => a.minutes - b.minutes).map(option => <Button key={option.minutes} component={Link} to={serviceBookingPath(service.slug, Number(option.minutes))} size="small" variant="outlined" aria-label={t('Book {{minutes}} minutes of {{service}}', { minutes: Number(option.minutes), service: serviceName })}>{t('{{minutes}} min — {{price}}', { minutes: Number(option.minutes), price: formatCad(Number(option.price_cents), language) })}</Button>)}</Stack>
               <Typography variant="caption" color="text.secondary" display="block" mt={1}>{t('Final price is checked before confirmation; practitioner or On-Site charges may apply.')}</Typography>
-              <Button component={Link} to={serviceBookingPath(service.slug)} variant="contained" sx={{ mt: 3, mb: 1.5 }}>{t('Book this treatment')}</Button>
+              {search&&<Typography>{t('Starting price')}: {formatCad(Math.min(...search.matches.filter(row=>row.service_slug===service.slug).map(row=>row.starting_price_cents)),language)}</Typography>}
+              {(!search||search.matches.some(row=>row.service_slug===service.slug&&row.status==='within_area'))&&<Button component={Link} to={serviceBookingPath(service.slug)} variant="contained" sx={{ mt: 3, mb: 1.5 }}>{t('Book this treatment')}</Button>}
+              {search&&<TravelMatchActions matches={search.matches.filter(row=>row.service_slug===service.slug)} t={t}/>}
               <ShareBookingLink path={serviceBookingPath(service.slug)} title={serviceName}/>
             </Grid>
             <Grid size={{ xs: 12, md: 5 }}><Typography variant="subtitle1" fontWeight={750}>{t('Practitioners for this treatment')}</Typography>

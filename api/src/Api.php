@@ -37,6 +37,8 @@ use function FastRoute\simpleDispatcher;
 final class Api
 {
     private EntraAuthenticator $auth;
+    private ?CustomerAuthenticator $customerAuth = null;
+    private ?\Wellness\Service\AccessAudit $accessAudit = null;
     private ?ClinicContext $clinicContext = null;
     private CatalogService $catalog;
     private AvailabilityService $availability;
@@ -46,6 +48,8 @@ final class Api
     private ProfileService $profiles;
     private PractitionerPublicProfileService $publicProfiles;
     private ClientService $clients;
+    private ?\Wellness\Service\ConsentLock $consentLock = null;
+    private string $consentRoute = '';
     private AddressCoverageService $addressCoverage;
     private PractitionerWorkLocationService $workLocations;
     private PractitionerTravelService $practitionerTravel;
@@ -65,6 +69,10 @@ final class Api
     public function handle(): never
     {
         $request=null;
+        $this->accessAudit=new \Wellness\Service\AccessAudit($this->database);
+        Response::beforeJson(function(array $payload,int $status)use(&$request):void{
+            $this->accessAudit->response($request,$payload,$status,$this->clinicContext?->clinicId);
+        });
         try{
             $request=Request::capture();$this->cors($request);
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
@@ -85,14 +93,36 @@ final class Api
             if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
                 Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
             }
+            if (str_starts_with($request->path,'/api/v1/public/discovery/') || $request->path==='/api/v1/profile/discovery-preferences' || str_starts_with($request->path,'/api/v1/travel-enquiries')) {
+                $this->clinicContext->assertActive($this->database);header('Cache-Control: no-store');
+                $discovery=$this->discovery();
+                if($request->path==='/api/v1/public/discovery/options'&&$request->method==='GET')Response::json(['data'=>$discovery->options()],200,$request->correlationId);
+                if($request->path==='/api/v1/public/discovery/search'&&$request->method==='POST')Response::json(['data'=>$discovery->search($this->clinicContext->clinicId,$request->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'))],200,$request->correlationId);
+                if($request->path==='/api/v1/profile/discovery-preferences'&&in_array($request->method,['GET','PUT'],true))Response::json(['data'=>$discovery->preferences($this->user($request),$request->method==='PUT'?$request->body:null,$request->correlationId)],200,$request->correlationId);
+                if(str_starts_with($request->path,'/api/v1/travel-enquiries'))Response::json(['data'=>$this->travelRoute($this->user($request),$request,substr($request->path,strlen('/api/v1/')))],200,$request->correlationId);
+                throw new ApiException(404,'not_found','Route not found.');
+            }
             $dispatcher=simpleDispatcher(function($routes):void{
                 $routes->addRoute('GET','/api/v1/health','health');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\d+}/travel-fee','travelFeeContext');
+                $routes->addRoute('POST','/api/v1/appointments/{id:\d+}/travel-fee/waive','waiveTravelFee');
+                $routes->addRoute('GET','/api/v1/appointments/{id:\d+}/receipt','sessionReceiptContext');
+                $routes->addRoute('PUT','/api/v1/receipts/template','saveReceiptTemplate');
+                $routes->addRoute('PUT','/api/v1/appointments/{id:\d+}/receipt-profile','saveReceiptProfile');
+                $routes->addRoute('POST','/api/v1/appointments/{id:\d+}/receipt','issueSessionReceipt');
+                $routes->addRoute('GET','/api/v1/receipts/{id:\d+}/pdf','sessionReceiptPdf');
+                $routes->addRoute('POST','/api/v1/receipts/{id:\d+}/void','voidSessionReceipt');
                 $routes->addRoute('GET','/api/v1/forms/drafts','formDrafts');
                 $routes->addRoute('POST','/api/v1/forms/drafts','saveFormDraft');
                 $routes->addRoute('POST','/api/v1/forms/drafts/import','importFormDraft');
                 $routes->addRoute('GET','/api/v1/forms/drafts/{id:\d+}','formDraftDetail');
                 $routes->addRoute('PATCH','/api/v1/forms/drafts/{id:\d+}','updateFormDraft');
                 $routes->addRoute('POST','/api/v1/forms/source/validate','validateFormSource');
+                $routes->addRoute('GET','/api/v1/forms/library','formLibrary');
+                $routes->addRoute('POST','/api/v1/forms/library','submitLibraryForm');
+                $routes->addRoute('GET','/api/v1/forms/library/{id:\\d+}','libraryFormDetail');
+                $routes->addRoute('POST','/api/v1/forms/library/{id:\\d+}/review','reviewLibraryForm');
+                $routes->addRoute('POST','/api/v1/forms/library/{id:\\d+}/copy','copyLibraryForm');
                 $routes->addRoute('GET','/api/v1/forms/templates','formTemplates');
                 $routes->addRoute('POST','/api/v1/forms/templates','publishForm');
                 $routes->addRoute('POST','/api/v1/forms/templates/{id:\d+}/versions','publishFormVersion');
@@ -110,6 +140,10 @@ final class Api
                 $routes->addRoute('GET','/api/v1/locations','locations');
                 $routes->addRoute('GET','/api/v1/services','services');
                 $routes->addRoute('GET','/api/v1/public/services','publicServices');
+                $routes->addRoute('POST','/api/v1/public/practitioner-enquiries','submitPractitionerEnquiry');
+                $routes->addRoute('GET','/api/v1/admin/practitioner-enquiries','practitionerEnquiries');
+                $routes->addRoute('PATCH','/api/v1/admin/practitioner-enquiries/{id:\\d+}','updatePractitionerEnquiry');
+                $routes->addRoute('POST','/api/v1/admin/practitioner-enquiries/{id:\\d+}/notify','notifyPractitionerEnquiry');
                 $routes->addRoute('GET','/api/v1/public/services/{slug:[a-z0-9-]+}','publicService');
                 $routes->addRoute('GET','/api/v1/public/practitioners','publicPractitioners');
                 $routes->addRoute('GET','/api/v1/public/practitioners/{slug:[a-z0-9-]+}','publicPractitioner');
@@ -124,6 +158,9 @@ final class Api
                 $routes->addRoute('PUT','/api/v1/dashboard/preferences','saveDashboardPreferences');
                 $routes->addRoute('DELETE','/api/v1/dashboard/preferences','resetDashboardPreferences');
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets','adminDashboardWidgets');
+                $routes->addRoute('GET','/api/v1/admin/privacy-audit','privacyAuditHistory');
+                $routes->addRoute('PUT','/api/v1/admin/privacy-audit/reviewers/{id:\d+}','grantPrivacyReview');
+                $routes->addRoute('DELETE','/api/v1/admin/privacy-audit/reviewers/{id:\d+}','revokePrivacyReview');
                 $routes->addRoute('GET','/api/v1/admin/notifications','adminNotifications');
                 $routes->addRoute('GET','/api/v1/practitioner/notifications','practitionerNotifications');
                 $routes->addRoute('POST','/api/v1/admin/notifications/{id:\d+}/review','reviewNotification');
@@ -135,6 +172,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions','dashboardWidgetVersions');
                 $routes->addRoute('POST','/api/v1/admin/dashboard-widgets/{id:[a-z][a-z0-9_]+}/versions/{version:\d+}/restore','restoreDashboardWidget');
                 $routes->addRoute('GET','/api/v1/customer/auth/me','customerMe');
+                $routes->addRoute('GET','/api/v1/profile/travel-settings','myTravelSettings');
+                $routes->addRoute('PUT','/api/v1/profile/travel-settings/{id:\\d+}','saveMyTravelSettings');
                 $routes->addRoute('GET','/api/v1/profile/work-location','myWorkLocation');
                 $routes->addRoute('GET','/api/v1/profile/global-credentials','globalCredentials');
                 $routes->addRoute('POST','/api/v1/profile/global-credentials','createGlobalCredential');
@@ -189,6 +228,8 @@ final class Api
                 $routes->addRoute('POST','/api/v1/address-coverage/approval','addressCoverageApproval');
                 $routes->addRoute('POST','/api/v1/address-coverage/approve','approveAddressCoverage');
                 $routes->addRoute('POST','/api/v1/address-coverage/revoke','revokeAddressCoverage');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/consent','clientConsent');
+                $routes->addRoute('PUT','/api/v1/clients/{id:\\d+}/consent','saveClientConsent');
                 $routes->addRoute('GET','/api/v1/clients','clients');
                 $routes->addRoute('POST','/api/v1/appointments/{id:\\d+}/action-links/revoke','revokeAppointmentActionLinks');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments','clientAppointments');
@@ -264,7 +305,20 @@ final class Api
             if (in_array($route[1], ['siteConfig', 'brandAsset', 'locations', 'services', 'publicServices', 'publicService', 'publicPractitioners', 'publicPractitioner', 'practitioners', 'team', 'teamImage', 'availability'], true)) {
                 $this->clinicContext->assertActive($this->database);
             }
+            $this->consentRoute=$route[1];
             $data=match($route[1]){
+                'submitPractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->submit($this->clinicContext->clinicId,$request->body,$_SERVER['REMOTE_ADDR']??'unknown'),
+                'practitionerEnquiries'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->list($this->user($request),$this->clinicContext->clinicId,$request->query),
+                'updatePractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->update($this->user($request),$this->clinicContext->clinicId,(int)$route[2]['id'],$request->body,$request->correlationId),
+                'notifyPractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->retryNotification($this->user($request),$this->clinicContext->clinicId,(int)$route[2]['id'],$request->correlationId),
+                'travelFeeContext'=>(new \Wellness\Service\OnsiteFeeService($this->database))->context($this->user($request),(int)$route[2]['id']),
+                'waiveTravelFee'=>(new \Wellness\Service\OnsiteFeeService($this->database))->waive($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'sessionReceiptContext'=>$this->receipts()->context($this->user($request),(int)$route[2]['id']),
+                'saveReceiptTemplate'=>$this->receipts()->saveTemplate($this->user($request),$request->body,$request->correlationId),
+                'saveReceiptProfile'=>$this->receipts()->saveProfile($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'issueSessionReceipt'=>$this->receipts()->issue($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'sessionReceiptPdf'=>$this->receipts()->pdf($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'voidSessionReceipt'=>$this->receipts()->void($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'staffInvitations'=>$this->staffInvitations()->list($this->user($request)),
                 'createStaffInvitation'=>$this->staffInvitations()->create($this->user($request),$request->body,$request->correlationId),
                 'approveStaffInvitation'=>$this->staffInvitations()->approve($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
@@ -290,6 +344,8 @@ final class Api
                 'saveDashboardPreferences'=>$this->dashboard->savePreferences($this->user($request),(string)($request->query['workspace']??''),$request->body),
                 'resetDashboardPreferences'=>$this->dashboard->resetPreferences($this->user($request),(string)($request->query['workspace']??'')),
                 'adminDashboardWidgets'=>$this->dashboard->adminList($this->user($request)),
+                'grantPrivacyReview','revokePrivacyReview'=>(new \Wellness\Service\PrivacyAuditService($this->database,new AuditLogger($this->database)))->setPermission($this->user($request),(int)$route[2]['id'],$route[1]==='grantPrivacyReview',$request->correlationId),
+                'privacyAuditHistory'=>(new \Wellness\Service\PrivacyAuditService($this->database,new AuditLogger($this->database)))->search($this->user($request),$request->query,$request->correlationId),
                 'adminNotifications'=>$this->notificationStatus->list($this->user($request),$request->query),
                 'practitionerNotifications'=>$this->notificationStatus->practitionerList($this->user($request),$request->query),
                 'reviewNotification'=>$this->notificationReviews->review($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
@@ -301,6 +357,8 @@ final class Api
                 'dashboardWidgetVersions'=>$this->dashboard->versions($this->user($request),(string)$route[2]['id']),
                 'restoreDashboardWidget'=>$this->dashboard->restore($this->user($request),(string)$route[2]['id'],(int)$route[2]['version'],$request->correlationId),
                 'customerMe'=>$this->customerMe($request),
+                'myTravelSettings'=>(new \Wellness\Service\PractitionerTravelSettingsService($this->database))->get($this->user($request)),
+                'saveMyTravelSettings'=>(new \Wellness\Service\PractitionerTravelSettingsService($this->database))->save($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'myWorkLocation'=>$this->workLocations->get($this->user($request)),
                 'saveMyWorkLocation'=>$this->workLocations->save($this->user($request),$request->body,$request->correlationId),
                 'profileAvatar'=>$this->profiles->avatar($this->user($request)),
@@ -327,6 +385,8 @@ final class Api
                 'recurringView'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->view($this->user($request),(int)$route[2]['id']),
                 'recurringChangePreview'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,false),
                 'recurringChange'=>(new \Wellness\Service\RecurringBookingService($this->database,$this->bookings))->change($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId,true),
+                'clientConsent'=>(new \Wellness\Service\ClientConsentService($this->database,new AuditLogger($this->database)))->list($this->user($request),(int)$route[2]['id']),
+                'saveClientConsent'=>(new \Wellness\Service\ClientConsentService($this->database,new AuditLogger($this->database)))->save($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'appointments'=>$this->bookings->list($this->user($request),$request->query),
                 'appointmentDetails'=>$this->bookings->getForStaff($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId) + ['action_links_enabled'=>$this->config->appointmentActionLinksEnabled],
                 'appointmentReassignmentOptions'=>$this->bookings->reassignmentOptions($this->user($request),(int)$route[2]['id']),
@@ -341,7 +401,7 @@ final class Api
                 'practitionerVisitMilestone'=>$this->practitionerVisits->milestone($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'practitionerVisitOutcome'=>$this->practitionerVisits->outcome($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
-                'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query),
+                'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query,$request->correlationId),
                 'practitionerClients'=>$this->clients->practitionerList($this->user($request),$request->query),
                 'formDrafts'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->list($this->user($request),$request->query),
                 'saveFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId),
@@ -349,6 +409,11 @@ final class Api
                 'formDraftDetail'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->detail($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'importFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->import($this->user($request),$request->body,$request->correlationId),
                 'validateFormSource'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->validate($this->user($request),$request->body),
+                'formLibrary'=>(new \Wellness\Service\FormLibraryService($this->database))->list($this->user($request),$request->query),
+                'submitLibraryForm'=>(new \Wellness\Service\FormLibraryService($this->database))->submit($this->user($request),$request->body,$request->correlationId),
+                'libraryFormDetail'=>(new \Wellness\Service\FormLibraryService($this->database))->detail($this->user($request),(int)$route[2]['id']),
+                'reviewLibraryForm'=>(new \Wellness\Service\FormLibraryService($this->database))->review($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'copyLibraryForm'=>(new \Wellness\Service\FormLibraryService($this->database))->copy($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'formTemplates'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->templates($this->user($request),$request->query),
                 'publishForm'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId),
                 'publishFormVersion'=>(new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database)))->publish($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
@@ -465,11 +530,12 @@ final class Api
         $this->clinicContext->assertActive($this->database);
         if ($this->config->customerOnboardingEnabled) {
             $service = $this->onboarding();
-            $session = $service->session((new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
+            $session = $service->session(($this->customerAuth ??= new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
             $identity = $session['identity_id']; unset($session['identity_id']);
+            $this->accessAudit?->customerIdentity((int)$identity,$this->clinicContext->clinicId);
             return $service->status($identity) + ['session' => $session];
         }
-        return (new CustomerAuthenticator($this->config))->authenticate($request->bearerToken());
+        return ($this->customerAuth ??= new CustomerAuthenticator($this->config))->authenticate($request->bearerToken());
     }
 
     private function onboarding(): CustomerOnboarding
@@ -483,8 +549,23 @@ final class Api
         if (!$this->config->applicationAdminEnabled || !$this->config->clinicManagementEnabled) throw new ApiException(503,'application_admin_unavailable','Application administration is not enabled.');
         header('Cache-Control: no-store');
         $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($request->bearerToken());
+        $this->accessAudit?->applicationActor($actor);
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        if($path==='discovery-settings'&&$request->method==='GET')return $this->discovery()->settings();
+        if($path==='discovery-settings'&&$request->method==='PUT')return $this->discovery()->saveSettings($actor,$request->body,$request->correlationId);
+        if(preg_match('#^clinics/(\d+)/practitioner-enquiries(?:/(settings|\d+)(/notify)?)?$#D',$path,$m)){
+            $enquiries=new \Wellness\Service\PractitionerEnquiryService($this->database);$clinic=(int)$m[1];$target=$m[2]??'';
+            if($request->method==='GET'&&$target==='')return $enquiries->list($actor,$clinic,$request->query);
+            if($request->method==='PUT'&&$target==='settings')return $enquiries->saveSettings($actor,$clinic,$request->body,$request->correlationId);
+            if($request->method==='PATCH'&&ctype_digit($target)&&empty($m[3]))return $enquiries->update($actor,$clinic,(int)$target,$request->body,$request->correlationId);
+            if($request->method==='POST'&&ctype_digit($target)&&!empty($m[3]))return $enquiries->retryNotification($actor,$clinic,(int)$target,$request->correlationId);
+        }
+        $library=new \Wellness\Service\FormLibraryService($this->database);
+        if($request->method==='GET'&&$path==='form-library')return $library->list($actor,$request->query);
+        if($request->method==='POST'&&$path==='form-library')return $library->submit($actor,$request->body,$request->correlationId);
+        if($request->method==='GET'&&preg_match('#^form-library/(\d+)$#D',$path,$m))return $library->detail($actor,(int)$m[1]);
+        if($request->method==='POST'&&preg_match('#^form-library/(\d+)/review$#D',$path,$m))return $library->review($actor,(int)$m[1],$request->body,$request->correlationId);
         if ($request->method==='GET' && $path==='me') return ['id'=>$actor->id,'display_name'=>$actor->displayName,'email'=>$actor->email,'roles'=>['application_admin']];
         if ($request->method==='GET' && $path==='clinics') return $service->list($actor);
         if ($request->method==='POST' && $path==='clinics') return $service->create($actor,$request->body,$request->correlationId);
@@ -516,13 +597,14 @@ final class Api
     private function customerRoute(Request $r): array
     {
         $this->clinicContext->assertActive($this->database);
+        header('Cache-Control: no-store');
         $route = $r->method . ' ' . substr($r->path, strlen('/api/v1/customer/'));
         if ($route === 'GET auth/options') return ['onboarding_enabled' => $this->config->customerOnboardingEnabled && ($this->config->clinicManagementEnabled || $this->clinicContext?->clinicId === $this->config->customerClinicId)];
         $service = $this->onboarding();
         if ($route === 'POST auth/challenge') return $service->challenge($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         $token = $r->headers['x-customer-session'] ?? null;
         if ($route === 'POST auth/logout') return $service->logout($token, $r->correlationId);
-        $auth = new CustomerAuthenticator($this->config);
+        $auth = $this->customerAuth ??= new CustomerAuthenticator($this->config);
         $claims = $auth->claims($r->bearerToken());
         if ($route === 'POST auth/session') {
             if (!is_string($r->body['id_token'] ?? null)) throw new ApiException(422, 'invalid_proof', 'A fresh sign-in proof is required.');
@@ -530,8 +612,21 @@ final class Api
         }
         $session = $service->session($claims, $token, $route === 'POST auth/activity');
         $identity = $session['identity_id'];
+        $this->accessAudit?->customerIdentity((int)$identity,$this->clinicContext->clinicId);
         unset($session['identity_id']);
-        $bookingActor = fn(): AuthContext => $service->bookingActor($identity);
+        $bookingActor = function()use($service,$identity):AuthContext{
+            ($this->consentLock ??= new \Wellness\Service\ConsentLock($this->database->connection()))->acquire($this->clinicContext->clinicId);
+            $actor=$service->bookingActor($identity);$this->accessAudit?->actor($actor);return $actor;
+        };
+        if(in_array($route,['GET profile','PATCH profile','GET appointments'],true))$bookingActor();
+        if(str_starts_with(substr($r->path,strlen('/api/v1/customer/')),'travel-enquiries'))return $this->travelRoute($bookingActor(),$r,substr($r->path,strlen('/api/v1/customer/')));
+        if($route==='POST discovery/search')return $this->discovery()->search($this->clinicContext->clinicId,$r->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'));
+        if(in_array($route,['GET consent','PUT consent'],true)){
+            $actor=$bookingActor();$consent=new \Wellness\Service\ClientConsentService($this->database,new AuditLogger($this->database));
+            return $r->method==='GET'?$consent->list($actor,$actor->userId):$consent->save($actor,$actor->userId,$r->body,$r->correlationId);
+        }
+        if($route==='GET receipts')return $this->receipts()->list($bookingActor(),$r->query);
+        if(preg_match('#^GET receipts/(\d+)/pdf$#',$route,$receiptMatch))return $this->receipts()->pdf($bookingActor(),(int)$receiptMatch[1],$r->correlationId);
         $forms=new \Wellness\Service\ClientFormsService($this->database,new AuditLogger($this->database));
         if($route==='GET forms'){$actor=$bookingActor();return $forms->list($actor,$actor->userId,$r->query,$r->correlationId);}
         if(preg_match('#^(GET|POST) forms/(\d+)(/(submit|draft|amendments))?$#',$route,$matches)){
@@ -565,6 +660,27 @@ final class Api
         };
     }
 
+    private function discovery(): \Wellness\Service\LocationDiscoveryService
+    {
+        return new \Wellness\Service\LocationDiscoveryService($this->database,$this->config);
+    }
+    private function travelRoute(AuthContext $actor,Request $request,string $path): array
+    {
+        header('Cache-Control: no-store');
+        $service=new \Wellness\Service\TravelEnquiryService($this->database,$this->discovery());
+        if($path==='travel-enquiries'&&$request->method==='GET')return $service->list($actor,$request->query);
+        if($path==='travel-enquiries'&&$request->method==='POST')return $service->create($actor,$request->body,$request->correlationId);
+        if(preg_match('#^travel-enquiries/(\d+)(?:/(reply|read|close))?$#D',$path,$match)){
+            if($request->method==='GET'&&!isset($match[2]))return $service->detail($actor,(int)$match[1],$request->query);
+            if($request->method==='POST'&&isset($match[2]))return $service->act($actor,(int)$match[1],$match[2],$request->body,$request->correlationId);
+        }
+        throw new ApiException(404,'not_found','Route not found.');
+    }
+    private function receipts(): \Wellness\Service\SessionReceiptService
+    {
+        return new \Wellness\Service\SessionReceiptService($this->database,new AuditLogger($this->database));
+    }
+
     private function databaseHealth(): array
     {
         $this->database->connection()->query('SELECT 1')->fetchColumn();
@@ -595,6 +711,10 @@ final class Api
             ? (new \Wellness\Auth\StaffMembershipResolver($this->database))->resolve($external->verify($request->bearerToken()),$this->clinicContext)
             : $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
         $this->clinicContext->assertActive($this->database);
+        $this->accessAudit?->actor($actor);
+        header('Cache-Control: no-store');
+        ($this->consentLock ??= new \Wellness\Service\ConsentLock($this->database->connection()))->acquire($actor->clinicId);
+        (new \Wellness\Service\ConsentAccess($this->database->connection()))->request($actor,$request,$this->consentRoute);
         return $actor;
     }
     private function staffInvitations(): \Wellness\Service\StaffInvitationService

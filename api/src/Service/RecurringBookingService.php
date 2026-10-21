@@ -22,9 +22,8 @@ final class RecurringBookingService
         if(!is_array($body['recurrence']??null))throw new ApiException(422,'invalid_recurrence','A recurrence pattern is required.');
         return $this->transaction($actor,$body,$apply,function()use($actor,$body,$correlation){
             $pdo=$this->database->connection();
-            $client=$pdo->prepare("SELECT id FROM users WHERE id=:id AND clinic_id=:clinic AND user_type='client' AND status='active'");
-            $client->execute(['id'=>(int)($body['client_id']??0),'clinic'=>$actor->clinicId]);
-            if(!$client->fetchColumn())throw new ApiException(422,'invalid_client','Select an active client in this clinic.');
+            $this->bookings->assertBookingClientAccess($actor,(int)($body['client_id']??0));
+            (new ConsentAccess($pdo))->assertRecipient($actor->clinicId,(int)($body['client_id']??0),(int)($body['practitioner_id']??0));
             $eligible=false;
             foreach($this->bookings->options($actor)['combinations'] as $option){
                 $matches=true;

@@ -90,9 +90,10 @@ final class AvailabilityService
     {
         $sql="SELECT r.id FROM rooms r WHERE r.location_id=:l AND r.is_bookable=1
             AND NOT EXISTS(SELECT 1 FROM room_practitioner_restrictions x WHERE x.room_id=r.id AND x.practitioner_id=:p AND x.allowed=0)
+            AND (NOT EXISTS(SELECT 1 FROM room_practitioner_restrictions x WHERE x.room_id=r.id AND x.allowed=1) OR EXISTS(SELECT 1 FROM room_practitioner_restrictions x WHERE x.room_id=r.id AND x.practitioner_id=:allowed_practitioner AND x.allowed=1))
             AND NOT EXISTS(SELECT 1 FROM service_room_capability_requirements req WHERE req.service_id=:s AND NOT EXISTS(SELECT 1 FROM room_capability_assignments a WHERE a.room_id=r.id AND a.capability_id=req.capability_id))
             AND NOT EXISTS(SELECT 1 FROM appointments a WHERE a.room_id=r.id AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.buffer_starts_at<DATE_ADD(:end,INTERVAL r.turnover_minutes MINUTE) AND DATE_ADD(a.buffer_ends_at,INTERVAL r.turnover_minutes MINUTE)>:start".($excludeAppointmentId!==null?' AND a.id<>:exclude':'').") ORDER BY r.id";
-        $params=['l'=>$locationId,'p'=>$practitionerId,'s'=>$serviceId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];if($excludeAppointmentId!==null)$params['exclude']=$excludeAppointmentId;
+        $params=['l'=>$locationId,'p'=>$practitionerId,'allowed_practitioner'=>$practitionerId,'s'=>$serviceId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];if($excludeAppointmentId!==null)$params['exclude']=$excludeAppointmentId;
         $statement=$this->database->connection()->prepare($sql);$statement->execute($params);return array_map('intval',$statement->fetchAll(\PDO::FETCH_COLUMN));
     }
 
@@ -101,7 +102,9 @@ final class AvailabilityService
         $pdo=$this->database->connection();$params=['p'=>$practitionerId,'l'=>$locationId,'start'=>$start->format('Y-m-d H:i:s'),'end'=>$end->format('Y-m-d H:i:s')];
         $queries=[
             "SELECT 1 FROM appointments WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND status NOT IN('canceled_by_client','canceled_by_clinic') AND buffer_starts_at<:end AND buffer_ends_at>:start".($excludeAppointmentId!==null?' AND id<>:exclude':'')." LIMIT 1",
-            "SELECT 1 FROM time_off WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND starts_at<:end AND ends_at>:start LIMIT 1",
+            // Time off belongs to the clinic's local practitioner record.
+            // Actual appointments still block this identity across clinics.
+            "SELECT 1 FROM time_off WHERE practitioner_id=:p AND starts_at<:end AND ends_at>:start LIMIT 1",
             "SELECT 1 FROM availability_overrides WHERE practitioner_id=:p AND location_id=:l AND override_type='blocked' AND starts_at<:end AND ends_at>:start LIMIT 1",
             "SELECT 1 FROM imported_calendar_entries WHERE practitioner_id IN (".PractitionerSchedule::idsSql().") AND blocks_booking=1 AND starts_at<:end AND ends_at>:start LIMIT 1",
         ];

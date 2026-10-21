@@ -31,6 +31,7 @@ final class ClientFormsService
         return $row;
     }
     private function client(AuthContext $actor,int $id): array {
+        (new ConsentAccess($this->database->connection()))->assertClient($actor,$id);
         $s=$this->database->connection()->prepare("SELECT u.id,u.display_name FROM users u WHERE u.id=? AND u.clinic_id=? AND u.user_type='client' AND u.status='active' AND NOT EXISTS(SELECT 1 FROM client_merge_records m WHERE m.duplicate_client_id=u.id)");$s->execute([$id,$actor->clinicId]);$row=$s->fetch();
         if(!$row||($actor->userType==='client'&&$actor->userId!==$id))throw new ApiException(404,'client_not_found','Client not found.');
         if(!$this->operator($actor)&&$actor->userType!=='client'){
@@ -55,7 +56,7 @@ final class ClientFormsService
         $p=$this->database->connection()->prepare("SELECT p.id,u.display_name FROM practitioners p JOIN users u ON u.id=p.user_id WHERE u.clinic_id=? AND u.status='active' AND p.active=1 ORDER BY u.display_name");$p->execute([$actor->clinicId]);$practitioners=$p->fetchAll();
         if(!$this->operator($actor))$practitioners=array_values(array_filter($practitioners,fn($p)=>(int)$p['id']===$this->ownPractitioner($actor)));
         $s=$this->database->connection()->prepare('SELECT id,name FROM services WHERE clinic_id=? AND active=1 ORDER BY name');$s->execute([$actor->clinicId]);
-        return ['items'=>array_slice($items,0,20),'page'=>$page,'has_more'=>count($items)>20,'practitioners'=>$practitioners,'services'=>$s->fetchAll(),'max_questions'=>ClientFormDefinition::maxQuestions(),'drafts_enabled'=>ClientFormDraftsService::enabled(),'can_author'=>$actor->hasAnyRole('super_admin','clinic_admin')||$this->ownPractitioner($actor)!==null];
+        return ['items'=>array_slice($items,0,20),'page'=>$page,'has_more'=>count($items)>20,'practitioners'=>$practitioners,'services'=>$s->fetchAll(),'max_questions'=>ClientFormDefinition::maxQuestions(),'library_enabled'=>FormLibraryService::enabled(),'drafts_enabled'=>ClientFormDraftsService::enabled(),'can_author'=>$actor->hasAnyRole('super_admin','clinic_admin')||$this->ownPractitioner($actor)!==null];
     }
     public function history(AuthContext $actor,int $id): array {
         $this->templateAuthor($actor);$row=$this->template($actor,$id);$s=$this->database->connection()->prepare('SELECT id,name,form_type,version,CAST(definition AS BINARY) definition,created_at FROM form_templates WHERE clinic_id=? AND family_key=? ORDER BY version DESC LIMIT 100');$s->execute([$actor->clinicId,$row['family_key']]);$rows=$s->fetchAll();foreach($rows as &$r){$r['version']=(int)$r['version'];$r['definition']=json_decode($r['definition'],true,32,JSON_THROW_ON_ERROR);}unset($r);return ['items'=>$rows];

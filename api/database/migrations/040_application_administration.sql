@@ -1,5 +1,6 @@
 -- Apply once after 039. No existing clinic role receives central access automatically.
-CREATE TABLE application_administrators (
+-- Fresh schemas include this prerequisite before the form-library foreign keys.
+CREATE TABLE IF NOT EXISTS application_administrators (
  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
  issuer VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
  subject VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,

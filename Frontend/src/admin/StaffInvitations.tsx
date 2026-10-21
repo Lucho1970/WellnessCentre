@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiRequest } from '../shared/api';
+import { ApiError, apiRequest } from '../shared/api';
 
 type Invitation = { id: number; recipient_email: string; given_name: string; family_name: string; expires_at: string; revoked_at: string | null; accepted_at: string | null; claimant_name: string | null; claim_status: string | null; verification_code: string | null };
 type Location = { id: number; name: string; is_bookable: boolean | number };
@@ -16,10 +16,19 @@ function StaffInvitationsForm() {
   const [items, setItems] = useState<Invitation[]>([]), [locations, setLocations] = useState<Location[]>([]);
   const [form, setForm] = useState(blank), [busy, setBusy] = useState(false), [error, setError] = useState(''), [link, setLink] = useState('');
   const [review, setReview] = useState<Invitation | null>(null), [verified, setVerified] = useState(false), [code, setCode] = useState('');
-  const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => apiRequest<T>(path, {
-    method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${await getAccessToken()}`, 'Content-Type': 'application/json' },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  }), [getAccessToken]);
+  const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
+    try {
+      return await apiRequest<T>(path, {
+        method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${await getAccessToken()}`, 'Content-Type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    } catch (cause) {
+      if (cause instanceof ApiError && [401, 403, 404].includes(cause.status)) {
+        setItems([]); setLocations([]); setForm(blank); setLink(''); setReview(null); setVerified(false); setCode('');
+      }
+      throw cause;
+    }
+  }, [getAccessToken]);
   const load = useCallback(async () => {
     const [invitations, available] = await Promise.all([request<{ items: Invitation[] }>('/admin/staff-invitations'), request<Location[]>('/admin/locations')]);
     setItems(invitations.items); setLocations(available.filter(location => Boolean(Number(location.is_bookable))));

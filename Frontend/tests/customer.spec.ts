@@ -1,10 +1,151 @@
 import { expect, test, type Page } from "@playwright/test";
 import { selectAccount } from "../src/auth/accountSelection";
+
+test('patient privacy instructions preserve independent restrictions and current versions', async ({ page }) => {
+  await fixture(page, true);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: 'linked', capabilities: ['own_appointments'], session: { idle_expires_at: Date.now()/1000+1800, absolute_expires_at: Date.now()/1000+28800 } } } }));
+  await page.route('**/api/v1/customer/appointments?**', route => route.fulfill({ json: { data: { items: [] } } }));
+  const items: {scope: string; target_staff_id: number; restricted: boolean; version: number}[] = [];
+  const changes: unknown[] = [];
+  await page.route('**/api/v1/customer/consent', async route => {
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON(); changes.push(body);
+      const old = items.find(item => item.scope === body.scope && item.target_staff_id === body.target_staff_id);
+      expect(body.version).toBe(old?.version ?? 0);
+      if (old) Object.assign(old, {restricted: body.restricted, version: old.version+1});
+      else items.push({...body, version: 1});
+    }
+    await route.fulfill({json: {data: {items, staff: [{id: 2, display_name: 'Practitioner A'}]}}});
+  });
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button', {name: 'Privacy instructions', exact: true}).click();
+  await page.getByRole('button', {name: 'Withdraw staff access permission', exact: true}).click();
+  await expect(page.getByText('Access restricted', {exact: true})).toBeVisible();
+  await page.getByLabel('Staff access restriction', {exact: true}).click();
+  await page.getByRole('option', {name: 'Practitioner A', exact: true}).click();
+  await expect(page.getByText('The restriction for all clinic staff also applies. Restoring one staff member does not clear it.', {exact: true})).toBeVisible();
+  await page.getByRole('button', {name: 'Withdraw staff access permission', exact: true}).click();
+  await page.getByRole('button', {name: 'Restore staff access permission', exact: true}).click();
+  expect(changes).toEqual([
+    {scope:'staff_access', target_staff_id:0, restricted:true, version:0},
+    {scope:'staff_access', target_staff_id:2, restricted:true, version:0},
+    {scope:'staff_access', target_staff_id:2, restricted:false, version:1},
+  ]);
+  expect(items.find(item => item.target_staff_id === 0)?.restricted).toBe(true);
+  await page.screenshot({path:test.info().outputPath('privacy-instructions.png'), fullPage:true});
+});
+
+test('mobile privacy conflict requires reload before another change', async ({ page }) => {
+  await page.setViewportSize({width:390,height:844});
+  await fixture(page, true);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**', route => route.fulfill({json:{data:{items:[]}}}));
+  let attempts=0;
+  await page.route('**/api/v1/customer/consent', route => {
+    if(route.request().method()==='PUT') {attempts++;return route.fulfill({status:409,json:{error:{code:'consent_changed',message:'Consent instructions changed. Reload before saving.'}}});}
+    return route.fulfill({json:{data:{items:[],staff:[]}}});
+  });
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button',{name:'Privacy instructions',exact:true}).click();
+  await page.getByRole('button',{name:'Stop appointment messages',exact:true}).click();
+  await expect(page.getByText('Consent instructions changed. Reload before saving.',{exact:false})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Stop appointment messages',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Reload',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Stop appointment messages',exact:true})).toBeEnabled();
+  expect(attempts).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
 import {
   freshCustomerLoginParameters,
   shouldClearCustomerAccountHint,
 } from "../src/customer/providerRouting";
 import type { AccountInfo } from "@azure/msal-browser";
+
+test('travel inbox preserves patient history and draft when recipient access is restricted',async({page})=>{
+  await fixture(page,true);
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**',route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route('**/api/v1/customer/travel-enquiries',route=>route.fulfill({json:{data:{items:[{id:81,status:'open',service_name:'Massage',practitioner_name:'Esther',unread:1}],unread_count:1,next_before:null}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81',route=>route.fulfill({json:{data:{id:81,status:'open',search_label:'Own visit area',service_name:'Massage',practitioner_name:'Esther',messages:[{id:101,body:'Own message history',created_at:'2026-10-18 15:00:00',sender_name:'Client'}],next_after:null}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81/read',route=>route.fulfill({json:{data:{saved:true}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81/reply',route=>route.fulfill({status:409,json:{error:{code:'travel_recipient_unavailable',message:'This enquiry cannot receive new messages under the current access permissions.'}}}));
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button',{name:'Travel enquiries',exact:true}).click();
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  await page.getByLabel('Your reply',{exact:true}).fill('Keep my draft');
+  await page.getByRole('button',{name:'Send reply',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'This enquiry cannot receive new messages under the current access permissions.'})).toBeVisible();
+  await expect(page.getByText('Own message history',{exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Your reply',exact:true})).toHaveValue('Keep my draft');
+  await expect(page.getByRole('textbox',{name:'Your reply',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Retry same reply',exact:true})).toHaveCount(0);
+});
+
+test('client discovers from a saved address and sends a duplicate-safe travel enquiry before reading a reply',async({page})=>{
+  await fixture(page,true);
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments','book_own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**',route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route('**/api/v1/customer/profile',route=>route.fulfill({json:{data:{address:{address_line1:'1 Synthetic Street',city:'Toronto',province:'Ontario',postal_code:'M5V 1A1',country:'Canada'}}}}));
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/practitioners',route=>route.fulfill({json:{data:[{slug:'esther',public_name:'Esther'}]}}));
+  await page.route('**/api/v1/public/services',route=>route.fulfill({json:{data:[{slug:'massage',name:'Massage'}]}}));
+  await page.route('**/api/v1/customer/discovery/search',route=>{expect(route.request().postDataJSON()).toMatchObject({area:'1 Synthetic Street, Toronto, Ontario, M5V 1A1, Canada'});return route.fulfill({json:{data:{label:'Synthetic area',point:{latitude:43.6,longitude:-79.4},settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:8,service_id:13,location_id:8,practitioner_slug:'esther',service_slug:'massage',status:'enquiry_only',token:'synthetic-proof',starting_price_cents:7500}]}}});});
+  let received:any=null,attempts=0;
+  await page.route('**/api/v1/customer/travel-enquiries',route=>{
+    if(route.request().method()==='POST'){
+      const body=route.request().postDataJSON();attempts++;if(!received)received=body;else expect(body).toEqual(received);
+      return attempts===1?route.abort('failed'):route.fulfill({json:{data:{id:81}}});
+    }
+    return route.fulfill({json:{data:{items:received?[{id:81,status:'open',service_name:'Massage',practitioner_name:'Esther',client_name:'Client',unread:1}]:[],unread_count:received?1:0,next_before:null}}});
+  });
+  await page.route('**/api/v1/customer/travel-enquiries/81',route=>route.fulfill({json:{data:{id:81,status:'open',search_label:'Synthetic area',service_name:'Massage',practitioner_name:'Esther',messages:[{id:101,body:'Please ask staff to arrange a visit.',created_at:'2026-10-18 15:00:00',sender_name:'Clinic team'}],next_after:null}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/81/read',route=>route.fulfill({json:{data:{saved:true}}}));
+  await page.goto('http://localhost:5184/client#discover=1');
+  await expect(page.getByText('Travel approval required',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Ask about travel',exact:true}).click();
+  await page.getByLabel('Your message',{exact:true}).fill('Would you consider extra travel?');
+  await page.getByRole('button',{name:'Send travel enquiry',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Retry same enquiry',exact:true})).toBeEnabled();
+  await expect(page.getByRole('textbox',{name:'Your message',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Retry same enquiry',exact:true}).click();
+  await page.getByRole('button',{name:/Unread · Massage/}).click();
+  await expect(page.getByText('Please ask staff to arrange a visit.',{exact:true})).toBeVisible();
+  expect(attempts).toBe(2);expect(received).toMatchObject({token:'synthetic-proof',search_label:'Synthetic area'});
+});
+
+test('signed-in booking defaults to saved-address filtering and keeps extra-distance matches out of booking choices',async({page})=>{
+  await fixture(page,true);
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['book_own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**',route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route('**/api/v1/customer/booking-options',route=>route.fulfill({json:{data:{default_location_id:8,rooms:[],combinations:[{location_id:8,location_name:'Virtual clinic',timezone:'America/Toronto',service_id:13,service_name:'Massage',practitioner_id:8,practitioner_name:'Esther',duration_option_id:4,duration_minutes:60,offers_mobile:1,offers_clinic:0,base_price_cents:7500,mobile_fee_cents:0}]}}}));
+  await page.route('**/api/v1/customer/profile',route=>route.fulfill({json:{data:{address:{address_line1:'1 Synthetic Street',city:'Toronto',province:'Ontario',postal_code:'M5V 1A1',country:'Canada'}}}}));
+  await page.route('**/api/v1/public/discovery/options',route=>route.fulfill({json:{data:{map_browser_key:''}}}));
+  await page.route('**/api/v1/public/discovery/search',route=>{expect(route.request().postDataJSON()).toMatchObject({area:'1 Synthetic Street, Toronto, Ontario, M5V 1A1, Canada'});return route.fulfill({json:{data:{label:'Synthetic area',point:{latitude:43.6,longitude:-79.4},settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:8,service_id:13,location_id:8,practitioner_slug:'esther',service_slug:'massage',status:'enquiry_only',token:'synthetic-proof',starting_price_cents:7500}]}}});});
+  await page.goto('http://localhost:5184/client');await page.getByRole('button',{name:'Book appointment',exact:true}).click();
+  await expect(page.getByText('No practitioners within normal coverage for this selection.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Find nearby care',exact:true}).last()).toBeVisible();
+});
+
+test('clients retrieve receipt PDFs and see voided receipts on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page, true);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: 'linked', capabilities: ['own_appointments'], session: { idle_expires_at: Date.now() / 1000 + 1800, absolute_expires_at: Date.now() / 1000 + 28800 } } } }));
+  await page.route('**/api/v1/customer/appointments?**', route => route.fulfill({ json: { data: { items: [] } } }));
+  await page.route('**/api/v1/customer/receipts?**', route => route.fulfill({ json: { data: { enabled: true, has_more: false, items: [{ id: 5, number: 'R-TEST', appointment_id: 41, status: 'issued', service_name: 'Massage', practitioner_name: 'Practitioner', total_cents: 11300 }, { id: 4, number: 'R-VOID', appointment_id: 40, status: 'void', service_name: 'Massage', practitioner_name: 'Practitioner', total_cents: 11300 }] } } }));
+  await page.route('**/api/v1/customer/receipts/5/pdf', route => {
+    expect(route.request().headers().authorization).toBe('Bearer customer-test-token');
+    return route.fulfill({ json: { data: { filename: 'R-TEST.pdf', pdf_base64: Buffer.from('%PDF-1.4\nSynthetic receipt download').toString('base64') } } });
+  });
+  await page.goto('http://localhost:5184/client');
+  await page.getByRole('button', { name: 'My receipts', exact: true }).click();
+  await expect(page.getByText('Voided receipt', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download receipt PDF' })).toHaveCount(1);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download receipt PDF' }).click();
+  expect((await download).suggestedFilename()).toBe('R-TEST.pdf');
+  await expect(page.getByRole('button', { name: 'Void receipt', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('client-receipts-mobile.png'), fullPage: true });
+});
 
 async function fixture(page: Page, signedIn = false, callbackFails = false) {
   // Only Playwright intercepts this module; no production bypass or fake tokens.
@@ -621,7 +762,7 @@ test("invitation fragment is removed and acceptance remains pending until manual
   await expect.poll(() => reads).toBeGreaterThan(before);
 });
 
-test("linked client books only for the signed-in client through the customer API", async ({
+for (const quotedFee of [0, 1500]) test(`linked client reviews distance fee ${quotedFee} before confirming`, async ({
   page,
 }) => {
   await fixture(page, true);
@@ -652,6 +793,7 @@ test("linked client books only for the signed-in client through the customer API
       confirmations++;
       const body = route.request().postDataJSON();
       expect(body.client_id).toBeUndefined();
+      expect(body.quoted_mobile_fee_cents).toBe(quotedFee);
       expect(body.service_id).toBe(4);
       expect(body.practitioner_id).toBe(7);
       expect(body.delivery_mode).toBe("mobile");
@@ -681,6 +823,7 @@ test("linked client books only for the signed-in client through the customer API
               offers_clinic: 0,
               travel_buffer_minutes: 20,
               mobile_fee_cents: 1500,
+              mobile_free_radius_km: 20,
               base_price_cents: 12000,
               practitioner_id: 7,
               practitioner_name: "Esther Vanderpoel",
@@ -723,6 +866,7 @@ test("linked client books only for the signed-in client through the customer API
           covered: true,
           radius_km: 25,
           token: "coverage-proof",
+          mobile_fee_cents: quotedFee,
         },
       },
     }),
@@ -760,6 +904,7 @@ test("linked client books only for the signed-in client through the customer API
     .getByRole("button", { name: "Validate address and coverage" })
     .click();
   await expect(page.getByText("Your address is within the practitioner’s On-Site service area.")).toBeVisible();
+  await expect(page.getByText(`Travel fee for this address: $${(quotedFee/100).toFixed(2)} CAD`)).toBeVisible();
   await page.getByRole("button", { name: "Find a time" }).click();
   await page.getByLabel("Appointment date").fill("2099-10-01");
   await page.getByRole("button", { name: "Find times" }).click();

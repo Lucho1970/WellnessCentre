@@ -24,6 +24,8 @@ After a duplicate client is merged, only the surviving client appears in client 
 
 When staff book an appointment, they may select the service or the practitioner first after choosing the base location. Each choice narrows the other menu to compatible assignments; use **Clear service** or **Clear practitioner** to switch paths. For an On-Site visit, an earlier Google distance check by itself does not create a reusable approval. Authorized clinic staff must click **Approve this address for future On-Site bookings** after a successful check. Future bookings with the same client address, base location, service, practitioner, and service-area settings can reuse that approval without another Google distance request. Changing any of those details requires a new check and approval.
 
+Select the patient before validating coverage. The check and any saved approval require current access to that patient and permission for the selected practitioner workflow. An unrelated restriction does not block the check; a restriction affecting this patient/workflow must be resolved through the clinic privacy lead. A refused operation clears cached coverage and selected times. Coverage proofs cannot be transferred between patients, and in-progress proofs from before the patient-bound update require a new validation.
+
 ## Common administration pattern
 
 Administration pages are moving to a list-first layout:
@@ -36,6 +38,8 @@ Administration pages are moving to a list-first layout:
 ## Clients
 
 The **Clients** page uses the list-first administration pattern. Use the search field in the command bar to find a client by name, email, or phone, then select the matching row. **Details** opens the complete contact profile and portal-access controls without making the fields editable. **Edit** opens the same client in an editable panel. Use **New client** to create a record.
+
+Registration may require an authorized review without showing matching patient details. Contact the clinic privacy lead rather than changing identifying information or creating another record to bypass the review. **Create anyway** is available only for permitted duplicate suggestions and cannot override a patient's privacy restriction. Unrelated restrictions do not prevent registering a distinct patient.
 
 Super Administrators can select an active duplicate and choose **Merge**. The merge remains a separate confirmation workflow because it reassigns related records. After a successful merge, the duplicate disappears from the list and the surviving client remains selected. Deactivate a client when future booking must be prevented without merging or deleting their history.
 
@@ -114,6 +118,8 @@ The calendar remembers your last **Day**, **Week**, or **Month** choice for your
 The calendar displays times in the device's timezone, which is shown above the grid. Turn on **Privacy mode** before sharing your screen to hide client names from calendar events and the detail panel. This is a display safeguard, not a change to account permissions. Google/Outlook connections for practitioners remain future features; this page does not put events into an external calendar.
 
 When adding or editing **Time off** in Availability, choose **Review affected appointments** before saving. Review any overlapping bookings, then save the block if it is correct. Saving does not cancel, reschedule, or notify those clients. A follow-up count appears in the Time off list; select the item and open **Details** to see the current affected appointments. Choose **Review appointment #…** to open that exact booking, even when it is not on the first appointment-list page, then reschedule or cancel it using the permitted actions. The impact list updates as appointments are rescheduled or canceled.
+
+Patient privacy restrictions also apply when saving or removing time off. A preview shows only appointments you can access. If any appointment in the affected period requires a privacy review, the entire change is refused and nothing is saved. Editing checks both the existing and proposed periods. Contact the clinic privacy lead to arrange authorized handling; an administrator cannot override the restriction. Restrictions on unrelated patients do not prevent changes to other periods.
 
 The Practitioner dashboard also shows a warning while any upcoming, active appointments overlap your time off. It counts each appointment once, even if multiple time-off blocks overlap it, and links directly to the first five bookings. Use **Refresh** after resolving one; the warning disappears when no future overlaps remain. This is a follow-up aid, not an automatic cancellation or client notification.
 

@@ -19,6 +19,8 @@ $schema = file_get_contents(dirname(__DIR__, 2) . '/database/schema.sql');
 $schema = substr($schema, 0, strpos($schema, '-- Private practitioner addresses;'));
 $pdo->exec(preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m', '', $schema));
 $pdo->exec(file_get_contents(dirname(__DIR__, 2) . '/database/migrations/038_practitioner_private_locations.sql'));
+$pdo->exec(file_get_contents(dirname(__DIR__, 2) . '/database/migrations/044_onsite_distance_fees.sql'));
+$pdo->exec(file_get_contents(dirname(__DIR__, 2) . '/database/migrations/050_consent_directives.sql'));
 $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Test A'),(2,'Test B');
  INSERT INTO locations(id,clinic_id,name,address_line1,city,province,postal_code) VALUES(1,1,'Public clinic','1 Public Street','Toronto','Ontario','M1M 1M1');
  INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(1,1,'p@example.test','P','staff','active'),(2,1,'client@example.test','C','client','active'),(3,2,'other@example.test','Other','staff','active');
@@ -57,6 +59,9 @@ $transport = function (string $url, array $headers, array $payload) use (&$reque
 $coverage = new AddressCoverageService($db, $config, $transport);
 $destination = array_replace($address, ['address_line1' => '80 Client Street', 'instructions' => '']);
 $body = ['location_id' => 1, 'service_id' => 1, 'practitioner_id' => 1, 'destination' => $destination];
+$deny(fn() => $coverage->validate($client, $body), 'delivery_unavailable');
+$check($requests === []); // No provider request before the active practitioner assignment exists.
+$pdo->exec('INSERT INTO practitioner_locations(practitioner_id,location_id) VALUES(1,1)');
 $result = $coverage->validate($client, $body);
 $check($requests[0]['address']['addressLines'] === ['12 Private Street']);
 $check($result['covered'] && !isset($result['distance_km']) && !isset($result['origin']));
@@ -65,9 +70,14 @@ $check(!isset($proof['distance_meters']) && !str_contains(json_encode($proof), '
 $hash = new ReflectionMethod(AddressCoverageService::class, 'addressHash');
 $check($proof['origin_hash'] !== $hash->invoke(null, $address));
 $coverage->verifyBooking($client, $body + ['address_validation_token' => $result['token']], $destination); $check(true);
-$staffResult = $coverage->validate($staff, $body);
+$staffBody = $body + ['client_id' => 2];
+$beforeRequests = count($requests);
+$deny(fn() => $coverage->validate($staff, $staffBody), 'client_not_found');
+$check(count($requests) === $beforeRequests); // No patient relationship means no provider disclosure.
+$pdo->exec("INSERT INTO audit_logs(clinic_id,actor_user_id,action,entity_type,entity_id,outcome,correlation_id) VALUES(1,1,'client.create','client',2,'success','synthetic-relationship')");
+$staffResult = $coverage->validate($staff, $staffBody);
 $check($staffResult['distance_km'] === 8.0);
-$coverage->approve($staff = new AuthContext(1, 1, '', '', '', 'staff', ['practitioner'], ['approve_onsite_service_area']), $body + ['client_id' => 2, 'address_validation_token' => $staffResult['token']], 'test');
+$coverage->approve($staff = new AuthContext(1, 1, '', '', '', 'staff', ['practitioner'], ['approve_onsite_service_area']), $staffBody + ['address_validation_token' => $staffResult['token']], 'test');
 $check($coverage->approvalStatus($client, $body)['approved']);
 
 $homeMoved = array_replace($address, ['address_line1' => '14 Private Street']);

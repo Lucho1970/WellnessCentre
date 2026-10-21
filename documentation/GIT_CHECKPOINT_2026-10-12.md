@@ -1,5 +1,7 @@
 # Development checkpoint — 12 October 2026
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 `feature/checkpoint-ready` preserves the accumulated work through central application administration (`eb769fa`) and prepares it for integration review. This checkpoint does not authorize a merge or perform hosted deployment.
 
 The accumulated baseline includes clinic routing and identity memberships, practitioner invitations, client appointment history, appointment email action links, recurring appointments, versioned intake forms and author drafts, private practitioner work locations, shared validation feedback, consecutive availability entry, separate clinic portals and central application administration. Individual feature documents retain rollout requirements and acceptance limits.

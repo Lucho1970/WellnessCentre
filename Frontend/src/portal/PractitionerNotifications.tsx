@@ -51,8 +51,10 @@ function PractitionerNotificationsForm() {
       const response = await fetch(`${apiBaseUrl}/practitioner/notifications?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status);
-      setData(normalizeNumericIds(body.data));
-    } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load your notifications.')); }
+      const next = normalizeNumericIds<Result>(body.data);
+      setData(next);
+      setSelected(previous => previous ? next.items.find(item => item.id === previous.id) ?? null : null);
+    } catch (cause) { setData(null); setSelected(null); formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load your notifications.')); }
     finally { setLoading(false); }
   }, [getAccessToken, page, status, channel, period, t]);
   useEffect(() => { void load(); }, [load]);

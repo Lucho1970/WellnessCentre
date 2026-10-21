@@ -1,0 +1,25 @@
+-- Apply before deploying response-boundary access auditing. No patient data is copied.
+CREATE TABLE access_audit_events (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    event_group CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    part_number INT UNSIGNED NOT NULL,
+    part_count INT UNSIGNED NOT NULL,
+    clinic_id BIGINT UNSIGNED NULL,
+    actor_type ENUM('staff','client','customer_identity','application_admin','anonymous') NOT NULL,
+    actor_id BIGINT UNSIGNED NULL,
+    correlation_id VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    action VARCHAR(40) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    route_key VARCHAR(240) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    http_method VARCHAR(8) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    http_status SMALLINT UNSIGNED NOT NULL,
+    outcome ENUM('success','denied','failure') NOT NULL,
+    ip_address VARBINARY(16) NULL,
+    metadata JSON NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY uq_access_event_part(event_group,part_number),
+    KEY ix_access_clinic_time(clinic_id,created_at),
+    KEY ix_access_actor(actor_type,actor_id,created_at),
+    KEY ix_access_correlation(correlation_id),
+    KEY ix_access_route_outcome(route_key,outcome,created_at),
+    FOREIGN KEY(clinic_id) REFERENCES clinics(id)
+) ENGINE=InnoDB;

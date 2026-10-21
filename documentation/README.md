@@ -1,6 +1,47 @@
 # Wellness Centre Documentation
 
+- [21 October repository integration and cleanup](GIT_CLEANUP_2026-10-21.md): consolidated source history, validation evidence, branch-deletion safeguards and hosted acceptance limits.
+
+- [Consent-authorized room maintenance](CONSENT_AUTHORIZED_ROOMS.md): current clinic-wide authority, complete turnover effects, guarded relocation, atomic audits and portal recovery.
+- [Consent-authorized clinic locations](CONSENT_AUTHORIZED_LOCATIONS.md): current clinic-wide authority, complete appointment/approval checks, atomic revocation audits and portal denial cleanup.
+- [Consent-authorized practitioner enquiries](CONSENT_AUTHORIZED_PRACTITIONER_ENQUIRIES.md): current clinic/central review authority, audited notification claims, clinic isolation and portal denial cleanup.
+- [Consent-authorized receipt templates](CONSENT_AUTHORIZED_RECEIPT_TEMPLATES.md): current clinic administrator checks, atomic versioned issuer configuration and preserved patient receipt restrictions.
+- [Consent-authorized staff avatars](CONSENT_AUTHORIZED_STAFF_AVATARS.md): staff-only moderation, current clinic authority, atomic image audits and profile/header denial cleanup.
+- [Consent-authorized qualifications](CONSENT_AUTHORIZED_QUALIFICATIONS.md): current clinic credential authority, independent verification, safe revocation, atomic audits and denial cleanup.
+- [Consent-authorized staff invitations](CONSENT_AUTHORIZED_STAFF_INVITATIONS.md): current clinic Super Admin authority, verified claim approval/revocation, preserved patient restrictions and atomic membership audits.
+- [Consent-authorized practitioner account management](CONSENT_AUTHORIZED_PRACTITIONER_MANAGEMENT.md): current clinic authority, safe deactivation/onboarding, atomic audits and preserved patient restrictions.
+- [Consent-authorized dashboard widget management](CONSENT_AUTHORIZED_DASHBOARD_WIDGETS.md): current clinic Super Admin checks, stored-definition validation, atomic configuration audits and denial cleanup.
+- [Consent-authorized reminder schedules](CONSENT_AUTHORIZED_REMINDER_SCHEDULES.md): complete pending queue authorization, strict worker timing parsing, atomic cancellation audits and settings denial handling.
+
+- [Restricted privacy-audit review](PRIVACY_AUDIT_REVIEW.md): explicit clinic permissions, minimal searchable access history, audited reviews/grants and migration 051.
+
+- [19 October current application release](CURRENT_APP_RELEASE_2026-10-19.md): corrected Livin Lively portal destination, cumulative consent changes, archive destinations and migration prerequisites.
+
+- [Practitioner enquiries and FAQ](PRACTITIONER_ENQUIRIES_RELEASE.md): public joining form, private admin inbox, editable central notification recipient and migration 047.
+
+- [Public services price correction](PUBLIC_SERVICE_PRICE_FIX.md): one-file API patch for services failing after the Wellnexa discovery release.
+
+- [Wellnexa discovery and social profiles](WELLNEXA_WEBSITE_DISCOVERY_RELEASE.md): sticky navigation, service/profile pages, joining information and practitioner social links; migration 046 and deployment.
+
+- [Starter form templates](../api/database/templates/README.md): bilingual massage intake JSON and repeatable SQL submission to the global library.
+
+- [Form library](FORM_LIBRARY_RELEASE.md): approved global/clinic templates, previews, independent drafts and editing controls; migration 045 and deployment.
+
+- [Practitioner travel settings](PRACTITIONER_TRAVEL_SETTINGS_RELEASE.md): edit own clinic-local travel thresholds, fees and buffers; API patch and shared portal deployment.
+
 This folder contains the living technical and delivery documentation for the Wellness Centre scheduling platform.
+
+- [Ontario PHIPA readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md): implemented safeguards, application gaps, unverified hosting/operational controls and required gates before using real patient data.
+- [Practitioner booking contact access](PRACTITIONER_BOOKING_CONTACT_ACCESS.md): relationship-scoped contacts/addresses, direct-booking bypass protection and synthetic authorization acceptance.
+- [Sensitive access audit](SENSITIVE_ACCESS_AUDIT.md): response-boundary read/search/export coverage, denied-access logging, migration 049, failure behavior and acceptance evidence.
+- [Consent restrictions and withdrawal](CONSENT_RESTRICTIONS_WITHDRAWAL.md): patient controls, negative access permissions, queued-message enforcement, migration 050, conservative bulk-route limits and synthetic authorization acceptance.
+- [Consent-filtered dashboards and schedules](CONSENT_FILTERED_DASHBOARDS_SCHEDULES.md): permitted-record counts, day cards, next visits, schedule impacts and notification activity without a clinic-wide consent block.
+- [Consent-filtered notifications](CONSENT_FILTERED_NOTIFICATIONS.md): permitted notification lists/counts, current review and retry authorization, recipient rechecks and stale-contact browser handling.
+- [Consent-filtered travel enquiries and messages](CONSENT_FILTERED_TRAVEL_ENQUIRIES.md): permitted inboxes/unread counts, thread actions, patient history, recipient restrictions and stale-thread browser handling.
+- [Consent-authorized bulk time-off](CONSENT_AUTHORIZED_TIME_OFF.md): complete affected-set authorization for create/update/delete, old/new-period checks, atomic audit rollback and denial handling.
+- [Consent-authorized client registration](CONSENT_AUTHORIZED_CLIENT_REGISTRATION.md): scoped duplicate review, hidden-match refusal before confirmation, legacy identity checks and remaining conservative-route inventory.
+- [Consent-authorized address coverage](CONSENT_AUTHORIZED_ADDRESS_COVERAGE.md): patient/recipient checks before maps requests, patient-bound proofs, atomic approvals/revocations and denial cleanup.
+- [Consent-authorized availability](CONSENT_AUTHORIZED_AVAILABILITY.md): old/new recurring rule and override windows, buffered appointment authorization, open-ended recurrence and atomic mutation audits.
 
 Start with these two authoritative documents:
 
@@ -11,7 +52,7 @@ Start with these two authoritative documents:
 - [Practitioner invitation pilot](PRACTITIONER_INVITATIONS.md): disabled staff registration, manual invitations, administrator approval, dedicated External ID apps and rollout checks.
 - [Client overview](CLIENT_OVERVIEW.md): appointment history, saved changes, configured practitioner access, role/clinic boundaries and deployment acceptance.
 - [Appointment action links](APPOINTMENT_ACTION_LINKS.md): sign-in-required email links, expiry/revocation, cancellation fee acknowledgement, migration and activation checks.
-- [Portal host cutover](PORTAL_HOST_CUTOVER.md): move Willow to `willowwellness.copihue.ca` and deploy a neutral landing page at `portal.copihue.ca`.
+- [Deployment layout](DEPLOYMENT_LAYOUT.md): confirmed marketing folders, shared clinic portal, general landing and private API; package destinations and configuration.
 - [Runtime website configuration](RUNTIME_WEBSITE_CONFIGURATION.md): live public website destination, temporary .com cutover, deployment order and checks.
 - [Practitioner external link plan](PRACTITIONER_EXTERNAL_LINK_PLAN.md): optional website/social-page links for independent practitioners and portal-only virtual clinics; local implementation and pending hosted acceptance.
 - [Practitioner person card](PRACTITIONER_PERSON_CARD.md): preferred public name, biography, optional public contacts, and hover previews.
@@ -47,3 +88,11 @@ Start with these two authoritative documents:
 - Mark work complete only after its acceptance criteria and tests pass.
 - Never place credentials, tenant secrets, database passwords, client records, or production configuration values in documentation.
 - Keep implementation-specific setup instructions beside the relevant component, such as `api/README.md`, while keeping cross-solution decisions here.
+
+- [Consent-authorized room capabilities and practitioner assignments](CONSENT_AUTHORIZED_ROOM_ASSIGNMENTS.md)
+
+- [Consent-authorized service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md)
+
+- [Consent-authorized tax creation and clinic booking settings](CONSENT_AUTHORIZED_TAX_BOOKING_SETTINGS.md)
+
+- [Consent-authorized clinic profile, branding, themes and welcome content](CONSENT_AUTHORIZED_CLINIC_BRANDING.md)

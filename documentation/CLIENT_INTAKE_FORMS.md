@@ -102,9 +102,9 @@ Requests always use the authenticated clinic/client context. Client input cannot
 
 ## Deployment and synthetic acceptance
 
-1. Back up the database and current matching private API/Willow portal files. Keep `CLIENT_FORMS_ENABLED=false` in private `/wellness-api/.env` while uploading.
+1. Back up the database and current matching private API/Livin’ Lively portal files. Keep `CLIENT_FORMS_ENABLED=false` in private `/wellness-api/.env` while uploading.
 2. Confirm previous release migrations through 035 and onboarding tables are present. Apply **036** once to the API's development database before enabling forms; do not import the entire migration directory or full schema. Inspect existing columns/table and the migration if it was partly applied; MySQL DDL is not an atomic rollback.
-3. Upload the matching private API and Willow portal builds from a reviewed revision. No public website, neutral landing, authentication callbacks, storage provider or new browser build flag is needed. This implementation task does not produce deployment ZIPs.
+3. Upload the matching private API and Livin’ Lively portal builds from a reviewed revision. No public website, neutral landing, authentication callbacks, storage provider or new browser build flag is needed. This implementation task does not produce deployment ZIPs.
 4. Set `CLIENT_FORMS_ENABLED=true` only for the planned synthetic acceptance run. Create an intake/consent template, assign directly, book a matching service, submit as a synthetic client and review as its practitioner. Publish a new version and verify old assignments retain their original questions.
 5. Test another client, another clinic and another practitioner; deny answer access to admin/reception/accounting. Check administrator-approved assignments, merged clients, revoked tasks, canceled appointments, recurring previews/conflicts, duplicate/uncertain requests, stale versions and French/mobile navigation.
 6. Record the exact hosted database version and acceptance results. Complete the plan's privacy/clinical-content review before real client answers are collected. If acceptance fails, disable the pilot. Keep task/submission/template/consent history when rolling back matching application files.

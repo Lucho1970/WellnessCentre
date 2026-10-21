@@ -17,7 +17,7 @@ final class PractitionerPublicProfileService
             throw new ApiException(403, 'forbidden', 'Practitioner access is required.');
         }
         $query = $this->database->connection()->prepare("SELECT t.user_id,t.public_name,t.booking_name,t.summary,t.summary_fr,
-                t.public_website_url,t.public_contact_email,t.public_contact_phone,t.public_contact_sms,t.published,t.slug
+                t.public_website_url,t.public_contact_email,t.public_contact_phone,t.public_contact_sms,t.social_links,t.published,t.slug
             FROM public_team_profiles t JOIN users u ON u.id=t.user_id AND u.clinic_id=t.clinic_id AND u.status='active'
             JOIN practitioners p ON p.user_id=u.id AND p.active=1
             WHERE t.user_id=:user AND t.clinic_id=:clinic AND t.section='practitioner'");
@@ -26,12 +26,14 @@ final class PractitionerPublicProfileService
         if (!$profile) throw new ApiException(404, 'profile_not_found', 'Ask an administrator to create your public practitioner profile.');
         $profile['published'] = (bool)$profile['published'];
         $profile['public_contact_sms'] = (bool)$profile['public_contact_sms'];
+        $profile['social_links'] = PublicSocialLinks::decode($profile['social_links']);
         return $profile;
     }
 
     public function update(AuthContext $actor, array $body, string $correlationId): array
     {
-        $this->get($actor);
+        $existing = $this->get($actor);
+        $social = array_key_exists('social_links',$body) ? PublicSocialLinks::validate($body['social_links']) : $existing['social_links'];
         $name = trim((string)($body['public_name'] ?? ''));
         $bookingName = trim((string)($body['booking_name'] ?? ''));
         $summary = trim((string)($body['summary'] ?? ''));
@@ -45,12 +47,13 @@ final class PractitionerPublicProfileService
         $contact = PublicCardContact::fromInput($body);
         $statement = $this->database->connection()->prepare("UPDATE public_team_profiles SET public_name=:name,booking_name=:booking,
             summary=:summary,summary_fr=:summary_fr,public_website_url=:website,public_contact_email=:email,public_contact_phone=:phone,
-            public_contact_sms=:sms,updated_by=:actor WHERE user_id=:user AND clinic_id=:clinic AND section='practitioner'");
+            public_contact_sms=:sms,social_links=:social,updated_by=:actor WHERE user_id=:user AND clinic_id=:clinic AND section='practitioner'");
         $statement->execute([
             'name' => $name, 'booking' => $bookingName,
             'summary' => $summary === '' ? null : $summary, 'summary_fr' => $summaryFr === '' ? null : $summaryFr,
             'website' => $contact['website'], 'email' => $contact['email'], 'phone' => $contact['phone'], 'sms' => $contact['sms'],
             'actor' => $actor->userId, 'user' => $actor->userId, 'clinic' => $actor->clinicId,
+            'social' => json_encode($social,JSON_THROW_ON_ERROR),
         ]);
         $this->audit->write($actor->clinicId, $actor, $correlationId, 'public_profile.self_update', 'user', $actor->userId, 'success', [
             'public_website' => $contact['website'] !== null, 'public_email' => $contact['email'] !== null, 'public_phone' => $contact['phone'] !== null, 'public_sms' => $contact['sms'] === 1,

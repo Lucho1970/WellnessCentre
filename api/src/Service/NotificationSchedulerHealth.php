@@ -47,9 +47,10 @@ final class NotificationSchedulerHealth
         }
         $pdo = $this->database->connection();
         $record = $pdo->query('SELECT status,last_started_at,last_completed_at,last_success_at,last_failure_at FROM notification_scheduler_state WHERE id=1')->fetch() ?: null;
-        $overdue = $pdo->prepare("SELECT COUNT(*) FROM notification_events WHERE clinic_id=:clinic AND status IN ('queued','failed')
+        $params=['clinic'=>$actor->clinicId];$visible=ConsentAccess::notificationCondition($actor,$params);
+        $overdue = $pdo->prepare("SELECT COUNT(*) FROM notification_events n WHERE n.clinic_id=:clinic $visible AND status IN ('queued','failed')
             AND GREATEST(scheduled_at,COALESCE(next_attempt_at,scheduled_at)) < UTC_TIMESTAMP() - INTERVAL 30 MINUTE");
-        $overdue->execute(['clinic' => $actor->clinicId]);
+        $overdue->execute($params);
         return self::assess($record, (int)$overdue->fetchColumn());
     }
 

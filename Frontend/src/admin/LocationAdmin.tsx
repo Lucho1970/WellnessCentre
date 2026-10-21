@@ -1,6 +1,6 @@
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Box, Button, Chip, Divider, Drawer, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, Paper, Stack, Switch, Typography } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, X } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
@@ -22,6 +22,8 @@ function LocationAdminForm() {
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
   const [items, setItems] = useState<Location[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const generation = useRef(0);
   const [form, setForm] = useState<Form>(() => blank());
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>(null);
@@ -38,23 +40,26 @@ function LocationAdminForm() {
     return term ? items.filter(item => `${item.name} ${address(item)} ${item.phone ?? ''}`.toLocaleLowerCase().includes(term)) : items;
   }, [items, query]);
 
+  const clearAccess = useCallback(() => { setLoaded(false); setItems([]); setSelectedId(null); setPanelMode(null); setEditingId(null); setForm(blank()); setPanelError(''); setSaved(''); formGuard.markClean(); }, [formGuard.markClean]);
   const load = useCallback(async (preferredId?: number | null) => {
-    setBusy(true); (formValidation.clear(), setLoadError(''));
+    const scope = ++generation.current; setLoaded(false); setBusy(true); (formValidation.clear(), setLoadError(''));
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/locations`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to load locations.'));
+      if (scope !== generation.current) return false;
       const loaded = normalizeNumericIds<Location[]>(body.data);
-      setItems(loaded);
+      setItems(loaded); setLoaded(true);
       setSelectedId(current => {
         const requested = Number(preferredId ?? current ?? 0) || null;
         return loaded.some(item => item.id === requested) ? requested : null;
       });
-    } catch (cause) { formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load locations.')); }
-    finally { setBusy(false); }
-  }, [getAccessToken, t]);
-  useEffect(() => { void load(); }, [load]);
+      return true;
+    } catch (cause) { if (scope === generation.current) { clearAccess(); formValidation.capture(cause); setLoadError(cause instanceof Error ? cause.message : t('Unable to load locations.')); } return false; }
+    finally { if (scope === generation.current) setBusy(false); }
+  }, [getAccessToken, t, clearAccess]);
+  useEffect(() => { void load(); return () => { generation.current++; }; }, [load]);
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
   const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
@@ -65,25 +70,26 @@ function LocationAdminForm() {
     formGuard.markClean(); setPanelMode(null); setEditingId(null); (formValidation.clear(), setPanelError(''));
   };
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    event.preventDefault(); const scope = ++generation.current; setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
     try {
       const token = await getAccessToken();
       const response = await fetch(editingId ? `${api}/admin/locations/${editingId}` : `${api}/admin/locations`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const body = await response.json();
+      if (scope !== generation.current) return;
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save location.'));
       const savedId = Number(body.data?.id ?? editingId ?? 0) || null;
       const message = t('{{name}} was {{action}}.', { name: form.name, action: t(editingId ? 'updated' : 'created') });
-      formGuard.markClean(); setPanelMode(null); setEditingId(null); await load(savedId); setSaved(message);
-    } catch (cause) { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save location.')); }
-    finally { setBusy(false); }
+      formGuard.markClean(); setPanelMode(null); setEditingId(null); if (await load(savedId)) setSaved(message);
+    } catch (cause) { if (scope === generation.current) { if (cause instanceof ApiError && [401, 403, 404].includes(cause.status)) { clearAccess(); setLoadError(cause.message); } else { formValidation.capture(cause); setPanelError(cause instanceof Error ? cause.message : t('Unable to save location.')); } } }
+    finally { if (scope === generation.current) setBusy(false); }
   };
 
   return <Stack spacing={2}>
     <Paper variant="outlined" sx={{ p: 1.5 }}><Stack component="nav" aria-label={t('Location actions')} direction={{ xs: 'column', md: 'row' }} gap={1} alignItems={{ md: 'center' }}>
-      <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New location')}</Button>
+      <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew} disabled={busy || !loaded}>{t('New location')}</Button>
       <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: .5 }}/>
-      <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
-      <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>
+      <Button startIcon={<Eye size={17}/>} disabled={!selected || busy || !loaded} onClick={showDetails}>{t('Details')}</Button>
+      <Button startIcon={<Pencil size={17}/>} disabled={!selected || busy || !loaded} onClick={() => startEdit()}>{t('Edit')}</Button>
       <TextField name="query" size="small" label={t('Filter locations')} value={query} onChange={event => setQuery(event.target.value)} sx={{ ml: { md: 'auto' }, minWidth: { md: 250 } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search size={16}/></InputAdornment> } }}/>
     </Stack></Paper>
     {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}
@@ -94,7 +100,7 @@ function LocationAdminForm() {
         {filteredItems.map(item => <ListItemButton key={item.id} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} divider sx={{ py: 1.75, px: 2.5 }}>
           <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{item.name}</Typography><Chip size="small" color={Boolean(Number(item.is_bookable)) ? 'success' : 'default'} label={t(Boolean(Number(item.is_bookable)) ? 'Bookable' : 'Not bookable')}/></Stack>} secondary={`${address(item) || t('Address not set')} · ${item.timezone}`} />
         </ListItemButton>)}
-        {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching locations' : 'No locations yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different location name or address.' : 'Create the first clinic location or service area.')}</Typography>{!query && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New location')}</Button>}</Box>}
+        {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching locations' : 'No locations yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different location name or address.' : 'Create the first clinic location or service area.')}</Typography>{!query && loaded && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew} disabled={busy || !loaded}>{t('New location')}</Button>}</Box>}
       </List>
     </Paper>
     <Drawer anchor="right" open={panelMode !== null} onClose={closePanel} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 620 }, maxWidth: '100%' } } }}>
@@ -119,7 +125,7 @@ function LocationDetails({ item, edit }: { item: Location; edit: () => void }) {
 function LocationFields({ form, field, busy, addressChange }: { form: Form; field: <K extends keyof Form>(key: K, value: Form[K]) => void; busy: boolean; addressChange: (value: Pick<Form, 'address_line1' | 'address_line2' | 'city' | 'province' | 'postal_code'>) => void }) {
   const { t } = useTranslation();
   return <Grid container spacing={2}>
-    <Grid size={{ xs: 12, md: 6 }}><TextField name="name" required fullWidth label={t('Location name')} value={form.name} onChange={event => field('name', event.target.value)} inputProps={{ maxLength: 150 }}/></Grid>
+    <Grid size={{ xs: 12, md: 6 }}><TextField name="name" required fullWidth label={t('Location name')} value={form.name} onChange={event => field('name', event.target.value)} inputProps={{ maxLength: 120 }}/></Grid>
     <Grid size={{ xs: 12, md: 6 }}><TextField name="timezone" required fullWidth label={t('Timezone')} value={form.timezone} onChange={event => field('timezone', event.target.value)} helperText={t('IANA timezone, for example America/Toronto')}/></Grid>
     <Grid size={12}><AddressEntry disabled={busy} value={{ address_line1: form.address_line1, address_line2: form.address_line2, city: form.city, province: form.province, postal_code: form.postal_code, country: 'Canada' }} onChange={value => addressChange({ address_line1: value.address_line1, address_line2: value.address_line2, city: value.city, province: value.province, postal_code: value.postal_code })}/></Grid>
     <Grid size={{ xs: 12, md: 6 }}><TextField name="phone" fullWidth label={t('Phone')} value={form.phone} onChange={event => field('phone', event.target.value)}/></Grid>

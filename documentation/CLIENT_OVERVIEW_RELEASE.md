@@ -4,11 +4,11 @@ This release adds client appointment history, saved operational appointment chan
 
 ## Upload only these two archives for this feature
 
-1. Back up the existing private application and Willow portal files before replacing them. Keep a recoverable copy of the previous release. Preserve the live private `.env`, runtime files and uploads.
+1. Back up the existing private application and Livin’ Lively portal files before replacing them. Keep a recoverable copy of the previous release. Preserve the live private `.env`, runtime files and uploads.
 2. Extract **wellness-api-private.zip** into the existing private **`/wellness-api`** directory. Its top-level `src`, `bin`, `vendor` and Composer files belong directly in that directory. Do not create `/wellness-api/private` or a second `/wellness-api/wellness-api`. This includes the new `src/Service/ClientOverviewService.php` and matching `src/Api.php`. PHP service classes must stay outside `public_html`.
-3. Extract **wellness-portal.zip** into the existing document root assigned to **willowwellness.copihue.ca**. Check that domain's directory in Netfirms before uploading; do not infer the directory from its domain name. Put `index.html`, `assets`, `.htaccess` and `api` directly in that document root. This is the same directory containing the currently working Willow application, not the generic `portal.copihue.ca` landing page.
+3. Extract **wellness-common-portal.zip** into the shared `/public_html/wellness-common-portal` directory once for both clinic hosts. Check that domain's directory in Netfirms before uploading; do not infer the directory from its domain name. Put `index.html`, `assets`, `.htaccess` and `api` directly in that document root. This is the same directory containing the currently working Livin’ Lively application, not the generic `portal.copihue.ca` landing page.
 4. Do not upload the other archives for this feature. In particular, leave the public clinic website, neutral portal landing and mail bridge alone. The full builder emits those artifacts for other release workflows.
-5. Hard-refresh the Willow portal after upload, sign in as administrator and open **Clients → Details → View appointments** or **Practitioner access**.
+5. Hard-refresh the Livin’ Lively portal after upload, sign in as administrator and open **Clients → Details → View appointments** or **Practitioner access**.
 
 No new SQL migration or environment setting is needed for the client overview itself. Existing prerequisites are client merge tables (006), appointment cancellation snapshot fields (015), reassignment history (029), and identity/membership foundation (032). Do not import the entire `sql-updates` directory or rerun migrations already applied.
 

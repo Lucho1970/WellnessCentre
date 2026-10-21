@@ -1,0 +1,6 @@
+RewriteEngine On
+# Only the supported contact route needs the React entry point.
+# Keep API routing and genuine missing assets under their own handlers.
+RewriteRule ^contact/?$ index.html [L]
+RewriteRule ^join/?$ index.html [L]
+RewriteRule ^(services|practitioners)/[a-z0-9][a-z0-9-]{0,119}/?$ index.html [L]

@@ -21,6 +21,7 @@ $port=(int)(getenv('CLINIC_TEST_PORT')?:13319);$tenant='11111111-1111-4111-8111-
 $pdo=new PDO("mysql:host=127.0.0.1;port=$port;charset=utf8mb4",'root','',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::ATTR_EMULATE_PREPARES=>false]);
 $name='wellness_global_test_'.bin2hex(random_bytes(6));$pdo->exec("CREATE DATABASE `$name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; USE `$name`");
 $schema=file_get_contents(dirname(__DIR__,2).'/database/schema.sql');$pdo->exec(preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m','',$schema));
+if((int)$pdo->query('SELECT COUNT(*) FROM application_administrators')->fetchColumn()!==0)throw new RuntimeException('Fresh schema must not grant central administrator access.');
 foreach(['005_customer_onboarding.sql','039_separate_clinic_portals.sql','040_application_administration.sql','042_global_practitioners.sql']as$m)$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/'.$m));
 $config=new Config('test',false,'test',[],'127.0.0.1',$port,$name,'root','',$tenant,'api','scope',300,clinicManagementEnabled:true,applicationAdminEnabled:true,applicationAdminHost:'portal.test');
 $database=new Database($config);(new ReflectionProperty(Database::class,'connection'))->setValue($database,$pdo);

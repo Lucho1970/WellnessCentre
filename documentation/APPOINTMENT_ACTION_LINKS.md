@@ -36,10 +36,10 @@ Staff appointment GET includes boolean `action_links_enabled` to hide revocation
 
 ## Deployment and rollback
 
-1. Back up the development database and matching private API/Willow portal files.
+1. Back up the development database and matching private API/Livin’ Lively portal files.
 2. Keep **`APPOINTMENT_ACTION_LINKS_ENABLED=false`** (default when absent) in the shared private API `.env`. Leave practitioner invitation and staff membership settings unchanged.
 3. Rehearse/apply **034_appointment_action_links.sql** once. It depends on existing clinics/users/appointments/notification_events and adds only its token table. Migration 033 is not required. The fresh schema already includes the table; do not apply 034 a second time after importing that full schema.
-4. Deploy matching private API source, bin/worker changes and the rebuilt Willow portal, preserving `.env`, runtime files and uploads. No frontend setting, identity app registration or provider callback is added. Leave the neutral landing and public website alone.
+4. Deploy matching private API source, bin/worker changes and the rebuilt Livin’ Lively portal, preserving `.env`, runtime files and uploads. No frontend setting, identity app registration or provider callback is added. Leave the neutral landing and public website alone.
 5. Hard-refresh client/staff tabs. Client cancellation now requires fee acknowledgement even while link generation is disabled, so the portal must match the API. Staff cancellation requests remain unchanged.
 6. After migration/code acceptance, set **`APPOINTMENT_ACTION_LINKS_ENABLED=true`** in the live private `.env`; no rebuild is needed for this runtime switch. `CLIENT_PORTAL_URL` must be HTTPS, end in `/client` (optionally with a base path), and contain no query, fragment or credentials.
 7. Test a new synthetic booking email and reminder. Previously sent emails keep their old general portal link; do not resend all historical notifications. Verify copied links fail under another client/clinic, stale links fail, revocation works and visiting a link never confirms a change.

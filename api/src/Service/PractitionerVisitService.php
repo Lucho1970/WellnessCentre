@@ -34,6 +34,8 @@ final class PractitionerVisitService
         $local=new DateTimeImmutable('now',$timezone);
         $start=$local->setTime(0,0)->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
         $end=$local->modify('+1 day')->setTime(0,0)->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+        $params=['clinic'=>$actor->clinicId,'user'=>$actor->userId,'start'=>$start,'end'=>$end];
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
         $query=$pdo->prepare("SELECT a.id,a.client_id,a.service_id,a.starts_at,a.ends_at,a.status,a.version,a.delivery_mode,
                    s.name service_name,u.display_name client_name,u.email client_email,cp.phone client_phone,l.name location_name,l.timezone
             FROM appointments a
@@ -42,10 +44,10 @@ final class PractitionerVisitService
             JOIN users u ON u.id=a.client_id AND u.clinic_id=a.clinic_id
             LEFT JOIN client_profiles cp ON cp.user_id=u.id
             JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id
-            WHERE a.clinic_id=:clinic AND a.starts_at>=:start AND a.starts_at<:end
+            WHERE a.clinic_id=:clinic $visible AND a.starts_at>=:start AND a.starts_at<:end
               AND a.status IN ('requested','confirmed','rescheduled','no_show','completed','invoiced','paid')
             ORDER BY a.starts_at,a.id LIMIT 51");
-        $query->execute(['clinic'=>$actor->clinicId,'user'=>$actor->userId,'start'=>$start,'end'=>$end]);
+        $query->execute($params);
         $appointments=$query->fetchAll();
         if(count($appointments)>50)throw new ApiException(422,'too_many_visits','Too many appointments in the day-of view.');
         if($appointments){
@@ -86,12 +88,14 @@ final class PractitionerVisitService
         $first=$local->modify('-6 days')->setTime(0,0);
         $last=$local->modify('+1 day')->setTime(0,0);
         $utc=new DateTimeZone('UTC');
+        $params=['clinic'=>$actor->clinicId,'user'=>$actor->userId,'start'=>$first->setTimezone($utc)->format('Y-m-d H:i:s'),'end'=>$last->setTimezone($utc)->format('Y-m-d H:i:s')];
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
         $query=$pdo->prepare("SELECT a.id,a.status,a.delivery_mode,a.ends_at FROM appointments a
             JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1
-            WHERE a.clinic_id=:clinic AND a.starts_at>=:start AND a.starts_at<:end
+            WHERE a.clinic_id=:clinic $visible AND a.starts_at>=:start AND a.starts_at<:end
               AND a.status IN ('confirmed','rescheduled','completed','no_show','invoiced','paid')
             ORDER BY a.id LIMIT 501");
-        $query->execute(['clinic'=>$actor->clinicId,'user'=>$actor->userId,'start'=>$first->setTimezone($utc)->format('Y-m-d H:i:s'),'end'=>$last->setTimezone($utc)->format('Y-m-d H:i:s')]);
+        $query->execute($params);
         $appointments=$query->fetchAll();
         if(count($appointments)>500)throw new ApiException(422,'too_many_visits','Too many visits in the seven-day summary.');
         $grouped=[];
@@ -226,8 +230,10 @@ final class PractitionerVisitService
 
     private function ownedAppointment(PDO $pdo,AuthContext $actor,int $appointmentId,bool $forUpdate=true): array
     {
-        $query=$pdo->prepare('SELECT a.id,a.status,a.version,a.delivery_mode,a.starts_at,a.ends_at FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1 WHERE a.id=:id AND a.clinic_id=:clinic'.($forUpdate?' FOR UPDATE':''));
-        $query->execute(['id'=>$appointmentId,'clinic'=>$actor->clinicId,'user'=>$actor->userId]);
+        $params=['id'=>$appointmentId,'clinic'=>$actor->clinicId,'user'=>$actor->userId];
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $query=$pdo->prepare('SELECT a.id,a.status,a.version,a.delivery_mode,a.starts_at,a.ends_at FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1 WHERE a.id=:id AND a.clinic_id=:clinic'.$visible.($forUpdate?' FOR UPDATE':''));
+        $query->execute($params);
         $appointment=$query->fetch();
         if(!$appointment)throw new ApiException(404,'appointment_not_found','Appointment not found.');
         return $appointment;

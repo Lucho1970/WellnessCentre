@@ -1,5 +1,7 @@
 # Appointment email delivery (Microsoft 365 development tenant)
 
+For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
+
 The PHP API queues booking confirmation, change, and cancellation events in MySQL. A private worker sends minimal bilingual email through Microsoft Graph. The optional HTTPS trigger is a small public pointer protected by a separate high-entropy key; no Graph secret belongs in the frontend or Git.
 
 ## Sender and tenant
@@ -24,7 +26,7 @@ Graph uses the [client-credentials flow](https://learn.microsoft.com/en-us/graph
    MAIL_CLIENT_ID=<mail-app-client-guid>
    MAIL_CLIENT_SECRET=<secret-value>
    MAIL_FROM_ADDRESS=wellness@lucho1970.onmicrosoft.com
-   CLIENT_PORTAL_URL=https://willowwellness.copihue.ca/client
+   CLIENT_PORTAL_URL=https://livinlively.copihue.ca/client
    ```
 
 4. Verify the mailbox and permission scope, then set `MAIL_ENABLED=true`. Run a private command-line smoke test with a safe test client address. Only then schedule the worker.
@@ -34,7 +36,7 @@ After a public-site/portal domain change, update `CLIENT_PORTAL_URL` in the live
 
 ### Azure Logic App Consumption scheduler (recommended for this hosting account)
 
-The Azure subscription can be in a different tenant from the Microsoft 365 mail sender. It only schedules an HTTPS request; the Graph app credentials stay in Netfirms' private `/wellness-api/.env`. Deploy `api/deploy/netfirms/public/cron/send-notifications.php` to `/public_html/wellness/api/cron/send-notifications.php`. The portal API package also contains the same pointer, but configure Azure to call **one** URL: `https://wellness.copihue.ca/api/cron/send-notifications.php`.
+The Azure subscription can be in a different tenant from the Microsoft 365 mail sender. It only schedules an HTTPS request; the Graph app credentials stay in Netfirms' private `/wellness-api/.env`. Deploy `api/deploy/netfirms/public/cron/send-notifications.php` to `/public_html/livinlively.ca/api/cron/send-notifications.php`. The portal API package also contains the same pointer, but configure Azure to call **one** URL: `https://livinlively.ca/api/cron/send-notifications.php`.
 
 1. Generate a random key of at least 32 characters. Keep it out of Git, chat, URL query strings, and logs. Put `MAIL_TRIGGER_SECRET=<key>` in the private `/wellness-api/.env`, with `MAIL_ENABLED=false`. The existing Graph settings remain there as before.
 2. Create a **Logic App (Consumption)** in the subscription (which may be in a different tenant). Deploy `deployments/azure-mail-trigger-2026-09-22/logic-app-consumption.json` as an **incremental** custom template to its resource group. Enter the existing Logic App's name and location, and put the private key only into the template's secure `mailTriggerSecret` field. This replaces its workflow with a built-in 15-minute Recurrence trigger and one built-in HTTP POST action, with a tiny `{}` JSON body (Netfirms requires a request length), secure inputs/outputs, and no automatic HTTP retries. The template leaves the Logic App **Disabled**. Do not put the real key in the Designer's Default Value field; it is stored in plaintext and the Actual Value field can be read-only.
