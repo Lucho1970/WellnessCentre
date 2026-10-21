@@ -1,5 +1,6 @@
 export default {
   "en": {
+    "Choose a valid UTF-8 CSV file.": "Choose a valid UTF-8 CSV file.",
     "Categories to create: {{categories}}": "Categories to create: {{categories}}",
     "Category": "Category",
     "Changes need a new preview before importing.": "Changes need a new preview before importing.",
@@ -63,7 +64,7 @@ export default {
     "Unexpected import fields.": "Unexpected import fields.",
     "Update content": "Update content",
     "Update names, descriptions and category only": "Update names, descriptions and category only",
-    "Upload an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.": "Upload an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.",
+    "Upload a CSV file or an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.": "Upload a CSV file or an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.",
     "Use Consultation, Treatment or Assessment for Type.": "Use Consultation, Treatment or Assessment for Type.",
     "Use Yes or No for Initial Consultation.": "Use Yes or No for Initial Consultation.",
     "Use unique durations from 15 to 480 minutes in 15-minute increments.": "Use unique durations from 15 to 480 minutes in 15-minute increments.",
@@ -78,6 +79,7 @@ export default {
     "Existing service #{{id}}: {{name}}": "Existing service #{{id}}: {{name}}"
   },
   "fr": {
+    "Choose a valid UTF-8 CSV file.": "Choisissez un fichier CSV UTF-8 valide.",
     "Categories to create: {{categories}}": "Catégories à créer : {{categories}}",
     "Category": "Catégorie",
     "Changes need a new preview before importing.": "Les modifications nécessitent un nouvel aperçu avant l’importation.",
@@ -141,7 +143,7 @@ export default {
     "Unexpected import fields.": "Champs d’importation inattendus.",
     "Update content": "Modifier le contenu",
     "Update names, descriptions and category only": "Modifier uniquement les noms, descriptions et catégorie",
-    "Upload an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.": "Importez un classeur XLSX contenant la feuille All Services. Limite : 250 services et 2 Mo.",
+    "Upload a CSV file or an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.": "Importez un fichier CSV ou un classeur XLSX contenant la feuille All Services. Limite : 250 services et 2 Mo.",
     "Use Consultation, Treatment or Assessment for Type.": "Utilisez Consultation, Treatment ou Assessment pour Type.",
     "Use Yes or No for Initial Consultation.": "Utilisez Yes ou No pour Initial Consultation.",
     "Use unique durations from 15 to 480 minutes in 15-minute increments.": "Utilisez des durées distinctes de 15 à 480 minutes, par tranches de 15 minutes.",

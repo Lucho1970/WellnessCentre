@@ -4,7 +4,7 @@ Clinic-wide **Super Admins** can open **Services → Import services** in the st
 
 ## Workbook and review
 
-Use an `.xlsx` workbook with a worksheet named exactly `All Services`. The importer reads the existing `Services-Library.xlsx` format:
+Use a UTF-8 `.csv` file or an `.xlsx` workbook with a worksheet named exactly `All Services`. Both use the same headings; `Services-Library-Priced.csv` is supported directly:
 
 | Column | Meaning |
 | --- | --- |
@@ -17,14 +17,17 @@ Use an `.xlsx` workbook with a worksheet named exactly `All Services`. The impor
 | Detailed Description EN / Detailed Description FR | Bilingual descriptions |
 | Service Code (optional) | Existing public URL slug, useful for matching a renamed service |
 | Prices CAD (optional) | Duration-to-price pairs, e.g. `30:60.00,60:110.00` |
+| Price (optional, alternative to Prices CAD) | CAD amounts in the same order as Durations, e.g. `60,90,110` for `30,45,60` |
 
-The supplied library has 64 services across six categories and no prices. Enter the price of **every duration of every new service** in the review screen, or add the optional Prices CAD column before uploading. A blank price never means free; explicit `0` does. Existing-service content updates require no replacement prices.
+The priced library has 64 services across six categories and 183 duration prices. Upload it directly; the existing `Price` column populates the review fields without retyping. Prices are CAD before tax. Keep comma-separated Durations and Price lists quoted as CSV fields. UTF-8 BOM, French accents, escaped quotes and quoted multiline descriptions are supported. CSV values are read as literal text, never evaluated as formulas.
+
+Choose either `Price` or `Prices CAD`, never both. A `Price` list must have exactly one amount per duration; a count mismatch clears all prices on that row rather than guessing the alignment. Individual invalid amounts remain blank for correction. Enter the price of **every duration of every new service** in the review screen if not supplied. A blank price never means free; explicit `0` does. Existing-service content updates require no replacement prices. Equal prices for different services are retained where supplied.
 
 Upload, review content and prices, choose duplicate handling and whether to create missing categories, then select **Preview import**. Each source row shows its planned action or validation errors. Correct workbook content by uploading a corrected copy; price fields and import options can be changed in the screen. Changes require another preview. After checking the clinic, rows, prices and category changes, select the review checkbox and **Import reviewed services**. A completion report lists source row numbers, actions and service IDs and can be downloaded as CSV.
 
 New services are **inactive and unpublished**, with no practitioner/location assignments. Review booking rules, room requirements and assignments before activation/publication. `Type` and `Initial Consultation` are retained as descriptive metadata in the restricted import record; they do not create consultation prerequisites or change booking eligibility.
 
-Limits: 250 service rows, 2 MiB XLSX, 10 MiB total expanded ZIP entries, 1 MiB JSON API request. Text, duration and price limits are also enforced by the server. Durations must be distinct 15-minute increments from 15 to 480 minutes. Prices must be whole cents from 0 to 10,000,000 (CAD 100,000). All ten original fields are required. Formulas, macros, encrypted archives, external worksheet relationships, duplicate/unknown headers, malformed ZIP/XML and unsupported formats are refused. This reads workbook data only; no spreadsheet instructions, macros or formulas execute. The original workbook stays on the local computer; normalized service rows are sent to the clinic API.
+Limits: 250 service rows, 2 MiB CSV/XLSX, 10 MiB total expanded ZIP entries, 1 MiB JSON API request. Text, duration and price limits are also enforced by the server. Durations must be distinct 15-minute increments from 15 to 480 minutes. Prices must be whole cents from 0 to 10,000,000 (CAD 100,000). All ten original fields are required. Formulas, macros, encrypted archives, external worksheet relationships, duplicate/unknown headers, malformed ZIP/XML and unsupported formats are refused. This reads workbook data only; no spreadsheet instructions, macros or formulas execute. The original file stays on the local computer; normalized service rows are sent to the clinic API.
 
 ## Duplicates and atomicity
 
@@ -57,6 +60,8 @@ npx playwright test tests/portal.spec.ts --grep 'service import'
 # Optional read-only acceptance with the private source workbook (no import request is sent):
 $env:SERVICE_IMPORT_WORKBOOK = 'D:/Dev/WelnessCentre/documentation/Services-Library.xlsx'
 npx playwright test tests/portal.spec.ts --grep 'supplied Services-Library'
+$env:SERVICE_IMPORT_CSV = 'D:/Dev/WelnessCentre/Services-Library-Priced.csv'
+npx playwright test tests/portal.spec.ts --grep 'supplied priced CSV'
 ```
 
 For another disposable local SQL engine, set `RECURRING_TEST_ALLOW_CREATE=true`, `RECURRING_TEST_PORT`, `RECURRING_TEST_USER` and `RECURRING_TEST_PASSWORD`, then run `php api/tests/integration/service-imports.php`. The fixture connects only to `127.0.0.1`, creates a randomly named synthetic database and never reads `.env`.
@@ -72,3 +77,12 @@ Local checks are separate from hosted acceptance. Before production use, apply t
 - All 53 standalone PHP test scripts and syntax checks for 97 source/public/changed integration files passed.
 - Dependency audit compared against unchanged `main`: identical existing high findings for `source-map-js` and `vite`; the ZIP dependency adds no audit finding. Those existing dependency upgrades remain separate maintenance work. Existing Vite chunk-size warnings also remain.
 - No hosted database acceptance, production deployment or live service import was performed. The source workbook and generated output remain uncommitted.
+
+### Priced CSV extension validation, 21 October 2026
+
+- Supports the original XLSX format and UTF-8 CSV with ordered `Price` amounts, including quoted commas/newlines, French text and a BOM. Both pricing columns together are rejected.
+- Frontend content/i18n validation, TypeScript and all three production builds passed. Existing chunk-size warnings remain.
+- All 12 focused import browser tests passed, including the private 64-service CSV with 183 populated prices and the original workbook. The expanded malformed-CSV test then passed again with file/row limits and duplicate-header coverage.
+- Import SQL authorization: 154 checks on each disposable local MySQL 5.7.44 and MariaDB 11.4.8, plus each shared 74-check booking authorization fixture. Valid priced requests cannot bypass role checks or preview ownership. Authorized apply preserves exact duration-aligned cents.
+- Changed PHP integration test syntax and Git whitespace checks passed. No backend schema or production authorization change is required by this extension.
+- This extension builds on the original service-import branch/PR. Deploy the original migration/API and the completed frontend together after review. No live services were imported, no hosted database acceptance was performed, and private CSV/XLSX files remain excluded from Git.

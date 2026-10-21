@@ -3,6 +3,11 @@ import { TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 export const serviceHeaders = ['Category', 'Service Name EN', 'Service Name FR', 'Type', 'Durations', 'Initial Consultation', 'Summary EN', 'Summary FR', 'Detailed Description EN', 'Detailed Description FR'];
 export const serviceValues = ['Synthetic category', 'Imported massage', 'Massage importé', 'Treatment', '30,60', 'No', 'English summary', 'Résumé français', 'English description', 'Description française'];
 
+export function serviceCsv(headers = [...serviceHeaders, 'Price'], values = [...serviceValues, '70,110']): Buffer {
+  const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  return Buffer.from('\uFEFF' + [headers, values].map(row => row.map(quote).join(',')).join('\r\n') + '\r\n');
+}
+
 /** Synthetic values-only XLSX: no patient data or dependency on a private workbook. */
 export async function serviceWorkbook(options: { headers?: string[]; values?: string[]; formula?: boolean; sheetName?: string; external?: boolean; extra?: string; rowCount?: number; oversized?: boolean } = {}): Promise<Buffer> {
   const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');

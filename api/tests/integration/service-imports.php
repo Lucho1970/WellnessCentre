@@ -19,7 +19,7 @@ $row=fn(string $name='Imported service',string $category='Synthetic category')=>
  'public_summary'=>'Synthetic summary','public_summary_fr'=>'Résumé synthétique',
  'description'=>'Synthetic description','description_fr'=>'Description synthétique',
  'prices'=>[['minutes'=>30,'price_cents'=>0],['minutes'=>60,'price_cents'=>6500]],'service_code'=>''];
-$body=fn(array $rows,array $options=[])=>array_replace(['request_key'=>sprintf('%s-%s-%s-%s-%s',bin2hex(random_bytes(4)),bin2hex(random_bytes(2)),bin2hex(random_bytes(2)),bin2hex(random_bytes(2)),bin2hex(random_bytes(6))),'file_name'=>'Synthetic.xlsx','rows'=>$rows,'duplicate_policy'=>'skip','create_categories'=>false],$options);
+$body=fn(array $rows,array $options=[])=>array_replace(['request_key'=>sprintf('%s-%s-%s-%s-%s',bin2hex(random_bytes(4)),bin2hex(random_bytes(2)),bin2hex(random_bytes(2)),bin2hex(random_bytes(2)),bin2hex(random_bytes(6))),'file_name'=>'Synthetic.csv','rows'=>$rows,'duplicate_policy'=>'skip','create_categories'=>false],$options);
 $preview=fn(array $rows,array $options=[])=>$admin->previewServiceImport($operator,$body($rows,$options),'import-preview');
 $apply=fn(array $p)=>$admin->applyServiceImport($operator,['preview_id'=>$p['preview_id'],'confirmation_hash'=>$p['confirmation_hash']],'import-apply');
 $snapshot=fn()=>array_map(fn($table)=>$pdo->query("SELECT * FROM $table ORDER BY 1")->fetchAll(),['services','service_categories','service_duration_options','practitioner_services','service_locations','appointments','audit_logs','service_import_batches']);
@@ -30,9 +30,9 @@ $refuse=function(callable $work,int $status,?string $code=null)use($check,$snaps
 };
 $valid=$preview([$row()]);
 foreach([$actor(2),$actor(2,['super_admin']),$actor(3,['clinic_admin']),$actor(4,['super_admin']),$actor(6,['super_admin']),$actor(101,['super_admin'],[],'client'),$actor(1,['super_admin'],[],'application_admin'),$actor(5,['super_admin']),$actor(99999,['super_admin'])] as $who){
- $refuse(fn()=>$admin->previewServiceImport($who,[],'denied'),403);
+ $refuse(fn()=>$admin->previewServiceImport($who,$body([$row()]),'denied'),403);
  $refuse(fn()=>$admin->serviceImport($who,$valid['preview_id']),403);
- $refuse(fn()=>$admin->applyServiceImport($who,[],'denied'),403);
+ $refuse(fn()=>$admin->applyServiceImport($who,['preview_id'=>$valid['preview_id'],'confirmation_hash'=>$valid['confirmation_hash']],'denied'),403);
 }
 foreach([fn()=>$admin->serviceImport($actor(3,['super_admin']),$valid['preview_id']),fn()=>$admin->applyServiceImport($actor(3,['super_admin']),['preview_id'=>$valid['preview_id'],'confirmation_hash'=>$valid['confirmation_hash']],'other')] as $work)$refuse($work,404,'service_import_not_found');
 $foreign=$actor(5,['super_admin'],[],'staff',2);
@@ -95,6 +95,11 @@ $p=$preview([$row('Atomic first','Atomic category'),array_replace($row('Atomic s
 $pdo->exec("CREATE TRIGGER import_audit_failure BEFORE INSERT ON audit_logs FOR EACH ROW BEGIN IF NEW.action='service_import.apply' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic audit failure'; END IF; END");
 $before=$snapshot();try{$apply($p);throw new RuntimeException('Expected audit failure');}catch(PDOException){}finally{$pdo->exec('DROP TRIGGER import_audit_failure');}
 $check($snapshot()===$before,'Failure after all rows rolls back categories, services, durations, audit and applied marker');$check($apply($p)['counts']['create']===2,'Same preview can be retried after a rollback');
+$csvRow=array_replace($row('Priced CSV import'),['durations'=>[30,45,60],'prices'=>[['minutes'=>30,'price_cents'=>7500],['minutes'=>45,'price_cents'=>9500],['minutes'=>60,'price_cents'=>11500]]]);
+$p=$preview([$csvRow]);$check($p['can_import'],'Normalized CSV prices can be previewed by the owning clinic administrator');
+$refuse(fn()=>$admin->applyServiceImport($foreign,['preview_id'=>$p['preview_id'],'confirmation_hash'=>$p['confirmation_hash']],'foreign-csv'),404,'service_import_not_found');
+$r=$apply($p);$csvId=(int)$r['rows'][0]['service_id'];
+$check($pdo->query("SELECT duration_minutes,price_cents FROM service_duration_options WHERE service_id=$csvId ORDER BY duration_minutes")->fetchAll(PDO::FETCH_NUM)===[[30,7500],[45,9500],[60,11500]],'CSV duration-aligned cents survive authorized apply exactly');
 $p=$preview([$row('Revoked')]);
 foreach(["UPDATE users SET status='inactive' WHERE id=1","UPDATE clinics SET status='inactive' WHERE id=1","DELETE ur FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE user_id=1 AND r.code='super_admin'"] as $revoke){
  $pdo->exec($revoke);$refuse(fn()=>$apply($p),403);$refuse(fn()=>$admin->serviceImport($operator,$p['preview_id']),403);

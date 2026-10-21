@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { serviceWorkbook, serviceHeaders, serviceValues } from './service-import-fixture';
+import { serviceCsv, serviceWorkbook, serviceHeaders, serviceValues } from './service-import-fixture';
 import {
   pageAt,
   pagePath,
@@ -26,6 +26,64 @@ const importPreview = (action = 'create', invalid = false) => ({
   preview_id: importId, confirmation_hash: importHash, expires_at: '2030-01-01 10:30:00', can_import: !invalid,
   counts: { create: action === 'create' ? 1 : 0, update: action === 'update' ? 1 : 0, skip: action === 'skip' ? 1 : 0, invalid: invalid ? 1 : 0 },
   new_categories: ['Synthetic category'], rows: [{ row_number: 2, service_id: action === 'create' ? null : 5, existing_name: action === 'create' ? null : 'Existing massage', action, errors: invalid ? ['invalid_prices'] : [], warnings: [] }],
+});
+
+test('service import CSV preloads ordered prices and preserves quoted bilingual content through preview and apply', async ({ page }) => {
+  await openServiceImport(page);
+  const values = [...serviceValues, '0,110.25'];
+  values[2] = 'Massage, "détente"'; values[8] = 'First line\r\nSecond line, quoted "text"';
+  await page.route('**/api/v1/admin/service-imports/preview', route => {
+    const body = route.request().postDataJSON();
+    expect(body.file_name).toBe('Priced.csv'); expect(body.duplicate_policy).toBe('skip');
+    expect(body.rows[0]).toMatchObject({ name_fr: values[2], description: values[8], durations: [30, 60], prices: [{ minutes: 30, price_cents: 0 }, { minutes: 60, price_cents: 11025 }] });
+    return route.fulfill({ json: { data: importPreview() } });
+  });
+  let applies = 0;
+  await page.route('**/api/v1/admin/service-imports/apply', route => {
+    applies++; expect(route.request().postDataJSON()).toEqual({ preview_id: importId, confirmation_hash: importHash });
+    return route.fulfill({ json: { data: { preview_id: importId, counts: { create: 1, update: 0, skip: 0, invalid: 0 }, categories_created: 0, applied: true, rows: [] } } });
+  });
+  await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Priced.csv', mimeType: 'text/csv', buffer: serviceCsv(undefined, values) });
+  await expect(page.getByRole('textbox', { name: 'Row 2 · 30 min price (CAD)', exact: true })).toHaveValue('0.00');
+  await expect(page.getByRole('textbox', { name: 'Row 2 · 60 min price (CAD)', exact: true })).toHaveValue('110.25');
+  await expect(page.getByRole('button', { name: 'Import reviewed services', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Preview import', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'I reviewed the rows, prices and category changes for this clinic.', exact: true }).check();
+  await page.getByRole('button', { name: 'Import reviewed services', exact: true }).click();
+  await expect(page.getByText('Import complete. Created: 1 · Updated: 0 · Skipped: 0', { exact: true })).toBeVisible();
+  expect(applies).toBe(1);
+});
+
+test('service import CSV rejects malformed files and cannot shift incomplete duration prices', async ({ page }) => {
+  await openServiceImport(page); let requests = 0;
+  await page.route('**/api/v1/admin/service-imports/**', route => { requests++; return route.fulfill({ json: { data: {} } }); });
+  const normalCsv = serviceCsv().toString('utf8').split('\r\n');
+  for (const buffer of [Buffer.from('a,"unterminated'), Buffer.from('a,"closed"x'), Buffer.from([0xff, 0xfe, 0x61]),
+    serviceCsv([...serviceHeaders, 'Price', 'Prices CAD'], [...serviceValues, '70,110', '30:70,60:110']),
+    serviceCsv([...serviceHeaders, 'Category'], [...serviceValues, 'Duplicate header']),
+    Buffer.from(normalCsv[0] + '\r\n' + Array(251).fill(normalCsv[1]).join('\r\n')),
+    Buffer.alloc(2 * 1024 * 1024 + 1, 65)]) {
+    await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Invalid.csv', mimeType: 'text/csv', buffer });
+    await expect(page.getByRole('alert').filter({ hasText: /Choose a valid UTF-8 CSV|column headings|exceeds the import limits/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Preview import', exact: true })).toBeDisabled();
+  }
+  for (const prices of ['70', '70,110,150', '70,', '70,=110', '70,-1', '70,1e2']) {
+    await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Incomplete.csv', mimeType: 'text/csv', buffer: serviceCsv(undefined, [...serviceValues, prices]) });
+    await expect(page.getByRole('textbox', { name: 'Row 2 · 60 min price (CAD)', exact: true })).toHaveValue('');
+  }
+  expect(requests).toBe(0);
+});
+
+test('service import reads every price from the supplied priced CSV locally', async ({ page }) => {
+  test.skip(!process.env.SERVICE_IMPORT_CSV, 'Optional private CSV acceptance; no live API writes.');
+  await openServiceImport(page);
+  await page.getByLabel('Service workbook', { exact: true }).setInputFiles(process.env.SERVICE_IMPORT_CSV!);
+  await expect(page.getByText(/64 service rows/)).toBeVisible();
+  const inputs = page.getByRole('table', { name: 'Service import rows' }).getByRole('textbox');
+  await expect(inputs).toHaveCount(183);
+  expect(await inputs.evaluateAll(elements => elements.every(e => Number((e as HTMLInputElement).value) > 0))).toBe(true);
+  await expect(page.getByRole('textbox', { name: 'Row 2 · 60 min price (CAD)', exact: true })).toHaveValue('110.00');
+  await expect(page.getByRole('textbox', { name: 'Row 36 · 60 min price (CAD)', exact: true })).toHaveValue('220.00');
 });
 
 test('service import requires prices and a reviewed preview; retry is safe and report is downloadable', async ({ page }) => {
@@ -65,11 +123,13 @@ test('service import requires prices and a reviewed preview; retry is safe and r
   expect(previews).toBe(2); expect(applies).toBe(2);
 });
 
-for (const status of [403, 409]) test(`service import ${status} after preview clears unsafe confirmation`, async ({ page }) => {
+for (const format of ['xlsx', 'csv']) for (const status of [403, 409]) test(`service import ${format} ${status} after preview clears unsafe confirmation`, async ({ page }) => {
   await openServiceImport(page);
   await page.route('**/api/v1/admin/service-imports/preview', route => route.fulfill({ json: { data: importPreview('update') } }));
   await page.route('**/api/v1/admin/service-imports/apply', route => route.fulfill({ status, json: { error: { code: status === 403 ? 'forbidden' : 'service_import_stale' } } }));
-  await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Synthetic.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await serviceWorkbook() });
+  await page.getByLabel('Service workbook', { exact: true }).setInputFiles(format === 'csv'
+    ? { name: 'Synthetic.csv', mimeType: 'text/csv', buffer: serviceCsv() }
+    : { name: 'Synthetic.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await serviceWorkbook() });
   await page.getByRole('combobox', { name: /^Existing services/ }).click();
   await page.getByRole('option', { name: 'Update names, descriptions and category only', exact: true }).click();
   await page.getByRole('button', { name: 'Preview import', exact: true }).click();

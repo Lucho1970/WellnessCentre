@@ -17,10 +17,15 @@ export function priceCents(value: string): number | null {
   return amount <= 10000000 ? amount : null;
 }
 
-/** Read only the named data sheet. Never execute formulas, macros or external relationships. */
+/** Read a values-only CSV or the named workbook sheet. Never execute spreadsheet content. */
 export async function readServiceWorkbook(file: File): Promise<ImportRow[]> {
-  if (!/\.xlsx$/i.test(file.name)) throw invalid();
+  if (!/\.(xlsx|csv)$/i.test(file.name)) throw invalid();
   if (file.size > maxFile) throw limited();
+  if (/\.csv$/i.test(file.name)) {
+    let text: string;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()); } catch { throw new Error('Choose a valid UTF-8 CSV file.'); }
+    return convertRecords(readCsv(text.replace(/^\uFEFF/, '')));
+  }
   const { ZipReader, BlobReader } = await import('@zip.js/zip.js');
   const reader = new ZipReader(new BlobReader(file), { useWebWorkers: false });
   try {
@@ -82,25 +87,60 @@ export async function readServiceWorkbook(file: File): Promise<ImportRow[]> {
       if (values.some(value => value !== '')) records.push({ number, values });
       if (records.length > 251) throw limited();
     }
-    if (records.length < 2 || records[0].number !== 1) throw invalid();
-    const headers = records.shift()!.values.map(value => value?.trim());
-    if (headers.some(header => ![...importHeaders, 'Service Code', 'Prices CAD'].includes(header)) || new Set(headers).size !== headers.length || importHeaders.some(header => !headers.includes(header))) throw new Error('The All Services column headings do not match the import format.');
-    return records.map(record => {
-      if (record.values.some((value, index) => value !== '' && !headers[index])) throw invalid();
-      const get = (name: string) => record.values[headers.indexOf(name)] ?? '';
-      const durationText = get('Durations');
-      const durations = /^\d+(?:\s*,\s*\d+)*$/.test(durationText) ? durationText.split(',').map(Number) : [];
-      const initial = get('Initial Consultation').toLowerCase();
-      const prices = get('Prices CAD').split(',').filter(Boolean).map(pair => { const parts = pair.trim().split(':'); return { minutes: /^\d+$/.test(parts[0]) ? Number(parts[0]) : NaN, price_cents: parts.length === 2 ? priceCents(parts[1]) : null }; });
-      const validPrices = prices.length === durations.length && new Set(prices.map(p => p.minutes)).size === prices.length && prices.every(p => durations.includes(p.minutes));
-      return {
-        row_number: record.number, category: get('Category'), name: get('Service Name EN'), name_fr: get('Service Name FR'), service_type: get('Type'), initial_consultation: initial === 'yes' ? true : initial === 'no' ? false : null,
-        durations, public_summary: get('Summary EN'), public_summary_fr: get('Summary FR'), description: get('Detailed Description EN'), description_fr: get('Detailed Description FR'), service_code: get('Service Code'),
-        prices: durations.map(minutes => ({ minutes, price_cents: validPrices ? prices.find(p => p.minutes === minutes)?.price_cents ?? null : null })),
-      };
-    });
+    return convertRecords(records);
   } catch (error) {
     if (error instanceof Error && [invalid().message, limited().message, 'Formulas are not supported. Import a workbook containing values only.', 'The All Services column headings do not match the import format.'].includes(error.message)) throw error;
     throw invalid();
   } finally { await reader.close(); }
+}
+
+
+type SourceRecord = { number: number; values: string[] };
+
+/** RFC 4180 values only: quoted commas/newlines and escaped quotes; never evaluate cells. */
+function readCsv(text: string): SourceRecord[] {
+  const records: SourceRecord[] = [];
+  let values: string[] = [], value = '', state: 'start' | 'plain' | 'quoted' | 'closed' = 'start', number = 1;
+  const malformed = () => new Error('Choose a valid UTF-8 CSV file.');
+  const field = () => { values.push(value.trim()); value = ''; state = 'start'; if (values.length > 32) throw malformed(); };
+  const record = () => {
+    field();
+    if (values.some(v => v !== '')) records.push({ number, values });
+    if (records.length > 251 || number > 10000) throw limited();
+    values = []; number++;
+  };
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (state === 'quoted') {
+      if (char === '"') { if (text[i + 1] === '"') { value += '"'; i++; } else state = 'closed'; }
+      else value += char;
+    } else if (char === ',') field();
+    else if (char === '\r' || char === '\n') { record(); if (char === '\r' && text[i + 1] === '\n') i++; }
+    else if (state === 'closed') throw malformed();
+    else if (char === '"') { if (state !== 'start') throw malformed(); state = 'quoted'; }
+    else { value += char; state = 'plain'; }
+  }
+  if (state === 'quoted') throw malformed();
+  if (value !== '' || values.length || state === 'closed') record();
+  return records;
+}
+
+function convertRecords(records: SourceRecord[]): ImportRow[] {
+  if (records.length < 2 || records[0].number !== 1) throw invalid();
+  const headers = records.shift()!.values.map(value => value?.trim());
+  if ((headers.includes('Price') && headers.includes('Prices CAD')) || headers.some(header => ![...importHeaders, 'Service Code', 'Prices CAD', 'Price'].includes(header)) || new Set(headers).size !== headers.length || importHeaders.some(header => !headers.includes(header))) throw new Error('The All Services column headings do not match the import format.');
+  return records.map(record => {
+    if (record.values.some((value, index) => value !== '' && !headers[index])) throw invalid();
+    const get = (name: string) => record.values[headers.indexOf(name)] ?? '';
+    const durationText = get('Durations');
+    const durations = /^\d+(?:\s*,\s*\d+)*$/.test(durationText) ? durationText.split(',').map(Number) : [];
+    const initial = get('Initial Consultation').toLowerCase();
+    const prices = headers.includes('Price') ? (get('Price') === '' ? [] : get('Price').split(',').map((value, index) => ({ minutes: durations[index], price_cents: priceCents(value) }))) : get('Prices CAD').split(',').filter(Boolean).map(pair => { const parts = pair.trim().split(':'); return { minutes: /^\d+$/.test(parts[0]) ? Number(parts[0]) : NaN, price_cents: parts.length === 2 ? priceCents(parts[1]) : null }; });
+    const validPrices = prices.length === durations.length && new Set(prices.map(p => p.minutes)).size === prices.length && prices.every(p => durations.includes(p.minutes));
+    return {
+      row_number: record.number, category: get('Category'), name: get('Service Name EN'), name_fr: get('Service Name FR'), service_type: get('Type'), initial_consultation: initial === 'yes' ? true : initial === 'no' ? false : null,
+      durations, public_summary: get('Summary EN'), public_summary_fr: get('Summary FR'), description: get('Detailed Description EN'), description_fr: get('Detailed Description FR'), service_code: get('Service Code'),
+      prices: durations.map(minutes => ({ minutes, price_cents: validPrices ? prices.find(p => p.minutes === minutes)?.price_cents ?? null : null })),
+    };
+  });
 }
