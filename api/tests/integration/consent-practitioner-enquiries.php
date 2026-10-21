@@ -6,7 +6,7 @@ use Wellness\Service\{PractitionerEnquiryService,ClientConsentService,ConsentLoc
 use Wellness\Http\ApiException;
 $checks=0;
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/040_application_administration.sql'));
-$pdo->exec("CREATE TABLE clinic_hosts(host VARCHAR(253) PRIMARY KEY,clinic_id BIGINT UNSIGNED NOT NULL UNIQUE,FOREIGN KEY(clinic_id) REFERENCES clinics(id));INSERT INTO clinic_hosts VALUES('wellnexa.copihue.ca',1)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS clinic_hosts(host VARCHAR(253) PRIMARY KEY,clinic_id BIGINT UNSIGNED NOT NULL UNIQUE,FOREIGN KEY(clinic_id) REFERENCES clinics(id));INSERT INTO clinic_hosts(host,clinic_id) VALUES('wellnexa.copihue.ca',1)");
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/047_practitioner_enquiries.sql'));
 $issuer='https://login.microsoftonline.com/audit-tenant/v2.0';
 $pdo->prepare("INSERT INTO application_administrators(id,issuer,subject,display_name,email) VALUES(1,?,'central-reviewer','Synthetic central admin','central@example.test')")->execute([$issuer]);

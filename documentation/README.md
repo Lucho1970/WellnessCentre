@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [21 October repository integration and cleanup](GIT_CLEANUP_2026-10-21.md): consolidated source history, validation evidence, branch-deletion safeguards and hosted acceptance limits.
+
 - [Consent-authorized room maintenance](CONSENT_AUTHORIZED_ROOMS.md): current clinic-wide authority, complete turnover effects, guarded relocation, atomic audits and portal recovery.
 - [Consent-authorized clinic locations](CONSENT_AUTHORIZED_LOCATIONS.md): current clinic-wide authority, complete appointment/approval checks, atomic revocation audits and portal denial cleanup.
 - [Consent-authorized practitioner enquiries](CONSENT_AUTHORIZED_PRACTITIONER_ENQUIRIES.md): current clinic/central review authority, audited notification claims, clinic isolation and portal denial cleanup.

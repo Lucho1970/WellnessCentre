@@ -22,6 +22,8 @@ $pdo->prepare('UPDATE services SET requires_room=0,lead_time_minutes=0,booking_h
 $durationIds=[];$clients=[];
 foreach([[$source,$local,$sourceLocation,$sourceService],[$target,$targetLocal,$targetLocation,$service]] as [$clinicId,$personId,$locationId,$serviceId]){
  $pdo->prepare("INSERT INTO users(clinic_id,email,display_name,user_type,status) VALUES(?,'leave-test@example.test','Synthetic client','client','active')")->execute([$clinicId]);$clients[$clinicId]=(int)$pdo->lastInsertId();
+ // Practitioners may book only patients with an established clinic-local relationship.
+ $pdo->prepare("INSERT INTO audit_logs(clinic_id,actor_user_id,correlation_id,action,entity_type,entity_id,outcome) SELECT ?,user_id,'synthetic-client-relationship','client.create','client',?,'success' FROM practitioners WHERE id=?")->execute([$clinicId,$clients[$clinicId],$personId]);
  $pdo->prepare('INSERT INTO service_duration_options(service_id,duration_minutes,price_cents) VALUES(?,60,10000)')->execute([$serviceId]);$durationIds[$clinicId]=(int)$pdo->lastInsertId();
  $pdo->prepare('INSERT INTO practitioner_services(practitioner_id,service_id,offers_clinic) VALUES(?,?,1)')->execute([$personId,$serviceId]);
  $pdo->prepare('INSERT INTO service_locations(service_id,location_id) VALUES(?,?)')->execute([$serviceId,$locationId]);

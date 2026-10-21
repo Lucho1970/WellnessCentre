@@ -4,7 +4,7 @@ require __DIR__.'/form-library.php';
 use Wellness\Service\{PractitionerEnquiryService,MailSendException};
 use Wellness\Auth\AuthContext;
 use Wellness\Http\ApiException;
-$pdo->exec("CREATE TABLE clinic_hosts(host VARCHAR(253) PRIMARY KEY,clinic_id BIGINT UNSIGNED NOT NULL UNIQUE,created_at DATETIME DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(clinic_id) REFERENCES clinics(id)); INSERT INTO clinic_hosts(host,clinic_id) VALUES('wellnexa.copihue.ca',1)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS clinic_hosts(host VARCHAR(253) PRIMARY KEY,clinic_id BIGINT UNSIGNED NOT NULL UNIQUE,created_at DATETIME DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(clinic_id) REFERENCES clinics(id)); INSERT INTO clinic_hosts(host,clinic_id) VALUES('wellnexa.copihue.ca',1)");
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/047_practitioner_enquiries.sql'));
 $pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='clinic_admin';INSERT INTO user_roles(user_id,role_id) SELECT 30,id FROM roles WHERE code='super_admin'");
 $checks=0;$assert=function(bool $ok,string $why)use(&$checks){if(!$ok)throw new RuntimeException($why);$checks++;};

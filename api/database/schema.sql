@@ -405,6 +405,28 @@ ALTER TABLE appointments
   ADD COLUMN mobile_fee_waived_at DATETIME NULL,
   ADD COLUMN mobile_fee_waiver_reason VARCHAR(300) NULL;
 
+-- Host storage is needed by the later practitioner-enquiry seed.
+CREATE TABLE IF NOT EXISTS clinic_hosts (
+ host VARCHAR(253) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
+ clinic_id BIGINT UNSIGNED NOT NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_clinic_portal(clinic_id),
+ FOREIGN KEY(clinic_id) REFERENCES clinics(id)
+) ENGINE=InnoDB;
+
+-- Central administrator identity storage must precede library references.
+-- No existing clinic role receives central access automatically.
+CREATE TABLE IF NOT EXISTS application_administrators (
+ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ issuer VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ subject VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ display_name VARCHAR(160) NOT NULL,
+ email VARCHAR(254) NOT NULL,
+ status ENUM('active','revoked') NOT NULL DEFAULT 'active',
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_application_administrator(issuer,subject)
+) ENGINE=InnoDB;
+
 -- 045 Form library
 -- Apply once after 037 (drafts), 040 (application administrators) and 044.
 CREATE TABLE form_library_entries (

@@ -1,7 +1,7 @@
 -- Apply once before CLINIC_MANAGEMENT_ENABLED=true. No clinic/client data is moved.
 -- Requires migrations 005 and 032. Existing sessions must sign in again after activation.
 ALTER TABLE clinics ADD website_url VARCHAR(2048) NULL;
-CREATE TABLE clinic_hosts (
+CREATE TABLE IF NOT EXISTS clinic_hosts (
  host VARCHAR(253) CHARACTER SET ascii COLLATE ascii_bin NOT NULL PRIMARY KEY,
  clinic_id BIGINT UNSIGNED NOT NULL,
  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
