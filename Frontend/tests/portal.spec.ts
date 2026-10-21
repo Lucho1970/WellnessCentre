@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { serviceWorkbook, serviceHeaders, serviceValues } from './service-import-fixture';
 import {
   pageAt,
   pagePath,
@@ -9,6 +10,142 @@ import {
 const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
+
+async function openServiceImport(page: Page) {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/services', route => route.fulfill({ json: { data: [] } }));
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [] } } }));
+  await page.goto(`${portalHost}/admin/services`);
+  await page.getByRole('button', { name: 'Import services', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import services for Test Wellness' })).toBeVisible();
+}
+
+const importId = '11111111-1111-4111-8111-111111111111';
+const importHash = 'a'.repeat(64);
+const importPreview = (action = 'create', invalid = false) => ({
+  preview_id: importId, confirmation_hash: importHash, expires_at: '2030-01-01 10:30:00', can_import: !invalid,
+  counts: { create: action === 'create' ? 1 : 0, update: action === 'update' ? 1 : 0, skip: action === 'skip' ? 1 : 0, invalid: invalid ? 1 : 0 },
+  new_categories: ['Synthetic category'], rows: [{ row_number: 2, service_id: action === 'create' ? null : 5, existing_name: action === 'create' ? null : 'Existing massage', action, errors: invalid ? ['invalid_prices'] : [], warnings: [] }],
+});
+
+test('service import requires prices and a reviewed preview; retry is safe and report is downloadable', async ({ page }) => {
+  await openServiceImport(page);
+  let previews = 0, applies = 0;
+  await page.route('**/api/v1/admin/service-imports/preview', route => {
+    previews++; const body = route.request().postDataJSON();
+    expect(body.duplicate_policy).toBe('skip'); expect(body.create_categories).toBe(true);
+    expect(body.rows[0]).toMatchObject({ row_number: 2, name_fr: 'Massage importé', initial_consultation: false, durations: [30, 60] });
+    if (previews === 1) expect(body.rows[0].prices).toEqual([{ minutes: 30, price_cents: null }, { minutes: 60, price_cents: null }]);
+    else expect(body.rows[0].prices).toEqual([{ minutes: 30, price_cents: 0 }, { minutes: 60, price_cents: 6500 }]);
+    return route.fulfill({ json: { data: importPreview('create', previews === 1) } });
+  });
+  await page.route('**/api/v1/admin/service-imports/apply', route => {
+    applies++; expect(route.request().postDataJSON()).toEqual({ preview_id: importId, confirmation_hash: importHash });
+    if (applies === 1) return route.abort('failed');
+    return route.fulfill({ json: { data: { preview_id: importId, counts: { create: 1, update: 0, skip: 0, invalid: 0 }, categories_created: 1, applied: true, rows: [{ row_number: 2, service_id: 42, action: 'create' }] } } });
+  });
+  await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Synthetic.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await serviceWorkbook() });
+  await expect(page.getByText('Imported massage', { exact: true })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Create missing categories', exact: true }).check();
+  await expect(page.getByRole('button', { name: 'Import reviewed services', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Preview import', exact: true }).click();
+  await expect(page.getByText('Enter valid CAD prices for every duration. Zero explicitly means free.', { exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Row 2 · 30 min price (CAD)', exact: true }).fill('0');
+  await page.getByRole('textbox', { name: 'Row 2 · 60 min price (CAD)', exact: true }).fill('65.00');
+  await expect(page.getByText('Changes need a new preview before importing.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Preview import', exact: true }).click();
+  const confirm = page.getByRole('checkbox', { name: 'I reviewed the rows, prices and category changes for this clinic.', exact: true });
+  await expect(confirm).toBeEnabled(); await confirm.check();
+  await page.getByRole('button', { name: 'Import reviewed services', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Import request failed.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Import reviewed services', exact: true }).click();
+  await expect(page.getByText('Import complete. Created: 1 · Updated: 0 · Skipped: 0', { exact: true })).toBeVisible();
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download import results', exact: true }).click();
+  expect((await download).suggestedFilename()).toBe('service-import-results.csv');
+  expect(previews).toBe(2); expect(applies).toBe(2);
+});
+
+for (const status of [403, 409]) test(`service import ${status} after preview clears unsafe confirmation`, async ({ page }) => {
+  await openServiceImport(page);
+  await page.route('**/api/v1/admin/service-imports/preview', route => route.fulfill({ json: { data: importPreview('update') } }));
+  await page.route('**/api/v1/admin/service-imports/apply', route => route.fulfill({ status, json: { error: { code: status === 403 ? 'forbidden' : 'service_import_stale' } } }));
+  await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Synthetic.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await serviceWorkbook() });
+  await page.getByRole('combobox', { name: /^Existing services/ }).click();
+  await page.getByRole('option', { name: 'Update names, descriptions and category only', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview import', exact: true }).click();
+  await expect(page.getByText('Existing prices and durations preserved', { exact: true })).toBeVisible();
+  await expect(page.getByText('Existing service #5: Existing massage', { exact: true })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'I reviewed the rows, prices and category changes for this clinic.', exact: true }).check();
+  await page.getByRole('button', { name: 'Import reviewed services', exact: true }).click();
+  if (status === 403) {
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByText('Imported massage', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Import services', exact: true })).toBeDisabled();
+  } else {
+    await expect(page.getByRole('button', { name: 'Import reviewed services', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Preview import', exact: true })).toBeEnabled();
+    await expect(page.getByRole('checkbox', { name: 'I reviewed the rows, prices and category changes for this clinic.', exact: true })).not.toBeChecked();
+  }
+});
+
+test('service import blocks invalid workbooks before sending service data and confirms discard', async ({ page }) => {
+  await openServiceImport(page); let requests = 0;
+  await page.route('**/api/v1/admin/service-imports/**', route => { requests++; return route.fulfill({ json: { data: {} } }); });
+  for (const [buffer, message] of [
+    [Buffer.from('not a zip'), 'Choose a valid service workbook with an All Services sheet.'],
+    [await serviceWorkbook({ formula: true }), 'Formulas are not supported. Import a workbook containing values only.'],
+    [await serviceWorkbook({ sheetName: 'Other sheet' }), 'Choose a valid service workbook with an All Services sheet.'],
+    [await serviceWorkbook({ external: true }), 'Choose a valid service workbook with an All Services sheet.'],
+    [await serviceWorkbook({ extra: 'xl/vbaProject.bin' }), 'Choose a valid service workbook with an All Services sheet.'],
+    [await serviceWorkbook({ headers: serviceHeaders.map((h, i) => i === 1 ? 'Category' : h) }), 'The All Services column headings do not match the import format.'],
+    [await serviceWorkbook({ rowCount: 251 }), 'The workbook exceeds the import limits: 2 MB, 250 services and 10 MB expanded.'],
+    [await serviceWorkbook({ oversized: true }), 'The workbook exceeds the import limits: 2 MB, 250 services and 10 MB expanded.'],
+  ] as [Buffer, string][]) {
+    await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Invalid.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer });
+    await expect(page.getByRole('alert').filter({ hasText: message })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Preview import', exact: true })).toBeDisabled();
+  }
+  expect(requests).toBe(0);
+  await page.getByLabel('Service workbook', { exact: true }).setInputFiles({ name: 'Valid.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await serviceWorkbook({ headers: [...serviceHeaders, 'Prices CAD'], values: [...serviceValues, '30:10.00:99,60:65.00'] }) });
+  await expect(page.getByRole('textbox', { name: 'Row 2 · 30 min price (CAD)', exact: true })).toHaveValue('');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Discard import changes?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Stay', exact: true }).click();
+  await expect(page.getByText('Imported massage', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Discard', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('service import reads the supplied Services-Library workbook locally', async ({ page }) => {
+  test.skip(!process.env.SERVICE_IMPORT_WORKBOOK, 'Optional private workbook acceptance; synthetic fixtures run in CI.');
+  await openServiceImport(page);
+  await page.getByLabel('Service workbook', { exact: true }).setInputFiles(process.env.SERVICE_IMPORT_WORKBOOK!);
+  await expect(page.getByText(/64 service rows/)).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Service import rows' }).getByRole('row')).toHaveCount(65);
+  const categories = await page.getByRole('table', { name: 'Service import rows' }).locator('tbody tr td:nth-child(3)').allTextContents();
+  expect(new Set(categories).size).toBe(6);
+  await expect(page.getByRole('button', { name: 'Import reviewed services', exact: true })).toBeDisabled();
+});
+
+test('service import is unavailable to reception and clinic administrators', async ({ page }) => {
+  await fixtures(page, ['clinic_admin', 'reception']);
+  await page.goto(`${portalHost}/admin/services`);
+  await expect(page.getByRole('button', { name: 'Import services', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Choose service workbook', exact: true })).toHaveCount(0);
+});
+
+test('service import provides French controls and validation', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('wellness.language', 'fr'));
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/services', route => route.fulfill({ json: { data: [] } }));
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [] } } }));
+  await page.goto(`${portalHost}/admin/services`);
+  await page.getByRole('button', { name: 'Importer des services', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Importer des services pour Test Wellness' })).toBeVisible();
+  await page.getByLabel('Classeur des services', { exact: true }).setInputFiles({ name: 'Invalid.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('invalid') });
+  await expect(page.getByRole('alert').filter({ hasText: 'Choisissez un classeur valide contenant la feuille All Services.' })).toBeVisible();
+});
 
 for (const unavailable of [false, true]) test(`notification review ${unavailable ? 'clears stale contact details after access denial' : 'closes a permitted notice and refreshes the list'}`, async ({ page }) => {
   await fixtures(page, ['clinic_admin']);

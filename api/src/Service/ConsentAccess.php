@@ -69,6 +69,7 @@ final class ConsentAccess
             'updateClinic','branding','saveBrandAsset','deleteBrandAsset','updatePortalTheme','updatePortalWelcome', // Public clinic presentation only; service owns persisted authority and atomic audits.
             'createTax','updateBookingSettings', // AdminService owns persisted clinic-wide authority; stored configuration only.
             'catalogueSettings','createServiceCategory','updateServiceCategory','createService','updateService','serviceAssignments','updateServiceAssignments',
+            'previewServiceImport','applyServiceImport','serviceImport', // AdminService owns current clinic-wide authority and complete update effects.
             'roomCapabilities','createRoomCapability','updateRoomCapabilityAssignments','roomPractitionerRestrictions','updateRoomPractitioners',
             'createRoom','updateRoom', // AdminService owns current clinic-wide authority, turnover effects and safe relocation.
             'createLocation','updateLocation', // AdminService authorizes approval revocations and timezone appointment effects before mutation.

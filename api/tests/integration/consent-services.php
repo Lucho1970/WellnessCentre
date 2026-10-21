@@ -4,6 +4,7 @@ require __DIR__.'/access-audit.php';
 use Wellness\Service\{AdminService,ClientConsentService,ConsentLock};
 use Wellness\Http\ApiException;
 $checks=0;$admin=new AdminService($database,$audit);$policy=new ClientConsentService($database,$audit);
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/052_service_imports.sql'));
 $pdo->exec("INSERT INTO locations(id,clinic_id,name,timezone) VALUES(10,1,'Own second','America/Toronto'),(20,2,'Foreign','America/Toronto');
  INSERT INTO service_categories(id,clinic_id,name) VALUES(10,1,'Own category'),(20,2,'Foreign category');
  INSERT INTO services(id,clinic_id,slug,name,price_cents,category_id) VALUES(11,1,'booked-service','Booked service',5000,10),(12,1,'empty-service','Empty service',5000,10),(20,2,'foreign-service','Foreign service',9000,20);
@@ -63,6 +64,27 @@ try{for($i=0;$i<100;$i++){$socket=@stream_socket_client('tcp://'.$address,$errno
  foreach([20,99999] as $target){[$status,$data,$cid]=$call('/api/v1/admin/services/'.$target,$adminToken,'PATCH',['name'=>'Foreign']);$expect($status===404&&$event($cid)[0]['outcome']==='denied','Foreign/missing HTTP service targets concealed');}
  [$status]=$call('/api/v1/admin/services',$adminToken,'GET',null,'audit-b.test');$expect($status===403,'Host switch cannot carry service authority into foreign clinic');
  try{(new \Wellness\Service\ConsentAccess($pdo))->request($operator,new \Wellness\Http\Request('POST','/api/v1/unclassified-operation',[],[],[],'unknown-route'),'unknownRoute');throw new RuntimeException('Expected unknown-route refusal');}catch(ApiException $e){$expect($e->status===403&&$e->errorCode==='consent_scope_restricted','Unknown staff route retains conservative consent fallback');}
+ // Import routes have their own current clinic-wide authority and consent enforcement.
+ $importBody=['request_key'=>'11111111-1111-4111-8111-111111111111','file_name'=>'Synthetic.xlsx','create_categories'=>false,'duplicate_policy'=>'skip','rows'=>[[
+  'row_number'=>2,'category'=>'HTTP updated category','name'=>'HTTP imported service','name_fr'=>'Service importé','service_type'=>'Treatment','initial_consultation'=>false,
+  'durations'=>[60],'prices'=>[['minutes'=>60,'price_cents'=>6000]],'public_summary'=>'Synthetic','public_summary_fr'=>'Synthétique','description'=>'Synthetic description','description_fr'=>'Description synthétique']]];
+ [$status,$data,$cid]=$call('/api/v1/admin/service-imports/preview',$adminToken,'POST',$importBody);
+ $expect($status===200&&$data['data']['can_import']&&$event($cid)[0]['outcome']==='success','Import preview passes route classification under unrelated consent restrictions');
+ $import=$data['data'];$confirmation=['preview_id'=>$import['preview_id'],'confirmation_hash'=>$import['confirmation_hash']];
+ [$status,$data,$cid]=$call('/api/v1/admin/service-imports/'.$import['preview_id'],$adminToken);
+ $expect($status===200&&$event($cid)[0]['outcome']==='success','Restricted preview read is audited');
+ foreach([['POST','/api/v1/admin/service-imports/preview',$importBody],['POST','/api/v1/admin/service-imports/apply',$confirmation],['GET','/api/v1/admin/service-imports/'.$import['preview_id'],null]] as [$method,$path,$payload]){
+  [$status,$data,$cid]=$call($path,$practitionerToken,$method,$payload);$expect($status===403&&$event($cid)[0]['outcome']==='denied','Import route denial is authorized and access audited');
+  [$status]=$call($path,$adminToken,$method,$payload,'audit-b.test');$expect($status===403,'Import route cannot carry authority into a different host clinic');
+ }
+ [$status,$data,$cid]=$call('/api/v1/admin/service-imports/apply',$adminToken,'POST',$confirmation);
+ $expect($status===200&&$data['data']['counts']['create']===1&&$event($cid)[0]['outcome']==='success','Reviewed import applies over authenticated HTTP with access audit');
+ $createdService=(int)$data['data']['rows'][0]['service_id'];
+ $expect(in_array(['type'=>'service','id'=>$createdService],json_decode($event($cid)[0]['metadata'],true)['resources'],true),'Apply access audit captures created service references');
+ [$status,$data,$cid]=$call('/api/v1/admin/service-imports/'.$import['preview_id'],$adminToken);
+ $expect($status===200&&in_array(['type'=>'service','id'=>$createdService],json_decode($event($cid)[0]['metadata'],true)['resources'],true),'Completed preview read audits saved result references');
+ [$status,$data]=$call('/api/v1/admin/service-imports/apply',$adminToken,'POST',$confirmation);$expect($status===200&&$data['data']['counts']['create']===1,'HTTP apply retry returns the same result');
+ [$status]=$call('/api/v1/admin/service-imports/preview',$adminToken,'POST',array_replace($importBody,['file_name'=>str_repeat('a',1048576)]));$expect($status===413,'Import request body is bounded before JSON parsing');
  [$status,$data]=$call('/api/v1/booking-clients/101/address',$practitionerToken);$expect($status===403&&$data['error']['code']==='consent_restricted','Service administration does not restore patient access');
 }finally{proc_terminate($server);proc_close($server);}
 echo "Consent-authorized services: $checks checks passed; synthetic local SQL/HTTP only.\n";

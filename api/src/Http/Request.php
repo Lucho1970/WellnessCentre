@@ -19,7 +19,9 @@ final readonly class Request
         $headers = function_exists('getallheaders') ? getallheaders() : [];
         $requestPath=parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $customer = str_starts_with($requestPath, '/api/v1/customer/') || str_starts_with($requestPath,'/api/v1/public/') || str_starts_with($requestPath,'/api/v1/travel-enquiries') || $requestPath==='/api/v1/profile/discovery-preferences';
-        $raw = ($customer ? file_get_contents('php://input', false, null, 0, 65537) : file_get_contents('php://input')) ?: '';
+        $serviceImport = str_starts_with($requestPath, '/api/v1/admin/service-imports');
+        $raw = ($serviceImport ? file_get_contents('php://input', false, null, 0, 1048577) : ($customer ? file_get_contents('php://input', false, null, 0, 65537) : file_get_contents('php://input'))) ?: '';
+        if ($serviceImport && strlen($raw) > 1048576) throw new ApiException(413, 'request_too_large', 'The request is too large.');
         if ($customer && strlen($raw) > 65536) throw new ApiException(413, 'request_too_large', 'The request is too large.');
         $body = $raw === '' ? [] : json_decode($raw, true);
         if (!is_array($body)) throw new ApiException(400, 'invalid_json', 'The request body must contain valid JSON.');

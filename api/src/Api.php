@@ -268,6 +268,9 @@ final class Api
                 $routes->addRoute('GET','/api/v1/admin/practitioners','adminPractitioners');
                 $routes->addRoute('POST','/api/v1/admin/practitioners/onboard','onboardPractitioner');
                 $routes->addRoute('PATCH','/api/v1/admin/practitioners/{id:\\d+}','updatePractitioner');
+                $routes->addRoute('POST','/api/v1/admin/service-imports/preview','previewServiceImport');
+                $routes->addRoute('POST','/api/v1/admin/service-imports/apply','applyServiceImport');
+                $routes->addRoute('GET','/api/v1/admin/service-imports/{id:[a-f0-9-]+}','serviceImport');
                 $routes->addRoute('POST','/api/v1/admin/services','createService');
                 $routes->addRoute('GET','/api/v1/admin/services','adminServices');
                 $routes->addRoute('PATCH','/api/v1/admin/services/{id:\\d+}','updateService');
@@ -471,6 +474,9 @@ final class Api
                 'onboardPractitioner'=>$this->onboardPractitioner($request),
                 'practitionerDirectoryOptions'=>$this->practitionerDirectoryOptions($request),
                 'updatePractitioner'=>$this->admin->updatePractitioner($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'previewServiceImport'=>$this->admin->previewServiceImport($this->user($request),$request->body,$request->correlationId),
+                'applyServiceImport'=>$this->admin->applyServiceImport($this->user($request),$request->body,$request->correlationId),
+                'serviceImport'=>$this->admin->serviceImport($this->user($request),(string)$route[2]['id']),
                 'createService'=>$this->admin->createService($this->user($request),$request->body,$request->correlationId),
                 'adminServices'=>$this->admin->services($this->user($request)),
                 'updateService'=>$this->admin->updateService($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),

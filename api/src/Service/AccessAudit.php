@@ -35,6 +35,7 @@ final class AccessAudit
         'amendment_id'=>'form_amendment',
     ];
     private const ENTITIES = [
+        'service-imports'=>'service_import',
         'dashboard-widgets'=>'dashboard_widget','reminder-schedules'=>'reminder_schedule','reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
         'next-onsite'=>'appointment','calendar'=>'appointment','receipts'=>'session_receipt','receipt'=>'session_receipt',
         'forms'=>'client_form_task','tasks'=>'client_form_task','templates'=>'form_template','drafts'=>'form_draft',
@@ -78,7 +79,7 @@ final class AccessAudit
         // This is a vocabulary, not a route authorization list. New words safely become :value.
         $words = array_merge(array_keys(self::ENTITIES), [
             'branding','logo','favicon','portal-theme','portal-welcome','api','v1','customer','application','admin','practitioner','profile','auth','me','options','activity',
-            'session','challenge','logout','register','accept','search','preview','availability','booking-options',
+            'session','challenge','logout','register','accept','search','preview','apply','availability','booking-options',
             'cancellation-preview','reassignment-options','address','address-coverage','validate','approval',
             'approve','revoke','resolve','appointment-links','action-links','pdf','download','merge-preview','merge',
             'dashboard','preferences','visit-summary','travel-estimate','qualifications','types','public-card',
@@ -145,6 +146,12 @@ final class AccessAudit
             }
         };
         $visit($data,$entity,0);
+        // Import plans have arbitrary descriptive payloads. Audit only their fixed row references.
+        if($entity==='service_import')foreach([$data['rows']??[],$data['result']['rows']??[]] as $rows)if(is_array($rows))foreach($rows as $row)if(is_array($row)){
+            foreach(['service_id'=>'service','category_id'=>'service_category'] as $key=>$type){
+                $id=self::positiveId($row[$key]??null);if($id!==null)$found[$type.':'.$id]=['type'=>$type,'id'=>$id];
+            }
+        }
         // Dashboard values have administrator-chosen widget keys. Only the fixed projection
         // schema may expose appointment records; do not recursively inspect definitions.
         $definitions = $data['definitions'] ?? [];
