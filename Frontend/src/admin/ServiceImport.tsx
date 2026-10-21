@@ -81,11 +81,11 @@ export function ServiceImport({ onClose, onImported, onDenied }: { onClose: () =
     <Dialog open fullWidth maxWidth="xl" onClose={close} aria-labelledby="service-import-title">
       <DialogTitle id="service-import-title">{t('Import services for {{clinic}}', { clinic: config.name })}</DialogTitle>
       <DialogContent dividers><Stack spacing={2}>
-        <Typography>{t('Upload an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.')}</Typography>
+        <Typography>{t('Upload a CSV file or an XLSX workbook with the All Services sheet. Limit: 250 services and 2 MB.')}</Typography>
         <Alert severity="info">{t('New services are inactive and unpublished. Prices are required; zero explicitly means free. Type and Initial Consultation are retained in the import record as descriptive metadata only.')}</Alert>
         {error && <Alert severity="error">{error}</Alert>}
         {!result && <>
-          <Button component="label" variant="outlined" disabled={busy}>{t('Choose service workbook')}<input aria-label={t('Service workbook')} type="file" accept=".xlsx" hidden onChange={event => { setPriceInputs({}); void selectFile(event.target.files?.[0]); event.target.value = ''; }}/></Button>
+          <Button component="label" variant="outlined" disabled={busy}>{t('Choose service workbook')}<input aria-label={t('Service workbook')} type="file" accept=".xlsx,.csv" hidden onChange={event => { setPriceInputs({}); void selectFile(event.target.files?.[0]); event.target.value = ''; }}/></Button>
           {fileName && <Typography>{fileName} · {t('{{count}} service rows', { count: rows.length })}</Typography>}
           <TextField id="service-import-duplicates" select label={t('Existing services')} value={policy} disabled={busy} onChange={event => { setPolicy(event.target.value); change(); }}>
             <MenuItem value="skip">{t('Skip existing services')}</MenuItem><MenuItem value="update_content">{t('Update names, descriptions and category only')}</MenuItem>
