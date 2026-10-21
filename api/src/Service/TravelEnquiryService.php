@@ -105,7 +105,8 @@ final class TravelEnquiryService
         try{
             $seen=$actor->userType==='client'?'client_seen_id':'practitioner_seen_id';
             // Administrators retain their shared staff read state; only permitted threads contribute.
-            $unread="EXISTS(SELECT 1 FROM travel_enquiry_messages m JOIN users author ON author.id=m.sender_id AND author.clinic_id=e.clinic_id AND (author.id=e.client_id OR author.user_type='staff') WHERE m.enquiry_id=e.id AND m.id>e.$seen AND ".($actor->userType==='client'?'m.sender_id<>e.client_id':'m.sender_id=e.client_id').')';
+            // MySQL 5.7 resolves outer enquiry references in WHERE, not the inner JOIN ON clause.
+            $unread="EXISTS(SELECT 1 FROM travel_enquiry_messages m JOIN users author ON author.id=m.sender_id WHERE author.clinic_id=e.clinic_id AND (author.id=e.client_id OR author.user_type='staff') AND m.enquiry_id=e.id AND m.id>e.$seen AND ".($actor->userType==='client'?'m.sender_id<>e.client_id':'m.sender_id=e.client_id').')';
             $from=self::FROM." WHERE e.clinic_id=:clinic AND $scope";
             $q=$pdo->prepare("SELECT e.id,e.status,e.search_label,e.created_at,u.display_name client_name,pu.display_name practitioner_name,s.name service_name,$unread unread$from AND e.id<:before ORDER BY e.id DESC LIMIT 51");$q->execute($params+['before'=>(int)$before]);$items=$q->fetchAll();$more=count($items)>50;$items=array_slice($items,0,50);
             $q=$pdo->prepare("SELECT COUNT(*)$from AND $unread");$q->execute($params);
