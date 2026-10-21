@@ -4668,3 +4668,64 @@ test('catalogue duplicate tax conflict retains draft for correction', async ({ p
   await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Correctable tax draft');
   await expect(page.getByRole('button', { name: 'Add tax', exact: true })).toBeEnabled();
 });
+
+for (const action of ['profile', 'theme', 'welcome', 'upload', 'remove', 'reload', 'public-refresh', '404'] as const) test(`clinic presentation ${action} refusal clears editable content until authorized retry`, async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  let denied = false;
+  const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const publicConfig = { name: 'Synthetic public clinic', legal_name: 'Synthetic Legal', email: 'clinic@example.test', phone: '905-555-0100', logo_version: 'logo-current', favicon_version: 'favicon-current', theme_primary_color: '#176b62', theme_secondary_color: '#d8754c', theme_font_family: 'Inter', welcome_title_en: 'Welcome to our clinic', welcome_title_fr: 'Bienvenue', welcome_body_en: 'Public English welcome', welcome_body_fr: 'Accueil public' };
+  await page.route('**/api/v1/site-config', route => route.fulfill(denied && action === 'public-refresh' ? { status: 503, json: { error: { code: 'clinic_not_configured' } } } : { json: { data: publicConfig } }));
+  await page.route('**/api/v1/brand/*', route => route.fulfill({ body: pixel, contentType: 'image/png' }));
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/clinic**', route => {
+    if (route.request().method() === 'GET') return route.fulfill(denied && action !== 'public-refresh' ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { logo: { content_hash: 'logo-current' }, favicon: { content_hash: 'favicon-current' } } } });
+    denied = true;
+    return route.fulfill(action === 'reload' || action === 'public-refresh' ? { json: { data: {} } } : { status: action === '404' ? 404 : 403, json: { error: { code: 'forbidden' } } });
+  });
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Operating name', exact: true }).fill('Unsaved clinic name');
+  await page.getByRole('textbox', { name: 'Welcome title (English)', exact: true }).fill('Unsaved welcome');
+  await page.locator('input[type="color"]').first().fill('#123456');
+  if (action === 'upload') await page.getByRole('button', { name: 'Replace image', exact: true }).first().locator('input').setInputFiles({ name: 'synthetic-logo.png', mimeType: 'image/png', buffer: pixel });
+  else await page.getByRole('button', { name: action === 'theme' ? 'Save portal appearance' : action === 'welcome' ? 'Save welcome message' : action === 'remove' ? 'Remove' : 'Save settings', exact: true }).first().click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Business email', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Welcome title (English)', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save portal appearance', exact: true })).toBeDisabled();
+  await expect(page.getByRole('img', { name: 'Current business logo', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('img', { name: 'Current favicon', exact: true })).toHaveCount(0);
+  for (const message of ['Business settings saved.', 'Portal theme saved.', 'Portal welcome message saved.', 'Business logo updated.', 'Business logo removed.']) await expect(page.getByText(message, { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })))).toBe(false);
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue(publicConfig.name);
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await expect(page.getByRole('img', { name: 'Current business logo', exact: true })).toBeVisible();
+});
+test('clinic presentation initial authorization denial cannot populate public data into editor', async ({ page }) => {
+  await fixtures(page, ['super_admin']); let denied = true;
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/clinic/branding', route => route.fulfill(denied ? { status: 403, json: { error: { code: 'forbidden' } } } : { json: { data: { logo: null, favicon: null } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeDisabled();
+  denied = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('Test Wellness');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+});
+test('clinic profile validation retains editable draft without reporting save success', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  await page.route('**/api/v1/admin/catalogue-settings', route => route.fulfill({ json: { data: { categories: [], taxes: [], settings: null } } }));
+  await page.route('**/api/v1/admin/clinic', route => route.fulfill({ status: 422, json: { error: { code: 'validation_error', message: 'Check public contact details.' } } }));
+  await page.goto(`${portalHost}/admin/settings`);
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Operating name', exact: true }).fill('Correctable public clinic draft');
+  await page.getByRole('button', { name: 'Save settings', exact: true }).click();
+  await expect(page.getByText('Unable to save business settings.', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toHaveValue('Correctable public clinic draft');
+  await expect(page.getByRole('textbox', { name: 'Operating name', exact: true })).toBeEnabled();
+  await expect(page.getByText('Business settings saved.', { exact: true })).toHaveCount(0);
+});

@@ -158,4 +158,9 @@ $check($description['targets']===[['type'=>'service','id'=>22]],'Service assignm
 $settingsRoute=AccessAudit::describe(new Request('PATCH','/api/v1/admin/booking-settings',[],[],['default_lead_time_minutes'=>60],'booking-settings-audit'));
 $check($settingsRoute['entity']==='clinic'&&$settingsRoute['route']==='/api/v1/admin/booking-settings','Booking settings has an explicit canonical audit route, without treating defaults as patient records');
 
+foreach(['/api/v1/admin/clinic','/api/v1/admin/clinic/branding','/api/v1/admin/clinic/branding/logo','/api/v1/admin/clinic/branding/favicon','/api/v1/admin/clinic/portal-theme','/api/v1/admin/clinic/portal-welcome'] as $path){
+    $description=AccessAudit::describe(new Request('PUT',$path,[],[],['image_base64'=>'private-image','welcome_title_en'=>'private-draft'],'clinic-audit'));
+    $check($description['route']===$path&&$description['entity']==='clinic','Clinic presentation route canonicalization contains no raw payload');
+}
+
 echo "Access audit policy/response checks: $checks passed.\n";

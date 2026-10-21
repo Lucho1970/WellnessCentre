@@ -66,6 +66,7 @@ final class ConsentAccess
             && in_array($r->method,['GET','POST'],true))return; // TravelEnquiryService owns row-level authorization.
         // These routes contain no patient records, or enforce their own filtered boundary below.
         if(in_array($route,[
+            'updateClinic','branding','saveBrandAsset','deleteBrandAsset','updatePortalTheme','updatePortalWelcome', // Public clinic presentation only; service owns persisted authority and atomic audits.
             'createTax','updateBookingSettings', // AdminService owns persisted clinic-wide authority; stored configuration only.
             'catalogueSettings','createServiceCategory','updateServiceCategory','createService','updateService','serviceAssignments','updateServiceAssignments',
             'roomCapabilities','createRoomCapability','updateRoomCapabilityAssignments','roomPractitionerRestrictions','updateRoomPractitioners',

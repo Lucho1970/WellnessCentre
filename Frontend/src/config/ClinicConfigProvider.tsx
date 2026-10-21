@@ -23,7 +23,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/a
 type ClinicConfigValue = {
   config: ClinicConfig;
   loading: boolean;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<ClinicConfig | null>;
 };
 
 const ClinicConfigContext = createContext<ClinicConfigValue | null>(null);
@@ -41,9 +41,11 @@ export function ClinicConfigProvider({ children }: PropsWithChildren) {
       document.title = body.data.name;
       const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'icon' }));
       favicon.href = body.data.favicon_version ? `${apiBaseUrl}/brand/favicon?v=${encodeURIComponent(body.data.favicon_version)}` : '/favicon.svg';
+      return body.data as ClinicConfig;
     } catch {
       setConfig(fallbackConfig);
       document.title = fallbackConfig.name;
+      return null;
     } finally {
       setLoading(false);
     }

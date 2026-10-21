@@ -41,7 +41,7 @@ final class AccessAudit
         'notifications'=>'notification','travel-enquiries'=>'travel_enquiry','messages'=>'travel_enquiry_message',
         'practitioners'=>'practitioner','staff'=>'user','users'=>'user','invitations'=>'invitation',
         'staff-invitations'=>'staff_invitation','recurring-series'=>'recurring_series','clinics'=>'clinic',
-        'booking-settings'=>'clinic','service-categories'=>'service_category','categories'=>'service_category','taxes'=>'tax','service-assignments'=>'service','catalogue-settings'=>'record','room-capabilities'=>'room_capability','capabilities'=>'room_capability','room-capability-assignments'=>'room_capability','room-practitioner-restrictions'=>'room','locations'=>'location','services'=>'service','logistics-notes'=>'appointment_logistics_note',
+        'clinic'=>'clinic','booking-settings'=>'clinic','service-categories'=>'service_category','categories'=>'service_category','taxes'=>'tax','service-assignments'=>'service','catalogue-settings'=>'record','room-capabilities'=>'room_capability','capabilities'=>'room_capability','room-capability-assignments'=>'room_capability','room-practitioner-restrictions'=>'room','locations'=>'location','services'=>'service','logistics-notes'=>'appointment_logistics_note',
         'visit-history'=>'visit_event','history'=>'history_event','practitioner-access'=>'practitioner',
         'global-credentials'=>'global_credential','qualifications'=>'qualification','rooms'=>'room',
         'practitioner-enquiries'=>'practitioner_enquiry','form-library'=>'form_library_entry','library'=>'form_library_entry',
@@ -77,7 +77,7 @@ final class AccessAudit
         if ($request === null) return ['route'=>'unparsed','entity'=>'record','targets'=>[]];
         // This is a vocabulary, not a route authorization list. New words safely become :value.
         $words = array_merge(array_keys(self::ENTITIES), [
-            'api','v1','customer','application','admin','practitioner','profile','auth','me','options','activity',
+            'branding','logo','favicon','portal-theme','portal-welcome','api','v1','customer','application','admin','practitioner','profile','auth','me','options','activity',
             'session','challenge','logout','register','accept','search','preview','availability','booking-options',
             'cancellation-preview','reassignment-options','address','address-coverage','validate','approval',
             'approve','revoke','resolve','appointment-links','action-links','pdf','download','merge-preview','merge',

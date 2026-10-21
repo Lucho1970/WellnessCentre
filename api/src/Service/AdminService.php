@@ -112,18 +112,30 @@ final class AdminService
     }
 
     public function updateClinic(AuthContext $actor,array $body,string $correlationId): array
+    {return $this->clinicAdministration($actor,fn()=>$this->updateClinicRecord($actor,$body,$correlationId),clinicWide:true);}
+
+    private function updateClinicRecord(AuthContext $actor,array $body,string $correlationId): array
     {
-        $this->superAdmin($actor);$this->required($body,['name']);
-        $name=trim((string)$body['name']);$legalName=$this->optional($body,'legal_name');$email=$this->optional($body,'email');$phone=$this->optional($body,'phone');
-        if(strlen($name)>160)throw new ApiException(422,'validation_error','The operating name is too long.',['name'=>'Maximum 160 characters']);
-        if($legalName!==null&&strlen($legalName)>190)throw new ApiException(422,'validation_error','The legal name is too long.',['legal_name'=>'Maximum 190 characters']);
-        if($email!==null&&(strlen($email)>190||filter_var($email,FILTER_VALIDATE_EMAIL)===false))throw new ApiException(422,'validation_error','Enter a valid email address.',['email'=>'Invalid email']);
-        if($phone!==null&&strlen($phone)>40)throw new ApiException(422,'validation_error','The phone number is too long.',['phone'=>'Maximum 40 characters']);
-        $pdo=$this->database->connection();
-        try{$pdo->beginTransaction();$statement=$pdo->prepare('UPDATE clinics SET name=:name,legal_name=:legal_name,email=:email,phone=:phone WHERE id=:clinic');$statement->execute(['name'=>$name,'legal_name'=>$legalName,'email'=>$email,'phone'=>$phone,'clinic'=>$actor->clinicId]);if($statement->rowCount()===0){$check=$pdo->prepare('SELECT 1 FROM clinics WHERE id=:clinic');$check->execute(['clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'clinic_not_found','Clinic not found.');}$this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.settings.update','clinic',$actor->clinicId,'success',['fields'=>['name','legal_name','email','phone']]);$pdo->commit();return $this->clinic($actor->clinicId);}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        $keys=['name'=>160,'legal_name'=>190,'email'=>190,'phone'=>40];
+        if(array_intersect_key($body,$keys)===[])throw new ApiException(422,'validation_error','Supply at least one clinic profile field.');
+        $values=array_replace($this->clinic($actor->clinicId),array_intersect_key($body,$keys));
+        foreach($keys as $key=>$limit){
+            $value=$values[$key];
+            if($key!=='name'&&$value===null)continue;
+            if(!is_string($value)||mb_strlen(trim($value))>$limit||preg_match('/[\x00-\x1f\x7f]/',$value))throw new ApiException(422,'validation_error','Enter valid clinic contact details.',[$key=>"Text only; maximum $limit characters"]);
+            $values[$key]=trim($value);if($key!=='name'&&$values[$key]==='')$values[$key]=null;
+        }
+        if($values['name']==='')throw new ApiException(422,'validation_error','Enter an operating name.',['name'=>'Required']);
+        if($values['email']!==null&&filter_var($values['email'],FILTER_VALIDATE_EMAIL)===false)throw new ApiException(422,'validation_error','Enter a valid email address.',['email'=>'Invalid email']);
+        $this->database->connection()->prepare('UPDATE clinics SET name=:name,legal_name=:legal_name,email=:email,phone=:phone WHERE id=:clinic')->execute($values+['clinic'=>$actor->clinicId]);
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.settings.update','clinic',$actor->clinicId,'success',['fields'=>array_keys(array_intersect_key($body,$keys))]);
+        return $this->clinic($actor->clinicId);
     }
 
     public function branding(AuthContext $actor): array
+    {return $this->clinicAdministration($actor,fn()=>$this->brandingRecord($actor),clinicWide:true);}
+
+    private function brandingRecord(AuthContext $actor): array
     {
         $this->superAdmin($actor);
         $statement=$this->database->connection()->prepare('SELECT asset_type,mime_type,byte_size,width_px,height_px,content_hash,updated_at FROM clinic_brand_assets WHERE clinic_id=:clinic ORDER BY asset_type');
@@ -134,11 +146,14 @@ final class AdminService
     }
 
     public function saveBrandAsset(AuthContext $actor,string $type,array $body,string $correlationId): array
+    {return $this->clinicAdministration($actor,fn()=>$this->saveBrandAssetRecord($actor,$type,$body,$correlationId),clinicWide:true);}
+
+    private function saveBrandAssetRecord(AuthContext $actor,string $type,array $body,string $correlationId): array
     {
         $this->superAdmin($actor);
         if(!in_array($type,['logo','favicon'],true))throw new ApiException(404,'brand_asset_not_found','Brand asset not found.');
-        $mime=(string)($body['mime_type']??'');$encoded=(string)($body['image_base64']??'');
-        if(!in_array($mime,['image/png','image/webp'],true)||$encoded===''||strlen($encoded)>1_100_000)throw new ApiException(422,'validation_error','Choose a valid PNG or WebP image.');
+        $mime=$body['mime_type']??null;$encoded=$body['image_base64']??null;
+        if(!in_array($mime,['image/png','image/webp'],true)||!is_string($encoded)||$encoded===''||strlen($encoded)>1_100_000)throw new ApiException(422,'validation_error','Choose a valid PNG or WebP image.');
         $data=base64_decode($encoded,true);
         if($data===false||strlen($data)>750_000)throw new ApiException(422,'validation_error','The image is invalid or larger than 750 KB.');
         $info=@getimagesizefromstring($data);$actualMime=$info['mime']??'';$width=(int)($info[0]??0);$height=(int)($info[1]??0);
@@ -152,6 +167,9 @@ final class AdminService
     }
 
     public function deleteBrandAsset(AuthContext $actor,string $type,string $correlationId): array
+    {return $this->clinicAdministration($actor,fn()=>$this->deleteBrandAssetRecord($actor,$type,$correlationId),clinicWide:true);}
+
+    private function deleteBrandAssetRecord(AuthContext $actor,string $type,string $correlationId): array
     {
         $this->superAdmin($actor);if(!in_array($type,['logo','favicon'],true))throw new ApiException(404,'brand_asset_not_found','Brand asset not found.');
         $statement=$this->database->connection()->prepare('DELETE FROM clinic_brand_assets WHERE clinic_id=:clinic AND asset_type=:type');$statement->execute(['clinic'=>$actor->clinicId,'type'=>$type]);
@@ -793,31 +811,34 @@ final class AdminService
     }
 
     public function updatePortalTheme(AuthContext $actor,array $body,string $correlationId): array
+    {return $this->clinicAdministration($actor,fn()=>$this->updatePortalThemeRecord($actor,$body,$correlationId),clinicWide:true);}
+
+    private function updatePortalThemeRecord(AuthContext $actor,array $body,string $correlationId): array
     {
         $this->superAdmin($actor);
         $primary=$body['primary_color']??null;$secondary=$body['secondary_color']??null;$font=$body['font_family']??null;
-        if(!is_string($primary)||!preg_match('/^#[0-9a-fA-F]{6}$/',$primary)||!is_string($secondary)||!preg_match('/^#[0-9a-fA-F]{6}$/',$secondary)||!in_array($font,['Inter','Arial','Georgia'],true))throw new ApiException(422,'validation_error','Choose valid portal colours and font.');
+        if(!is_string($primary)||!preg_match('/^#[0-9a-fA-F]{6}$/D',$primary)||!is_string($secondary)||!preg_match('/^#[0-9a-fA-F]{6}$/D',$secondary)||!in_array($font,['Inter','Arial','Georgia'],true))throw new ApiException(422,'validation_error','Choose valid portal colours and font.');
         $pdo=$this->database->connection();
-        try{$pdo->beginTransaction();$save=$pdo->prepare('INSERT INTO clinic_portal_themes(clinic_id,primary_color,secondary_color,font_family,updated_by) VALUES(:clinic,:primary,:secondary,:font,:actor) ON DUPLICATE KEY UPDATE primary_color=VALUES(primary_color),secondary_color=VALUES(secondary_color),font_family=VALUES(font_family),updated_by=VALUES(updated_by)');$save->execute(['clinic'=>$actor->clinicId,'primary'=>strtolower($primary),'secondary'=>strtolower($secondary),'font'=>$font,'actor'=>$actor->userId]);$this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.portal_theme.update','clinic',$actor->clinicId);$pdo->commit();return ['primary_color'=>strtolower($primary),'secondary_color'=>strtolower($secondary),'font_family'=>$font];}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        $save=$pdo->prepare('INSERT INTO clinic_portal_themes(clinic_id,primary_color,secondary_color,font_family,updated_by) VALUES(:clinic,:primary,:secondary,:font,:actor) ON DUPLICATE KEY UPDATE primary_color=VALUES(primary_color),secondary_color=VALUES(secondary_color),font_family=VALUES(font_family),updated_by=VALUES(updated_by)');$save->execute(['clinic'=>$actor->clinicId,'primary'=>strtolower($primary),'secondary'=>strtolower($secondary),'font'=>$font,'actor'=>$actor->userId]);$this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.portal_theme.update','clinic',$actor->clinicId);return ['primary_color'=>strtolower($primary),'secondary_color'=>strtolower($secondary),'font_family'=>$font];
     }
     public function updatePortalWelcome(AuthContext $actor,array $body,string $correlationId): array
+    {return $this->clinicAdministration($actor,fn()=>$this->updatePortalWelcomeRecord($actor,$body,$correlationId),clinicWide:true);}
+
+    private function updatePortalWelcomeRecord(AuthContext $actor,array $body,string $correlationId): array
     {
         $this->superAdmin($actor);
         $copy=[];
         foreach(['welcome_title_en'=>160,'welcome_title_fr'=>160,'welcome_body_en'=>3000,'welcome_body_fr'=>3000] as $field=>$limit){
             $value=$body[$field]??null;
-            if(!is_string($value)||trim($value)===''||strlen($value)>$limit)throw new ApiException(422,'validation_error','Provide the welcome title and message in English and French.');
+            if(!is_string($value)||trim($value)===''||mb_strlen($value)>$limit||preg_match(str_starts_with($field,'welcome_title')?'/[\x00-\x1f\x7f]/':'/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/',$value))throw new ApiException(422,'validation_error','Provide the welcome title and message in English and French.');
             $copy[$field]=trim($value);
         }
         $pdo=$this->database->connection();
-        try{
-            $pdo->beginTransaction();
-            $statement=$pdo->prepare('INSERT INTO clinic_portal_themes(clinic_id,welcome_title_en,welcome_title_fr,welcome_body_en,welcome_body_fr,updated_by) VALUES(:clinic,:welcome_title_en,:welcome_title_fr,:welcome_body_en,:welcome_body_fr,:actor) ON DUPLICATE KEY UPDATE welcome_title_en=VALUES(welcome_title_en),welcome_title_fr=VALUES(welcome_title_fr),welcome_body_en=VALUES(welcome_body_en),welcome_body_fr=VALUES(welcome_body_fr),updated_by=VALUES(updated_by)');
-            $statement->execute(['clinic'=>$actor->clinicId,'actor'=>$actor->userId]+$copy);
-            $this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.portal_welcome.update','clinic',$actor->clinicId);
-            $pdo->commit();
-            return $copy;
-        }catch(Throwable $error){if($pdo->inTransaction())$pdo->rollBack();throw $error;}
+        $statement=$pdo->prepare('INSERT INTO clinic_portal_themes(clinic_id,welcome_title_en,welcome_title_fr,welcome_body_en,welcome_body_fr,updated_by) VALUES(:clinic,:welcome_title_en,:welcome_title_fr,:welcome_body_en,:welcome_body_fr,:actor) ON DUPLICATE KEY UPDATE welcome_title_en=VALUES(welcome_title_en),welcome_title_fr=VALUES(welcome_title_fr),welcome_body_en=VALUES(welcome_body_en),welcome_body_fr=VALUES(welcome_body_fr),updated_by=VALUES(updated_by)');
+        $statement->execute(['clinic'=>$actor->clinicId,'actor'=>$actor->userId]+$copy);
+        $this->audit->write($actor->clinicId,$actor,$correlationId,'clinic.portal_welcome.update','clinic',$actor->clinicId);
+
+        return $copy;
     }
     public function timeOffImpact(AuthContext $actor,int $id): array
     {

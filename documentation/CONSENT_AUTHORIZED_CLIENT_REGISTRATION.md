@@ -53,3 +53,5 @@ The [PHIPA readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md) release gates
 Subsequent service work: [service configuration and assignments](CONSENT_AUTHORIZED_SERVICES.md) now have current clinic authority, complete booking/series and approval-effect checks, atomic replacement and individual approval revocation audits. Tax creation and clinic booking defaults remain separately blocked.
 
 Subsequent configuration work: [tax creation and clinic booking defaults](CONSENT_AUTHORIZED_TAX_BOOKING_SETTINGS.md) now have current clinic authority, bounded validation and atomic audits, without propagating configuration into existing patient records. Clinic profile, branding, theme and welcome routes remain separately blocked.
+
+Subsequent presentation work: [clinic profile, branding, themes and welcome content](CONSENT_AUTHORIZED_CLINIC_BRANDING.md) now require current clinic-wide authority and atomic audits. Public presentation maintenance grants no patient access; unknown staff routes retain the fallback and client merges with consent history still need reviewed reconciliation.

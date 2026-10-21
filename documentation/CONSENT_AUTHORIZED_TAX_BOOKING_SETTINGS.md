@@ -34,3 +34,5 @@ Local validation on 20 October 2026:
 Review base: `feature/consent-authorized-services` (`6b19eb5`). This task builds on that unmerged checkpoint. No migration is required. Before real patient data, rehearse current roles, authorized configuration, audit failure and concurrent locking on the hosted database and complete the [readiness review](PHIPA_READINESS_REVIEW_2026-10-18.md) release gates. Local checks do not establish hosted acceptance or PHIPA certification.
 
 Remaining conservative clinic configuration includes clinic profile, branding, themes and welcome content. Client merges with any consent history still require reviewed reconciliation. Unknown authenticated staff routes retain the fallback.
+
+Subsequent presentation work: [clinic profile, branding, themes and welcome content](CONSENT_AUTHORIZED_CLINIC_BRANDING.md) now require current clinic-wide authority and atomic audits. Public presentation maintenance grants no patient access; unknown staff routes retain the fallback and client merges with consent history still need reviewed reconciliation.
