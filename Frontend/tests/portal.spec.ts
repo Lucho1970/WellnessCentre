@@ -1548,6 +1548,7 @@ test("role policies preserve current access without broadening permissions", () 
     "clients",
     "forms",
     "my_notifications",
+    "travel",
     "calendar",
     "profile",
   ]);
