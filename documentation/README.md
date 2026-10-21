@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Service spreadsheet import](SERVICE_IMPORT.md): bilingual workbook preview, pricing validation, conservative duplicate handling, current clinic authorization and migration 052.
+
 - [21 October repository integration and cleanup](GIT_CLEANUP_2026-10-21.md): consolidated source history, validation evidence, branch-deletion safeguards and hosted acceptance limits.
 
 - [Consent-authorized room maintenance](CONSENT_AUTHORIZED_ROOMS.md): current clinic-wide authority, complete turnover effects, guarded relocation, atomic audits and portal recovery.

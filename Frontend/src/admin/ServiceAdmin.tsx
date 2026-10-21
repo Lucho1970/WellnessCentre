@@ -9,6 +9,7 @@ import { apiErrorMessage } from '../shared/api';
 import { formatCad } from '../i18n/format';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { ServiceAssignments } from './ServiceAssignments';
+import { ServiceImport } from './ServiceImport';
 import { Link as RouterLink } from 'react-router-dom';
 import { pagePath } from '../portal/access';
 
@@ -70,6 +71,7 @@ function ServiceAdminForm() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [assignmentServiceId, setAssignmentServiceId] = useState<number | null>(null);
   const [assignmentsDirty, setAssignmentsDirty] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [busy, setBusy] = useState(false);
@@ -96,7 +98,7 @@ function ServiceAdminForm() {
   const [loaded, setLoaded] = useState(false);
   const generation = useRef(0);
   const clearAccess = () => {
-    setLoaded(false); setItems([]); setCategories([]); setSelectedId(null); setForm(blank());
+    setImportOpen(false); setLoaded(false); setItems([]); setCategories([]); setSelectedId(null); setForm(blank());
     setPanelMode(null); setEditingId(null); setAssignmentServiceId(null); setAssignmentsDirty(false);
     setQuery(''); setCategoryFilter('all'); setSaved(''); setPanelError(''); formGuard.markClean(); formValidation.clear();
   };
@@ -173,9 +175,11 @@ function ServiceAdminForm() {
   };
 
   return <Stack spacing={2}>
+    {importOpen && <ServiceImport onClose={() => setImportOpen(false)} onImported={() => { void load(); }} onDenied={cause => { generation.current++; clearAccess(); setLoadError(cause.message); }}/>}
     <Paper variant="outlined" sx={{ p: 1.5 }}>
       <Stack component="nav" aria-label={t('Service actions')} direction={{ xs: 'column', md: 'row' }} gap={1} alignItems={{ md: 'center' }}>
         <Button variant="contained" startIcon={<Plus size={17}/>} disabled={!loaded || busy} onClick={startNew}>{t('New service')}</Button>
+        <Button disabled={!loaded || busy || panelMode === 'new' || panelMode === 'edit'} onClick={() => setImportOpen(true)}>{t('Import services')}</Button>
         <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: 0.5 }}/>
         <Button startIcon={<Eye size={17}/>} disabled={!selected} onClick={showDetails}>{t('Details')}</Button>
         <Button startIcon={<Pencil size={17}/>} disabled={!selected} onClick={() => startEdit()}>{t('Edit')}</Button>

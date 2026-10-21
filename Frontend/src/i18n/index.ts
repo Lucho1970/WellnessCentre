@@ -12,6 +12,7 @@ import globalPractitioners from './globalPractitioners';
 import receipts from './receipts';
 import onsiteFees from './onsiteFees';
 import discovery from './discovery';
+import serviceImports from './serviceImports';
 
 export const supportedLanguages = ['en', 'fr'] as const;
 export type SupportedLanguage = typeof supportedLanguages[number];
@@ -33,7 +34,7 @@ function initialLanguage(): SupportedLanguage {
 }
 
 void i18n.use(initReactI18next).init({
-  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en, ...globalPractitioners.en, ...receipts.en, ...onsiteFees.en, ...discovery.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr, ...globalPractitioners.fr, ...receipts.fr, ...onsiteFees.fr, ...discovery.fr } } },
+  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en, ...globalPractitioners.en, ...receipts.en, ...onsiteFees.en, ...discovery.en, ...serviceImports.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr, ...globalPractitioners.fr, ...receipts.fr, ...onsiteFees.fr, ...discovery.fr, ...serviceImports.fr } } },
   lng: initialLanguage(),
   fallbackLng: 'en',
   supportedLngs: supportedLanguages,
