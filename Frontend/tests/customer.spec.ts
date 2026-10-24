@@ -81,6 +81,20 @@ test('travel inbox preserves patient history and draft when recipient access is 
   await expect(page.getByRole('button',{name:'Retry same reply',exact:true})).toHaveCount(0);
 });
 
+test('customer travel badge fetches only the authenticated count until the inbox is opened',async({page})=>{
+  await fixture(page,true); let counts=0,lists=0;
+  await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));
+  await page.route('**/api/v1/customer/appointments?**',route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route('**/api/v1/customer/travel-enquiries/unread-count',route=>{counts++;return route.fulfill({json:{data:{unread_count:2}}});});
+  await page.route('**/api/v1/customer/travel-enquiries',route=>{lists++;return route.fulfill({json:{data:{items:[],unread_count:2,next_before:null}}});});
+  await page.goto('http://localhost:5184/client');
+  await expect(page.getByRole('button',{name:'Unread travel enquiries: 2',exact:true})).toBeVisible();
+  expect(counts).toBe(1);expect(lists).toBe(0);
+  await page.getByRole('button',{name:'Unread travel enquiries: 2',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Travel enquiries',exact:true})).toBeVisible();
+  await expect.poll(()=>lists).toBeGreaterThan(0);
+});
+
 test('client discovers from a saved address and sends a duplicate-safe travel enquiry before reading a reply',async({page})=>{
   await fixture(page,true);
   await page.route('**/api/v1/customer/auth/me',route=>route.fulfill({json:{data:{authenticated:true,authentication_context:'customer',onboarding_status:'linked',capabilities:['own_appointments','book_own_appointments'],session:{idle_expires_at:Date.now()/1000+1800,absolute_expires_at:Date.now()/1000+28800}}}}));

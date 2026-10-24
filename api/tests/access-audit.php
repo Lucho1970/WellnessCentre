@@ -72,6 +72,9 @@ foreach([
 $check(!str_contains(json_encode($row),'private-')&&!str_contains(json_encode($row),'1990'),'No query, credentials, demographics, answers or clinical content');
 $check($payload['data']['items'][0]['id']==='12','Auditing does not alter the response contract');
 $importDescription=AccessAudit::describe($request('/api/v1/admin/service-imports/apply','POST'));
+$countDescription=AccessAudit::describe($request('/api/v1/travel-enquiries/unread-count'));
+$check($countDescription['route']==='/api/v1/travel-enquiries/unread-count'&&$countDescription['entity']==='travel_enquiry','Unread count access has a searchable audit route');
+$check(AccessAudit::resources(['unread_count'=>7],'travel_enquiry')===[],'Count-only response does not fabricate patient or enquiry audit targets');
 $check($importDescription['route']==='/api/v1/admin/service-imports/apply'&&$importDescription['entity']==='service_import','Import paths are searchable without retaining arbitrary UUID path values');
 $check(AccessAudit::resources(['rows'=>[['service_id'=>11,'category_id'=>12,'payload'=>['client_id'=>999,'description'=>'private-text']]]],'service_import')===[['type'=>'service','id'=>11],['type'=>'service_category','id'=>12]],'Import row references are audited without inspecting uploaded content');
 $check(AccessAudit::resources(['result'=>['rows'=>[['service_id'=>13]]]],'service_import')===[['type'=>'service','id'=>13]],'Reading a completed import audits service IDs from the saved result');

@@ -674,6 +674,7 @@ final class Api
     {
         header('Cache-Control: no-store');
         $service=new \Wellness\Service\TravelEnquiryService($this->database,$this->discovery());
+        if($path==='travel-enquiries/unread-count'&&$request->method==='GET')return $service->unreadCount($actor);
         if($path==='travel-enquiries'&&$request->method==='GET')return $service->list($actor,$request->query);
         if($path==='travel-enquiries'&&$request->method==='POST')return $service->create($actor,$request->body,$request->correlationId);
         if(preg_match('#^travel-enquiries/(\d+)(?:/(reply|read|close))?$#D',$path,$match)){
