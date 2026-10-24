@@ -28,7 +28,15 @@ The runner initializes a new random directory under the operating system tempora
 
 ## Deployment and rollback
 
-The reviewed source branch is `bugs/travel-enquiries-mysql57`. A generated patch ZIP contains only `src/Service/TravelEnquiryService.php` and a release manifest recording the committed source revision and file hash. Extract it into the private `/wellness-api` application directory, preserving the existing `.env` and all other files. Back up the previous service file before replacement. No frontend build, dependency update or SQL import is needed for this patch.
+The original source branch was `bugs/travel-enquiries-mysql57`. The correction is now carried forward onto `bugs/restore-travel-inbox-mysql57`, based on the merged service importer. A generated patch ZIP contains only `src/Service/TravelEnquiryService.php`; its adjacent release manifest records the committed source revision and file/archive hashes. Extract the ZIP into the private `/wellness-api` application directory, preserving the existing `.env` and all other files. Back up the previous service file before replacement. No frontend build, dependency update or SQL import is needed for this patch.
+
+The `service-import-2026-10-21` full API archive was built from main without the earlier separate compatibility branch. It contains the affected query and can overwrite an earlier hosted hotfix. When deploying that historical archive, apply this patch afterward. Keep historical packages unchanged; future full releases should be built from a revision that includes this correction.
+
+Build a new one-file patch from clean committed source:
+
+```powershell
+./scripts/build-travel-inbox-patch.ps1 -ReleaseName travel-inbox-mysql57-YYYY-MM-DD
+```
 
 After deployment, sign in to the Wellnexa portal with the affected account, open browser Network, and check that the initial and subsequent one-minute `/api/v1/travel-enquiries` requests return 200. Verify unread counts and clinic/role boundaries using synthetic records and confirm matching periodic PDO failures stop. If the same failure remains, verify the deployed file/OPcache and obtain privacy-safe SQLSTATE/driver diagnostics rather than logging SQL values or exception payloads. Restore the backed-up service file to roll back.
 
