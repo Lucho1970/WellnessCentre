@@ -11,6 +11,89 @@ const publicHost = "http://localhost:5183";
 const portalHost = "http://localhost:5184";
 const errors = new WeakMap<Page, string[]>();
 
+async function badgeClock(page: Page) {
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
+  await fixtures(page, ['super_admin']);
+}
+async function badgeVisibility(page: Page, hidden: boolean) {
+  await page.evaluate(hidden => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: hidden ? 'hidden' : 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+}
+
+test('travel badge polls only the count, pauses hidden tabs and immediately refreshes on return', async ({ page }) => {
+  await badgeClock(page); let calls=0, lists=0;
+  await page.route('**/api/v1/travel-enquiries', route => { lists++; return route.fulfill({json:{data:{items:[],unread_count:0,next_before:null}}}); });
+  await page.route('**/api/v1/travel-enquiries/unread-count', route => { calls++; return route.fulfill({json:{data:{unread_count:calls}}}); });
+  await page.goto(`${portalHost}/admin/services`);
+  const badge=page.getByRole('button',{name:/Unread travel enquiries:/});
+  await expect(badge).toHaveText('Unread travel enquiries: 1');
+  await page.clock.runFor(60000); await expect(badge).toHaveText('Unread travel enquiries: 2');
+  await badgeVisibility(page,true);
+  await page.clock.runFor(600000); expect(calls).toBe(2);
+  await badgeVisibility(page,false); await expect(badge).toHaveText('Unread travel enquiries: 3');
+  await page.clock.runFor(60000); await expect(badge).toHaveText('Unread travel enquiries: 4');
+  expect(lists).toBe(0);
+});
+
+test('travel badge backs off failed requests up to fifteen minutes and resets after success', async ({ page }) => {
+  await badgeClock(page); let calls=0;
+  await page.route('**/api/v1/travel-enquiries/unread-count', route => {
+    calls++;
+    return route.fulfill(calls>=2&&calls<=7 ? {status:500,json:{error:{code:'internal_error'}}} : {json:{data:{unread_count:calls}}});
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  const badge=page.getByRole('button',{name:/Unread travel enquiries:/});
+  await expect(badge).toHaveText('Unread travel enquiries: 1');
+  await page.clock.runFor(60000); await expect(badge).toHaveCount(0); expect(calls).toBe(2);
+  for(const delay of [120000,240000,480000,900000,900000,900000]) {
+    const previous=calls;
+    await page.clock.runFor(delay-1000); expect(calls).toBe(previous);
+    await page.clock.runFor(1100); await expect.poll(()=>calls).toBe(previous+1);
+  }
+  await expect(badge).toHaveText('Unread travel enquiries: 8');
+  await page.clock.runFor(59000); expect(calls).toBe(8);
+  await page.clock.runFor(1100); await expect(badge).toHaveText('Unread travel enquiries: 9');
+});
+
+test('travel badge defers its first request while hidden and ignores stale in-flight responses', async ({ page }) => {
+  await badgeClock(page);
+  await page.addInitScript(()=>Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'}));
+  let calls=0; let release: (()=>Promise<void>) | undefined;
+  await page.route('**/api/v1/travel-enquiries/unread-count', async route => {
+    calls++;
+    if(calls===1) { await new Promise<void>(resolve=>{release=async()=>{await route.fulfill({json:{data:{unread_count:99}}});resolve();};}); }
+    else await route.fulfill({json:{data:{unread_count:2}}});
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  await expect(page.getByRole('heading',{name:'Services',exact:true})).toBeVisible();
+  await page.clock.runFor(120000); expect(calls).toBe(0);
+  await badgeVisibility(page,false); await expect.poll(()=>calls).toBe(1);
+  await page.clock.runFor(600000); expect(calls).toBe(1);
+  await badgeVisibility(page,true); await badgeVisibility(page,false); expect(calls).toBe(1);
+  await release!();
+  const badge=page.getByRole('button',{name:/Unread travel enquiries:/});
+  await expect(badge).toHaveText('Unread travel enquiries: 2'); expect(calls).toBe(2);
+  await page.goto(publicHost);
+  await page.clock.runFor(600000); expect(calls).toBe(2);
+});
+
+for(const status of [401,403,404])test(`travel badge clears its count after ${status} denial and refreshes when visible again`, async ({ page }) => {
+  await badgeClock(page); let calls=0;
+  await page.route('**/api/v1/travel-enquiries/unread-count', route => {
+    calls++; return route.fulfill(calls===2 ? {status,json:{error:{code:'forbidden'}}} : {json:{data:{unread_count:1}}});
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  const badge=page.getByRole('button',{name:/Unread travel enquiries:/});
+  await expect(badge).toHaveText('Unread travel enquiries: 1');
+  await page.clock.runFor(60000); await expect(badge).toHaveCount(0);
+  await page.clock.runFor(60000); expect(calls).toBe(2);
+  await badgeVisibility(page,true); await badgeVisibility(page,false);
+  await expect(badge).toHaveText('Unread travel enquiries: 1'); expect(calls).toBe(3);
+});
+
 async function openServiceImport(page: Page) {
   await fixtures(page, ['super_admin']);
   await page.route('**/api/v1/admin/services', route => route.fulfill({ json: { data: [] } }));

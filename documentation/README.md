@@ -2,6 +2,7 @@
 
 - [Service spreadsheet import](SERVICE_IMPORT.md): bilingual workbook preview, pricing validation, conservative duplicate handling, current clinic authorization and migration 052.
 - [Travel-enquiry MySQL 5.7 correction](TRAVEL_ENQUIRY_MYSQL57_FIX.md): reproduced inbox failure, preserved consent filtering, dual-engine tests and one-file deployment.
+- [Travel unread-count polling](TRAVEL_UNREAD_POLLING.md): count-only authorized endpoints, visibility-aware checks, bounded retries and deployment order.
 
 - [21 October repository integration and cleanup](GIT_CLEANUP_2026-10-21.md): consolidated source history, validation evidence, branch-deletion safeguards and hosted acceptance limits.
 

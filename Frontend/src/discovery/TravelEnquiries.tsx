@@ -20,7 +20,40 @@ export function StaffTravelEnquiries(){const request=useTravelRequest();return <
 
 export function TravelEnquiryNotice({request,open}:{request:DiscoveryRequest;open:()=>void}) {
   const {t}=useTranslation();const [count,setCount]=useState(0);
-  useEffect(()=>{let live=true;const load=()=>{void request('/travel-enquiries').then(data=>{if(live)setCount(data.unread_count);}).catch(()=>{if(live)setCount(0);});};load();const timer=setInterval(load,60000);return()=>{live=false;clearInterval(timer);};},[request]);
+  useEffect(()=>{
+    const interval=60000,maxDelay=15*60000;
+    let live=true,inFlight=false,refreshPending=false,generation=0,delay=interval;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setCount(0);
+    const visible=()=>document.visibilityState!=='hidden';
+    const clear=()=>{if(timer!==undefined)clearTimeout(timer);timer=undefined;};
+    const load=async()=>{
+      clear();
+      if(!live||!visible())return;
+      if(inFlight){refreshPending=true;return;}
+      inFlight=true;refreshPending=false;const version=generation;
+      try{
+        const data=await request('/travel-enquiries/unread-count');
+        if(!Number.isSafeInteger(data.unread_count)||data.unread_count<0)throw new Error('Invalid unread count');
+        if(live&&version===generation&&visible()){setCount(data.unread_count);delay=interval;}
+      }catch{
+        if(live&&version===generation){setCount(0);delay=Math.min(delay*2,maxDelay);}
+      }finally{
+        inFlight=false;
+        if(live&&visible()){
+          if(refreshPending)void load();else timer=setTimeout(()=>{void load();},delay);
+        }
+      }
+    };
+    const visibility=()=>{
+      generation++;clear();setCount(0);
+      if(visible())void load();
+    };
+    document.addEventListener('visibilitychange',visibility);
+    // Let a development StrictMode cleanup cancel the first effect before it sends a request.
+    queueMicrotask(()=>{void load();});
+    return()=>{live=false;generation++;clear();document.removeEventListener('visibilitychange',visibility);};
+  },[request]);
   return count>0?<div className="discovery-ui" role="status"><button type="button" onClick={open}>{t('Unread travel enquiries')}: {count}</button></div>:null;
 }
 

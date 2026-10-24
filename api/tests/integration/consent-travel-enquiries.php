@@ -41,6 +41,17 @@ if(!is_resource($server))throw new RuntimeException('Cannot start travel API');f
 try{
     $ready=false;for($i=0;$i<100;$i++){$connection=@stream_socket_client('tcp://'.$address,$errno,$error,0.1);if($connection){fclose($connection);$ready=true;break;}usleep(20000);}$expect($ready,'Travel API ready');
     $expected=$visibleThreads;rsort($expected);
+    foreach([[$practitionerToken,52],[$adminToken,53],[$otherToken,1]] as [$token,$count]){
+        [$status,$countData,$cid,$raw]=$call('/api/v1/travel-enquiries/unread-count?client_id=101&practitioner_id=3&clinic_id=2&before=1',$token);
+        $expect($status===200&&$countData['data']===['unread_count'=>$count]&&!str_contains($raw,'PRIVATE-'),'Count-only HTTP route applies authorization and ignores submitted scope/page IDs');
+        $auditEvent=$event($cid)[0];$metadata=json_decode($auditEvent['metadata'],true);
+        $expect($auditEvent['outcome']==='success'&&!str_contains(json_encode($metadata),'PRIVATE-'),'Count access is audited without patient content');
+    }
+    [$status,$countData]=$customer('travel-enquiries/unread-count');$expect($status===200&&array_keys($countData['data'])===['unread_count'],'Customer-session route supports count-only self-access');
+    [$status,$countData,$cid]=$call('/api/v1/travel-enquiries/unread-count',null);$expect($status===401&&!isset($countData['data']['unread_count'])&&$event($cid)[0]['outcome']==='denied','Unauthenticated count request is denied and audited');
+    $pdo->exec("UPDATE users SET status='inactive' WHERE id=2");
+    try{[$status,$countData]=$call('/api/v1/travel-enquiries/unread-count',$practitionerToken);$expect(in_array($status,[401,403],true)&&!isset($countData['data']['unread_count']),'Persisted account deactivation prevents count disclosure');}
+    finally{$pdo->exec("UPDATE users SET status='active' WHERE id=2");}
     [$status,$data,$cid,$raw]=$call('/api/v1/travel-enquiries',$practitionerToken);$data=$data['data'];
     $expect($status===200&&$ids($data['items'])===array_slice($expected,0,50)&&$data['unread_count']===52,'Own inbox filters hidden threads before unread count and page cap');
     $expect((int)$data['next_before']===array_slice($expected,0,50)[49]&&!str_contains($raw,'PRIVATE-AREA-101'),'Cursor contains the last permitted thread, no hidden visit area');
@@ -71,6 +82,7 @@ try{
     $set(104,2,true);$before=$snapshot($visibleThread);
     foreach([['GET','',null],['POST','/reply',$reply],['POST','/read',['message_id'=>0]],['POST','/close',[]]] as [$method,$suffix,$body]){[$status]=$call('/api/v1/travel-enquiries/'.$visibleThread.$suffix,$practitionerToken,$method,$body);$expect($status===404&&$snapshot($visibleThread)===$before,'Stale list grants no thread/action/replay authority after withdrawal');}
     [$status,$data]=$call('/api/v1/travel-enquiries',$practitionerToken);$expect($status===200&&$data['data']['items']===[]&&$data['data']['unread_count']===0&&$data['data']['next_before']===null,'All-restricted inbox is empty without a whole-clinic block');
+    [$status,$data]=$call('/api/v1/travel-enquiries/unread-count',$practitionerToken);$expect($status===200&&$data['data']===['unread_count'=>0],'Count endpoint filters after withdrawal without a conservative whole-clinic block');
     $set(104,2,false);
     [$status]=$call('/api/v1/travel-enquiries/'.$visibleThread,$practitionerToken);$expect($status===200,'Restoration applies on the next thread request');
     $pdo->exec('UPDATE practitioners SET active=0 WHERE id=2');try{[$status,$data]=$call('/api/v1/travel-enquiries',$practitionerToken);$expect($status===200&&$data['data']['items']===[],'Inactive practitioner has no own inbox');[$status]=$call('/api/v1/travel-enquiries/'.$visibleThread,$practitionerToken);$expect($status===404,'Inactive profile cannot access a thread');}finally{$pdo->exec('UPDATE practitioners SET active=1 WHERE id=2');}
@@ -104,7 +116,7 @@ try{
     $denies(fn()=>$travel->list($actor(1,['accountant'])),403);
     $denies(fn()=>$travel->detail($actor(2,['super_admin','practitioner'],['schedule_for_other_practitioners']),$hiddenThread),404);
     $pdo->exec('RENAME TABLE client_consent_directives TO retained_travel_directives');
-    try{foreach(['/api/v1/travel-enquiries','/api/v1/travel-enquiries/'.$hiddenThread] as $path){[$status,,$cid,$raw]=$call($path,$adminToken);$expect($status===500&&!str_contains($raw,'PRIVATE-'),'Missing policy storage blocks staff thread disclosures');}$before=$snapshot($hiddenThread);[$status]=$call('/api/v1/travel-enquiries/'.$hiddenThread.'/close',$adminToken,'POST',[]);$expect($status===500&&$snapshot($hiddenThread)===$before,'Missing policy storage blocks thread mutations');}
+    try{foreach(['/api/v1/travel-enquiries','/api/v1/travel-enquiries/unread-count','/api/v1/travel-enquiries/'.$hiddenThread] as $path){[$status,,$cid,$raw]=$call($path,$adminToken);$expect($status===500&&!str_contains($raw,'PRIVATE-'),'Missing policy storage blocks staff thread disclosures');}$before=$snapshot($hiddenThread);[$status]=$call('/api/v1/travel-enquiries/'.$hiddenThread.'/close',$adminToken,'POST',[]);$expect($status===500&&$snapshot($hiddenThread)===$before,'Missing policy storage blocks thread mutations');}
     finally{$pdo->exec('RENAME TABLE retained_travel_directives TO client_consent_directives');}
 }finally{proc_terminate($server);proc_close($server);}
 echo "Filtered travel enquiry/message SQL/HTTP authorization: $checks checks passed.\n";

@@ -79,7 +79,7 @@ final class AccessAudit
         // This is a vocabulary, not a route authorization list. New words safely become :value.
         $words = array_merge(array_keys(self::ENTITIES), [
             'branding','logo','favicon','portal-theme','portal-welcome','api','v1','customer','application','admin','practitioner','profile','auth','me','options','activity',
-            'session','challenge','logout','register','accept','search','preview','apply','availability','booking-options',
+            'session','challenge','logout','register','accept','search','preview','apply','unread-count','availability','booking-options',
             'cancellation-preview','reassignment-options','address','address-coverage','validate','approval',
             'approve','revoke','resolve','appointment-links','action-links','pdf','download','merge-preview','merge',
             'dashboard','preferences','visit-summary','travel-estimate','qualifications','types','public-card',

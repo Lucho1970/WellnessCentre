@@ -97,20 +97,38 @@ final class TravelEnquiryService
         $q=$this->database->connection()->prepare('INSERT INTO travel_enquiry_messages(enquiry_id,sender_id,reference,body) VALUES(?,?,?,?)');$q->execute([$id,$actor->userId,$reference,$message]);
     }
 
+    private function unreadCondition(AuthContext $actor): string
+    {
+        $seen=$actor->userType==='client'?'client_seen_id':'practitioner_seen_id';
+        // Keep outer enquiry references in WHERE for MySQL 5.7 compatibility.
+        return "EXISTS(SELECT 1 FROM travel_enquiry_messages m JOIN users author ON author.id=m.sender_id WHERE author.clinic_id=e.clinic_id AND (author.id=e.client_id OR author.user_type='staff') AND m.enquiry_id=e.id AND m.id>e.$seen AND ".($actor->userType==='client'?'m.sender_id<>e.client_id':'m.sender_id=e.client_id').')';
+    }
+
+    private function countUnread(string $from,string $unread,array $params): int
+    {
+        $q=$this->database->connection()->prepare("SELECT COUNT(*)$from AND $unread");$q->execute($params);return (int)$q->fetchColumn();
+    }
+
+    /** Same authorization as the inbox, without selecting patient/thread details. */
+    public function unreadCount(AuthContext $actor): array
+    {
+        [$scope,$params]=$this->scope($actor);$params['clinic']=$actor->clinicId;
+        $lock=$this->lock($actor);
+        try{return ['unread_count'=>$this->countUnread(self::FROM." WHERE e.clinic_id=:clinic AND $scope",$this->unreadCondition($actor),$params)];}
+        finally{$lock->release();}
+    }
+
     public function list(AuthContext $actor,array $query=[]): array
     {
         [$scope,$params]=$this->scope($actor);$params['clinic']=$actor->clinicId;
         $before=$query['before']??PHP_INT_MAX;if(filter_var($before,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])===false)throw new ApiException(422,'validation_error','Invalid enquiry page.');
         $pdo=$this->database->connection();$lock=$this->lock($actor);
         try{
-            $seen=$actor->userType==='client'?'client_seen_id':'practitioner_seen_id';
             // Administrators retain their shared staff read state; only permitted threads contribute.
-            // MySQL 5.7 resolves outer enquiry references in WHERE, not the inner JOIN ON clause.
-            $unread="EXISTS(SELECT 1 FROM travel_enquiry_messages m JOIN users author ON author.id=m.sender_id WHERE author.clinic_id=e.clinic_id AND (author.id=e.client_id OR author.user_type='staff') AND m.enquiry_id=e.id AND m.id>e.$seen AND ".($actor->userType==='client'?'m.sender_id<>e.client_id':'m.sender_id=e.client_id').')';
+            $unread=$this->unreadCondition($actor);
             $from=self::FROM." WHERE e.clinic_id=:clinic AND $scope";
             $q=$pdo->prepare("SELECT e.id,e.status,e.search_label,e.created_at,u.display_name client_name,pu.display_name practitioner_name,s.name service_name,$unread unread$from AND e.id<:before ORDER BY e.id DESC LIMIT 51");$q->execute($params+['before'=>(int)$before]);$items=$q->fetchAll();$more=count($items)>50;$items=array_slice($items,0,50);
-            $q=$pdo->prepare("SELECT COUNT(*)$from AND $unread");$q->execute($params);
-            return ['items'=>$items,'unread_count'=>(int)$q->fetchColumn(),'next_before'=>$more?(int)end($items)['id']:null];
+            return ['items'=>$items,'unread_count'=>$this->countUnread($from,$unread,$params),'next_before'=>$more?(int)end($items)['id']:null];
         }finally{$lock->release();}
     }
 
