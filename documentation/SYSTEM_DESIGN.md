@@ -1,5 +1,11 @@
 # Wellness Centre — System Design
 
+**Subscription foundation, 26 October 2026:** The additive billing/communication design and
+migration 053 are specified in [Registration and billing](REGISTRATION_BILLING_PLAN.md).
+The first slice supplies internal policy/storage and serialized SMS accounting only; it does
+not expose registration/payment routes or change existing notification behavior. Billing
+subjects remain clinic/member scoped and never replace identity or clinical authorization.
+
 Version 1.4 · 20 September 2026 · Companion to [Master Requirements](MASTER_REQUIREMENTS.md)
 
 ### Customer onboarding implementation checkpoint

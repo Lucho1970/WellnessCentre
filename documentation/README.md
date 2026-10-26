@@ -1,5 +1,9 @@
 # Wellness Centre Documentation
 
+- [26 October Git checkpoint](GIT_CHECKPOINT_2026-10-26.md): historical branch integration/removal, preserved user files and registration development baseline.
+
+- [Registration, subscriptions and communications](REGISTRATION_BILLING_PLAN.md): company and Wellnexa signup, tier/add-on architecture, six-month beta, confirmed CAD 10/100 SMS budgets, branded email and initial accounting implementation.
+
 - [Service spreadsheet import](SERVICE_IMPORT.md): bilingual workbook preview, pricing validation, conservative duplicate handling, current clinic authorization and migration 052.
 - [Travel-enquiry MySQL 5.7 correction](TRAVEL_ENQUIRY_MYSQL57_FIX.md): reproduced inbox failure, preserved consent filtering, dual-engine tests and one-file deployment.
 - [Travel unread-count polling](TRAVEL_UNREAD_POLLING.md): count-only authorized endpoints, visibility-aware checks, bounded retries and deployment order.

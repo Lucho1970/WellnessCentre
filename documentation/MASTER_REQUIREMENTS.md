@@ -1,5 +1,12 @@
 # Wellness Centre — Master Requirements
 
+**Registration/billing scope, 26 October 2026:** Separate tenant-company and Wellnexa practitioner
+signup; versioned feature tiers and add-ons; six-calendar-month practitioner beta; outgoing-only
+SMS with shared Wellnexa communications and paid dedicated upgrades; CAD 10/member/month for
+up to 10 funded practitioners within CAD 100/month overall; branded email with replies to each
+practitioner's inbox. See [Registration and billing contract](REGISTRATION_BILLING_PLAN.md) for
+confirmed decisions, unresolved commercial terms, isolation gates and implementation status.
+
 Version 1.5 · Updated 20 September 2026 · Product owner: Luis Duran
 
 Onboarding checkpoint: new-client registration, reviewed existing-record invitations,
