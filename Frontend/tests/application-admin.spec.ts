@@ -272,6 +272,225 @@ async function authentication(page: Page, signedIn = true) {
   );
 }
 
+async function billingFixture(page: Page) {
+  await authentication(page);
+  await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));
+  await page.route('**/api/v1/application/clinics', route => route.fulfill({ json: { data: { items: [{ id: 4, name: 'Wellnexa' }, { id: 5, name: 'Other clinic' }] } } }));
+  const state = {
+    writes: [] as { path: string; body: Record<string, any> }[],
+    denied: false, uncertain: false,
+    plans: [{ id: 1, code: 'beta', display_name: 'Beta membership', scope: 'practitioner', version: 1, base_monthly_cents: null as number | null, features: { booking: true, sms_reminders: false } }, { id: 2, code: 'clinic', display_name: 'Clinic plan', scope: 'tenant', version: 1, base_monthly_cents: null as number | null, features: { booking: true } }],
+    data: {
+      month: '2026-10', pool: { id: 1, revision: 3, timezone: 'America/Toronto', monthly_limit_cents: 10000, member_limit_cents: 1000, max_members: 10, status: 'inactive' },
+      summary: { limit_cents: 10000, spent_cents: 3000, reserved_cents: 5000, remaining_cents: 2000, over_limit_cents: 0, threshold: 80, overhead_cents: 1500, overhead_reserved_cents: 2000, unresolved_count: 1 },
+      members: [{ membership_id: 7, display_name: 'Practitioner One', status: 'active', membership_status: 'active', limit_cents: 1000, spent_cents: 800, reserved_cents: 0, threshold: 80 }],
+      candidates: [{ id: 7, display_name: 'Practitioner One' }, { id: 8, display_name: 'Practitioner Two' }],
+      entries: [{ id: 3, reference: 'rental-estimate', membership_id: null, estimated_cents: 2000, actual_cents: null as number | null, status: 'reserved' }],
+      subscriptions: [{ id: 10, version: 2, membership_id: 7 as number | null, member_name: 'Practitioner One' as string | null, plan_name: 'Beta membership', plan_version: 1, status: 'trialing', trial_ends_at: '2027-04-26 12:00:00' as string | null, trial_timezone: 'America/Toronto', resume_status: null as string | null, allows_new_activity: true }],
+      events: [{ id: 1, action: 'sms.pool.configure', reason: 'Initial beta allocation', administrator: 'Operator', created_at: '2026-10-26 12:00:00' }],
+    },
+  };
+  await page.route('**/api/v1/application/billing**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (state.denied) return route.fulfill({ status: 403, json: { error: { code: 'application_admin_required', message: 'Application administrator access is required.' } } });
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON(); state.writes.push({ path, body });
+      if (state.uncertain && state.writes.length === 1) return route.fulfill({ status: 503, json: { error: { code: 'server', message: 'Temporary service failure' } } });
+      if (path.endsWith('/plans') && !state.uncertain) state.plans.unshift({ id: 3, code: body.code, display_name: body.display_name, scope: body.scope, version: 2, base_monthly_cents: body.base_monthly_cents, features: body.features });
+      return route.fulfill({ json: { data: { id: 3, version: 3 } } });
+    }
+    return route.fulfill({ json: { data: path.endsWith('/billing') ? { plans: state.plans, features: ['booking', 'calendar', 'client_management', 'reporting', 'sms_reminders', 'dedicated_number', 'custom_email'] } : state.data } });
+  });
+  await page.goto('http://localhost:5185/admin/');
+  await page.getByRole('tab', { name: 'Billing', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Monthly SMS budget' })).toBeVisible();
+  return state;
+}
+
+test('billing dashboard separates actual costs, commitments and shared overhead with threshold alerts', async ({ page }) => {
+  await billingFixture(page);
+  await expect(page.getByText('Clinic SMS budget has reached 80% of its monthly limit.')).toBeVisible();
+  await expect(page.getByText('Shared overhead: $15.00 confirmed; $20.00 reserved.')).toBeVisible();
+  await expect(page.getByText('One submitted message awaits cost reconciliation.')).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Funded practitioner budgets' })).toContainText('Practitioner One');
+  await expect(page.getByRole('table', { name: 'Funded practitioner budgets' })).toContainText('$8.00');
+  await expect(page.getByText(/Payment collection and automatic SMS budget enforcement are not active yet/)).toBeVisible();
+  await page.screenshot({ path: 'test-results/billing-desktop.png', fullPage: true, animations: 'disabled' });
+});
+
+test('billing creates a new priced plan version with explicit features and a recorded reason', async ({ page }) => {
+  const state = await billingFixture(page);
+  await page.getByRole('button', { name: 'Create plan version', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Plan code').fill('beta');
+  await dialog.getByLabel('Plan name').fill('Beta membership');
+  await dialog.getByLabel('Monthly price (CAD)', { exact: true }).fill('30.50');
+  await dialog.getByLabel('SMS reminders', { exact: true }).check();
+  await dialog.getByLabel('Reason for change').fill('Approved beta pricing proposal');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes).toHaveLength(1);
+  expect(state.writes[0].body).toMatchObject({ code: 'beta', scope: 'practitioner', base_monthly_cents: 3050, features: { booking: false, sms_reminders: true }, reason: 'Approved beta pricing proposal' });
+  expect(state.writes[0].body.request_key).toMatch(/^[a-f0-9-]{36}$/);
+  await expect(page.getByText(/Beta membership · beta v1/)).toBeVisible();
+  await expect(page.getByText(/Beta membership · beta v2/)).toBeVisible();
+});
+
+test('billing creates a clinic subscription independently from practitioner memberships', async ({ page }) => {
+  const state = await billingFixture(page);
+  await page.getByRole('button', { name: 'Create subscription', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('Subscription owner')).toContainText('Clinic subscription');
+  await dialog.getByLabel('Plan version').click();
+  await page.getByRole('option', { name: 'Clinic plan v1', exact: true }).click();
+  await dialog.getByLabel('Reason for change').fill('Configure the Wellnexa tenant');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({ membership_id: null, plan_version_id: 2, status: 'pending', timezone: 'America/Toronto' });
+});
+
+test('billing extends a trial with its current version and preserves timezone wording', async ({ page }) => {
+  const state = await billingFixture(page);
+  await page.getByRole('button', { name: 'Extend trial', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Last day of trial').fill('2027-05-31');
+  await dialog.getByLabel('Reason for change').fill('Approved additional beta testing');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes[0]).toMatchObject({ path: '/api/v1/application/billing/clinics/4/subscriptions/10', body: { version: 2, action: 'extend', trial_last_day: '2027-05-31' } });
+});
+
+test('billing budget edits retain the selected month and save next-period defaults explicitly', async ({ page }) => {
+  const state = await billingFixture(page);
+  await page.getByRole('button', { name: 'Configure SMS budget', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Clinic monthly limit (CAD)').fill('150.00');
+  await dialog.getByLabel('Reason for change').fill('Approved budget for a new month');
+  await expect(dialog.getByText(/Existing monthly limits stay unchanged/)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({ revision: 3, monthly_limit_cents: 15000, member_limit_cents: 1000, max_members: 10, status: 'inactive' });
+  await expect(page.getByText('$100.00', { exact: true })).toBeVisible();
+});
+
+test('billing funds an eligible practitioner and confirms shared overhead without messaging', async ({ page }) => {
+  const state = await billingFixture(page);
+  await page.getByRole('button', { name: 'Fund a practitioner', exact: true }).click();
+  let dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Practitioner').click();
+  await page.getByRole('option', { name: 'Practitioner Two', exact: true }).click();
+  await dialog.getByLabel('Reason for change').fill('Second funded beta participant');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({ membership_id: 8, action: 'enroll', revision: 3 });
+  await page.getByRole('button', { name: 'Confirm overhead cost', exact: true }).click();
+  dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Amount (CAD)').fill('21.25');
+  await dialog.getByLabel('Reason for change').fill('Actual provider statement amount');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes[1].body).toMatchObject({ action: 'settle', reference: 'rental-estimate', amount_cents: 2125, month: '2026-10' });
+});
+
+test('billing uncertain saves retry the identical frozen request and disable edits', async ({ page }) => {
+  const state = await billingFixture(page); state.uncertain = true;
+  await page.getByRole('button', { name: 'Suspend subscription', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Reason for change').fill('Administrative trial suspension');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(dialog.getByText(/The save outcome is uncertain/)).toBeVisible();
+  await expect(dialog.getByLabel('Reason for change')).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Retry same change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes).toHaveLength(2); expect(state.writes[1]).toEqual(state.writes[0]);
+});
+
+test('billing confirmed overhead corrections carry the previously reviewed amount', async ({ page }) => {
+  const state = await billingFixture(page);
+  state.data.entries.push({ id: 4, reference: 'rental-confirmed', membership_id: null, estimated_cents: 2000, actual_cents: 2500, status: 'settled' });
+  await page.getByRole('button', { name: 'Reload billing data', exact: true }).click();
+  await page.getByRole('button', { name: 'Correct overhead cost', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Amount (CAD)').fill('24.50');
+  await dialog.getByLabel('Reason for change').fill('Corrected provider statement amount');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByText('Billing changes saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({ action: 'correct', amount_cents: 2450, expected_actual_cents: 2500, reference: 'rental-confirmed' });
+});
+
+test('billing stale budget versions clear the editor and require refreshed authority', async ({ page }) => {
+  await billingFixture(page);
+  await page.route('**/api/v1/application/billing/clinics/4/pool', route => route.fulfill({ status: 409, json: { error: { code: 'billing_version_changed', message: 'Billing settings changed or this action is unavailable. Reload before trying again.' } } }));
+  await page.getByRole('button', { name: 'Configure SMS budget', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Reason for change').fill('Attempt using a stale configuration');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Billing settings changed or this action is unavailable. Reload before trying again.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Monthly SMS budget' })).toHaveCount(0);
+});
+
+test('billing validation focuses its field and preserves the unsaved plan', async ({ page }) => {
+  await billingFixture(page);
+  await page.route('**/api/v1/application/billing/plans', route => route.fulfill({ status: 422, json: { error: { code: 'validation_error', message: 'Check the billing fields.', fields: { display_name: 'Enter a valid value.' } } } }));
+  await page.getByRole('button', { name: 'Create plan version', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Plan code').fill('beta');
+  await dialog.getByLabel('Plan name').fill('Retain this draft');
+  await dialog.getByLabel('Reason for change').fill('Reason retained after validation');
+  await dialog.getByRole('button', { name: 'Save billing change' }).click();
+  await expect(dialog.getByLabel('Plan name')).toBeFocused();
+  await expect(dialog.getByLabel('Plan name')).toHaveValue('Retain this draft');
+  await expect(dialog.getByLabel('Reason for change')).toHaveValue('Reason retained after validation');
+});
+
+test('billing clinic switching hides old financial details while the next clinic loads', async ({ page }) => {
+  const state = await billingFixture(page);
+  let release!: () => void;
+  let requested!: () => void;
+  const started = new Promise<void>(resolve => { requested = resolve; });
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/v1/application/billing/clinics/5', async route => {
+    requested(); await held;
+    await route.fulfill({ json: { data: { ...state.data, members: [], candidates: [], subscriptions: [], entries: [], events: [] } } });
+  });
+  await page.getByLabel('Clinic').click();
+  await page.getByRole('option', { name: 'Other clinic', exact: true }).click();
+  await started;
+  await expect(page.getByText('Practitioner One', { exact: true })).toHaveCount(0);
+  release();
+  await expect(page.getByRole('heading', { name: 'Monthly SMS budget' })).toBeVisible();
+  await expect(page.getByText('Practitioner One', { exact: true })).toHaveCount(0);
+});
+
+test('billing revocation clears previously visible financial details and blocks further edits', async ({ page }) => {
+  const state = await billingFixture(page); state.denied = true;
+  await page.getByRole('button', { name: 'Reload billing data', exact: true }).click();
+  await expect(page.getByRole('alert', { }).filter({ hasText: /administrator|access|permission/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Monthly SMS budget' })).toHaveCount(0);
+  await expect(page.getByText('Practitioner One', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Create subscription', exact: true })).toHaveCount(0);
+});
+
+test('billing French mobile dashboard and editor fit the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await billingFixture(page);
+  await page.getByRole('button', { name: 'FR', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Budget SMS mensuel' })).toBeVisible();
+  await expect(page.getByText('Le budget SMS de la clinique a atteint 80 % de son plafond mensuel.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: 'test-results/billing-french-dashboard.png', fullPage: true });
+  await page.getByRole('button', { name: 'Configurer le budget SMS', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Plafond mensuel de la clinique (CAD)');
+  await page.screenshot({ path: 'test-results/billing-french-mobile.png', animations: 'disabled' });
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Créer une version de forfait', exact: true }).click();
+  await expect(page.getByRole('dialog').getByLabel('Calendrier')).toBeVisible();
+  await expect(page.getByRole('dialog').getByLabel('Gestion des clients')).toBeVisible();
+  await expect(page.getByRole('dialog').getByLabel('Rapports')).toBeVisible();
+});
+
 test("central directory imports an existing practitioner and assigns a second clinic without credentials", async ({
   page,
 }) => {

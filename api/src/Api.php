@@ -558,6 +558,8 @@ final class Api
         $this->accessAudit?->applicationActor($actor);
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        if ($path==='billing' || str_starts_with($path,'billing/')) return (new \Wellness\Service\BillingAdministrationService($this->database,$this->config))
+            ->handle($actor,$request->method,substr($path,strlen('billing')),$request->query,$request->body,$request->correlationId);
         if($path==='discovery-settings'&&$request->method==='GET')return $this->discovery()->settings();
         if($path==='discovery-settings'&&$request->method==='PUT')return $this->discovery()->saveSettings($actor,$request->body,$request->correlationId);
         if(preg_match('#^clinics/(\d+)/practitioner-enquiries(?:/(settings|\d+)(/notify)?)?$#D',$path,$m)){

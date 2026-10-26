@@ -40,6 +40,7 @@ $offset = strpos($schema, 'CREATE TABLE form_library_entries');
 if ($offset === false) throw new RuntimeException('Cannot isolate schema baseline.');
 $pdo->exec(preg_replace('/^(CREATE DATABASE|USE ).*;\r?$/m', '', substr($schema,0,$offset)));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/053_subscription_foundation.sql'));
+$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/054_billing_administration.sql'));
 $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Synthetic Wellnexa'),(2,'Foreign clinic')");
 for ($id=1; $id<=14; $id++) {
     $clinic = $id===13 ? 2 : 1;

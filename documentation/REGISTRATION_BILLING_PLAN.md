@@ -110,8 +110,12 @@ health, retry failures and prevent duplication with provider-generated notificat
 1. **Foundation (this branch):** migration 053; separate clinic/member billing subjects;
    versioned plan/features and subscription storage; six-month and expiry policies; internal
    CAD SMS reservation/settlement ledger with real SQL concurrency tests.
-2. **Administration:** authorized plan/subscription management, audited beta enrollment and
-   overhead reservations, cost dashboards, thresholds and operational exception queues.
+2. **Administration (implemented on feature/billing-administration):** authorized versioned
+   plan/trial subscription management, audited funding enrollment and overhead reservations,
+   cost dashboard with on-screen thresholds and reconciliation exceptions. See
+   [Central billing administration](BILLING_ADMINISTRATION.md) for migration 054 and rollout.
+   Email alerts, automatic provider reconciliation and actual subscription enforcement remain
+   in the communications/paid-conversion stages.
 3. **Wellnexa registration:** application/review, verified claim, onboarding checklist, trial
    activation, credential/publication gates and existing-practitioner migration decisions.
 4. **Communication integration:** sender setup, provider/segment estimates, reminder worker,
@@ -136,6 +140,10 @@ scope if included; DNS/hosting ownership/automation; sender addresses, alert rec
 manual payments and language requirements. No production charge can rely on an assumed term.
 
 ## Slice 1 technical and deployment boundaries
+
+This section records foundation commit 41a45a9. The later administration slice requires
+migration 054 and its default-off gate; follow [Billing administration](BILLING_ADMINISTRATION.md)
+when deploying the current code, including the updated ledger period snapshots.
 
 Migration `api/database/migrations/053_subscription_foundation.sql` is additive and applied
 once after the maintained 052 baseline and 032 membership prerequisite. No backfill, real

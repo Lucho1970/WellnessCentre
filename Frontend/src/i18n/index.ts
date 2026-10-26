@@ -8,6 +8,7 @@ import staffProfileMessages from './staffProfileMessages';
 import formValidationMessages from './formValidationMessages';
 import clinics from './clinics';
 import applicationAdmin from './applicationAdmin';
+import billing from './billing';
 import globalPractitioners from './globalPractitioners';
 import receipts from './receipts';
 import onsiteFees from './onsiteFees';
@@ -34,7 +35,7 @@ function initialLanguage(): SupportedLanguage {
 }
 
 void i18n.use(initReactI18next).init({
-  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en, ...globalPractitioners.en, ...receipts.en, ...onsiteFees.en, ...discovery.en, ...serviceImports.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr, ...globalPractitioners.fr, ...receipts.fr, ...onsiteFees.fr, ...discovery.fr, ...serviceImports.fr } } },
+  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en, ...billing.en, ...globalPractitioners.en, ...receipts.en, ...onsiteFees.en, ...discovery.en, ...serviceImports.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr, ...billing.fr, ...globalPractitioners.fr, ...receipts.fr, ...onsiteFees.fr, ...discovery.fr, ...serviceImports.fr } } },
   lng: initialLanguage(),
   fallbackLng: 'en',
   supportedLngs: supportedLanguages,

@@ -47,7 +47,7 @@ final class SmsBudgetLedger
             $month = SubscriptionPolicy::month($now, $pool['timezone']);
             $period = $this->period($pdo, $pool, $month);
             $pdo->prepare('INSERT IGNORE INTO sms_budget_member_periods(pool_id,membership_id,period_start,limit_cents) VALUES(?,?,?,?)')
-                ->execute([$pool['id'], $membershipId, $month, $pool['member_limit_cents']]);
+                ->execute([$pool['id'], $membershipId, $month, $period['member_limit_cents']]);
             $q = $pdo->prepare('SELECT * FROM sms_budget_member_periods WHERE pool_id=? AND membership_id=? AND period_start=?');
             $q->execute([$pool['id'], $membershipId, $month]);
             $member = $q->fetch();
@@ -170,8 +170,8 @@ final class SmsBudgetLedger
 
     private function period(PDO $pdo, array $pool, string $month): array
     {
-        $pdo->prepare('INSERT IGNORE INTO sms_budget_periods(pool_id,period_start,limit_cents) VALUES(?,?,?)')
-            ->execute([$pool['id'], $month, $pool['monthly_limit_cents']]);
+        $pdo->prepare('INSERT IGNORE INTO sms_budget_periods(pool_id,period_start,limit_cents,member_limit_cents) VALUES(?,?,?,?)')
+            ->execute([$pool['id'], $month, $pool['monthly_limit_cents'], $pool['member_limit_cents']]);
         $q = $pdo->prepare('SELECT * FROM sms_budget_periods WHERE pool_id=? AND period_start=?');
         $q->execute([$pool['id'], $month]);
         return $q->fetch();

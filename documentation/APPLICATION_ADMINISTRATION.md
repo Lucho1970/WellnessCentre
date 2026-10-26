@@ -1,5 +1,11 @@
 # Central application administration
 
+The **Billing** tab adds central-only versioned plans, separate clinic/practitioner trial
+subscriptions, funded SMS cohort management and monthly cost monitoring. See
+[Billing administration](BILLING_ADMINISTRATION.md) for migrations 053/054 and the default-off
+BILLING_ADMIN_ENABLED gate. It performs no payment collection, phone/email provisioning or
+changes to existing clinic access/notification sending.
+
 For current package destinations and shared portal hosting, see [Deployment layout](DEPLOYMENT_LAYOUT.md).
 
 The public landing page stays at `portal.copihue.ca`. Its Administration sign-in link opens `/admin/`. The central application is a separate frontend build, uses only workforce Microsoft authentication and never loads a clinic catalogue or clinical record. Clinic portals retain their own business settings, locations and other operational screens. Clinic creation and portal hostname registration now belong to central administration; old clinic `/admin/clinics` APIs deny access.

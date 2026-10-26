@@ -1,5 +1,11 @@
 # Wellness Centre — System Design
 
+**Billing administration, 26 October 2026:** Migration 054 and a default-off central-only API
+extend 053 with immutable plan versions, one-open-subscription constraints, replay receipts,
+atomic financial audits and budget-period member-limit snapshots. The Billing UI clears stale
+scope/authorization data and freezes uncertain writes for identical retry. See
+[Billing administration](BILLING_ADMINISTRATION.md) for endpoints, transactions and rollout.
+
 **Subscription foundation, 26 October 2026:** The additive billing/communication design and
 migration 053 are specified in [Registration and billing](REGISTRATION_BILLING_PLAN.md).
 The first slice supplies internal policy/storage and serialized SMS accounting only; it does

@@ -1,5 +1,12 @@
 # Wellness Centre — Master Requirements
 
+**Billing administration implementation, 26 October 2026:** Central operators can manage
+versioned plan features/prices, separate clinic/practitioner trial subscriptions, funded SMS
+cohorts and shared-cost reservations/reconciliation. Monthly dashboards distinguish confirmed
+and committed costs and show 50/80/100% thresholds. Changes are authorized, reasoned, audited
+and replay-safe. See [Billing administration](BILLING_ADMINISTRATION.md). Provider collection,
+SMS worker enforcement, emailed alerts and public self-registration remain pending.
+
 **Registration/billing scope, 26 October 2026:** Separate tenant-company and Wellnexa practitioner
 signup; versioned feature tiers and add-ons; six-calendar-month practitioner beta; outgoing-only
 SMS with shared Wellnexa communications and paid dedicated upgrades; CAD 10/member/month for

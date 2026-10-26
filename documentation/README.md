@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Central billing administration](BILLING_ADMINISTRATION.md): versioned plans, clinic/practitioner trials, funded SMS cohort, cost dashboard/alerts, audited overhead and migration 054.
+
 - [26 October Git checkpoint](GIT_CHECKPOINT_2026-10-26.md): historical branch integration/removal, preserved user files and registration development baseline.
 
 - [Registration, subscriptions and communications](REGISTRATION_BILLING_PLAN.md): company and Wellnexa signup, tier/add-on architecture, six-month beta, confirmed CAD 10/100 SMS budgets, branded email and initial accounting implementation.
