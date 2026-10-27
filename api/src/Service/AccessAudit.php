@@ -16,8 +16,9 @@ final class AccessAudit
     private string $actorType = 'anonymous';
     private ?int $actorId = null;
     private ?int $actorClinic = null;
+    private ?string $applicantFingerprint = null;
     private const CONTAINERS = [
-        'categories','taxes','capabilities','rooms','data','items','versions','appointments','appointment','clients','client','practitioners','practitioner',
+        'application','submissions','categories','taxes','capabilities','rooms','data','items','versions','appointments','appointment','clients','client','practitioners','practitioner',
         'users','user','profile','events','notes','note','messages','forms','tasks','receipts','notifications',
         'invitations','claims','entries','series','history','changes','widgets','results','records','amendments',
         'upcoming','recent','next_appointment','follow_ups','time_off_follow_ups','combinations','locations','services',
@@ -35,6 +36,7 @@ final class AccessAudit
         'amendment_id'=>'form_amendment',
     ];
     private const ENTITIES = [
+        'practitioner-applications'=>'practitioner_application',
         'service-imports'=>'service_import',
         'dashboard-widgets'=>'dashboard_widget','reminder-schedules'=>'reminder_schedule','reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
         'next-onsite'=>'appointment','calendar'=>'appointment','receipts'=>'session_receipt','receipt'=>'session_receipt',
@@ -70,6 +72,12 @@ final class AccessAudit
     public function applicationActor(ApplicationAdminContext $actor): void
     {
         $this->actorType = 'application_admin'; $this->actorId = $actor->id; $this->actorClinic = null;
+    }
+
+    public function practitionerApplicant(\Wellness\Auth\VerifiedIdentity $identity,int $clinic): void
+    {
+        $this->actorType='practitioner_applicant';$this->actorId=null;$this->actorClinic=$clinic;
+        $this->applicantFingerprint=hash('sha256',json_encode([$identity->adapter,$identity->issuer,$identity->subject],JSON_THROW_ON_ERROR));
     }
 
     /** Canonical route and numeric targets only; unknown path segments are never retained. */
@@ -216,6 +224,7 @@ final class AccessAudit
                 $insert = $pdo->prepare('INSERT INTO access_audit_events(event_group,part_number,part_count,clinic_id,actor_type,actor_id,correlation_id,action,route_key,http_method,http_status,outcome,ip_address,metadata) VALUES(:event,:part,:parts,:clinic,:actor_type,:actor_id,:correlation,:action,:route,:method,:status,:outcome,INET6_ATON(:ip),:metadata)');
                 foreach ($chunks as $index=>$chunk) {
                     $metadata = $outcome === 'success' ? ['resources'=>$chunk] : ['attempted_resources'=>array_values($attempted),'error_code'=>$code,'resources'=>$chunk];
+                    if($this->applicantFingerprint!==null)$metadata['applicant_fingerprint']=$this->applicantFingerprint;
                     if ($outcome === 'success' && $requested) $metadata['requested_resources'] = array_values($requested);
                     $insert->execute(['event'=>$event,'part'=>$index+1,'parts'=>count($chunks),
                         'clinic'=>$this->actorClinic ?? $resolvedClinic,'actor_type'=>$this->actorType,'actor_id'=>$this->actorId,

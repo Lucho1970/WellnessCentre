@@ -20,6 +20,7 @@ final readonly class Request
         $requestPath=parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $customer = str_starts_with($requestPath, '/api/v1/customer/') || str_starts_with($requestPath,'/api/v1/public/') || str_starts_with($requestPath,'/api/v1/travel-enquiries') || $requestPath==='/api/v1/profile/discovery-preferences' || str_starts_with($requestPath,'/api/v1/application/billing');
         $serviceImport = str_starts_with($requestPath, '/api/v1/admin/service-imports');
+        $customer = $customer || str_contains($requestPath,'/practitioner-applications');
         $raw = ($serviceImport ? file_get_contents('php://input', false, null, 0, 1048577) : ($customer ? file_get_contents('php://input', false, null, 0, 65537) : file_get_contents('php://input'))) ?: '';
         if ($serviceImport && strlen($raw) > 1048576) throw new ApiException(413, 'request_too_large', 'The request is too large.');
         if ($customer && strlen($raw) > 65536) throw new ApiException(413, 'request_too_large', 'The request is too large.');

@@ -37,6 +37,7 @@ use function FastRoute\simpleDispatcher;
 final class Api
 {
     private EntraAuthenticator $auth;
+    private ?\Wellness\Auth\ExternalStaffAuthenticator $externalStaffAuth = null;
     private ?CustomerAuthenticator $customerAuth = null;
     private ?\Wellness\Service\AccessAudit $accessAudit = null;
     private ?ClinicContext $clinicContext = null;
@@ -92,6 +93,21 @@ final class Api
             }
             if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
                 Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
+            }
+            if($request->path==='/api/v1/public/practitioner-applications' || str_starts_with($request->path,'/api/v1/practitioner-applications/')) {
+                header('Cache-Control: no-store');
+                $service=new \Wellness\Service\PractitionerApplicationService($this->database,$this->config);
+                if($request->path==='/api/v1/public/practitioner-applications' && $request->method==='GET')Response::json(['data'=>$service->publicInfo($this->clinicContext->clinicId)],200,$request->correlationId);
+                $identity=$this->externalStaff()->verify($request->bearerToken());
+                $this->accessAudit?->practitionerApplicant($identity,$this->clinicContext->clinicId);
+                $result=match($request->method.' '.$request->path) {
+                    'GET /api/v1/practitioner-applications/me'=>$service->me($this->clinicContext->clinicId,$identity),
+                    'POST /api/v1/practitioner-applications/me'=>$service->submit($this->clinicContext->clinicId,$identity,$request->body,$request->correlationId),
+                    'POST /api/v1/practitioner-applications/withdraw'=>$service->withdraw($this->clinicContext->clinicId,$identity,$request->body,$request->correlationId),
+                    'POST /api/v1/practitioner-applications/activate'=>$service->activate($this->clinicContext->clinicId,$identity,$request->body,$request->correlationId),
+                    default=>throw new ApiException(404,'not_found','Route not found.'),
+                };
+                Response::json(['data'=>$result],200,$request->correlationId);
             }
             if (str_starts_with($request->path,'/api/v1/public/discovery/') || $request->path==='/api/v1/profile/discovery-preferences' || str_starts_with($request->path,'/api/v1/travel-enquiries')) {
                 $this->clinicContext->assertActive($this->database);header('Cache-Control: no-store');
@@ -558,6 +574,8 @@ final class Api
         $this->accessAudit?->applicationActor($actor);
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        if(preg_match('#^clinics/([1-9][0-9]*)/practitioner-applications(.*)$#D',$path,$m))return (new \Wellness\Service\PractitionerApplicationService($this->database,$this->config))
+            ->admin($actor,(int)$m[1],$request->method,$m[2],$request->body,$request->correlationId);
         if ($path==='billing' || str_starts_with($path,'billing/')) return (new \Wellness\Service\BillingAdministrationService($this->database,$this->config))
             ->handle($actor,$request->method,substr($path,strlen('billing')),$request->query,$request->body,$request->correlationId);
         if($path==='discovery-settings'&&$request->method==='GET')return $this->discovery()->settings();
@@ -715,7 +733,7 @@ final class Api
 
     private function user(Request $request): AuthContext
     {
-        $external = new \Wellness\Auth\ExternalStaffAuthenticator($this->config);
+        $external = $this->externalStaff();
         $actor = $external->isCandidate($request->bearerToken())
             ? (new \Wellness\Auth\StaffMembershipResolver($this->database))->resolve($external->verify($request->bearerToken()),$this->clinicContext)
             : $this->auth->authenticateForClinic($request->bearerToken(), $this->clinicContext);
@@ -730,10 +748,12 @@ final class Api
     {
         return new \Wellness\Service\StaffInvitationService($this->database,$this->config,new AuditLogger($this->database));
     }
+    private function externalStaff(): \Wellness\Auth\ExternalStaffAuthenticator
+    { return $this->externalStaffAuth ??= new \Wellness\Auth\ExternalStaffAuthenticator($this->config); }
     private function staffInvitationClaim(Request $request): array
     {
         $this->clinicContext->assertActive($this->database);
-        return $this->staffInvitations()->claim($this->clinicContext->clinicId,(new \Wellness\Auth\ExternalStaffAuthenticator($this->config))->verify($request->bearerToken()),$request->body,$request->correlationId);
+        return $this->staffInvitations()->claim($this->clinicContext->clinicId,$this->externalStaff()->verify($request->bearerToken()),$request->body,$request->correlationId);
     }
     private function me(AuthContext $user): array{return ['id'=>$user->userId,'clinic_id'=>$user->clinicId,'email'=>$user->email,'display_name'=>$user->displayName,'user_type'=>$user->userType,'roles'=>$user->roles,'permissions'=>$user->permissions];}
 

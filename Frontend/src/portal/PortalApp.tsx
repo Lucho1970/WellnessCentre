@@ -9,7 +9,8 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { PractitionerApplicationPage } from '../auth/PractitionerApplicationPage';
 import { StaffInvitationPage } from '../auth/StaffInvitationPage';
 import { StaffSignIn } from "../auth/StaffSignIn";
 import { UserAccountMenu } from "../auth/UserAccountMenu";
@@ -46,6 +47,8 @@ function ClientBookingInformation() {
   );
 }
 export function PortalApp() {
+  const location=useLocation();
+  const applicationPath=location.pathname==='/staff/apply' || (location.pathname==='/staff/external' && sessionStorage.getItem('wellness.staff.application-return')==='1');
   const { config } = useClinicConfig();
   const { t } = useTranslation();
   return (
@@ -89,7 +92,7 @@ export function PortalApp() {
               </Button>
               <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
                 <LanguageSwitcher />
-                <UserAccountMenu />
+                {!applicationPath && <UserAccountMenu />}
               </Stack>
             </Stack>
           </Toolbar>
@@ -103,6 +106,8 @@ export function PortalApp() {
         sx={{ py: { xs: 3, md: 5 }, minHeight: "85vh" }}
       >
         <Routes>
+          {import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && <Route path="/staff/apply" element={<PractitionerApplicationPage/>}/>}
+          {import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.application-return')==='1' && <Route path="/staff/external" element={<Navigate replace to="/staff/apply"/>}/>}
           {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <Route path="/staff/invitation" element={<StaffInvitationPage/>}/>}
           {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.invitation') && <Route path="/staff/external" element={<Navigate replace to="/staff/invitation"/>}/>}
           <Route path="/client/*" element={<ClientBookingInformation />} />

@@ -51,4 +51,15 @@ $same=new Config('test',false,'test',[],'',3306,'','','','workforce','api','acce
 denied(fn()=>(new ExternalStaffAuthenticator($same,$loader))->verify($sign($claims)),503);
 $rotated=new ExternalStaffAuthenticator($config,fn(bool $refresh)=>['keys'=>$refresh?[$jwk]:[]]);
 check($rotated->verify($sign($claims))->subject==='staff-subject');
+// Closing application intake or invitations must not revoke previously approved sign-in.
+foreach(['applications','durable'] as $mode){
+    $independent=new Config('test',false,'test',[],'',3306,'','','','workforce','workforce-api','access_as_user',300,
+        customerTenantId:$tenant,customerSubdomain:'teststaff',customerApiClientId:$clientApi,customerSpaClientId:$clientSpa,
+        staffExternalTenantId:$tenant,staffExternalSubdomain:'teststaff',staffExternalApiClientId:$api,staffExternalSpaClientId:$spa,
+        practitionerApplicationsEnabled:$mode==='applications',externalStaffAuthEnabled:$mode==='durable');
+    $adapter=new ExternalStaffAuthenticator($independent,$loader);
+    check(!$independent->staffInvitationsEnabled && $adapter->isCandidate($sign($claims)));
+    check($adapter->verify($sign($claims))->subject==='staff-subject');
+    denied(fn()=>$adapter->verify($sign($customerClaims)),401);
+}
 echo "$checks external staff token checks passed.\n";

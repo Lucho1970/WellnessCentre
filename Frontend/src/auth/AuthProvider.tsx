@@ -6,7 +6,7 @@ import { selectAccount } from './accountSelection';
 import i18n from '../i18n';
 import { claimStaffSessionRecovery, clearStaffSessionRecovery, needsInteractiveStaffAuth } from './staffSessionRecovery';
 
-export const externalStaff = __APP_SURFACE__ !== 'application-admin' && import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.provider') === 'external';
+export const externalStaff = __APP_SURFACE__ !== 'application-admin' && (import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' || import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' || import.meta.env.VITE_STAFF_EXTERNAL_AUTH_ENABLED === 'true') && sessionStorage.getItem('wellness.staff.provider') === 'external';
 const tenantId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_TENANT_ID : import.meta.env.VITE_ENTRA_TENANT_ID) ?? '';
 const spaClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_SPA_CLIENT_ID : import.meta.env.VITE_ENTRA_SPA_CLIENT_ID) ?? '';
 const apiClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_API_CLIENT_ID : import.meta.env.VITE_ENTRA_API_CLIENT_ID) ?? '';

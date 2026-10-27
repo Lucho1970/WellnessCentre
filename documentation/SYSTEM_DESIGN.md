@@ -1,5 +1,13 @@
 # Wellness Centre — System Design
 
+**Practitioner applications, 27 October 2026:** Migration 055 adds clinic-scoped application
+settings, immutable terms/submissions, identity-bound status, reasoned review events and
+idempotent activation. Separate external-practitioner status routes work before membership;
+central review remains host/grant restricted. Activation atomically creates or explicitly
+reuses membership/global-profile/billing associations, preserving prior trials and revocation.
+Global/per-clinic activation gates remain off until privacy and hosted identity acceptance.
+See [Practitioner applications](PRACTITIONER_APPLICATIONS.md) for API and rollout boundaries.
+
 **Billing administration, 26 October 2026:** Migration 054 and a default-off central-only API
 extend 053 with immutable plan versions, one-open-subscription constraints, replay receipts,
 atomic financial audits and budget-period member-limit snapshots. The Billing UI clears stale

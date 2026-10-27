@@ -1,9 +1,14 @@
 export async function bootstrap() {
+  const applicationsEnabled=import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true';
+  if(applicationsEnabled && window.location.pathname.endsWith('/staff/apply')) {
+    sessionStorage.setItem('wellness.staff.provider','external');sessionStorage.setItem('wellness.staff.application-return','1');sessionStorage.removeItem('wellness.staff.invitation');
+  }
   if (window.location.pathname.endsWith('/staff/invitation') || window.location.pathname.endsWith('/staff/external')) {
-    if (import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true') sessionStorage.setItem('wellness.staff.provider','external');
+    if (import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' || applicationsEnabled || import.meta.env.VITE_STAFF_EXTERNAL_AUTH_ENABLED === 'true') sessionStorage.setItem('wellness.staff.provider','external');
+    if(window.location.pathname.endsWith('/staff/invitation'))sessionStorage.removeItem('wellness.staff.application-return');
     const token=new URLSearchParams(window.location.hash.slice(1)).get('token');
     if (token && /^[a-f0-9]{64}$/.test(token)) {sessionStorage.setItem('wellness.staff.invitation',token);history.replaceState(null,'',window.location.pathname);}
-  } else if (window.location.pathname.endsWith('/staff/login')) sessionStorage.removeItem('wellness.staff.provider');
+  } else if (window.location.pathname.endsWith('/staff/login')) { sessionStorage.removeItem('wellness.staff.provider');sessionStorage.removeItem('wellness.staff.application-return'); }
   const root = import.meta.env.BASE_URL.replace(/\/$/, '');
   if (/^\/practitioners\/[a-z0-9-]+$/.test(window.location.pathname)
     || /^\/services\/[a-z0-9-]+\/book$/.test(window.location.pathname)

@@ -1,5 +1,13 @@
 # Wellness Centre — Master Requirements
 
+**Practitioner applications, 27 October 2026:** Signed external practitioners can submit and
+revise a clinic application with explicit terms acceptance. Central operators independently
+review identity/eligibility before approval; applicant-controlled activation starts a
+six-calendar-month trial and preserves existing trial history. Migration 055 and separate
+intake/activation gates default off. Independent-practice privacy and hosted identity checks
+remain release requirements. Notifications, subscription enforcement and company provisioning
+remain later work. See [Practitioner applications](PRACTITIONER_APPLICATIONS.md).
+
 **Billing administration implementation, 26 October 2026:** Central operators can manage
 versioned plan features/prices, separate clinic/practitioner trial subscriptions, funded SMS
 cohorts and shared-cost reservations/reconciliation. Monthly dashboards distinguish confirmed

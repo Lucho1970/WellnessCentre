@@ -1,5 +1,69 @@
 import { test, expect, type Page } from "@playwright/test";
 
+async function applicationFixture(page: Page) {
+  await authentication(page);
+  await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));
+  await page.route('**/api/v1/application/clinics', route => route.fulfill({ json: { data: { items: [{ id: 4, name: 'Wellnexa' }] } } }));
+  const item = { id: 71, version: 1, status: 'submitted', given_name: 'Alice', family_name: 'Applicant', email: 'alice@example.test', phone: '', discipline: 'Massage therapy', credentials: 'Declared credentials', service_area: 'Toronto', services: 'Synthetic proposed services', enquiry_reference: '', verification_code: 'ABCDEF123456', approved_location_id: null, source_enquiry_id: null, allow_existing_membership: false, review_message: '' };
+  const state = { writes: [] as any[], uncertain: false, denied: false, data: { settings: { revision: 1, enabled: true, activation_enabled: false, terms_text: 'Synthetic reviewed joining terms for this clinic. No legal terms or prices are supplied by the software.', terms_version: 1, plan_version_id: 1, timezone: 'America/Toronto' }, activation_gate: false, items: [item], plans: [{ id: 1, display_name: 'Beta membership', version: 1 }], locations: [{ id: 8, name: 'Virtual clinic' }], enquiries: [{ id: 5, full_name: 'Alice enquiry', reference: 'synthetic-reference' }] } };
+  await page.route('**/api/v1/application/clinics/4/practitioner-applications**', route => {
+    if (state.denied) return route.fulfill({ status: 403, json: { error: { code: 'application_admin_required', message: 'Access revoked.' } } });
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON(); state.writes.push({ path, body });
+      if (state.uncertain) { state.uncertain = false; return route.fulfill({ status: 503, json: { error: { code: 'unavailable', message: 'Temporary failure.' } } }); }
+      if (path.endsWith('/review')) { item.status = body.decision; item.version++; item.review_message = body.review_message; }
+      return route.fulfill({ json: { data: { version: item.version } } });
+    }
+    if (path.endsWith('/71')) return route.fulfill({ json: { data: { application: item, submissions: [{ version: 1, details: { credentials: item.credentials, services: item.services }, submitted_at: '2026-10-27 12:00:00' }], events: [{ action: 'application.submit', reason: 'Applicant accepted reviewed terms.', created_at: '2026-10-27 12:00:00' }] } } });
+    return route.fulfill({ json: { data: state.data } });
+  });
+  await page.goto('http://localhost:5185/admin/');
+  await page.getByRole('tab', { name: 'Practitioner applications', exact: true }).click();
+  await expect(page.getByText('Alice Applicant', { exact: true })).toBeVisible();
+  return state;
+}
+
+test('practitioner review requires independent identity, qualifications, location and a reason', async ({ page }) => {
+  const state = await applicationFixture(page);
+  await page.getByRole('button', { name: 'Review application 71', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Submitted version 1', { exact: false })).toBeVisible();
+  await dialog.getByRole('combobox', { name: 'Review decision' }).click();
+  await page.getByRole('option', { name: 'Application approved' }).click();
+  await dialog.getByRole('textbox', { name: 'Message shown to the applicant' }).fill('Approved for the beta.');
+  await dialog.getByRole('textbox', { name: 'Independently confirmed code' }).fill('ABCDEF123456');
+  await dialog.getByRole('checkbox', { name: 'I have independently confirmed the intended applicant.' }).check();
+  await dialog.getByRole('checkbox', { name: 'I have reviewed the application credentials and eligibility requirements.' }).check();
+  await dialog.getByRole('combobox', { name: 'Initial clinic location' }).click();
+  await page.getByRole('option', { name: 'Virtual clinic' }).click();
+  await dialog.getByRole('textbox', { name: 'Reason for change' }).fill('Reviewed identity and eligibility independently.');
+  await dialog.getByRole('button', { name: 'Save application review' }).click();
+  await expect(page.getByText('Application changes saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({ version: 1, decision: 'approved', applicant_verified: true, credentials_reviewed: true, allow_existing_membership: false, location_id: 8, source_enquiry_id: null });
+});
+
+test('application settings expose held activation and preserve uncertain request on retry', async ({ page }) => {
+  const state = await applicationFixture(page); state.uncertain = true;
+  await page.getByRole('button', { name: 'Configure practitioner applications', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('checkbox', { name: 'Allow approved applicants to activate accounts' })).toBeDisabled();
+  await dialog.getByRole('textbox', { name: 'Reason for change' }).fill('Reviewed intake configuration.');
+  await dialog.getByRole('button', { name: 'Save application review' }).click();
+  await expect(dialog.getByRole('textbox', { name: 'Reviewed joining terms' })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Retry application change' }).click();
+  await expect(page.getByText('Application changes saved.')).toBeVisible();
+  expect(state.writes[1]).toEqual(state.writes[0]);
+});
+
+test('revoked application reviewer loses stale private detail', async ({ page }) => {
+  const state = await applicationFixture(page); state.denied = true;
+  await page.getByRole('button', { name: 'Review application 71', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByText('Alice Applicant', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
 test("global discovery settings save revisioned distances and expose conflicts", async ({
   page,
 }) => {

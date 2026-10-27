@@ -18,13 +18,13 @@ final class ExternalStaffAuthenticator implements IdentityAdapter
     public function isCandidate(?string $token): bool
     {
         // Routing hint only; verify() still authenticates the entire token.
-        if (!$this->config->staffInvitationsEnabled || $this->config->staffExternalApiClientId === '' || !$token || strlen($token)>16384) return false;
+        if ((!$this->config->staffInvitationsEnabled && !$this->config->practitionerApplicationsEnabled && !$this->config->externalStaffAuthEnabled) || $this->config->staffExternalApiClientId === '' || !$token || strlen($token)>16384) return false;
         try { $parts=explode('.',$token); $claims=json_decode(JWT::urlsafeB64Decode($parts[1]??''),true,16,JSON_THROW_ON_ERROR);return ($claims['aud']??null)===$this->config->staffExternalApiClientId; } catch (Throwable) {return false;}
     }
 
     public function verify(?string $token): VerifiedIdentity
     {
-        if (!$this->config->staffInvitationsEnabled) throw new ApiException(503,'staff_invitations_disabled','Staff invitations are not enabled.');
+        if (!$this->config->staffInvitationsEnabled && !$this->config->practitionerApplicationsEnabled && !$this->config->externalStaffAuthEnabled) throw new ApiException(503,'staff_invitations_disabled','Staff invitations are not enabled.');
         if ($this->config->staffExternalApiClientId === $this->config->customerApiClientId
             || $this->config->staffExternalSpaClientId === $this->config->customerSpaClientId
             || $this->config->staffExternalApiClientId === $this->config->staffExternalSpaClientId

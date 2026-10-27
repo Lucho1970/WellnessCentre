@@ -44,6 +44,9 @@ final readonly class Config
         public bool $applicationAdminEnabled = false,
         public string $applicationAdminHost = 'portal.copihue.ca',
         public bool $billingAdminEnabled = false,
+        public bool $practitionerApplicationsEnabled = false,
+        public bool $practitionerApplicationActivationEnabled = false,
+        public bool $externalStaffAuthEnabled = false,
     ) {}
 
     public static function fromEnvironment(): self
@@ -92,6 +95,9 @@ final readonly class Config
             filter_var($value('APPLICATION_ADMIN_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             $value('APPLICATION_ADMIN_HOST', 'portal.copihue.ca'),
             filter_var($value('BILLING_ADMIN_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            filter_var($value('PRACTITIONER_APPLICATIONS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            filter_var($value('PRACTITIONER_APPLICATION_ACTIVATION_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            filter_var($value('STAFF_EXTERNAL_AUTH_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
         );
     }
 

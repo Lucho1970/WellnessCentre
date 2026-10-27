@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Wellnexa practitioner applications](PRACTITIONER_APPLICATIONS.md): signed application/review, retained consent history, guarded membership/trial activation, migration 055 and default-off rollout gates.
+
 - [Central billing administration](BILLING_ADMINISTRATION.md): versioned plans, clinic/practitioner trials, funded SMS cohort, cost dashboard/alerts, audited overhead and migration 054.
 
 - [26 October Git checkpoint](GIT_CHECKPOINT_2026-10-26.md): historical branch integration/removal, preserved user files and registration development baseline.

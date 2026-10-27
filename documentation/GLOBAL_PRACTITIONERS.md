@@ -1,5 +1,11 @@
 # Global practitioners and practitioner-owned credentials
 
+The external practitioner self-service joining flow now has a separate
+[application/review and activation workflow](PRACTITIONER_APPLICATIONS.md). It reuses an exact
+verified global identity without overwriting existing names/private credentials or other
+clinic data. Existing workforce users continue to use the import/assignment workflow here;
+contact emails are never used to merge identities. Activation remains held for rollout checks.
+
 Application Administration (`https://portal.copihue.ca/admin/`) has separate **Clinics** and **Global practitioners** tabs. An explicit active application-administrator grant is required. Clinic Super Admin roles alone do not grant central access.
 
 ## Add the existing practitioner to Wellnexa

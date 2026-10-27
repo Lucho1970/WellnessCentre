@@ -1,5 +1,11 @@
 # Central application administration
 
+The **Practitioner applications** tab provides clinic intake settings, reviewed joining terms,
+private review/history and independent approval before applicant-controlled trial activation.
+See [Practitioner applications](PRACTITIONER_APPLICATIONS.md) for migration 055, default-off
+activation gates and existing-member migration rules. Clinic administrators do not gain this
+central authority through their clinic role.
+
 The **Billing** tab adds central-only versioned plans, separate clinic/practitioner trial
 subscriptions, funded SMS cohort management and monthly cost monitoring. See
 [Billing administration](BILLING_ADMINISTRATION.md) for migrations 053/054 and the default-off

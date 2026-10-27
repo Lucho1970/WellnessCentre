@@ -1,5 +1,10 @@
 # Wellness Centre internal API
 
+Practitioner application/review and guarded trial activation are documented in
+[Practitioner applications](../documentation/PRACTITIONER_APPLICATIONS.md). Migration 055 and
+default-off application/activation flags are required; durable external practitioner sign-in
+must remain enabled after approved accounts are activated, independently of intake.
+
 PHP 8.2+ / MySQL API, deployed on Netfirms with MySQL 5.7 compatibility. It includes Microsoft Entra access-token validation, role enforcement, public catalogue and availability endpoints, production setup endpoints, transactional booking, notification queuing, and audit logging. See [Master Requirements](../documentation/MASTER_REQUIREMENTS.md) for scope and delivery stages and [System Design](../documentation/SYSTEM_DESIGN.md) for architecture and data design. [`DATABASE_PLAN.md`](DATABASE_PLAN.md) is a historical table reference, not the current master plan.
 
 Create the database and optionally load non-sensitive development data:

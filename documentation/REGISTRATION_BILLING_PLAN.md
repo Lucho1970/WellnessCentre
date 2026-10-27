@@ -116,8 +116,12 @@ health, retry failures and prevent duplication with provider-generated notificat
    [Central billing administration](BILLING_ADMINISTRATION.md) for migration 054 and rollout.
    Email alerts, automatic provider reconciliation and actual subscription enforcement remain
    in the communications/paid-conversion stages.
-3. **Wellnexa registration:** application/review, verified claim, onboarding checklist, trial
-   activation, credential/publication gates and existing-practitioner migration decisions.
+3. **Wellnexa registration (implemented on feature/practitioner-applications):** signed
+   application/review, independent code confirmation, retained terms/submissions, onboarding
+   checklist and guarded six-month activation. See [Practitioner applications](PRACTITIONER_APPLICATIONS.md)
+   for migration 055 and existing-member exceptions. Activation remains default-off pending
+   independent-practitioner privacy and hosted identity acceptance. Credential/publication
+   checks stay separate; application emails and subscription enforcement are later work.
 4. **Communication integration:** sender setup, provider/segment estimates, reminder worker,
    conversion/reconciliation, opt-out enforcement, budget fallback and monitoring.
 5. **Paid conversion:** agreed rates/terms, provider setup, hosted collection, finalized invoices,

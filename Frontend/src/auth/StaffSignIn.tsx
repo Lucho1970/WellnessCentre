@@ -10,7 +10,8 @@ type StaffAccess = { roles: string[]; permissions: string[] };
 
 function StaffSignInForm({ children }: { children: (access: StaffAccess) => ReactNode }) {
   const formValidation = useFormValidation();
-  const externalStaff = import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.provider') === 'external';
+  const externalAvailable = import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' || import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' || import.meta.env.VITE_STAFF_EXTERNAL_AUTH_ENABLED === 'true';
+  const externalStaff = externalAvailable && sessionStorage.getItem('wellness.staff.provider') === 'external';
   const { t } = useTranslation();
   const { account, configured, isAuthenticated, sessionExpired, signIn, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';
@@ -41,7 +42,7 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
       {!configured && <Alert severity="warning">{t('Staff sign-in is not configured for this environment. Please contact the administrator.')}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
       <Button variant="contained" size="large" startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <LogIn size={18} />} disabled={busy || !configured} onClick={() => void login()}>{externalStaff ? t('Invited practitioner sign-in') : t('Sign in with Microsoft')}</Button>
-      {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <Button href={`${import.meta.env.BASE_URL}staff/${externalStaff ? 'login' : 'external'}`}>{externalStaff ? t('Existing workforce staff sign-in') : t('Invited practitioner sign-in')}</Button>}
+      {externalAvailable && <Button href={`${import.meta.env.BASE_URL}staff/${externalStaff ? 'login' : 'external'}`}>{externalStaff ? t('Existing workforce staff sign-in') : t('Invited practitioner sign-in')}</Button>}
       <Button href={`${import.meta.env.BASE_URL}client`}>{t('Client sign in / booking')}</Button>
     </Stack>
   </Paper>;
