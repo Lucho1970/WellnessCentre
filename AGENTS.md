@@ -6,6 +6,8 @@ For baseline findings and remediation priorities, see [the 29 October 2026 audit
 
 For the follow-up on frontend lint tooling and build dependency advisories (F-02/F-03), see [frontend quality gates](documentation/FRONTEND_QUALITY_GATES.md). Its validation does not close the other privacy, security or hosted acceptance findings.
 
+Before preparing tester access or delivery, follow [pilot safety controls](documentation/PILOT_SAFETY_CONTROLS.md). Pilot configuration is private, opt-in and restrictive; do not infer that the existing database contains synthetic records or that a pilot approval grants a role.
+
 ## Repository workflow
 
 - Keep `main` clean. Before changing source, tests, configuration, or documentation, switch to a dedicated branch.

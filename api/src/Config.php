@@ -54,6 +54,7 @@ final readonly class Config
 
     public static function fromEnvironment(): self
     {
+        PilotPolicy::fromEnvironment(); // Invalid pilot settings must not silently disable protection.
         $value = static fn(string $key, string $default = ''): string => (string)($_ENV[$key] ?? getenv($key) ?: $default);
         $required = static function (string $key) use ($value): string {
             $result = trim($value($key));

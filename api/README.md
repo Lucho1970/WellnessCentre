@@ -1,5 +1,9 @@
 # Wellness Centre internal API
 
+## Pilot safeguards
+
+See [pilot access and delivery controls](../documentation/PILOT_SAFETY_CONTROLS.md) for private `PILOT_*` settings, deny-by-default tester identities/destinations, the CLI preflight and disposable SQL tests. No new schema or database is required; enabling this policy does not approve real patient data.
+
 [Provider evidence](../documentation/PROVIDER_EVIDENCE.md) documents migration 057 and
 `PROVIDER_EVIDENCE_ENABLED=false`: reviewed normalized CSV previews, fixed CAD/USD conversion,
 exact message reconciliation and sender-specific STOP enforcement. Once using imported STOP
@@ -181,3 +185,6 @@ They link to the authenticated practitioner schedule and stay within one
 being retried automatically, to avoid duplicate texts. Native incoming SMS is not integrated.
 Migration 057 supplies reviewed STOP evidence imports; the daily provider opt-out review
 remains required before managed live delivery. See the provider-evidence guide above.
+# Pilot safeguards
+
+See [pilot access and delivery controls](../documentation/PILOT_SAFETY_CONTROLS.md) for private `PILOT_*` settings, deny-by-default tester identities/destinations, the CLI preflight and disposable SQL tests. No new schema or database is required; enabling this policy does not approve real patient data.

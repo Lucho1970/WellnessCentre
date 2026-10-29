@@ -91,6 +91,9 @@ final class Api
                 $this->catalog = new CatalogService($this->database, $this->clinicContext->clinicId);
                 $this->availability = new AvailabilityService($this->database, $this->clinicContext->clinicId);
             }
+            if ($request->method === 'POST' && $request->path === '/api/v1/public/practitioner-enquiries' && PilotPolicy::fromEnvironment()->enabled) {
+                throw new \Wellness\Http\ApiException(403, 'pilot_access_denied', 'Public enquiries are paused during this pilot.');
+            }
             if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
                 Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
             }

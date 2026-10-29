@@ -36,6 +36,7 @@ final class GraphMailClient
         if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
             throw new MailSendException('Recipient email address is invalid.', false);
         }
+        \Wellness\PilotPolicy::fromEnvironment()->assertMail($recipient, $this->fromAddress, $replyTo, $calendar);
         $token = $this->accessToken();
         $body = json_encode(self::mailPayload($recipient, $subject, $content, $calendar, $replyTo), JSON_THROW_ON_ERROR);
         $url = 'https://graph.microsoft.com/v1.0/users/' . rawurlencode($this->fromAddress) . '/sendMail';

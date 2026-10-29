@@ -60,6 +60,9 @@ final class CustomerAuthenticator
             if (!$idProof && !in_array('access_as_client', preg_split('/\s+/', trim($claims['scp'])) ?: [], true)) {
                 throw new ApiException(403, 'missing_scope', 'The customer API permission is missing.');
             }
+            // External ID's oid is stable across the SPA/API audiences; sub may be pairwise.
+            $pilotSubject = is_string($claims['oid'] ?? null) ? $claims['oid'] : $claims['sub'];
+            \Wellness\PilotPolicy::fromEnvironment()->assertIdentity('entra-customer', $claims['iss'], $pilotSubject);
             return $claims; // Internal only. Never serialize raw token claims to the browser.
         } catch (ApiException $error) { throw $error; }
         catch (Throwable) { throw new ApiException(401, 'invalid_customer_token', 'Customer authorization is invalid or expired. Please sign in again.'); }

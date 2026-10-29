@@ -82,6 +82,7 @@ final class EntraAuthenticator implements IdentityAdapter
         if ($objectId === '') throw new ApiException(401, 'invalid_token_claims', 'The token has no stable user identifier.');
         $roleMap=['Wellness.SuperAdmin'=>'super_admin','Wellness.ClinicAdmin'=>'clinic_admin','Wellness.Reception'=>'reception','Wellness.Practitioner'=>'practitioner','Wellness.Accountant'=>'accountant'];
         $directoryRoles=array_values(array_filter(array_map(static fn($role)=>$roleMap[(string)$role]??null,(array)($claims['roles']??[]))));
+        \Wellness\PilotPolicy::fromEnvironment()->assertIdentity('entra-workforce', $expectedIssuer, $objectId);
         return new VerifiedIdentity('entra-workforce', $expectedIssuer, $objectId, $tenant, $directoryRoles);
     }
 

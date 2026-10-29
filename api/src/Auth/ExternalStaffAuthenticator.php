@@ -32,6 +32,7 @@ final class ExternalStaffAuthenticator implements IdentityAdapter
             throw new ApiException(503,'staff_identity_not_configured','Use separate staff application registrations.');
         }
         $claims=$this->claims($token);
+        \Wellness\PilotPolicy::fromEnvironment()->assertIdentity('entra-external-staff',$claims['iss'],$claims['sub']);
         return new VerifiedIdentity('entra-external-staff',$claims['iss'],$claims['sub'],$claims['tid']);
     }
 

@@ -1,6 +1,22 @@
 import { expect, test, type Page } from "@playwright/test";
 import { selectAccount } from "../src/auth/accountSelection";
 
+for (const [language, message] of [
+  ['en', 'This pilot is limited to approved test accounts. Contact the clinic for access.'],
+  ['fr', 'Ce projet pilote est réservé aux comptes de test approuvés. Contactez la clinique pour obtenir un accès.'],
+] as const) test(`pilot denial explains restricted access without loading client records in ${language}`, async ({ page }) => {
+  await fixture(page, true);
+  let privateReads = 0;
+  await page.route(/\/api\/v1\/customer\/(?:profile|appointments|forms|receipts)(?:[/?]|$)/, route => {
+    privateReads++;
+    return route.fulfill({ status: 403, json: { error: { code: 'pilot_access_denied' } } });
+  });
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ status: 403, json: { error: { code: 'pilot_access_denied' } } }));
+  await page.goto(`http://localhost:5184/client?lang=${language}`);
+  await expect(page.getByRole('alert').filter({ hasText: message })).toBeVisible();
+  expect(privateReads).toBe(0);
+});
+
 test('patient privacy instructions preserve independent restrictions and current versions', async ({ page }) => {
   await fixture(page, true);
   await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ json: { data: { authenticated: true, authentication_context: 'customer', onboarding_status: 'linked', capabilities: ['own_appointments'], session: { idle_expires_at: Date.now()/1000+1800, absolute_expires_at: Date.now()/1000+28800 } } } }));

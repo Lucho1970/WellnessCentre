@@ -109,8 +109,8 @@ test('return callback restores application while workforce login clears applicat
   await expect(page).toHaveURL(`${host}/staff/apply`);
   await expect(page.getByRole('heading', { name: 'Apply to join the clinic' })).toBeVisible();
   await page.goto(`${host}/staff/login`);
-  expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.application-return'))).toBeNull();
-  expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBeNull();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('wellness.staff.application-return'))).toBeNull();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBeNull();
 });
 
 test('changing language preserves an unfinished application', async ({ page }) => {

@@ -10,6 +10,7 @@ final class CommunicationNoticeWorker
     private function q(string $sql,array $values=[]): \PDOStatement {$q=$this->pdo->prepare($sql);$q->execute($values);return $q;}
     public function run(int $limit=5): array
     {
+        \Wellness\PilotPolicy::fromEnvironment();
         $summary=['sent'=>0,'retry'=>0,'review'=>0,'canceled'=>0];
         $this->q("UPDATE communication_notices SET status='needs_review',lease_token=NULL,leased_until=NULL,last_error='Delivery outcome unknown after expired worker lease.' WHERE status='sending' AND leased_until<UTC_TIMESTAMP()");
         for($i=0;$i<max(1,min(100,$limit));$i++){
@@ -21,6 +22,8 @@ final class CommunicationNoticeWorker
                 $route=(new ClinicMailRouter($this->pdo,$this->mailer))->route((int)$notice['clinic_id']);
                 $route['mailer']->send($message['recipient'],$message['subject'],$message['body'],null,$route['reply_to']);
                 $this->finish($notice,'sent');$summary['sent']++;
+            }catch(\Wellness\PilotDeliveryBlocked $e){
+                $this->finish($notice,'canceled',0,$e->getMessage());$summary['canceled']++;
             }catch(MailSendException $e){
                 $retry=$e->retryable&&!$e->ambiguous&&(int)$notice['attempt_count']<5;
                 $this->finish($notice,$retry?'failed':'needs_review',$retry?max($e->retryAfterSeconds,NotificationWorker::backoff((int)$notice['attempt_count'])):0);
@@ -79,10 +82,10 @@ final class CommunicationNoticeWorker
     {
         $q=$this->q("SELECT u.email FROM staff_memberships m JOIN users u ON u.id=m.local_user_id AND u.clinic_id=m.clinic_id AND u.status='active' JOIN product_identities i ON i.id=m.identity_id AND i.status='active' WHERE m.id=? AND m.clinic_id=? AND m.status='active'",[$membership,$clinic]);return $q->fetchColumn()?:null;
     }
-    private function finish(array $n,string $status,int $retry=0): void
+    private function finish(array $n,string $status,int $retry=0,?string $policyReason=null): void
     {
         $next=$retry?gmdate('Y-m-d H:i:s',time()+$retry):null;
-        $q=$this->q("UPDATE communication_notices SET status=?,lease_token=NULL,leased_until=NULL,next_attempt_at=?,last_error=?,sent_at=CASE WHEN ?='sent' THEN UTC_TIMESTAMP() ELSE sent_at END WHERE id=? AND status='sending' AND lease_token=?",[$status,$next,$status==='needs_review'?'Delivery requires operator review.':null,$status,$n['id'],$n['lease_token']]);
+        $q=$this->q("UPDATE communication_notices SET status=?,lease_token=NULL,leased_until=NULL,next_attempt_at=?,last_error=?,sent_at=CASE WHEN ?='sent' THEN UTC_TIMESTAMP() ELSE sent_at END WHERE id=? AND status='sending' AND lease_token=?",[$status,$next,$policyReason??($status==='needs_review'?'Delivery requires operator review.':null),$status,$n['id'],$n['lease_token']]);
         if($q->rowCount()!==1)throw new \RuntimeException('Communication notice lease was lost.');
     }
 }

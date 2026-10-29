@@ -27,6 +27,7 @@ final class NotificationWorker
     /** @return array{sent:int,retry:int,review:int,canceled:int} */
     public function run(int $limit = 20, ?int $appointmentId = null): array
     {
+        \Wellness\PilotPolicy::fromEnvironment(); // Reject malformed safety configuration before claiming work.
         $limit = max(1, min(100, $limit));
         if ($appointmentId !== null && $appointmentId < 1) throw new \InvalidArgumentException('Invalid appointment ID.');
         $noticeLimit=0;
@@ -49,6 +50,7 @@ final class NotificationWorker
                     $superseded = $details === null || !(new ConsentAccess($this->pdo))->notificationAllowed($details) || $this->superseded($details)
                         || ($event['channel'] === 'sms' && strtotime((string)$details['scheduled_at'] . ' UTC') < time() - 3600)
                         || (str_starts_with((string)$details['event_code'], 'staff_') && !StaffNotificationRecipient::allowed($this->pdo,$details));
+                    if (!$superseded) \Wellness\PilotPolicy::fromEnvironment()->assertRecipient((string)$event['channel'], (string)$event['recipient_address']);
                     $staffNotice = !$superseded && str_starts_with((string)$details['event_code'], 'staff_');
                     $portalUrl = $superseded ? $this->clientPortalUrl : ClinicPortalUrl::resolve($this->pdo,(int)$details['clinic_id'],$this->clientPortalUrl,($this->budgetGuard||$this->clinicMail)?true:null);
                     $mailRoute=(!$superseded && $event['channel']==='email' && $this->clinicMail)?$this->clinicMail->route((int)$details['clinic_id'],(int)$details['appointment_id'],$staffNotice):['mailer'=>$this->mailer,'reply_to'=>null];
@@ -59,6 +61,10 @@ final class NotificationWorker
                         ? StaffAppointmentSms::compose($details, $portalUrl)
                         : ($staffNotice ? StaffAppointmentEmail::compose($details, $portalUrl) : AppointmentEmail::compose($details, $portalUrl)));
                     $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $portalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $mailRoute['mailer']->senderAddress(), (string)$event['recipient_address']);
+                } catch (\Wellness\PilotDeliveryBlocked $e) {
+                    $this->finish($event, 'canceled', $e->getMessage());
+                    $summary['canceled']++;
+                    continue;
                 } catch (Throwable $e) {
                     $this->finish($event, 'needs_review', 'Notification could not be prepared (' . get_class($e) . ').');
                     $summary['review']++;
@@ -80,6 +86,10 @@ final class NotificationWorker
                     } else {
                         $mailRoute['mailer']->send((string)$event['recipient_address'], $message['subject'], $message['body'], $calendar,$mailRoute['reply_to']);
                     }
+                } catch (\Wellness\PilotDeliveryBlocked $e) {
+                    $this->finish($event, 'canceled', $e->getMessage());
+                    $summary['canceled']++;
+                    continue;
                 } catch (\Wellness\Http\ApiException $e) {
                     $review=$e->errorCode==='sms_already_submitted';
                     $this->finish($event,$review?'needs_review':'canceled','Spending policy: '.$e->errorCode);

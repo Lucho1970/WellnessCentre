@@ -26,6 +26,7 @@ final class VoipMsSmsClient
 
     public function send(string $recipient, string $message): ?string
     {
+        \Wellness\PilotPolicy::fromEnvironment()->assertRecipient('sms', $recipient);
         if (!CanadianSmsNumber::isAllowed($recipient) || $message === '' || strlen($message) > 160 || preg_match('/[^\x20-\x7E]/', $message)) {
             throw new SmsSendException('SMS recipient or message is invalid.');
         }

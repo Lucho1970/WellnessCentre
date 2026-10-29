@@ -1,4 +1,5 @@
 const en = {
+  "API error: pilot_access_denied": "This pilot is limited to approved test accounts. Contact the clinic for access.",
   "API error: tax_already_exists": "A tax with this code already exists in this clinic.",
   "API error: service_privacy_review": "This service change needs a privacy review before it can be saved.",
   "API error: room_relocation_review": "Moving this room requires a reviewed migration of its booking history or assignments.",

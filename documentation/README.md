@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Pilot access and delivery safeguards](PILOT_SAFETY_CONTROLS.md): approved tester identities, destination restrictions, private preflight and activation on the existing clinic database.
+
 - [Frontend quality gates](FRONTEND_QUALITY_GATES.md): lint restoration, compatible build dependency security patches, validation and remaining pilot gates.
 
 - [Ontario health application, security, development and release standard](../AGENTS.md): mandatory repository rules and evidence-based real-patient-data release gates.

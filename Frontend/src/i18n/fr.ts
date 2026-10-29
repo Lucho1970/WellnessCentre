@@ -1,4 +1,5 @@
 const fr: Record<string, string> = {
+  "API error: pilot_access_denied": "Ce projet pilote est réservé aux comptes de test approuvés. Contactez la clinique pour obtenir un accès.",
   "API error: tax_already_exists": "Une taxe portant ce code existe déjà dans cette clinique.",
   "API error: service_privacy_review": "Ce changement de service nécessite un examen de confidentialité avant de pouvoir être enregistré.",
   "API error: room_relocation_review": "Le déplacement de cette salle nécessite une migration examinée de son historique de rendez-vous ou de ses affectations.",
