@@ -200,11 +200,11 @@ try{
     $raw=$pdo->query('SELECT definition FROM form_templates WHERE id='.$unicodeTemplate['id'])->fetchColumn();
     try{json_decode($raw,true,32,JSON_THROW_ON_ERROR);throw new RuntimeException('Expected baseline UTF-8 transport failure');}catch(JsonException $e){$assert($e->getCode()===JSON_ERROR_UTF8,'Baseline reproduces the hosted JSON error code 5');}
     $templates=$forms->templates($clinician,[])['items'];$unicodeRow=array_values(array_filter($templates,fn($row)=>(int)$row['id']===$unicodeTemplate['id']))[0];
-    $assert($unicodeRow['definition']===$unicodeDefinition,'Template list preserves Unicode despite the result charset');
+    $assert($canonicalJsonObjects($unicodeRow['definition'])===$canonicalJsonObjects($unicodeDefinition),'Template list preserves Unicode despite the result charset');
     $assert(is_string(json_encode($templates,JSON_THROW_ON_ERROR)),'Template response is valid UTF-8 JSON');
-    $assert($forms->history($clinician,$unicodeTemplate['id'])['items'][0]['definition']===$unicodeDefinition,'History preserves original Unicode');
+    $assert($canonicalJsonObjects($forms->history($clinician,$unicodeTemplate['id'])['items'][0]['definition'])===$canonicalJsonObjects($unicodeDefinition),'History preserves original Unicode');
     $detail=$forms->detail($mergedClient,$unicodeTask['id'],'forms-test');
-    $assert($detail['definition']===$unicodeDefinition,'Assigned definition preserves Unicode');
+    $assert($canonicalJsonObjects($detail['definition'])===$canonicalJsonObjects($unicodeDefinition),'Assigned definition preserves Unicode');
     $assert($detail['answers']['text']===$unicodeText,'Submitted answers preserve Unicode');
     $assert($forms->submit($mergedClient,$unicodeTask['id'],$unicodeSubmit,'forms-test')['status']==='submitted','Unicode answer retry remains idempotent');
     $assert($pdo->query('SELECT HEX(definition) FROM form_templates WHERE id='.$unicodeTemplate['id'])->fetchColumn()===$beforeHex,'Read path does not rewrite the stored form');

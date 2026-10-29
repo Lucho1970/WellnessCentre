@@ -80,9 +80,9 @@ try{for($i=0;$i<100;$i++){$socket=@stream_socket_client('tcp://'.$address,$errno
  [$status,$data,$cid]=$call('/api/v1/admin/service-imports/apply',$adminToken,'POST',$confirmation);
  $expect($status===200&&$data['data']['counts']['create']===1&&$event($cid)[0]['outcome']==='success','Reviewed import applies over authenticated HTTP with access audit');
  $createdService=(int)$data['data']['rows'][0]['service_id'];
- $expect(in_array(['type'=>'service','id'=>$createdService],json_decode($event($cid)[0]['metadata'],true)['resources'],true),'Apply access audit captures created service references');
+ $expect(in_array(['id'=>$createdService,'type'=>'service'],$canonicalReferences(json_decode($event($cid)[0]['metadata'],true)['resources']),true),'Apply access audit captures created service references');
  [$status,$data,$cid]=$call('/api/v1/admin/service-imports/'.$import['preview_id'],$adminToken);
- $expect($status===200&&in_array(['type'=>'service','id'=>$createdService],json_decode($event($cid)[0]['metadata'],true)['resources'],true),'Completed preview read audits saved result references');
+ $expect($status===200&&in_array(['id'=>$createdService,'type'=>'service'],$canonicalReferences(json_decode($event($cid)[0]['metadata'],true)['resources']),true),'Completed preview read audits saved result references');
  [$status,$data]=$call('/api/v1/admin/service-imports/apply',$adminToken,'POST',$confirmation);$expect($status===200&&$data['data']['counts']['create']===1,'HTTP apply retry returns the same result');
  [$status]=$call('/api/v1/admin/service-imports/preview',$adminToken,'POST',array_replace($importBody,['file_name'=>str_repeat('a',1048576)]));$expect($status===413,'Import request body is bounded before JSON parsing');
  [$status,$data]=$call('/api/v1/booking-clients/101/address',$practitionerToken);$expect($status===403&&$data['error']['code']==='consent_restricted','Service administration does not restore patient access');

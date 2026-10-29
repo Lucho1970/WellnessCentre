@@ -119,7 +119,13 @@ $race=function(array $bodies)use($name):array{
 $raceBody=array_replace($body,['starts_at'=>(new DateTimeImmutable($start))->modify('+42 days')->format('Y-m-d\TH:i:sP'),'idempotency_key'=>'concurrent-identical-series']);
 $preview=$series->create($client,$raceBody,'test',false);$check($preview['ready']);$raceBody['preview_token']=$preview['preview_token'];
 $before=$counts();$identical=$race([$raceBody,$raceBody]);$after=$counts();
-$check($identical[0]['applied']&&$identical[0]===$identical[1]);
+// The replay can round-trip through MySQL JSON, which reorders object members.
+// Compare all fields/types exactly while retaining the order of JSON lists.
+$canonicalJsonObjects=static function(array $value)use(&$canonicalJsonObjects):array{
+ foreach($value as &$child)if(is_array($child))$child=$canonicalJsonObjects($child);unset($child);
+ if(!array_is_list($value))ksort($value);return $value;
+};
+$check($identical[0]['applied']&&$canonicalJsonObjects($identical[0])===$canonicalJsonObjects($identical[1]));
 $check($after['appointments']===$before['appointments']+3&&$after['requests']===$before['requests']+1&&$after['notifications']===$before['notifications']+3);
 $raceBody=array_replace($body,['starts_at'=>(new DateTimeImmutable($start))->modify('+84 days')->format('Y-m-d\TH:i:sP'),'idempotency_key'=>'concurrent-competing-series-a']);
 $other=array_replace($raceBody,['idempotency_key'=>'concurrent-competing-series-b']);

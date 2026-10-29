@@ -1,5 +1,7 @@
 # Wellness Centre internal API
 
+See [API request-body limits](../documentation/API_REQUEST_BODY_LIMITS.md) for the 2 MiB fallback, existing stricter route limits, local HTTP regression evidence and remaining hosting abuse controls.
+
 ## Pilot safeguards
 
 See [pilot access and delivery controls](../documentation/PILOT_SAFETY_CONTROLS.md) for private `PILOT_*` settings, deny-by-default tester identities/destinations, the CLI preflight and disposable SQL tests. No new schema or database is required; enabling this policy does not approve real patient data.

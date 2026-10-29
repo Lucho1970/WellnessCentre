@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [API request-body limits](API_REQUEST_BODY_LIMITS.md): bounded capture on every API path, preserved strict policies, HTTP/SQL regression and remaining hosting controls (F-09).
+
 - [Pilot access and delivery safeguards](PILOT_SAFETY_CONTROLS.md): approved tester identities, destination restrictions, private preflight and activation on the existing clinic database.
 
 - [Frontend quality gates](FRONTEND_QUALITY_GATES.md): lint restoration, compatible build dependency security patches, validation and remaining pilot gates.

@@ -36,7 +36,7 @@ final class ClientFormsService
         if(!$row||($actor->userType==='client'&&$actor->userId!==$id))throw new ApiException(404,'client_not_found','Client not found.');
         if(!$this->operator($actor)&&$actor->userType!=='client'){
             $p=$this->ownPractitioner($actor);if(!$p)throw new ApiException(403,'forbidden','Practitioner access is required.');
-            $s=$this->database->connection()->prepare("SELECT 1 WHERE EXISTS(SELECT 1 FROM appointments WHERE clinic_id=? AND client_id=? AND practitioner_id=?) OR EXISTS(SELECT 1 FROM audit_logs WHERE clinic_id=? AND actor_user_id=? AND action='client.create' AND entity_type='client' AND entity_id=? AND outcome='success') OR EXISTS(SELECT 1 FROM client_form_tasks WHERE clinic_id=? AND client_id=? AND practitioner_id=? AND status<>'revoked')");$s->execute([$actor->clinicId,$id,$p,$actor->clinicId,$actor->userId,$id,$actor->clinicId,$id,$p]);
+            $s=$this->database->connection()->prepare("SELECT 1 FROM DUAL WHERE EXISTS(SELECT 1 FROM appointments WHERE clinic_id=? AND client_id=? AND practitioner_id=?) OR EXISTS(SELECT 1 FROM audit_logs WHERE clinic_id=? AND actor_user_id=? AND action='client.create' AND entity_type='client' AND entity_id=? AND outcome='success') OR EXISTS(SELECT 1 FROM client_form_tasks WHERE clinic_id=? AND client_id=? AND practitioner_id=? AND status<>'revoked')");$s->execute([$actor->clinicId,$id,$p,$actor->clinicId,$actor->userId,$id,$actor->clinicId,$id,$p]);
             if(!$s->fetchColumn())throw new ApiException(404,'client_not_found','Client not found.');
         }
         return $row;
@@ -119,7 +119,16 @@ final class ClientFormsService
     public function submit(AuthContext $actor,int $id,array $body,string $cid): array {
         $this->guard($actor);if($actor->userType!=='client')throw new ApiException(403,'forbidden','Client access is required.');$pdo=$this->database->connection();
         try{$pdo->beginTransaction();$row=$this->task($actor,$id,true);$definition=json_decode($row['definition'],true,32,JSON_THROW_ON_ERROR);$answers=ClientFormDefinition::answers($definition,$body['answers']??null);
-            if($row['submission_id']){$s=$pdo->prepare('SELECT CAST(response_data AS BINARY) response_data FROM form_submissions WHERE id=?');$s->execute([$row['submission_id']]);if(json_decode($s->fetchColumn(),true,32,JSON_THROW_ON_ERROR)!==$answers)throw new ApiException(409,'form_already_submitted','Submitted answers cannot be overwritten.');$pdo->commit();return ['id'=>$id,'status'=>$row['status']];}
+            if($row['submission_id']){
+                $s=$pdo->prepare('SELECT CAST(response_data AS BINARY) response_data FROM form_submissions WHERE id=?');
+                $s->execute([$row['submission_id']]);
+                $stored=json_decode($s->fetchColumn(),true,32,JSON_THROW_ON_ERROR);
+                // Answer validation already sorts incoming keys. MySQL JSON can store
+                // them in another order; keep exact field/value/type checks on retries.
+                if(is_array($stored))ksort($stored);
+                if($stored!==$answers)throw new ApiException(409,'form_already_submitted','Submitted answers cannot be overwritten.');
+                $pdo->commit();return ['id'=>$id,'status'=>$row['status']];
+            }
             if($row['status']!=='pending'||!is_int($body['version']??null)||$body['version']!==(int)$row['version']||($body['confirmed']??false)!==true)throw new ApiException(409,'form_changed','Review the current form before submitting.');
             $s=$pdo->prepare("INSERT INTO form_submissions(form_template_id,appointment_id,client_id,response_data,status,submitted_at) VALUES(?,?,?,?,'submitted',UTC_TIMESTAMP())");$s->execute([$row['form_template_id'],$row['appointment_id'],$actor->userId,json_encode($answers,JSON_THROW_ON_ERROR)]);$submission=(int)$pdo->lastInsertId();
             $pdo->prepare("UPDATE client_form_tasks SET submission_id=?,status='submitted',submitted_at=UTC_TIMESTAMP(),version=version+1 WHERE id=?")->execute([$submission,$id]);

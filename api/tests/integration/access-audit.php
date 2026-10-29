@@ -52,6 +52,9 @@ $event=function(string $correlation)use($pdo):array{
     $rows=$q->fetchAll();if(!$rows)throw new RuntimeException('Missing HTTP audit event: '.$correlation);
     return $rows;
 };
+// MySQL JSON reorders object keys; keep exact keys/types/list order without
+// treating JSON object member order as part of the privacy audit contract.
+$canonicalReferences=static fn(array $refs):array=>array_map(static function(array $ref):array{ksort($ref);return $ref;},$refs);
 try{
     $ready=false;for($i=0;$i<100;$i++){$connection=@stream_socket_client('tcp://'.$address,$errno,$error,0.1);if($connection){fclose($connection);$ready=true;break;}usleep(20000);}
     $expect($ready,'Synthetic API ready');
@@ -66,7 +69,7 @@ try{
     foreach([108,105,99999] as $target){
         [$status,,$cid]=$call('/api/v1/booking-clients/'.$target.'/address',$practitionerToken);
         $row=$event($cid)[0];$meta=json_decode($row['metadata'],true);
-        $expect($status===404&&$row['outcome']==='denied'&&$meta['attempted_resources']===[['type'=>'client','id'=>$target]]&&$meta['resources']===[],'Concealed/foreign/missing address denial logged without confirming existence');
+        $expect($status===404&&$row['outcome']==='denied'&&$canonicalReferences($meta['attempted_resources'])===[['id'=>$target,'type'=>'client']]&&$meta['resources']===[],'Concealed/foreign/missing address denial logged without confirming existence');
     }
     [$status,,$cid]=$call('/api/v1/clients',null);
     $row=$event($cid)[0];$expect($status===401&&$row['actor_type']==='anonymous'&&$row['actor_id']===null,'Missing credentials never supply actor IDs');
@@ -90,7 +93,7 @@ try{
     [$status,,$cid]=$call('/api/v1/forms/tasks/'.$task,$adminToken);
     $expect($status===403&&$event($cid)[0]['outcome']==='denied','Administrator clinical-answer denial is audited');
     [$status,$data,$cid]=$call('/api/v1/customer/profile',$customerToken,'GET',null,'audit-a.test',true);
-    $row=$event($cid)[0];$expect($status===200&&$row['actor_type']==='client'&&(int)$row['actor_id']===101&&json_decode($row['metadata'],true)['resources']===[['type'=>'client','id'=>101]],'Customer profile attribution and record ID');
+    $row=$event($cid)[0];$expect($status===200&&$row['actor_type']==='client'&&(int)$row['actor_id']===101&&$canonicalReferences(json_decode($row['metadata'],true)['resources'])===[['id'=>101,'type'=>'client']],'Customer profile attribution and record ID');
     [$status,,$cid]=$call('/api/v1/customer/auth/me',$customerToken,'GET',null,'audit-a.test',true);
     $expect($status===200&&$event($cid)[0]['actor_type']==='customer_identity','Session status has verified customer identity attribution');
     $appointment=(int)$pdo->query('SELECT id FROM appointments WHERE client_id=101 LIMIT 1')->fetchColumn();
@@ -104,7 +107,7 @@ try{
     $body=['client_id'=>108,'delivery_mode'=>'clinic','location_id'=>1,'practitioner_id'=>2,'service_id'=>1,'duration_option_id'=>1,'starts_at'=>'2027-01-20T10:00:00-05:00','idempotency_key'=>'audit-denied-write'];
     [$status,,$cid]=$call('/api/v1/appointments',$practitionerToken,'POST',$body);
     $expect($status===422&&$event($cid)[0]['outcome']==='denied','Writer authorization denial persists after rollback');
-    $expect(in_array(['type'=>'client','id'=>108],json_decode($event($cid)[0]['metadata'],true)['attempted_resources'],true),'Denied submitted client ID is recorded only as an attempted target');
+    $expect(in_array(['id'=>108,'type'=>'client'],$canonicalReferences(json_decode($event($cid)[0]['metadata'],true)['attempted_resources']),true),'Denied submitted client ID is recorded only as an attempted target');
     [$status,,$cid]=$call('/api/v1/clients',$adminToken,'GET',null,'unknown-audit.test');
     $row=$event($cid)[0];$expect($status===404&&$row['clinic_id']===null&&$row['actor_type']==='anonymous','Unknown host denial does not trust Host or token claims for attribution');
     // Simulate unavailable audit storage after successful disclosure query, then during a denial.
