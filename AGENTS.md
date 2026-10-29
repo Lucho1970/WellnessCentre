@@ -1,5 +1,8 @@
 # Repository workflow
 
+- Read and follow [the Ontario health application, security, development and release standard](documentation/ONTARIO_HEALTH_APPLICATION_STANDARD.md) before modifying this solution. Its MUST/MUST NOT rules and evidence-based release gates apply to developers and coding agents across the repository. Record unmet controls explicitly; a successful build is not privacy, security or hosted acceptance.
+- For the current baseline assessment and remediation priorities, see [the 29 October 2026 audit](documentation/COMPLIANCE_AUDIT_2026-10-29.md). Reassess findings against the revision being changed; do not treat historical findings as current verification.
+
 - Keep `main` clean. Before changing source, tests, configuration, or documentation, switch to a dedicated branch.
 - Use `feature/<short-description>` for additions and planned development; use `bugs/<short-description>` for fixes. These user-requested prefixes override the generic `codex/` default.
 - Each new task should have its own branch. Check existing branches and working-tree changes before switching; preserve unfinished work and never reset or discard it to start a task.

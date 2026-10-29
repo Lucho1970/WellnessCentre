@@ -1,5 +1,8 @@
 # Wellness Centre Documentation
 
+- [Ontario health application, security, development and release standard](ONTARIO_HEALTH_APPLICATION_STANDARD.md): mandatory repository rules and evidence-based real-patient-data release gates.
+- [Compliance audit — 29 October 2026](COMPLIANCE_AUDIT_2026-10-29.md): current source/local validation, remaining gaps, owners and remediation priorities.
+
 - [Reviewed SMS provider evidence](PROVIDER_EVIDENCE.md): normalized charge/STOP imports, recorded CAD/USD conversion, atomic reconciliation, sender-wide opt-outs and migration 057.
 
 - [Automated communications and SMS budget enforcement](AUTOMATED_COMMUNICATIONS.md): operational email outbox, trial/cost alerts, clinic senders, guarded staff SMS, reconciliation and migration 056.
