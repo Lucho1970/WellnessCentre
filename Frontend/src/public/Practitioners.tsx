@@ -30,7 +30,7 @@ const localized = (english: string | null, french: string | null, language: stri
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('');
 const imageFor = (person: Practitioner) => person.has_image ? `${apiBaseUrl}/team/${encodeURIComponent(person.slug)}/image?v=${encodeURIComponent(person.image_version ?? '')}` : undefined;
 
-function PractitionerCard({ person, embedded }: { person: Practitioner; embedded: boolean }) {
+function PractitionerCard({ person }: { person: Practitioner; embedded: boolean }) {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage ?? 'en';
   const professionalDetails = [person.credentials, person.discipline].filter((value, index, values) => value && values.indexOf(value) === index).join(' · ');

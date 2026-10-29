@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Frontend quality gates](FRONTEND_QUALITY_GATES.md): lint restoration, compatible build dependency security patches, validation and remaining pilot gates.
+
 - [Ontario health application, security, development and release standard](../AGENTS.md): mandatory repository rules and evidence-based real-patient-data release gates.
 - [Compliance audit — 29 October 2026](COMPLIANCE_AUDIT_2026-10-29.md): current source/local validation, remaining gaps, owners and remediation priorities.
 

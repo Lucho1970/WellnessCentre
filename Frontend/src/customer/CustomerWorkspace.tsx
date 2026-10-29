@@ -58,7 +58,7 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
   }, [canBook, status.onboarding_status]);
   useEffect(() => {
     if (status.onboarding_status !== 'linked' || !['profile','appointments'].includes(mode)) return;
-    const controller = new AbortController(); setLoading(true); (formValidation.clear(), setError(''));
+    const controller = new AbortController(); setLoading(true); formValidation.clear(); setError('');
     void customerFetch(mode === 'profile' ? '/profile' : `/appointments?show_canceled=${showCanceled ? '1' : '0'}`, { signal: controller.signal }).then(data => {
       if (controller.signal.aborted) return;
       if (mode === 'profile') setProfile({ ...emptyProfile, ...data, address: data.address ?? { ...emptyAddress } });
@@ -76,7 +76,7 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
       : appointmentInstant(right.starts_at) - appointmentInstant(left.starts_at));
   }, [appointmentView, appointments, showCanceled]);
   const save = async (event: FormEvent) => {
-    event.preventDefault(); setSaving(true); (formValidation.clear(), setError(''));
+    event.preventDefault(); setSaving(true); formValidation.clear(); setError('');
     try {
       if (mode === 'invite') {
         await customerFetch('/invitations/accept', { method: 'POST', body: JSON.stringify({ token, claimant_name: claimantName }) });
@@ -92,7 +92,7 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
   };
   const field = (key: 'given_name' | 'family_name' | 'email' | 'phone', label: string, maxLength: number) => <TextField fullWidth required label={label} value={profile[key] ?? ''} disabled={saving} type={key === 'email' ? 'email' : 'text'} inputProps={{ maxLength }} onChange={e => setProfile(p => ({ ...p, [key]: e.target.value }))} />;
   const downloadCalendar = async (appointmentId: number) => {
-    setCalendarDownloading(appointmentId); (formValidation.clear(), setError(''));
+    setCalendarDownloading(appointmentId); formValidation.clear(); setError('');
     try {
       const data = await customerFetch(`/appointments/${appointmentId}/calendar`);
       if (typeof data.content !== 'string' || !/^appointment-\d+\.ics$/.test(data.filename)) throw new Error(t('The calendar file could not be prepared.'));

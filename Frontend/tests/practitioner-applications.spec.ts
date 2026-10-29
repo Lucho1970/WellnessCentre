@@ -6,7 +6,7 @@ const profile = { given_name: 'Alice', family_name: 'Applicant', email: 'alice@e
 async function fixture(page: Page, signedIn = true) {
   const state = {
     offer: { available: true, enabled: true, activation_available: false, terms: { id: 1, version: 1, content: terms }, plan: { id: 1, name: 'Beta membership', base_monthly_cents: null } },
-    application: null as any, writes: [] as { path: string; body: any }[], uncertain: false, denial: 0, privateRequests: [] as string[],
+    application: null as (Record<string, unknown> & { status: string }) | null, writes: [] as { path: string; body: Record<string, unknown> }[], uncertain: false, denial: 0, privateRequests: [] as string[],
   };
   await page.route('**/src/auth/AuthProvider.tsx', route => route.fulfill({ contentType: 'application/javascript', body: `
     const account=${signedIn ? "{homeAccountId:'alice',name:'Alice',username:'alice@example.test'}" : 'null'};
@@ -48,7 +48,7 @@ test('anonymous mobile application entry chooses practitioner identity and retai
   await expect(page.getByRole('button', { name: 'Sign in or register to apply' })).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBe('external');
   await page.getByRole('button', { name: 'Sign in or register to apply' }).click();
-  expect(await page.evaluate(() => (window as any).testLogin)).toBe(true);
+  expect(await page.evaluate(() => (window as Window & { testLogin?: boolean }).testLogin)).toBe(true);
   await page.goto(`${host}/staff/apply?lang=fr`);
   await expect(page.getByRole('heading', { name: 'Présenter une candidature à la clinique' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

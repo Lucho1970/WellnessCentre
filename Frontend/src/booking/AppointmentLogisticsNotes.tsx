@@ -26,7 +26,7 @@ function AppointmentLogisticsNotesForm({ appointmentId, timezone, enabled, reque
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    setLoading(true); (formValidation.clear(), setError('')); setResult(null);
+    setLoading(true); formValidation.clear(); setError(''); setResult(null);
     void request(`/appointments/${appointmentId}/logistics-notes`, { signal: controller.signal })
       .then(data => {
         if (controller.signal.aborted) return;
@@ -42,7 +42,7 @@ function AppointmentLogisticsNotesForm({ appointmentId, timezone, enabled, reque
     event.preventDefault();
     const value = note.trim();
     if (!value || value.length > 500 || saving) return;
-    setSaving(true); (formValidation.clear(), setError(''));
+    setSaving(true); formValidation.clear(); setError('');
     try {
       await request(`/appointments/${appointmentId}/logistics-notes`, { method: 'POST', body: JSON.stringify({ note: value }) });
       setNote('');

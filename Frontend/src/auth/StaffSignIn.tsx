@@ -18,7 +18,7 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const [access, setAccess] = useState<(StaffAccess & { account: string }) | null>(null);
   useEffect(() => {
-    const controller = new AbortController(); setAccess(null); (formValidation.clear(), setError(''));
+    const controller = new AbortController(); setAccess(null); formValidation.clear(); setError('');
     if (!isAuthenticated || sessionExpired) return () => controller.abort();
     setBusy(true);
     void getAccessToken().then(token => apiRequest<{ roles: string[]; permissions?: string[] }>('/auth/me', { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }))
@@ -31,7 +31,7 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
     return () => controller.abort();
   }, [getAccessToken, isAuthenticated, sessionExpired, accountKey, retry, t]);
   const login = async () => {
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try { await signIn(); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); }
     finally { setBusy(false); }
   };

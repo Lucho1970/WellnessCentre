@@ -33,7 +33,7 @@ export function TravelEnquiryNotice({request,open}:{request:DiscoveryRequest;ope
       if(inFlight){refreshPending=true;return;}
       inFlight=true;refreshPending=false;const version=generation;
       try{
-        const data=await request('/travel-enquiries/unread-count');
+        const data=await request<{ unread_count: number }>('/travel-enquiries/unread-count');
         if(!Number.isSafeInteger(data.unread_count)||data.unread_count<0)throw new Error('Invalid unread count');
         if(live&&version===generation&&visible()){setCount(data.unread_count);delay=interval;}
       }catch{
@@ -71,12 +71,12 @@ export function TravelEnquiries({client=false,request,onLockedChange}:{client?:b
   useUnsavedChanges(Boolean(message)||uncertain);
   useEffect(()=>{onLockedChange?.(Boolean(message)||uncertain||busy);return()=>onLockedChange?.(false);},[message,uncertain,busy,onLockedChange]);
   useEffect(()=>{active.current=true;return()=>{active.current=false;generation.current++;};},[]);
-  const list=useCallback(async(cursor?:number)=>{const version=generation.current;try{const data=await request(`/travel-enquiries${cursor?`?before=${cursor}`:''}`);if(active.current&&version===generation.current){setItems(data.items);setBefore(data.next_before);setError('');}}catch(cause){if(active.current&&version===generation.current&&!revoked(cause))setError(cause instanceof Error?cause.message:t('Unable to load travel enquiries.'));}},[request,t,revoked]);
+  const list=useCallback(async(cursor?:number)=>{const version=generation.current;try{const data=await request<{ items: Thread[]; next_before: number | null }>(`/travel-enquiries${cursor?`?before=${cursor}`:''}`);if(active.current&&version===generation.current){setItems(data.items);setBefore(data.next_before);setError('');}}catch(cause){if(active.current&&version===generation.current&&!revoked(cause))setError(cause instanceof Error?cause.message:t('Unable to load travel enquiries.'));}},[request,t,revoked]);
   useEffect(()=>{void list();},[list]);
   const show=async(id:number,after?:number)=>{
     const version=generation.current;setError('');setBusy(true);
     try{
-      const data=await request(`/travel-enquiries/${id}${after?`?after=${after}`:''}`);
+      const data=await request<Thread & { messages: Message[]; next_after: number | null }>(`/travel-enquiries/${id}${after?`?after=${after}`:''}`);
       if(!active.current||version!==generation.current)return;setThread(data);setNotice('');
       const last=data.messages.at(-1)?.id??0;
       await request(`/travel-enquiries/${id}/read`,{message_id:last});if(active.current&&version===generation.current)await list();

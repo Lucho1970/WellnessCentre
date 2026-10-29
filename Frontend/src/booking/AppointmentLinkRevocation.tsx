@@ -8,7 +8,7 @@ function AppointmentLinkRevocationForm({ appointmentId, request }: { appointment
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [done, setDone] = useState(false);
   const revoke = async () => {
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try { await request(`/appointments/${appointmentId}/action-links/revoke`, { method: 'POST', body: '{}' }); setDone(true); setConfirming(false); }
     catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to revoke appointment links.')); }
     finally { setBusy(false); }

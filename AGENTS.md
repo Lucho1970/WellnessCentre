@@ -4,6 +4,8 @@ Read and follow the repository workflow and all 38 controls below before modifyi
 
 For baseline findings and remediation priorities, see [the 29 October 2026 audit](documentation/COMPLIANCE_AUDIT_2026-10-29.md). Reassess findings against the revision being changed; do not treat historical findings as current verification.
 
+For the follow-up on frontend lint tooling and build dependency advisories (F-02/F-03), see [frontend quality gates](documentation/FRONTEND_QUALITY_GATES.md). Its validation does not close the other privacy, security or hosted acceptance findings.
+
 ## Repository workflow
 
 - Keep `main` clean. Before changing source, tests, configuration, or documentation, switch to a dedicated branch.

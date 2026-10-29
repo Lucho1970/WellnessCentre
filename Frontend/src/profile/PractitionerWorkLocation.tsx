@@ -5,7 +5,6 @@ import { Box, Button, Checkbox, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { AddressEntry, type AddressValue } from '../shared/AddressEntry';
-import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const empty = (): AddressValue => ({ address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada' });
@@ -38,13 +37,13 @@ function PractitionerWorkLocationForm() {
     return result.data;
   };
   const load = async () => {
-    setLoading(true); (formValidation.clear(), setError('')); setMessage('');
+    setLoading(true); formValidation.clear(); setError(''); setMessage('');
     try { apply(await request()); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load or save your work location.')); }
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, []);
   const save = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setMessage('');
+    event.preventDefault(); setBusy(true); formValidation.clear(); setError(''); setMessage('');
     const homeEntered = [home.address_line1, home.address_line2, home.city, home.province, home.postal_code].some(value => value.trim());
     try {
       apply(await request({ home_address: same || homeEntered ? home : null, work_address: same ? null : work, work_same_as_home: same, version }));

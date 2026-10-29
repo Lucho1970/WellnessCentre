@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { formatCad, formatDateTime } from '../i18n/format';
 import i18n from '../i18n';
 
-export type SeriesRequest = (path: string, init?: RequestInit) => Promise<any>;
+export type SeriesRequest = <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
 type Item = { appointment_id?: number; starts_at: string | null; local_time?: string; ok: boolean; message?: string; subtotal_cents?: number; fee_cents?: number };
 export type SeriesResult = { series_id: number | null; timezone: string; ready: boolean; applied: boolean; preview_token: string; items: Item[] };
 
@@ -37,11 +37,11 @@ function RecurringBookingForm({ payload, request, single, complete, setBusy }: {
   const [result, setResult] = useState<SeriesResult | null>(null), [error, setError] = useState(''), [busy, localBusy] = useState(false), [uncertain, setUncertain] = useState(false);
   const key = useRef(crypto.randomUUID()), sending = useRef(false);
   const serialized = JSON.stringify(payload);
-  useEffect(() => { setResult(null); (formValidation.clear(), setError('')); key.current = crypto.randomUUID(); }, [serialized, frequency, count, endMode, until]);
+  useEffect(() => { setResult(null); formValidation.clear(); setError(''); key.current = crypto.randomUUID(); }, [serialized, frequency, count, endMode, until]);
   const send = async (apply: boolean) => {
     let hold = false;
     if (sending.current) return;
-    sending.current = true; localBusy(true); setBusy(true); (formValidation.clear(), setError(''));
+    sending.current = true; localBusy(true); setBusy(true); formValidation.clear(); setError('');
     try {
       const response = readSeriesResult(await request(`/recurring-series${apply ? '' : '/preview'}`, { method: 'POST', body: JSON.stringify({ ...payload, idempotency_key: key.current, recurrence: { frequency, ...(endMode === 'count' ? { count: Number(count) } : { until }) }, ...(apply ? { preview_token: result?.preview_token } : {}) }) }));
       setResult(response); setUncertain(false); hold = response.applied;

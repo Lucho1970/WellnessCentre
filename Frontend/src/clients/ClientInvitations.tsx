@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 type Invitation = { id: number; expires_at: string; revoked_at: string | null; consumed_at: string | null; claim_status: string | null; claimant_name: string | null };
-function ClientInvitationsForm({ clientId, request }: { clientId: number; request: (path: string, init?: RequestInit) => Promise<any> }) {
+function ClientInvitationsForm({ clientId, request }: { clientId: number; request: <T = unknown>(path: string, init?: RequestInit) => Promise<T> }) {
   const formValidation = useFormValidation();
   const { t } = useTranslation();
   const [items, setItems] = useState<Invitation[]>([]), [linked, setLinked] = useState(false);
@@ -15,16 +15,16 @@ function ClientInvitationsForm({ clientId, request }: { clientId: number; reques
   const [refresh, setRefresh] = useState(0);
   useUnsavedChanges(code.trim() !== '' || verified);
   useEffect(() => {
-    const controller = new AbortController(); setReady(false); (formValidation.clear(), setError(''));
-    void request(`/${clientId}/invitations`, { signal: controller.signal }).then(data => {
+    const controller = new AbortController(); setReady(false); formValidation.clear(); setError('');
+    void request<{ items: Invitation[]; linked: boolean }>(`/${clientId}/invitations`, { signal: controller.signal }).then(data => {
       if (!controller.signal.aborted) { setItems(data.items); setLinked(data.linked); setReady(true); }
     }).catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause.message); });
     return () => controller.abort();
   }, [clientId, request, refresh]);
-  const run = async (action: () => Promise<void>) => { setBusy(true); (formValidation.clear(), setError('')); try { await action(); setCode(''); setVerified(false); setRefresh(v => v + 1); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to update invitation.')); } finally { setBusy(false); } };
+  const run = async (action: () => Promise<void>) => { setBusy(true); formValidation.clear(); setError(''); try { await action(); setCode(''); setVerified(false); setRefresh(v => v + 1); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to update invitation.')); } finally { setBusy(false); } };
   const issue = (delivery: 'email' | 'manual') => void run(async () => {
     if (!window.confirm(t('Create a new invitation? Previous invitations and pending claims for this client will be revoked.'))) return;
-    const result = await request(`/${clientId}/invitations`, { method: 'POST', body: JSON.stringify({ delivery }) });
+    const result = await request<{ delivery: string; token?: string }>(`/${clientId}/invitations`, { method: 'POST', body: JSON.stringify({ delivery }) });
     setDeliveryNotice(result.delivery === 'email_accepted' ? t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.') : delivery === 'email' ? t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.') : '');
     setLink(result.delivery === 'email_accepted' ? '' : `${portalLink('client/invite')}#token=${result.token}`);
   });

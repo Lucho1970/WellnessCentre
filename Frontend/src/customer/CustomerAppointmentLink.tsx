@@ -13,7 +13,7 @@ function CustomerAppointmentLinkForm({ close, complete, onLockedChange }: { onLo
   const [appointment, setAppointment] = useState<CustomerAppointment | null>(null);
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    const controller = new AbortController(); setBusy(true); (formValidation.clear(), setError(''));
+    const controller = new AbortController(); setBusy(true); formValidation.clear(); setError('');
     if (!token || token === 'invalid') { setBusy(false); setError(t('This appointment link is invalid. Open My appointments or contact the clinic.')); return; }
     void customerFetch('/appointment-links/resolve', { method: 'POST', body: JSON.stringify({ token }), signal: controller.signal }).then(data => {
       if (controller.signal.aborted) return;

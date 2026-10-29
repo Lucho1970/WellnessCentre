@@ -43,7 +43,7 @@ export function FormLibrary({ central = false, practitioners = [], onUse, source
   const copyKeys = useRef<Record<string, string>>({});
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');
-    void request(`${base}?${new URLSearchParams({ scope, mode, q: search, page: String(page) })}`, { signal: controller.signal })
+    void request<{ items: Item[]; has_more: boolean; can_review: boolean; max_questions: number }>(`${base}?${new URLSearchParams({ scope, mode, q: search, page: String(page) })}`, { signal: controller.signal })
       .then(value => { if (!controller.signal.aborted) setData(value); })
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });

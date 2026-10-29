@@ -35,7 +35,7 @@ function StaffInvitationsForm() {
   }, [request]);
   useEffect(() => { void load().catch(cause => setError(cause instanceof Error ? cause.message : t('Unable to load invitations.'))); }, [load, t]);
   const create = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setLink('');
+    event.preventDefault(); setBusy(true); formValidation.clear(); setError(''); setLink('');
     try {
       const result = await request<{ token: string }>('/admin/staff-invitations', { ...form, role: 'practitioner', location_id: Number(form.location_id), existing_user_id: form.existing_user_id ? Number(form.existing_user_id) : null });
       const url = new URL(`${import.meta.env.BASE_URL}staff/invitation`, window.location.origin); url.hash = `token=${result.token}`;
@@ -44,7 +44,7 @@ function StaffInvitationsForm() {
     finally { setBusy(false); }
   };
   const action = async (item: Invitation, approve: boolean) => {
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try {
       await request(`/admin/staff-invitations/${item.id}/${approve ? 'approve' : 'revoke'}`, approve ? { recipient_verified: verified, verification_code: code } : {});
       setReview(null); await load();

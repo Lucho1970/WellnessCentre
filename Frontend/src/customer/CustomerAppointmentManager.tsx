@@ -43,7 +43,7 @@ function CustomerAppointmentManagerForm({ appointment, close, complete, onLocked
   const closeSafely = () => { if (!dirty || window.confirm(t('Discard your unsaved changes?'))) close(); };
 
   const beginCancel = async () => {
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try { setCancellation(await customerFetch(`/appointments/${appointment.id}/cancellation-preview`)); setAction('cancel'); }
     catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }
     finally { setBusy(false); }
@@ -51,7 +51,7 @@ function CustomerAppointmentManagerForm({ appointment, close, complete, onLocked
 
   const display = (value: string, database = false) => formatDateTime(database ? `${value.replace(' ', 'T')}Z` : value, i18n.resolvedLanguage, { timeZone: appointment.timezone, dateStyle: 'medium', timeStyle: 'short' });
   const loadSlots = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setSlots([]); setSlot(null); setSearched(false);
+    event.preventDefault(); setBusy(true); formValidation.clear(); setError(''); setSlots([]); setSlot(null); setSearched(false);
     try {
       const data = await customerFetch(`/appointments/${appointment.id}/availability?date_from=${date}&date_to=${date}`);
       const currentStart = databaseInstant(appointment.starts_at).getTime();
@@ -62,7 +62,7 @@ function CustomerAppointmentManagerForm({ appointment, close, complete, onLocked
   };
   const submit = async () => {
     if (action === 'reschedule' && (!slot || (needsRoom && !room))) return;
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try {
       const body = action === 'cancel'
         ? { action, version: appointment.version, reason, expected_cancellation_fee_cents: Number(cancellation?.fee_cents) }

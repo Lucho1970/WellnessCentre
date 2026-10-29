@@ -5,7 +5,6 @@ import { Box, Button, Checkbox, Chip, Divider, MenuItem, Paper, Stack, Typograph
 import { Pencil, Plus, Save, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage } from '../shared/api';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 import { formatCad } from '../i18n/format';
 
@@ -121,11 +120,11 @@ function ServiceAssignmentsForm({ initialServiceId, lockService = false, onDirty
     setSelectedPeople(links.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))));
     setSelectedLocations(locationLinks.filter((item) => item.service_id === Number(service) && Boolean(Number(item.active))).map((item) => item.location_id));
   };
-  const cancelEdit = () => { resetSelections(); setEditing(false); (formValidation.clear(), setError('')); };
+  const cancelEdit = () => { resetSelections(); setEditing(false); formValidation.clear(); setError(''); };
 
   const save = async () => {
     setBusy(true);
-    (formValidation.clear(), setError(''));
+    formValidation.clear(); setError('');
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/services/${service}/assignments`, {
@@ -182,7 +181,7 @@ function AssignmentSummary({ locations, people, locationIds, links, money }: { l
     <Divider/>
     <Box><Typography fontWeight={700} mb={1}>{t('Practitioners')}</Typography><Stack spacing={1}>{links.map(link => {
       const name = people.find(person => person.practitioner_id === link.practitioner_id)?.display_name ?? t('Unknown practitioner');
-      const modes = [Boolean(Number(link.offers_clinic)) ? t('Clinic visits') : '', Boolean(Number(link.offers_mobile)) ? t('On-Site visits') : ''].filter(Boolean);
+      const modes = [Number(link.offers_clinic) ? t('Clinic visits') : '', Number(link.offers_mobile) ? t('On-Site visits') : ''].filter(Boolean);
       return <Paper key={link.practitioner_id} variant="outlined" sx={{ p: 2 }}><Typography fontWeight={700}>{name}</Typography><Stack direction="row" flexWrap="wrap" gap={1} my={1}>{modes.map(mode => <Chip key={mode} size="small" color="primary" variant="outlined" label={mode}/>)}</Stack>{link.mobile_free_radius_km != null && <Typography>{t('Free travel up to {{distance}} km.', { distance: link.mobile_free_radius_km })}</Typography>}{Boolean(Number(link.offers_mobile)) && <Typography variant="body2" color="text.secondary">{t('{{radius}} km radius · {{minutes}} min travel each way · {{fee}} On-Site fee', { radius: link.mobile_radius_km ?? t('Not set'), minutes: link.travel_buffer_minutes, fee: money(Number(link.mobile_fee_cents)) })}</Typography>}</Paper>;
     })}{!links.length && <Typography color="text.secondary">{t('No practitioners assigned.')}</Typography>}</Stack></Box>
   </Stack>;

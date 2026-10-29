@@ -60,7 +60,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
   const formGuard = useUnsavedForm();
 
   const load = useCallback(async () => {
-    setBusy(true); (formValidation.clear(), setLoadError(''));
+    setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken(); const headers = { Authorization: `Bearer ${token}` };
       const responses = practitionerMode
@@ -109,26 +109,26 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
   const startNew = (kind: ItemKind) => {
     if (!selectedPractitioner || !canManage) return;
     setSaved('');
-    formGuard.markClean(); setImpactReview(null); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); (formValidation.clear(), setPanelError('')); setPanelMode('new');
+    formGuard.markClean(); setImpactReview(null); setPanelKind(kind); setForm(blankForm(kind, defaultLocationId(selectedPractitioner))); formValidation.clear(); setPanelError(''); setPanelMode('new');
   };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelKind(selected.kind); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelKind(selected.kind); formValidation.clear(); setPanelError(''); setPanelMode('details'); };
   const startEdit = () => {
     if (!selected || !canManage) return;
     const location = itemLocation(selected) ?? locations.find(item => item.id === defaultLocationId(selectedPractitioner)) ?? locations[0];
     const next = blankForm(selected.kind, location?.id ?? null);
     if (selected.rule) Object.assign(next, { location_id: String(selected.rule.location_id), weekday: String(selected.rule.weekday), start_time: selected.rule.start_time.slice(0, 5), end_time: selected.rule.end_time.slice(0, 5), valid_from: selected.rule.valid_from, valid_until: selected.rule.valid_until ?? '' });
     if (selected.exception) Object.assign(next, { location_id: String(location?.id ?? ''), starts_at: utcToLocalInput(selected.exception.starts_at, location?.timezone ?? 'America/Toronto'), ends_at: utcToLocalInput(selected.exception.ends_at, location?.timezone ?? 'America/Toronto'), type: selected.exception.type, reason: selected.exception.reason ?? '' });
-    formGuard.markClean(); setImpactReview(null); setPanelKind(selected.kind); setForm(next); (formValidation.clear(), setPanelError('')); setPanelMode('edit');
+    formGuard.markClean(); setImpactReview(null); setPanelKind(selected.kind); setForm(next); formValidation.clear(); setPanelError(''); setPanelMode('edit');
   };
   const closePanel = () => {
     if (busy) return;
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); (formValidation.clear(), setPanelError(''));
+    formGuard.markClean(); setPanelMode(null); formValidation.clear(); setPanelError('');
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (!selectedPractitioner || !canManage) return;
-    setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    setBusy(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken();
       const resource = panelKind === 'rule' ? 'availability-rules' : panelKind === 'override' ? 'availability-overrides' : 'time-off';
@@ -158,7 +158,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
 
   const remove = async () => {
     if (!canManage || !selected || !window.confirm(t(selected.kind === 'rule' ? 'Archive these working hours?' : 'Remove this schedule item?'))) return;
-    setBusy(true); (formValidation.clear(), setLoadError(''));
+    setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken(); const resource = selected.kind === 'rule' ? 'availability-rules' : selected.kind === 'override' ? 'availability-overrides' : 'time-off';
       const response = await fetch(`${api}/admin/${resource}/${selected.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });

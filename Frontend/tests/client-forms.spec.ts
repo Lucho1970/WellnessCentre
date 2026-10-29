@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { Definition } from '../src/forms/FormTasks';
+type TemplateBody = Record<string, unknown> & { definition: Definition };
 const libraryDefinition = { instructions: 'Library instructions', instructions_fr: 'Instructions du modèle', sections: [{ id: 's1', title: 'First section', title_fr: 'Première section' }, { id: 's2', title: 'Second section', title_fr: 'Deuxième section' }], questions: [{ id: 'a', section_id: 's1', label: 'First question', label_fr: 'Première question', type: 'text', required: true }, { id: 'b', section_id: 's1', label: 'Second question', label_fr: 'Deuxième question', type: 'text', required: false }, { id: 'c', section_id: 's2', label: 'Third question', label_fr: 'Troisième question', type: 'yes_no', required: false }] };
 const libraryItem = { id: 91, entry_id: 20, version: 1, revision: 2, scope: 'global', name: 'Library starter', description: 'A reusable starter for testing', form_type: 'intake', definition: libraryDefinition, status: 'approved', review_note: '', can_use: true, can_review: false, can_revise: false, can_retire: false };
 async function libraryFixture(page: Page, admin = false) {
@@ -8,7 +10,7 @@ async function libraryFixture(page: Page, admin = false) {
   await page.route('**/api/v1/forms/library/91', route => route.fulfill({ json: { data: libraryItem } }));
 }
 test('an existing working form can be submitted to a clinic library without publishing it', async ({ page }) => {
-  await libraryFixture(page); let submitted: any; let publications = 0;
+  await libraryFixture(page); let submitted: TemplateBody; let publications = 0;
   await page.route('**/api/v1/forms/library', route => { submitted = route.request().postDataJSON(); return route.fulfill({ json: { data: { ...libraryItem, status: 'pending' } } }); });
   await page.route('**/api/v1/forms/templates', route => { publications++; return route.fulfill({ json: { data: { id: 99 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create form', exact: true }).click();
@@ -56,7 +58,7 @@ test('form library previews bilingual questions and creates an independently edi
 test('clinic form library submissions require review and a rejection reason', async ({ page }) => {
   await libraryFixture(page, true); const pending = { ...libraryItem, scope: 'clinic', status: 'pending', revision: 1, can_use: false, can_review: true };
   await page.route('**/api/v1/forms/library?**', route => route.fulfill({ json: { data: { items: [pending], can_review: true, has_more: false, max_questions: 100 } } }));
-  await page.route('**/api/v1/forms/library/91', route => route.fulfill({ json: { data: pending } })); let review: any;
+  await page.route('**/api/v1/forms/library/91', route => route.fulfill({ json: { data: pending } })); let review: Record<string, unknown>;
   await page.route('**/api/v1/forms/library/91/review', route => { review = route.request().postDataJSON(); return route.fulfill({ json: { data: { ...pending, status: 'rejected' } } }); });
   await page.goto(`${host}/admin/forms`);
   await page.getByRole('combobox', { name: /^Library Global library/ }).click(); await page.getByRole('option', { name: 'Clinic library', exact: true }).click();
@@ -67,7 +69,7 @@ test('clinic form library submissions require review and a rejection reason', as
   await expect(page.getByText('Library review saved.')).toBeVisible(); expect(review).toEqual({ action: 'reject', revision: 1, review_note: 'Please clarify this question' });
 });
 test('practitioner submits a clinic library template without self-approval', async ({ page }) => {
-  await libraryFixture(page); let submitted: any;
+  await libraryFixture(page); let submitted: Record<string, unknown>;
   await page.route('**/api/v1/forms/library', route => { submitted = route.request().postDataJSON(); return route.fulfill({ json: { data: { ...libraryItem, status: 'pending' } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create library template', exact: true }).click(); const dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: /^Submit to library/ }).click(); await page.getByRole('option', { name: 'Clinic library', exact: true }).click();
@@ -112,7 +114,7 @@ async function complete(page: Page) {
   await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check();
 }
 test('client explicitly submits the assigned version and a required false yes/no answer', async ({ page }) => {
-  await fixture(page); let body: any;
+  await fixture(page); let body: Record<string, unknown>;
   await page.route('**/api/v1/customer/forms/19/submit', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
   await complete(page); await expect(page.getByRole('button', { name: 'My appointments', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible();
@@ -144,7 +146,7 @@ test('uncertain assignment keeps its key and locks client details until retry', 
   await page.getByRole('button', { name: 'Retry confirmation', exact: true }).click(); await expect(page.getByText('Form assigned.', { exact: true })).toBeVisible(); expect(bodies[1]).toEqual(bodies[0]); await expect(page.getByRole('tab', { name: 'Appointment history' })).toBeEnabled();
 });
 test('template changes publish a new version and preserve the previous definition', async ({ page }) => {
-  await fixture(page, 'practitioner'); let body: any;
+  await fixture(page, 'practitioner'); let body: TemplateBody;
   await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Version history', exact: true }).click(); await expect(page.getByText('Synthetic answer / Réponse fictive')).toBeVisible(); await page.getByRole('button', { name: 'Close', exact: true }).click(); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Assigned practitioner' })).toBeDisabled(); await page.getByRole('textbox', { name: 'Form name', exact: true }).fill('Revised intake'); await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible();
@@ -166,7 +168,7 @@ async function openTyped(page: Page) {
   await page.goto(`${host}/client`); await page.getByRole('button', { name: 'My forms', exact: true }).click(); await page.getByRole('button', { name: 'Complete form', exact: true }).click();
 }
 test('date, international phone and email fields submit canonical answers', async ({ page }) => {
-  await openTyped(page); let body: any;
+  await openTyped(page); let body: Record<string, unknown>;
   await page.route('**/api/v1/customer/forms/19/submit', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
   await page.getByLabel('Birth date').fill('2000-02-29');
   await expect(page.getByLabel('Birth date')).toHaveAttribute('type', 'date');
@@ -188,7 +190,7 @@ test('invalid typed answers remain editable and do not send a submission', async
   await page.getByRole('textbox', { name: 'Contact telephone', exact: true }).fill('(416) 555-1234'); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(sent).toBe(1);
 });
 test('a new version changes text to date while the existing version remains text', async ({ page }) => {
-  await fixture(page, 'practitioner'); let body: any;
+  await fixture(page, 'practitioner'); let body: TemplateBody;
   await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
   await page.getByRole('combobox', { name: /Answer type/ }).first().click(); await page.getByRole('option', { name: 'Date', exact: true }).click(); await page.getByRole('checkbox', { name: 'No future dates (for example, birth date)' }).check();
@@ -207,7 +209,7 @@ const sectionedDefinition = { ...definition, sections: [
   { id: 'health', title: 'Health History', title_fr: 'Antécédents médicaux', description: 'Use synthetic answers only.', description_fr: 'Utilisez uniquement des réponses fictives.' }
 ], questions: definition.questions.map((question, index) => ({ ...question, section_id: index === 0 ? 'client_info' : 'health' })) };
 test('sections group client questions and descriptions without changing answer IDs', async ({ page }) => {
-  await fixture(page); let body: any;
+  await fixture(page); let body: Record<string, unknown>;
   await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition: sectionedDefinition, answers: null } } }));
   await page.route('**/api/v1/customer/forms/19/submit', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
   await complete(page);
@@ -217,7 +219,7 @@ test('sections group client questions and descriptions without changing answer I
   await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(body.answers).toEqual({ q1: 'Test response', yes: false, consent: true });
 });
 test('author creates sections, adds questions into them and reorders sections', async ({ page }) => {
-  await fixture(page, 'practitioner'); let body: any;
+  await fixture(page, 'practitioner'); let body: TemplateBody;
   await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
   await page.getByRole('button', { name: 'Add section', exact: true }).click(); await page.getByLabel('Section 1 title (English)').fill('Client Information'); await page.getByLabel('Section 1 description (English)').fill('Check your details.');
@@ -226,11 +228,11 @@ test('author creates sections, adds questions into them and reorders sections', 
   await page.getByRole('button', { name: 'Add question to Health History', exact: true }).click(); await page.getByRole('textbox', { name: 'Question (English)' }).last().fill('Synthetic history question');
   await page.getByRole('button', { name: 'Move section down', exact: true }).first().click(); await expect(page.getByLabel('Section 1 title (English)')).toHaveValue('Health History');
   await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible();
-  expect(body.definition.sections.map((section: any) => section.title)).toEqual(['Health History', 'Client Information']); expect(body.definition.sections[1].description).toBe('Check your details.');
+  if (!body.definition.sections) throw new Error('Expected published sections.'); expect(body.definition.sections.map((section) => section.title)).toEqual(['Health History', 'Client Information']); expect(body.definition.sections[1].description).toBe('Check your details.');
   expect(body.definition.questions[0].section_id).toBe(body.definition.sections[1].id); expect(body.definition.questions[3].section_id).toBe(body.definition.sections[0].id); expect(template.definition.questions).toHaveLength(3);
 });
 test('removing a section preserves its questions and uncertain publication locks sections', async ({ page }) => {
-  await fixture(page, 'practitioner'); const bodies: any[] = [];
+  await fixture(page, 'practitioner'); const bodies: TemplateBody[] = [];
   await page.route('**/api/v1/forms/templates*', route => route.fulfill({ json: { data: { items: [{ ...template, definition: sectionedDefinition }], practitioners: [{ id: 7, display_name: 'Esther' }], services: [], can_author: true, has_more: false } } }));
   await page.route('**/api/v1/forms/templates/12/versions', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry' } } } : { json: { data: { id: 13, version: 2 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
@@ -257,7 +259,7 @@ async function openChoices(page: Page) {
   await page.goto(`${host}/client`); await page.getByRole('button', { name: 'My forms', exact: true }).click(); await page.getByRole('button', { name: 'Complete form', exact: true }).click();
 }
 test('required radio and checkbox questions reject empty answers and submit selected IDs', async ({ page }) => {
-  await openChoices(page); let body: any;
+  await openChoices(page); let body: Record<string, unknown>;
   await page.route('**/api/v1/customer/forms/19/submit', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
   await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check(); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByRole('alert').filter({ hasText: 'Check the form questions' })).toBeVisible(); expect(body).toBeUndefined();
   await page.getByRole('radio', { name: 'Low', exact: true }).check(); await page.getByRole('radio', { name: 'Moderate', exact: true }).check(); await expect(page.getByRole('radio', { name: 'Low', exact: true })).not.toBeChecked();
@@ -265,18 +267,18 @@ test('required radio and checkbox questions reject empty answers and submit sele
   await page.getByRole('checkbox', { name: 'Low', exact: true }).check(); await page.getByRole('checkbox', { name: 'High', exact: true }).check(); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(body.answers).toEqual({ stress: 'moderate', habits: ['high', 'low'] });
 });
 test('uncertain choice submission locks selections and retries the same answers', async ({ page }) => {
-  await openChoices(page); const bodies: any[] = [];
+  await openChoices(page); const bodies: Record<string, unknown>[] = [];
   await page.route('**/api/v1/customer/forms/19/submit', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry' } } } : { json: { data: { id: 19, status: 'submitted' } } }); });
   await page.getByRole('radio', { name: 'High', exact: true }).check(); await page.getByRole('checkbox', { name: 'Moderate', exact: true }).check(); await page.getByRole('checkbox', { name: 'I reviewed these answers and confirm submission.' }).check(); await page.getByRole('button', { name: 'Submit form', exact: true }).click();
   await expect(page.getByRole('radio', { name: 'Low', exact: true })).toBeDisabled(); await expect(page.getByRole('checkbox', { name: 'High', exact: true })).toBeDisabled(); await page.getByRole('button', { name: 'Retry confirmation', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(bodies[1]).toEqual(bodies[0]);
 });
 test('author publishes editable choice options in a new version', async ({ page }) => {
-  await fixture(page, 'practitioner'); let body: any;
+  await fixture(page, 'practitioner'); let body: TemplateBody;
   await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click();
   await page.getByRole('combobox', { name: /Answer type/ }).first().click(); await page.getByRole('option', { name: 'Single choice (radio buttons)', exact: true }).click();
   await page.getByLabel('Option 1 (English)').fill('Low'); await page.getByLabel('Option 1 (French)').fill('Faible'); await page.getByLabel('Option 2 (English)').fill('Moderate'); await page.getByRole('button', { name: 'Add option', exact: true }).click(); await page.getByLabel('Option 3 (English)').fill('High');
-  await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible(); expect(body.definition.questions[0].options.map((option: any) => option.label)).toEqual(['Low', 'Moderate', 'High']); expect(body.definition.questions[0].type).toBe('single_choice'); expect(template.definition.questions[0].type).toBe('text');
+  await page.getByRole('button', { name: 'Publish new version' }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible(); if (!body.definition.questions[0].options) throw new Error('Expected published options.'); expect(body.definition.questions[0].options.map((option) => option.label)).toEqual(['Low', 'Moderate', 'High']); expect(body.definition.questions[0].type).toBe('single_choice'); expect(template.definition.questions[0].type).toBe('text');
 });
 test('saved choice answers display read-only French labels on mobile', async ({ page }) => {
   await fixture(page); await page.setViewportSize({ width: 390, height: 844 });
@@ -287,7 +289,7 @@ test('saved choice answers display read-only French labels on mobile', async ({ 
 
 const portable = { format: 'wellness-form', format_version: 1, name: template.name, form_type: template.form_type, definition };
 test('editable source validates JSON and publishes changes as a new version', async ({ page }) => {
-  await fixture(page, 'practitioner'); let body: any;
+  await fixture(page, 'practitioner'); let body: TemplateBody;
   await page.route('**/api/v1/forms/templates/12/versions', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'View source', exact: true }).click();
   const panel = page.getByRole('dialog'), raw = panel.getByRole('textbox', { name: 'Form JSON source' });
@@ -308,15 +310,15 @@ test('rejected source schema leaves the original editor intact', async ({ page }
   await panel.getByRole('button', { name: 'Apply source', exact: true }).click(); await expect(panel.getByRole('alert')).toBeVisible(); await expect(page.getByLabel('Form name', { exact: false })).toHaveValue(template.name);
 });
 test('unfinished draft can be saved with blank labels and resumed after reload', async ({ page }) => {
-  await fixture(page, 'practitioner'); let stored: any;
+  await fixture(page, 'practitioner'); let stored: TemplateBody;
   await page.route('**/api/v1/forms/drafts*', route => { if (route.request().method() === 'POST') { stored = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 31, version: 1, status: 'draft' } } }); } return route.fulfill({ json: { data: { items: stored ? [{ id: 31, version: 1, name: stored.name, updated_at: '2026-10-06 12:00:00' }] : [], has_more: false } } }); });
-  await page.route('**/api/v1/forms/drafts/31', route => { const { idempotency_key, draft_version, ...payload } = stored; return route.fulfill({ json: { data: { id: 31, version: 1, status: 'draft', payload } } }); });
+  await page.route('**/api/v1/forms/drafts/31', route => { const payload = Object.fromEntries(Object.entries(stored).filter(([key]) => key !== 'idempotency_key' && key !== 'draft_version')); return route.fulfill({ json: { data: { id: 31, version: 1, status: 'draft', payload } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create form', exact: true }).click(); await page.getByRole('textbox', { name: 'Form name', exact: true }).fill('Unfinished intake');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click(); await expect(page.getByText('Draft saved. You can return after signing in again.')).toBeVisible(); expect(stored.definition.questions[0].label).toBe('');
   await page.reload(); await page.getByRole('button', { name: 'Resume draft', exact: true }).click(); await expect(page.getByRole('textbox', { name: 'Form name', exact: true })).toHaveValue('Unfinished intake'); await expect(page.getByRole('textbox', { name: 'Question (English)', exact: true })).toHaveValue(''); await expect(page.getByText('Draft saved', { exact: true })).toBeVisible();
 });
 test('uncertain draft save locks editing and retries the identical request', async ({ page }) => {
-  await fixture(page, 'practitioner'); const requests: any[] = []; let publication: any;
+  await fixture(page, 'practitioner'); const requests: Record<string, unknown>[] = []; let publication: Record<string, unknown>;
   await page.route('**/api/v1/forms/drafts', route => { requests.push(route.request().postDataJSON()); return route.fulfill(requests.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry draft' } } } : { json: { data: { id: 31, version: 1, status: 'draft' } } }); });
   await page.route('**/api/v1/forms/templates/12/versions', route => { publication = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 13, version: 2 } } }); });
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Create new version', exact: true }).click(); await page.getByRole('button', { name: 'Save draft', exact: true }).click(); await expect(page.getByRole('textbox', { name: 'Form name', exact: true })).toBeDisabled(); await expect(page.getByRole('button', { name: 'View source', exact: true })).toBeDisabled();
@@ -324,7 +326,7 @@ test('uncertain draft save locks editing and retries the identical request', asy
   await page.getByRole('button', { name: 'Publish new version', exact: true }).click(); await expect(page.getByRole('button', { name: 'Create form', exact: true })).toBeVisible(); expect(publication.draft_id).toBe(31); expect(publication.draft_version).toBe(1);
 });
 test('JSON file imports as a private draft with no inherited service bindings', async ({ page }) => {
-  await fixture(page, 'practitioner'); let imported: any;
+  await fixture(page, 'practitioner'); let imported: Record<string, unknown>;
   await page.route('**/api/v1/forms/drafts/import', route => { imported = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: 32, version: 1, status: 'draft' } } }); });
   await page.route('**/api/v1/forms/drafts/32', route => route.fulfill({ json: { data: { id: 32, version: 1, status: 'draft', payload: { name: portable.name, form_type: portable.form_type, definition, owner_practitioner_id: 7, service_ids: [], previous_template_id: null, expected_version: 0 } } } }));
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Import form JSON', exact: true }).click(); const panel = page.getByRole('dialog'); await panel.locator('input[type=file]').setInputFiles({ name: 'test.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(portable)) });
@@ -335,7 +337,7 @@ test('French mobile source panel fits the viewport', async ({ page }) => {
 });
 
 test('invalid import remains editable and uncertain import reuses its original key', async ({ page }) => {
-  await fixture(page, 'practitioner'); const imports: any[] = [];
+  await fixture(page, 'practitioner'); const imports: Record<string, unknown>[] = [];
   await page.route('**/api/v1/forms/drafts/import', route => { imports.push(route.request().postDataJSON()); return route.fulfill(imports.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry import' } } } : { json: { data: { id: 32, version: 1, status: 'draft' } } }); });
   await page.route('**/api/v1/forms/drafts/32', route => route.fulfill({ json: { data: { id: 32, version: 1, status: 'draft', payload: { name: portable.name, form_type: portable.form_type, definition, owner_practitioner_id: 7, service_ids: [], previous_template_id: null, expected_version: 0 } } } }));
   await page.goto(`${host}/practitioner/forms`); await page.getByRole('button', { name: 'Import form JSON', exact: true }).click(); const panel = page.getByRole('dialog'), raw = panel.getByRole('textbox', { name: 'Form JSON source' });
@@ -360,7 +362,7 @@ test('configured question limit permits more than 30 questions and stops at the 
   await fixture(page, 'practitioner');
   const expanded = { ...template, form_type: 'intake', definition: { ...definition, sections: [{ id: 'info', title: 'Information' }], questions: Array.from({ length: 30 }, (_, index) => ({ ...definition.questions[0], id: `q${index}`, section_id: 'info' })) } };
   await page.route('**/api/v1/forms/templates?*', route => route.fulfill({ json: { data: { items: [expanded], practitioners: [{ id: 7, display_name: 'Esther' }], services: [], can_author: true, drafts_enabled: true, max_questions: 32, has_more: false } } }));
-  let saved: any;
+  let saved: TemplateBody;
   await page.route('**/api/v1/forms/drafts', route => route.request().method() === 'POST' ? (saved = route.request().postDataJSON(), route.fulfill({ json: { data: { id: 91, version: 1, status: 'draft' } } })) : route.fulfill({ json: { data: { items: [], has_more: false } } }));
   await page.goto(`${host}/practitioner/forms`);
   await page.getByRole('button', { name: 'Create new version', exact: true }).click();
@@ -391,7 +393,7 @@ async function openAnswers(page: Page) {
 }
 
 test('client answer draft saves partial answers without consent and resumes after reload', async ({ page }) => {
-  await fixture(page); let draft: any = null, version = 1; const saves: any[] = [], submissions: unknown[] = [];
+  await fixture(page); let draft: { answers: Record<string, unknown>; updated_at: string } | null = null, version = 1; const saves: Record<string, unknown>[] = [], submissions: unknown[] = [];
   await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, version, definition, answers: null, answer_changes_enabled: true, draft } } }));
   await page.route('**/api/v1/customer/forms/19/draft', route => { const body = route.request().postDataJSON(); saves.push(body); draft = { answers: body.answers, updated_at: '2026-10-13 12:00:00' }; version++; return route.fulfill({ json: { data: { id: 19, status: 'pending', version } } }); });
   await page.route('**/api/v1/customer/forms/19/submit', route => { submissions.push(route.request().postDataJSON()); return route.fulfill({ json: { data: { id: 19, status: 'submitted' } } }); });
@@ -411,7 +413,7 @@ test('client answer draft saves partial answers without consent and resumes afte
 });
 
 test('uncertain client answer draft locks navigation and retries the identical save key', async ({ page }) => {
-  await fixture(page); const bodies: any[] = [];
+  await fixture(page); const bodies: Record<string, unknown>[] = [];
   await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, definition, answers: null, answer_changes_enabled: true } } }));
   await page.route('**/api/v1/customer/forms/19/draft', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { message: 'Retry draft' } } } : { json: { data: { id: 19, status: 'pending', version: 2 } } }); });
   await openAnswers(page); await page.getByLabel('Synthetic answer').fill('Partial draft');
@@ -434,7 +436,7 @@ test('stale client draft keeps edits until explicit reload of the newer saved ve
 });
 
 test('client amendment requires a reason, preserves consent and retries the same correction', async ({ page }) => {
-  await fixture(page); const bodies: any[] = [];
+  await fixture(page); const bodies: Record<string, unknown>[] = [];
   await page.route('**/api/v1/customer/forms/19', route => route.fulfill({ json: { data: { ...task, status: 'reviewed', version: 4, definition, answers: { q1: 'Original answer', yes: false, consent: true }, answer_changes_enabled: true, amendments: [] } } }));
   await page.route('**/api/v1/customer/forms/19/amendments', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { message: 'Retry amendment' } } } : { json: { data: { id: 19, status: 'submitted', version: 5, amendment_id: 31 } } }); });
   await openAnswers(page); await page.getByRole('button', { name: 'Amend answers', exact: true }).click();

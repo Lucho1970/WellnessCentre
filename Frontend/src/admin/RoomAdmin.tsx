@@ -44,7 +44,7 @@ function RoomAdminForm() {
 
   const clearAccess = useCallback(() => { setLoaded(false); setLocations([]); setItems([]); setSelectedId(null); setPanelMode(null); setEditingId(null); setForm(blank()); setPanelError(''); setSaved(''); setCapabilitiesOpen(false); setCapabilitiesDirty(false); formGuard.markClean(); }, [formGuard.markClean]);
   const load = useCallback(async (preferredId?: number | null) => {
-    const scope = ++generation.current; setLoaded(false); setBusy(true); (formValidation.clear(), setLoadError(''));
+    const scope = ++generation.current; setLoaded(false); setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken(); const headers = { Authorization: `Bearer ${token}` };
       const [locationResponse, roomResponse] = await Promise.all([fetch(`${api}/admin/locations`, { headers }), fetch(`${api}/admin/rooms`, { headers })]);
@@ -62,13 +62,13 @@ function RoomAdminForm() {
   useEffect(() => { void load(); return () => { generation.current++; }; }, [load]);
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
-  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank(String(locations[0]?.id ?? ''))); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
-  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(roomForm(item)); (formValidation.clear(), setPanelError('')); setPanelMode('edit'); };
-  const closePanel = () => { if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; formGuard.markClean(); setPanelMode(null); setEditingId(null); (formValidation.clear(), setPanelError('')); };
+  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank(String(locations[0]?.id ?? ''))); formValidation.clear(); setPanelError(''); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); formValidation.clear(); setPanelError(''); setPanelMode('details'); };
+  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(roomForm(item)); formValidation.clear(); setPanelError(''); setPanelMode('edit'); };
+  const closePanel = () => { if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; formGuard.markClean(); setPanelMode(null); setEditingId(null); formValidation.clear(); setPanelError(''); };
   const closeCapabilities = () => { if (capabilitiesDirty && !window.confirm(t('Discard your unsaved changes?'))) return; setCapabilitiesDirty(false); setCapabilitiesOpen(false); };
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); const scope = ++generation.current; setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    event.preventDefault(); const scope = ++generation.current; setBusy(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken(); const payload = { ...form, location_id: Number(form.location_id), turnover_minutes: Number(form.turnover_minutes) };
       const response = await fetch(editingId ? `${api}/admin/rooms/${editingId}` : `${api}/admin/rooms`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -92,7 +92,7 @@ function RoomAdminForm() {
     {saved && <Alert severity="success" onClose={() => setSaved('')}>{saved}</Alert>}{loadError && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>{t('Retry')}</Button>}>{loadError}</Alert>}
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Rooms')}</Typography><Typography color="text.secondary">{t('Select a room to view its details or enable actions.')}</Typography></Box>
-      <List disablePadding aria-label={t('Rooms')}>{filteredItems.map(item => <ListItemButton key={item.id} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} divider sx={{ py: 1.75, px: 2.5 }}><ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{item.name}</Typography><Chip size="small" color={Boolean(Number(item.is_bookable)) ? 'success' : 'default'} label={t(Boolean(Number(item.is_bookable)) ? 'Bookable' : 'Not bookable')}/></Stack>} secondary={`${item.location_name} · ${item.room_type || t('General')} · ${t('{{minutes}} min turnover', { minutes: item.turnover_minutes })}`}/></ListItemButton>)}
+      <List disablePadding aria-label={t('Rooms')}>{filteredItems.map(item => <ListItemButton key={item.id} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} divider sx={{ py: 1.75, px: 2.5 }}><ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{item.name}</Typography><Chip size="small" color={Number(item.is_bookable) ? 'success' : 'default'} label={t(Number(item.is_bookable) ? 'Bookable' : 'Not bookable')}/></Stack>} secondary={`${item.location_name} · ${item.room_type || t('General')} · ${t('{{minutes}} min turnover', { minutes: item.turnover_minutes })}`}/></ListItemButton>)}
         {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching rooms' : 'No rooms yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different room or location name.' : locations.length ? 'Create the first room at a clinic location.' : 'Create a location before adding rooms.')}</Typography>{!query && loaded && locations.length > 0 && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew}>{t('New room')}</Button>}</Box>}
       </List>
     </Paper>
@@ -108,7 +108,7 @@ export const RoomAdmin = withFormValidation(RoomAdminForm);
 
 
 function RoomDetails({ item, edit }: { item: Room; edit: () => void }) {
-  const { t } = useTranslation(); const rows = [[t('Status'), t(Boolean(Number(item.is_bookable)) ? 'Bookable' : 'Not bookable')], [t('Location'), item.location_name], [t('Room type'), item.room_type || t('General')], [t('Turnover time'), t('{{minutes}} minutes', { minutes: item.turnover_minutes })], [t('Equipment and room notes'), item.equipment_notes || t('Not set')]];
+  const { t } = useTranslation(); const rows = [[t('Status'), t(Number(item.is_bookable) ? 'Bookable' : 'Not bookable')], [t('Location'), item.location_name], [t('Room type'), item.room_type || t('General')], [t('Turnover time'), t('{{minutes}} minutes', { minutes: item.turnover_minutes })], [t('Equipment and room notes'), item.equipment_notes || t('Not set')]];
   return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button></Stack>;
 }
 

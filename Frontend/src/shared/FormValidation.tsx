@@ -111,11 +111,11 @@ export function FormControlLabel(props: FormControlLabelProps & { name?: string 
   useLayoutEffect(() => name && root.current ? validation.register(name, root.current) : undefined, [name, validation.register]);
   const message = validation.fields[name];
   if (!name) return <MuiFormControlLabel {...props}/>;
-  const control = props.control as ReactElement<{ onChange?: (...args: any[]) => void; inputProps?: Record<string, unknown> }>;
+  const control = props.control as ReactElement<{ onChange?: (...args: unknown[]) => void; inputProps?: Record<string, unknown> }>;
   return <FormControl ref={root} error={Boolean(message)} aria-describedby={message ? id : undefined}>
     <MuiFormControlLabel {...props} control={cloneElement(control, {
       inputProps: { ...control.props.inputProps, ...(message ? { 'aria-invalid': true, 'aria-describedby': id } : {}) },
-      onChange: (...args: any[]) => { validation.clearField(name); control.props.onChange?.(...args); },
+      onChange: (...args: unknown[]) => { validation.clearField(name); control.props.onChange?.(...args); },
     })} onChange={(event, checked) => { validation.clearField(name); props.onChange?.(event, checked); }}/>
     {message && <FormHelperText id={id}>{translate(message)}</FormHelperText>}
   </FormControl>;

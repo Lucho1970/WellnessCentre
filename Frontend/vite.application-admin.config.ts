@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-export default defineConfig(({ command }) => ({
+export default defineConfig(() => ({
   plugins: [react(), { name: 'central-admin-entry', configureServer(server) {
     server.middlewares.use((req, _res, next) => { if (req.url?.split('?')[0].match(/^\/admin\/?$/)) req.url = '/admin/central.html'; next(); });
   } }],

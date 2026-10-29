@@ -60,7 +60,7 @@ function GuestBookingForm() {
   }, [durations, requestedDuration]);
 
   useEffect(() => {
-    const controller = new AbortController(); setLoading(true); (formValidation.clear(), setError(''));
+    const controller = new AbortController(); setLoading(true); formValidation.clear(); setError('');
     const servicePath = preferredPractitionerId ? `/services?practitioner_id=${preferredPractitionerId}` : '/services';
     void Promise.all([apiRequest<Location[]>('/locations', { signal: controller.signal }), apiRequest<Service[]>(servicePath, { signal: controller.signal }), apiRequest<PublicPractitioner[]>('/public/practitioners', { signal: controller.signal })])
       .then(([nextLocations, nextServices, nextPublicPractitioners]) => { if (!controller.signal.aborted) { const requestedService=nextServices.find(item=>item.slug===requestedServiceSlug);setLocations(nextLocations); setServices(nextServices); setPublicPractitioners(nextPublicPractitioners.filter(item => item.booking_practitioner_id)); setLocationId(String(nextLocations.find(item=>String(item.id)===requestedLocationId)?.id??nextLocations[0]?.id??'')); setServiceId(String(requestedServiceSlug ? requestedService?.id ?? '' : nextServices[0]?.id ?? '')); if (requestedServiceSlug && !requestedService) setError(t('This treatment is not available for online booking.')); } })
@@ -69,7 +69,7 @@ function GuestBookingForm() {
     return () => controller.abort();
   }, [retry, preferredPractitionerId, requestedServiceSlug, t]);
   useEffect(() => {
-    const controller = new AbortController(); setPractitioners([]); setPractitionerId(''); setSlot(null); (formValidation.clear(), setPractitionerError(''));
+    const controller = new AbortController(); setPractitioners([]); setPractitionerId(''); setSlot(null); formValidation.clear(); setPractitionerError('');
     if (!serviceId) return () => controller.abort();
     setPractitionerBusy(true);
     void apiRequest<Practitioner[]>(`/practitioners?service_id=${serviceId}`, { signal: controller.signal })
@@ -82,7 +82,7 @@ function GuestBookingForm() {
     if (locationId) setAppointmentDate(current => current || dateInZone(selectedTimezone));
   }, [locationId, selectedTimezone]);
   useEffect(() => {
-    const controller = new AbortController(); setSlot(null); setAvailability(previous => ({ ...previous, availability: [] })); (formValidation.clear(), setSlotError(''));
+    const controller = new AbortController(); setSlot(null); setAvailability(previous => ({ ...previous, availability: [] })); formValidation.clear(); setSlotError('');
     if (!locationId || !serviceId || !practitionerId || !appointmentDate || !hasDuration) { setSlotBusy(false); return () => controller.abort(); }
     setSlotBusy(true);
     const query = new URLSearchParams({ delivery_mode: mode, location_id: locationId, service_id: serviceId, practitioner_id: practitionerId, date_from: appointmentDate, date_to: appointmentDate });

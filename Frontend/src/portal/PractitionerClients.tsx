@@ -37,7 +37,7 @@ function PractitionerClientsForm() {
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); (formValidation.clear(), setError(''));
+    setLoading(true); formValidation.clear(); setError('');
     void (async () => {
       try {
         const token = await getAccessToken();

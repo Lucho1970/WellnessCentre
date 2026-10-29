@@ -32,8 +32,8 @@ export async function customerToken() {
   try {
     return (await customerInstance.acquireTokenSilent({ account, scopes: customerScopes })).accessToken;
   } catch (error) {
-    if (error instanceof InteractionRequiredAuthError) throw new Error('Your session needs authorization. Please sign in again.');
-    throw new Error('Unable to authorize your client session. Please try signing in again.');
+    if (error instanceof InteractionRequiredAuthError) throw new Error('Your session needs authorization. Please sign in again.', { cause: error });
+    throw new Error('Unable to authorize your client session. Please try signing in again.', { cause: error });
   }
 }
 

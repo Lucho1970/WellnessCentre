@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 function buildBase(surface: string) {
   const html = readFileSync(`dist/${surface}/index.html`, 'utf8');
-  const src = html.match(/src="([^"]+\/assets\/[^\"]+)"/)?.[1] ?? html.match(/src="(\/assets\/[^\"]+)"/)?.[1];
+  const src = html.match(/src="([^"]+\/assets\/[^"]+)"/)?.[1] ?? html.match(/src="(\/assets\/[^"]+)"/)?.[1];
   if (!src) throw new Error(`Cannot find ${surface} build asset path`);
   return src.slice(0, src.indexOf('/assets/') + 1);
 }

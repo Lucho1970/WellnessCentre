@@ -12,10 +12,10 @@ function StaffInvitationPageForm() {
   const [code,setCode]=useState('');
   const [token,setToken]=useState(sessionStorage.getItem('wellness.staff.invitation'));
   useEffect(()=>{
-    const capture=()=>{const next=new URLSearchParams(window.location.hash.slice(1)).get('token');if(next&&/^[a-f0-9]{64}$/.test(next)){sessionStorage.setItem('wellness.staff.invitation',next);history.replaceState(null,'',window.location.pathname);setToken(next);setPending(false);setCode('');(formValidation.clear(), setError(''));}};
+    const capture=()=>{const next=new URLSearchParams(window.location.hash.slice(1)).get('token');if(next&&/^[a-f0-9]{64}$/.test(next)){sessionStorage.setItem('wellness.staff.invitation',next);history.replaceState(null,'',window.location.pathname);setToken(next);setPending(false);setCode('');formValidation.clear(); setError('');}};
     window.addEventListener('hashchange',capture);capture();return()=>window.removeEventListener('hashchange',capture);
   },[]);
-  const act=async()=>{setBusy(true);(formValidation.clear(), setError(''));try{if(!isAuthenticated){await signIn();return;}const bearer=await getAccessToken();const result=await apiRequest<{verification_code:string}>('/staff-invitations/claim',{method:'POST',headers:{Authorization:`Bearer ${bearer}`,'Content-Type':'application/json'},body:JSON.stringify({token,claimant_name:name})});setCode(result.verification_code);setPending(true);}catch(e){ formValidation.capture(e);setError(e instanceof Error?e.message:t('Sign-in failed.'));}finally{setBusy(false);}};
+  const act=async()=>{setBusy(true);formValidation.clear(); setError('');try{if(!isAuthenticated){await signIn();return;}const bearer=await getAccessToken();const result=await apiRequest<{verification_code:string}>('/staff-invitations/claim',{method:'POST',headers:{Authorization:`Bearer ${bearer}`,'Content-Type':'application/json'},body:JSON.stringify({token,claimant_name:name})});setCode(result.verification_code);setPending(true);}catch(e){ formValidation.capture(e);setError(e instanceof Error?e.message:t('Sign-in failed.'));}finally{setBusy(false);}};
   return <Paper variant="outlined" sx={{p:4,maxWidth:650,mx:'auto'}}><Stack spacing={2}>
     <Typography variant="h4" component="h1">{t('Practitioner invitation')}</Typography>
     <Typography>{t('Sign in or register, then submit your invitation for clinic approval. This does not publish your profile or grant access immediately.')}</Typography>

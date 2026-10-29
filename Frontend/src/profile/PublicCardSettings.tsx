@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Button, Checkbox, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage } from '../shared/api';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type CardForm = { public_name: string; booking_name: string; summary: string; summary_fr: string; public_website_url: string; public_contact_email: string; public_contact_phone: string; public_contact_sms: boolean; social_links: { label: string; url: string }[] };
@@ -39,7 +38,7 @@ function PublicCardSettingsForm() {
   const set = <K extends keyof CardForm>(key: K, value: CardForm[K]) => setForm(current => current ? { ...current, [key]: value } : null);
   const save = async () => {
     if (!form) return;
-    setBusy(true); (formValidation.clear(), setError('')); setSaved(false);
+    setBusy(true); formValidation.clear(); setError(''); setSaved(false);
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/profile/public-card`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });

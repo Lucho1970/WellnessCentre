@@ -34,7 +34,7 @@ export function PractitionerPersonCard({ person }: { person: Person }) {
   const title = localized(person.public_title, person.public_title_fr, language);
   const bio = localized(person.summary, person.summary_fr, language);
   const details = [person.credentials, person.discipline].filter((value, index, list) => value && list.indexOf(value) === index).join(' · ');
-  const image = Boolean(Number(person.has_image)) ? `${apiBaseUrl}/team/${encodeURIComponent(person.slug)}/image?v=${encodeURIComponent(person.image_version ?? '')}` : undefined;
+  const image = Number(person.has_image) ? `${apiBaseUrl}/team/${encodeURIComponent(person.slug)}/image?v=${encodeURIComponent(person.image_version ?? '')}` : undefined;
   return <Paper variant="outlined" elevation={6} sx={{ width: { xs: 290, sm: 340 }, maxWidth: 'calc(100vw - 32px)', p: 2.5, borderRadius: 3, boxShadow: 6, color: 'text.primary' }}>
     <Stack direction="row" spacing={1.5} alignItems="center">
       <Avatar src={image} alt="" sx={{ width: 72, height: 72, bgcolor: 'primary.light', color: 'primary.dark', fontSize: 26 }}>{initials(person.public_name)}</Avatar>

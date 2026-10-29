@@ -42,7 +42,7 @@ function LocationAdminForm() {
 
   const clearAccess = useCallback(() => { setLoaded(false); setItems([]); setSelectedId(null); setPanelMode(null); setEditingId(null); setForm(blank()); setPanelError(''); setSaved(''); formGuard.markClean(); }, [formGuard.markClean]);
   const load = useCallback(async (preferredId?: number | null) => {
-    const scope = ++generation.current; setLoaded(false); setBusy(true); (formValidation.clear(), setLoadError(''));
+    const scope = ++generation.current; setLoaded(false); setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/locations`, { headers: { Authorization: `Bearer ${token}` } });
@@ -62,15 +62,15 @@ function LocationAdminForm() {
   useEffect(() => { void load(); return () => { generation.current++; }; }, [load]);
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) => setForm(current => ({ ...current, [key]: value }));
-  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
-  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(locationForm(item)); (formValidation.clear(), setPanelError('')); setPanelMode('edit'); };
+  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); formValidation.clear(); setPanelError(''); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); formValidation.clear(); setPanelError(''); setPanelMode('details'); };
+  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.id); setEditingId(item.id); setForm(locationForm(item)); formValidation.clear(); setPanelError(''); setPanelMode('edit'); };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); setEditingId(null); (formValidation.clear(), setPanelError(''));
+    formGuard.markClean(); setPanelMode(null); setEditingId(null); formValidation.clear(); setPanelError('');
   };
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); const scope = ++generation.current; setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    event.preventDefault(); const scope = ++generation.current; setBusy(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken();
       const response = await fetch(editingId ? `${api}/admin/locations/${editingId}` : `${api}/admin/locations`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
@@ -98,7 +98,7 @@ function LocationAdminForm() {
       <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h5">{t('Clinic locations')}</Typography><Typography color="text.secondary">{t('Select a location to view its details or enable actions.')}</Typography></Box>
       <List disablePadding aria-label={t('Clinic locations')}>
         {filteredItems.map(item => <ListItemButton key={item.id} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} divider sx={{ py: 1.75, px: 2.5 }}>
-          <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{item.name}</Typography><Chip size="small" color={Boolean(Number(item.is_bookable)) ? 'success' : 'default'} label={t(Boolean(Number(item.is_bookable)) ? 'Bookable' : 'Not bookable')}/></Stack>} secondary={`${address(item) || t('Address not set')} · ${item.timezone}`} />
+          <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{item.name}</Typography><Chip size="small" color={Number(item.is_bookable) ? 'success' : 'default'} label={t(Number(item.is_bookable) ? 'Bookable' : 'Not bookable')}/></Stack>} secondary={`${address(item) || t('Address not set')} · ${item.timezone}`} />
         </ListItemButton>)}
         {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching locations' : 'No locations yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different location name or address.' : 'Create the first clinic location or service area.')}</Typography>{!query && loaded && <Button variant="contained" startIcon={<Plus size={17}/>} onClick={startNew} disabled={busy || !loaded}>{t('New location')}</Button>}</Box>}
       </List>
@@ -118,7 +118,7 @@ export const LocationAdmin = withFormValidation(LocationAdminForm);
 
 function LocationDetails({ item, edit }: { item: Location; edit: () => void }) {
   const { t } = useTranslation();
-  const rows = [[t('Status'), t(Boolean(Number(item.is_bookable)) ? 'Bookable' : 'Not bookable')], [t('Address'), address(item) || t('Address not set')], [t('Timezone'), item.timezone], [t('Phone'), item.phone || t('Not set')]];
+  const rows = [[t('Status'), t(Number(item.is_bookable) ? 'Bookable' : 'Not bookable')], [t('Address'), address(item) || t('Address not set')], [t('Timezone'), item.timezone], [t('Phone'), item.phone || t('Not set')]];
   return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button></Stack>;
 }
 

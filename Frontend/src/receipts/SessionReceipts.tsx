@@ -5,7 +5,7 @@ import { customerFetch } from '../customer/session';
 import { formatCad } from '../i18n/format';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
-type Request = (path: string, init?: RequestInit) => Promise<any>;
+type Request = <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
 type Receipt = { id: number; number: string; appointment_id: number; status: 'issued' | 'void'; service_name: string; practitioner_name: string; total_cents: number; void_reason: string | null };
 type Template = { issuer_name: string; issuer_address: string; issuer_contact: string; clinic_logo: string };
 type Profile = { practitioner_name: string; designation: string; registration_number: string; practitioner_logo: string };
@@ -16,7 +16,7 @@ const moneyCents = (value: string): number | null => /^\d{1,7}(\.\d{1,2})?$/.tes
 const localToday = () => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 async function download(request: Request, id: number) {
-  const data = await request(`/receipts/${id}/pdf`);
+  const data = await request<{ pdf_base64: string; filename: string }>(`/receipts/${id}/pdf`);
   const bytes = Uint8Array.from(atob(data.pdf_base64), char => char.charCodeAt(0));
   const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = data.filename; document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
@@ -64,7 +64,7 @@ export function SessionReceipt({ appointmentId, request, onStateChange, onStatus
   useEffect(() => { onStateChange?.({ busy: busy || childBusy, dirty: dirty || childDirty }); }, [busy, childBusy, dirty, childDirty, onStateChange]);
   useEffect(() => () => onStateChange?.({ busy: false, dirty: false }), [onStateChange]);
   useUnsavedChanges(dirty);
-  useEffect(() => { let active = true; setData(null); void request(`/appointments/${appointmentId}/receipt`).then(value => { if (!active) return; setData(value); if (value.enabled) { setTemplate(value.template ?? emptyTemplate); setProfile(value.profile ?? { ...emptyProfile, practitioner_name: value.appointment.practitioner_name }); } }).catch(cause => { if (active) setError(cause.message); }); return () => { active = false; }; }, [appointmentId, request, reload]);
+  useEffect(() => { let active = true; setData(null); void request<Context>(`/appointments/${appointmentId}/receipt`).then(value => { if (!active) return; setData(value); if (value.enabled) { setTemplate(value.template ?? emptyTemplate); setProfile(value.profile ?? { ...emptyProfile, practitioner_name: value.appointment.practitioner_name }); } }).catch(cause => { if (active) setError(cause.message); }); return () => { active = false; }; }, [appointmentId, request, reload]);
   const refresh = () => { setDirty(false); setConfirmed(false); setReload(x => x + 1); };
   const run = async (action: () => Promise<void>) => { setBusy(true); setError(''); setNotice(''); try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to save receipt.')); } finally { setBusy(false); } };
   if (!data) return error ? <Alert severity="error">{error}</Alert> : null;

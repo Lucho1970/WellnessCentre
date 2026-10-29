@@ -104,7 +104,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
   ) => set(on ? [...list, id] : list.filter((x) => x !== id));
   const add = async () => {
     setBusy(true);
-    (formValidation.clear(), setError(""));
+    formValidation.clear(); setError("");
     try {
       const token = await getAccessToken(),
         r = await fetch(`${api}/admin/room-capabilities`, {
@@ -131,7 +131,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
   };
   const save = async () => {
     setBusy(true);
-    (formValidation.clear(), setError(""));
+    formValidation.clear(); setError("");
     try {
       const token = await getAccessToken(),
         r = await fetch(`${api}/admin/room-capability-assignments`, {

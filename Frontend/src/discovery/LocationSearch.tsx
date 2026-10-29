@@ -6,7 +6,7 @@ import './discovery.css';
 export type Point = { latitude: number; longitude: number };
 export type Match = { practitioner_id: number; service_id: number; location_id: number; practitioner_slug: string; service_slug: string; status: 'within_area'|'enquiry_only'; token: string; starting_price_cents:number };
 export type SearchResult = { point: Point; label: string; matches: Match[]; settings: { extra_km: number; cap_km: number } };
-export type DiscoveryRequest = (path: string, body?: unknown) => Promise<any>;
+export type DiscoveryRequest = <T = unknown>(path: string, body?: unknown) => Promise<T>;
 export type Translate = (key: string) => string;
 const identity: Translate = key => key;
 const storageKey = 'wellness.discovery.point.v1';
@@ -50,7 +50,7 @@ export function LocationSearch({request,onResult,defaultArea,savedAddressLink,t=
     finally{if(mounted.current&&current===generation.current)setBusy(false);}
   };
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;initialized.current=false;generation.current++;};},[]);
-  useEffect(()=>{let live=true;void request('/public/discovery/options').then(data=>{if(live&&typeof data.map_browser_key==='string')setMapKey(data.map_browser_key);}).catch(()=>{});return()=>{live=false;};},[request]);
+  useEffect(()=>{let live=true;void request<{ map_browser_key?: string }>('/public/discovery/options').then(data=>{if(live&&typeof data.map_browser_key==='string')setMapKey(data.map_browser_key);}).catch(()=>{});return()=>{live=false;};},[request]);
   useEffect(()=>{
     if(initialized.current)return;
     try{const saved=JSON.parse(sessionStorage.getItem(storageKey)??'null');if(saved?.expires>Date.now()&&Number.isFinite(saved.point?.latitude)&&Number.isFinite(saved.point?.longitude)){initialized.current=true;setOnly(Boolean(saved.only));void search({point:saved.point});return;}}catch{/* No saved point. */}

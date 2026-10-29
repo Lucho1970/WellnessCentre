@@ -6,7 +6,6 @@ import { ImagePlus, Save, Trash2 } from 'lucide-react';
 import { useStaffAuth } from '../auth/AuthProvider';
 import { useClinicConfig, type ClinicConfig } from '../config/ClinicConfigProvider';
 import { useTranslation } from 'react-i18next';
-import { apiErrorMessage } from '../shared/api';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { wellnexaPalette, wellnexaPortalPreset } from '../shared/wellnexaTheme';
 

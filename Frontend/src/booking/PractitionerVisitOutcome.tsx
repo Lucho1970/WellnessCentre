@@ -30,7 +30,7 @@ function PractitionerVisitOutcomeForm({ appointment, request, onChanged }: Props
   const update = async (outcome: 'completed' | 'no_show' | 'reopen') => {
     const question = outcome === 'completed' ? 'Mark this appointment completed?' : outcome === 'no_show' ? 'Mark this appointment as a no-show?' : 'Undo this appointment outcome?';
     if (!window.confirm(t(question))) return;
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try {
       await request(`/practitioner/today/${appointment.id}/outcome`, { method: 'POST', body: JSON.stringify({ outcome, version: appointment.version }) });
       onChanged(t(outcome === 'reopen' ? 'Appointment #{{id}} outcome restored.' : outcome === 'no_show' ? 'Appointment #{{id}} marked no-show.' : 'Appointment #{{id}} marked completed.', { id: appointment.id }));

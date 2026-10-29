@@ -27,8 +27,8 @@ function ClientOverviewForm({ clientId, initialTab, request, back, onLockedChang
   const [history, setHistory] = useState<History | null>(null), [access, setAccess] = useState<AccessList | null>(null);
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   useEffect(() => {
-    if(tab==='forms'){setBusy(false);(formValidation.clear(), setError(''));return;}
-    const controller = new AbortController(); setBusy(true); (formValidation.clear(), setError(''));
+    if(tab==='forms'){setBusy(false);formValidation.clear(); setError('');return;}
+    const controller = new AbortController(); setBusy(true); formValidation.clear(); setError('');
     const path = tab === 'appointments' ? `/${clientId}/appointments?view=${view}&page=${historyPage}` : `/${clientId}/practitioner-access?page=${accessPage}`;
     void request(path, { signal: controller.signal }).then(result => {
       if (controller.signal.aborted) return;
@@ -116,7 +116,7 @@ function AppointmentChangesValidated({ clientId, appointmentId, timezone, curren
   const [data, setData] = useState<{ items: Change[]; has_more: boolean } | null>(null);
   useEffect(() => {
     if (!open) return;
-    const controller = new AbortController(); setBusy(true); (formValidation.clear(), setError(''));
+    const controller = new AbortController(); setBusy(true); formValidation.clear(); setError('');
     void request(`/${clientId}/appointments/${appointmentId}/history?page=${page}`, { signal: controller.signal }).then(result => {
       if (controller.signal.aborted) return;
       const response = result as { appointment: { id: number }; items: Change[]; has_more: boolean };

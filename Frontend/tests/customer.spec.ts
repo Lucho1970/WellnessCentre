@@ -104,7 +104,7 @@ test('client discovers from a saved address and sends a duplicate-safe travel en
   await page.route('**/api/v1/public/practitioners',route=>route.fulfill({json:{data:[{slug:'esther',public_name:'Esther'}]}}));
   await page.route('**/api/v1/public/services',route=>route.fulfill({json:{data:[{slug:'massage',name:'Massage'}]}}));
   await page.route('**/api/v1/customer/discovery/search',route=>{expect(route.request().postDataJSON()).toMatchObject({area:'1 Synthetic Street, Toronto, Ontario, M5V 1A1, Canada'});return route.fulfill({json:{data:{label:'Synthetic area',point:{latitude:43.6,longitude:-79.4},settings:{extra_km:25,cap_km:100},matches:[{practitioner_id:8,service_id:13,location_id:8,practitioner_slug:'esther',service_slug:'massage',status:'enquiry_only',token:'synthetic-proof',starting_price_cents:7500}]}}});});
-  let received:any=null,attempts=0;
+  let received:unknown=null,attempts=0;
   await page.route('**/api/v1/customer/travel-enquiries',route=>{
     if(route.request().method()==='POST'){
       const body=route.request().postDataJSON();attempts++;if(!received)received=body;else expect(body).toEqual(received);
@@ -199,7 +199,7 @@ test("customer route offers sign-in without running staff authentication", async
   await page
     .getByRole("button", { name: "Sign in or create client account" })
     .click();
-  expect(await page.evaluate(() => (window as any).customerSignInCalled)).toBe(
+  expect(await page.evaluate(() => (window as Window & { customerSignInCalled?: boolean }).customerSignInCalled)).toBe(
     true,
   );
   expect(
@@ -269,7 +269,7 @@ test("verified identity remains unlinked with no client records or staff roles",
   await page.getByRole("button", { name: "Open client account menu" }).click();
   expect(checks).toBe(1);
   await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
-  expect(await page.evaluate(() => (window as any).customerSignOutCalled)).toBe(
+  expect(await page.evaluate(() => (window as Window & { customerSignOutCalled?: boolean }).customerSignOutCalled)).toBe(
     true,
   );
   await expect(

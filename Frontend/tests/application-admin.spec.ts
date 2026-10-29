@@ -4,7 +4,7 @@ async function communicationsFixture(page:Page){
   await authentication(page);
   await page.route('**/api/v1/application/me',route=>route.fulfill({json:{data:{id:1}}}));
   await page.route('**/api/v1/application/clinics',route=>route.fulfill({json:{data:{items:[{id:4,name:'Wellnexa'}]}}}));
-  const state={writes:[] as any[],uncertain:false,denied:false,data:{provider_evidence_available:false,
+  const state={writes:[] as { path: string; body: Record<string, unknown> }[],uncertain:false,denied:false,data:{provider_evidence_available:false,
     settings:{revision:1,email_enabled:true,sms_enabled:false,mail_from:'clinic@example.test',reply_to:'reply@example.test',alert_email:'operator@example.test',sms_from_did:'4165550100',cad_micros_per_segment:7500,fixed_cad_micros:0,tariff_valid_until:'2026-11-15 12:00:00',opt_out_checked_at:'2026-10-28 12:00:00'},
     gates:{automated_email:true,sms_budgets:true},suppressed_count:1,health:{needs_review:1,overdue:0,stale_leases:0},held_sms:[] as {id:number;last_error:string;scheduled_at:string}[],events:[],members:[{id:7,display_name:'Practitioner One',reply_email:null,reply_active:false,reply_version:0}],
     notices:[{id:8,kind:'application',recipient_kind:'operator',recipient_address:'operator@example.test',status:'needs_review',attempt_count:1,created_at:'2026-10-28 12:00:00'}],
@@ -21,7 +21,7 @@ async function communicationsFixture(page:Page){
 
 async function providerFixture(page:Page){
   const parent=await communicationsFixture(page);parent.data.provider_evidence_available=true;
-  const state={writes:[] as {path:string;body:any}[],uncertain:false,stale:false,report:{id:51,status:'preview',statement_reference:'October statement',preview_hash:'a'.repeat(64),can_apply:true,fx:{rate_micros:1370000,date:'2026-10-01',reference:'Verified source'},rows:[{line:2,type:'charge',reference:'provider-001',sender_did:'4165550100',currency:'USD',amount_micros:17500,status:'ready',actual_cents:3}]}};
+  const state={writes:[] as {path:string;body:Record<string, unknown>}[],uncertain:false,stale:false,report:{id:51,status:'preview',statement_reference:'October statement',preview_hash:'a'.repeat(64),can_apply:true,fx:{rate_micros:1370000,date:'2026-10-01',reference:'Verified source'},rows:[{line:2,type:'charge',reference:'provider-001',sender_did:'4165550100',currency:'USD',amount_micros:17500,status:'ready',actual_cents:3}]}};
   await page.route('**/api/v1/application/clinics/4/provider-evidence**',route=>{
     const path=new URL(route.request().url()).pathname;
     if(route.request().method()==='POST'){const body=route.request().postDataJSON();state.writes.push({path,body});if(state.uncertain){state.uncertain=false;return route.fulfill({status:503,json:{error:{code:'unavailable'}}});}if(state.stale&&path.endsWith('/apply'))return route.fulfill({status:409,json:{error:{code:'provider_evidence_changed'}}});return route.fulfill({json:{data:path.endsWith('/preview')?state.report:{id:51,status:'applied'}}});}
@@ -117,7 +117,7 @@ async function applicationFixture(page: Page) {
   await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));
   await page.route('**/api/v1/application/clinics', route => route.fulfill({ json: { data: { items: [{ id: 4, name: 'Wellnexa' }] } } }));
   const item = { id: 71, version: 1, status: 'submitted', given_name: 'Alice', family_name: 'Applicant', email: 'alice@example.test', phone: '', discipline: 'Massage therapy', credentials: 'Declared credentials', service_area: 'Toronto', services: 'Synthetic proposed services', enquiry_reference: '', verification_code: 'ABCDEF123456', approved_location_id: null, source_enquiry_id: null, allow_existing_membership: false, review_message: '' };
-  const state = { writes: [] as any[], uncertain: false, denied: false, data: { settings: { revision: 1, enabled: true, activation_enabled: false, terms_text: 'Synthetic reviewed joining terms for this clinic. No legal terms or prices are supplied by the software.', terms_version: 1, plan_version_id: 1, timezone: 'America/Toronto' }, activation_gate: false, items: [item], plans: [{ id: 1, display_name: 'Beta membership', version: 1 }], locations: [{ id: 8, name: 'Virtual clinic' }], enquiries: [{ id: 5, full_name: 'Alice enquiry', reference: 'synthetic-reference' }] } };
+  const state = { writes: [] as { path: string; body: Record<string, unknown> }[], uncertain: false, denied: false, data: { settings: { revision: 1, enabled: true, activation_enabled: false, terms_text: 'Synthetic reviewed joining terms for this clinic. No legal terms or prices are supplied by the software.', terms_version: 1, plan_version_id: 1, timezone: 'America/Toronto' }, activation_gate: false, items: [item], plans: [{ id: 1, display_name: 'Beta membership', version: 1 }], locations: [{ id: 8, name: 'Virtual clinic' }], enquiries: [{ id: 5, full_name: 'Alice enquiry', reference: 'synthetic-reference' }] } };
   await page.route('**/api/v1/application/clinics/4/practitioner-applications**', route => {
     if (state.denied) return route.fulfill({ status: 403, json: { error: { code: 'application_admin_required', message: 'Access revoked.' } } });
     const path = new URL(route.request().url()).pathname;
@@ -453,7 +453,7 @@ async function billingFixture(page: Page) {
   await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));
   await page.route('**/api/v1/application/clinics', route => route.fulfill({ json: { data: { items: [{ id: 4, name: 'Wellnexa' }, { id: 5, name: 'Other clinic' }] } } }));
   const state = {
-    writes: [] as { path: string; body: Record<string, any> }[],
+    writes: [] as { path: string; body: Record<string, unknown> }[],
     denied: false, uncertain: false,
     plans: [{ id: 1, code: 'beta', display_name: 'Beta membership', scope: 'practitioner', version: 1, base_monthly_cents: null as number | null, features: { booking: true, sms_reminders: false } }, { id: 2, code: 'clinic', display_name: 'Clinic plan', scope: 'tenant', version: 1, base_monthly_cents: null as number | null, features: { booking: true } }],
     data: {

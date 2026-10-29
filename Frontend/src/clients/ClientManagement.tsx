@@ -80,7 +80,7 @@ function ClientManagementForm({ canMerge = false }: { canMerge?: boolean }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); (formValidation.clear(), setError(''));
+    setLoading(true); formValidation.clear(); setError('');
     void request(`?q=${encodeURIComponent(search)}&page=${page}`, { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) { setItems(data.items); setMore(data.has_more); } })
       .catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Unable to load clients.')); })
@@ -89,13 +89,13 @@ function ClientManagementForm({ canMerge = false }: { canMerge?: boolean }) {
   }, [request, search, page, refresh]);
 
   const selected = items.find(item => item.id === selectedId) ?? null;
-  const newClient = () => { const values={ ...empty, address:{...emptyAddress} }; setId(null); setForm(values); setOriginal(values); (formValidation.clear(), setFormError('')); setDuplicateCandidates([]); setPanelMode('new'); };
+  const newClient = () => { const values={ ...empty, address:{...emptyAddress} }; setId(null); setForm(values); setOriginal(values); formValidation.clear(); setFormError(''); setDuplicateCandidates([]); setPanelMode('new'); };
   const openClient = useCallback(async (clientId: number, mode: 'details' | 'edit' | 'overview') => {
-    setOpening(true); (formValidation.clear(), setError(''));
+    setOpening(true); formValidation.clear(); setError('');
     try {
       const client: Detail = await request(`/${clientId}`);
       const values = { ...empty, ...Object.fromEntries(Object.keys(empty).filter(key=>key!=='address').map(key => [key, client[key as keyof Form] ?? ''])), address: client.address ? { ...emptyAddress, ...client.address } : { ...emptyAddress } } as Form;
-      setClientName(client.display_name); setSelectedId(clientId); setId(clientId); setForm(values); setOriginal(values); (formValidation.clear(), setFormError('')); setDuplicateCandidates([]); setPanelMode(mode);
+      setClientName(client.display_name); setSelectedId(clientId); setId(clientId); setForm(values); setOriginal(values); formValidation.clear(); setFormError(''); setDuplicateCandidates([]); setPanelMode(mode);
     } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to open client.')); }
     finally { setOpening(false); }
   }, [request, t]);
@@ -109,7 +109,7 @@ function ClientManagementForm({ canMerge = false }: { canMerge?: boolean }) {
     setPanelMode(null);
   };
   const saveClient = async (confirmPossibleDuplicate=false) => {
-    setSaving(true); (formValidation.clear(), setFormError('')); setDuplicateCandidates([]);
+    setSaving(true); formValidation.clear(); setFormError(''); setDuplicateCandidates([]);
     try {
       await request(id === null ? '' : `/${id}`, { method: id === null ? 'POST' : 'PATCH', body: JSON.stringify({...form,confirm_possible_duplicate:confirmPossibleDuplicate}) });
       setNotice(t(id === null ? 'Client created. The record is ready for booking.' : 'Client details saved.'));
@@ -118,10 +118,10 @@ function ClientManagementForm({ canMerge = false }: { canMerge?: boolean }) {
     finally { setSaving(false); }
   };
   const save = (event: FormEvent) => { event.preventDefault(); void saveClient(false); };
-  const beginMerge=(client=selected)=>{if(!client)return;setMergeDuplicate(client);setMergeSearch('');setMergeResults([]);setMergeSurvivor(null);setMergePreview(null);setMergeReason('');setPrimaryEmailSource('survivor');setProfileSource('survivor');setAddressSource('survivor');setMergeConfirmation('');(formValidation.clear(), setMergeError(''));setMergeOpen(true);};
-  const searchMerge=async()=>{if(!mergeDuplicate||mergeSearch.trim().length<2)return;setMergeBusy(true);(formValidation.clear(), setMergeError(''));try{const data=await request(`?q=${encodeURIComponent(mergeSearch.trim())}&page=1`);setMergeResults((data.items as Summary[]).filter(item=>Number(item.id)!==Number(mergeDuplicate.id)));}catch(cause){ formValidation.capture(cause);setMergeError(cause instanceof Error?cause.message:t('Unable to load clients.'));}finally{setMergeBusy(false);}};
-  const chooseSurvivor=async(client:Summary)=>{if(!mergeDuplicate)return;setMergeBusy(true);(formValidation.clear(), setMergeError(''));setMergeSurvivor(client);try{setMergePreview(await request(`/${client.id}/merge-preview/${mergeDuplicate.id}`));setMergeConfirmation('');}catch(cause){ formValidation.capture(cause);setMergePreview(null);setMergeError(cause instanceof Error?cause.message:t('Unable to review this merge.'));}finally{setMergeBusy(false);}};
-  const completeMerge=async()=>{if(!mergeDuplicate||!mergeSurvivor||!mergePreview)return;setMergeBusy(true);(formValidation.clear(), setMergeError(''));try{await request(`/${mergeSurvivor.id}/merge/${mergeDuplicate.id}`,{method:'POST',body:JSON.stringify({survivor_revision:mergePreview.survivor.revision,duplicate_revision:mergePreview.duplicate.revision,primary_email_source:primaryEmailSource,profile_source:profileSource,address_source:addressSource,reason:mergeReason,confirmation:mergeConfirmation})});setMergeOpen(false);setSelectedId(mergeSurvivor.id);setNotice(t('Client records merged. Both email addresses were preserved.'));setRefresh(value=>value+1);}catch(cause){ formValidation.capture(cause);setMergeError(cause instanceof Error?cause.message:t('Unable to merge client records.'));}finally{setMergeBusy(false);}};
+  const beginMerge=(client=selected)=>{if(!client)return;setMergeDuplicate(client);setMergeSearch('');setMergeResults([]);setMergeSurvivor(null);setMergePreview(null);setMergeReason('');setPrimaryEmailSource('survivor');setProfileSource('survivor');setAddressSource('survivor');setMergeConfirmation('');formValidation.clear(); setMergeError('');setMergeOpen(true);};
+  const searchMerge=async()=>{if(!mergeDuplicate||mergeSearch.trim().length<2)return;setMergeBusy(true);formValidation.clear(); setMergeError('');try{const data=await request(`?q=${encodeURIComponent(mergeSearch.trim())}&page=1`);setMergeResults((data.items as Summary[]).filter(item=>Number(item.id)!==Number(mergeDuplicate.id)));}catch(cause){ formValidation.capture(cause);setMergeError(cause instanceof Error?cause.message:t('Unable to load clients.'));}finally{setMergeBusy(false);}};
+  const chooseSurvivor=async(client:Summary)=>{if(!mergeDuplicate)return;setMergeBusy(true);formValidation.clear(); setMergeError('');setMergeSurvivor(client);try{setMergePreview(await request(`/${client.id}/merge-preview/${mergeDuplicate.id}`));setMergeConfirmation('');}catch(cause){ formValidation.capture(cause);setMergePreview(null);setMergeError(cause instanceof Error?cause.message:t('Unable to review this merge.'));}finally{setMergeBusy(false);}};
+  const completeMerge=async()=>{if(!mergeDuplicate||!mergeSurvivor||!mergePreview)return;setMergeBusy(true);formValidation.clear(); setMergeError('');try{await request(`/${mergeSurvivor.id}/merge/${mergeDuplicate.id}`,{method:'POST',body:JSON.stringify({survivor_revision:mergePreview.survivor.revision,duplicate_revision:mergePreview.duplicate.revision,primary_email_source:primaryEmailSource,profile_source:profileSource,address_source:addressSource,reason:mergeReason,confirmation:mergeConfirmation})});setMergeOpen(false);setSelectedId(mergeSurvivor.id);setNotice(t('Client records merged. Both email addresses were preserved.'));setRefresh(value=>value+1);}catch(cause){ formValidation.capture(cause);setMergeError(cause instanceof Error?cause.message:t('Unable to merge client records.'));}finally{setMergeBusy(false);}};
   const field = (key: keyof Form, label: string, options: { required?: boolean; type?: string; maxLength?: number } = {}) => <TextField name={key}
     fullWidth label={label} value={form[key]} required={options.required} type={options.type ?? 'text'} disabled={saving}
     onChange={event => setForm(current => ({ ...current, [key]: event.target.value }))}

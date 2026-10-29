@@ -14,7 +14,7 @@ export function ClientDiscovery({book,openInbox,onLockedChange,canBook=true}:{ca
   const pending=useRef<Record<string,string>|null>(null);
   useUnsavedChanges(Boolean(message)||uncertain);
   useEffect(()=>{onLockedChange?.(Boolean(message)||uncertain||busy);return()=>onLockedChange?.(false);},[message,uncertain,busy,onLockedChange]);
-  useEffect(()=>{let active=true;void Promise.all([customerFetch('/profile'),publicDiscoveryRequest('/public/practitioners'),publicDiscoveryRequest('/public/services')]).then(([profile,nextPeople,nextServices])=>{
+  useEffect(()=>{let active=true;void Promise.all([customerFetch('/profile'),publicDiscoveryRequest<{ slug: string; public_name: string }[]>('/public/practitioners'),publicDiscoveryRequest<{ slug: string; name: string }[]>('/public/services')]).then(([profile,nextPeople,nextServices])=>{
     if(!active)return;const a=profile.address;if(a)setArea([a.address_line1,a.city,a.province,a.postal_code,a.country].filter(Boolean).join(', '));setPeople(nextPeople);setServices(nextServices);
   }).catch(cause=>{if(active)setError(cause.message);});return()=>{active=false;};},[]);
   const request=useCallback((path:string,body?:unknown)=>path.endsWith('/options')?publicDiscoveryRequest(path):customerFetch('/discovery/search',{method:'POST',body:JSON.stringify(body),signal:AbortSignal.timeout(45000)}),[]);

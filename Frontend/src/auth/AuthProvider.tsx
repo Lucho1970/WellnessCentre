@@ -63,7 +63,7 @@ function StaffAuthBridge({ children }: PropsWithChildren) {
       }
       try { await sessionRecoveryRedirect; } catch { /* The sign-in button remains available. */ }
       finally { sessionRecoveryRedirect = null; }
-      throw new Error(t('Your staff session has expired. Sign in with Microsoft to continue.'));
+      throw new Error(t('Your staff session has expired. Sign in with Microsoft to continue.'), { cause: error });
     }
   }, [account, instance, t]);
   const value = useMemo(() => ({ account, configured, isAuthenticated, sessionExpired, signIn, signOut, getAccessToken }), [account, getAccessToken, isAuthenticated, sessionExpired, signIn, signOut]);

@@ -48,7 +48,7 @@ function PractitionerQualificationsForm({ practitionerId, admin = false, globalR
     setTypes(normalizeNumericIds<QualificationType[]>(typeBody.data));
     setRecords(normalizeNumericIds<Qualification[]>(recordBody.data));
   }, [base, getAccessToken, t, clearDenied]);
-  useEffect(() => { setAuthorized(false); setRecords([]); setTypes([]); (formValidation.clear(), setError('')); void load().catch(cause => setError(cause instanceof Error ? cause.message : t('Unable to load qualifications.'))); }, [load]);
+  useEffect(() => { setAuthorized(false); setRecords([]); setTypes([]); formValidation.clear(); setError(''); void load().catch(cause => setError(cause instanceof Error ? cause.message : t('Unable to load qualifications.'))); }, [load]);
 
   const request = async (url: string, method: string, body: object) => {
     const token = await getAccessToken();
@@ -59,7 +59,7 @@ function PractitionerQualificationsForm({ practitionerId, admin = false, globalR
     await load();
   };
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setMessage('');
+    event.preventDefault(); setBusy(true); formValidation.clear(); setError(''); setMessage('');
     try {
       await request(base, 'POST', { qualification_type_id: Number(typeId), issuer, issued_on: issuedOn, expires_on: expiresOn || null });
       setTypeId(''); setIssuer(''); setIssuedOn(''); setExpiresOn(''); setMessage(t('Qualification submitted for review.'));
@@ -67,14 +67,14 @@ function PractitionerQualificationsForm({ practitionerId, admin = false, globalR
     finally { setBusy(false); }
   };
   const createType = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setMessage('');
+    event.preventDefault(); setBusy(true); formValidation.clear(); setError(''); setMessage('');
     try { await request(`${api}/admin/qualifications/types`, 'POST', { name: newType, requires_expiry: typeRequiresExpiry }); setNewType(''); setMessage(t('Qualification type added.')); }
     catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to save qualification.')); }
     finally { setBusy(false); }
   };
   const review = async (record: Qualification, status: 'verified' | 'rejected' | 'revoked') => {
     if (status === 'revoked' && !window.confirm(t('Revoke this qualification?'))) return;
-    setBusy(true); (formValidation.clear(), setError('')); setMessage('');
+    setBusy(true); formValidation.clear(); setError(''); setMessage('');
     try { await request(`${api}/admin/qualifications/${record.id}/review`, 'PATCH', { status, review_note: reviewNote }); setReviewNote(''); setMessage(t('Qualification review saved.')); }
     catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to save qualification.')); }
     finally { setBusy(false); }

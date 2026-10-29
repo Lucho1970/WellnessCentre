@@ -42,7 +42,7 @@ function StaffAdminForm() {
   }, [staff, query]);
 
   const load = useCallback(async (preferredId?: number | null) => {
-    setBusy(true); (formValidation.clear(), setLoadError(''));
+    setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
@@ -59,17 +59,17 @@ function StaffAdminForm() {
   }, [getAccessToken, t]);
   useEffect(() => { void load(); }, [load]);
 
-  const startNew = () => { formGuard.markClean(); setNewStaff(blank()); setEditing(null); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
+  const startNew = () => { formGuard.markClean(); setNewStaff(blank()); setEditing(null); formValidation.clear(); setPanelError(''); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); formValidation.clear(); setPanelError(''); setPanelMode('details'); };
   const startEdit = (member = selected) => {
     if (!member || isSelf(member)) return;
     formGuard.markClean(); setSelectedId(member.id);
     setEditing({ ...member, roles: [...member.roles], permissions: [...member.permissions] });
-    (formValidation.clear(), setPanelError('')); setPanelMode('edit');
+    formValidation.clear(); setPanelError(''); setPanelMode('edit');
   };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); setEditing(null); (formValidation.clear(), setPanelError(''));
+    formGuard.markClean(); setPanelMode(null); setEditing(null); formValidation.clear(); setPanelError('');
   };
   const setEdit = <K extends keyof Staff>(key: K, value: Staff[K]) => setEditing(current => current ? { ...current, [key]: value } : null);
   const setNew = <K extends keyof NewStaff>(key: K, value: NewStaff[K]) => setNewStaff(current => ({ ...current, [key]: value }));
@@ -86,7 +86,7 @@ function StaffAdminForm() {
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (panelMode === 'edit' && !editing) return;
-    setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    setBusy(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken();
       const creating = panelMode === 'new';

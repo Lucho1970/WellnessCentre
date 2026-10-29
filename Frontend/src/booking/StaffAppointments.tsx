@@ -102,17 +102,17 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
   useEffect(() => {
     if (linkedId === null) return;
     let active = true;
-    setSelectedId(linkedId); (formValidation.clear(), setLinkedError(''));
+    setSelectedId(linkedId); formValidation.clear(); setLinkedError('');
     void request(`/appointments/${linkedId}${practitionerMode ? '?scope=practitioner' : ''}`)
       .then(data => { if (active) { setFocusedAppointment(data); setSelectedId(linkedId); setDetailsOpen(true); } })
       .catch(error => { formValidation.capture(error); if (active) setLinkedError(error instanceof Error ? error.message : t('Unable to load appointment.')); });
     return () => { active = false; };
   }, [linkedId, practitionerMode, refresh, request, t]);
   useEffect(() => {
-    if (!detailsOpen || selectedId === null) { setDetailsRecord(null); setDetailsBusy(false); (formValidation.clear(), setDetailsError('')); return; }
-    if (focusedAppointment?.id === selectedId) { setDetailsRecord(focusedAppointment); setDetailsBusy(false); (formValidation.clear(), setDetailsError('')); return; }
+    if (!detailsOpen || selectedId === null) { setDetailsRecord(null); setDetailsBusy(false); formValidation.clear(); setDetailsError(''); return; }
+    if (focusedAppointment?.id === selectedId) { setDetailsRecord(focusedAppointment); setDetailsBusy(false); formValidation.clear(); setDetailsError(''); return; }
     const controller = new AbortController();
-    setDetailsRecord(null); setDetailsBusy(true); (formValidation.clear(), setDetailsError(''));
+    setDetailsRecord(null); setDetailsBusy(true); formValidation.clear(); setDetailsError('');
     void request(`/appointments/${selectedId}${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) setDetailsRecord(data); })
       .catch(error => { formValidation.capture(error); if (!controller.signal.aborted) setDetailsError(error instanceof Error ? error.message : t('Unable to load appointment.')); })
@@ -120,7 +120,7 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
     return () => controller.abort();
   }, [detailsOpen, selectedId, focusedAppointment, practitionerMode, request, t]);
   useEffect(() => {
-    const controller = new AbortController(); setListBusy(true); (formValidation.clear(), setListError(''));
+    const controller = new AbortController(); setListBusy(true); formValidation.clear(); setListError('');
     void request(`/appointments?view=${view}&page=${page}&show_canceled=${showCanceled ? '1' : '0'}${practitionerMode ? '&scope=practitioner' : ''}`, { signal: controller.signal })
       .then(data => { if (!controller.signal.aborted) { setAppointments(data); setSelectedId(current => data.some((item: Appointment) => item.id === current) || current === linkedId ? current : null); } })
       .catch(error => { formValidation.capture(error); if (!controller.signal.aborted) setListError(error.message); })
@@ -193,7 +193,7 @@ export const StaffAppointments = withFormValidation(StaffAppointmentsForm);
 
 
 type ReassignmentCandidate = { practitioner_id: number; practitioner_name: string };
-function ReassignAppointmentValidated({ appointment, request, close, complete }: { appointment: Appointment; request: (path: string, init?: RequestInit) => Promise<any>; close: () => void; complete: () => void }) {
+function ReassignAppointmentValidated({ appointment, request, close, complete }: { appointment: Appointment; request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>; close: () => void; complete: () => void }) {
   const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const [candidates, setCandidates] = useState<ReassignmentCandidate[]>([]);
@@ -214,7 +214,7 @@ function ReassignAppointmentValidated({ appointment, request, close, complete }:
   const closeSafely = () => { if (!saving && (!(practitionerId || reason.trim()) || window.confirm(t('Discard your unsaved changes?')))) close(); };
   const submit = async () => {
     if (!practitionerId || !reason.trim()) return;
-    setSaving(true); (formValidation.clear(), setError(''));
+    setSaving(true); formValidation.clear(); setError('');
     try {
       await request(`/appointments/${appointment.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reassign', version: Number(appointment.version), practitioner_id: Number(practitionerId), reason: reason.trim() }) });
       complete();
@@ -237,7 +237,7 @@ function ReassignAppointmentValidated({ appointment, request, close, complete }:
 const ReassignAppointment = withFormValidation(ReassignAppointmentValidated);
 
 
-type ManageProps = { appointment: Appointment; initialAction: 'reschedule' | 'cancel'; request: (path: string, init?: RequestInit) => Promise<any>; canAssessFees: boolean; canManageFees: boolean; close: () => void; complete: (message: string) => void };
+type ManageProps = { appointment: Appointment; initialAction: 'reschedule' | 'cancel'; request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>; canAssessFees: boolean; canManageFees: boolean; close: () => void; complete: (message: string) => void };
 function ManageAppointmentValidated({ appointment, initialAction, request, canAssessFees, canManageFees, close, complete }: ManageProps) {
   const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
@@ -261,15 +261,15 @@ function ManageAppointmentValidated({ appointment, initialAction, request, canAs
   useEffect(() => {
     if (initialAction !== 'cancel') return;
     let active = true;
-    void request(`/appointments/${appointment.id}/cancellation-preview`).then(preview => {
+    void request<CancellationPreview>(`/appointments/${appointment.id}/cancellation-preview`).then(preview => {
       if (active) { setCancellation(preview); setAdjustedFee((Number(preview.fee_cents)/100).toFixed(2)); }
     }).catch(cause => { formValidation.capture(cause); if (active) setError(cause instanceof Error ? cause.message : t('Unable to load the cancellation policy.')); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [appointment.id, initialAction, request, t]);
   const loadSlots = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setError('')); setSlots([]); setSlot(null); setSearched(false);
+    event.preventDefault(); setBusy(true); formValidation.clear(); setError(''); setSlots([]); setSlot(null); setSearched(false);
     try {
-      const data = await request(`/appointments/${appointment.id}/availability?date_from=${date}&date_to=${date}`);
+      const data = await request<{ availability: Slot[] }>(`/appointments/${appointment.id}/availability?date_from=${date}&date_to=${date}`);
       const currentStart=new Date(`${appointment.starts_at.replace(' ', 'T')}Z`).getTime();
       setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(appointment.duration_option_id) && new Date(item.starts_at).getTime() !== currentStart)); setSearched(true);
     } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
@@ -277,7 +277,7 @@ function ManageAppointmentValidated({ appointment, initialAction, request, canAs
   };
   const submit = async () => {
     if (action === 'reschedule' && (!slot || (needsRoom && !room))) return;
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try {
       const body = action === 'cancel'
         ? { action, version: Number(appointment.version), reason, apply_cancellation_fee: clientRequested, ...(clientRequested && canManageFees && cancellation && Math.round(Number(adjustedFee)*100) !== Number(cancellation.fee_cents) ? { adjusted_fee_cents: Math.round(Number(adjustedFee)*100) } : {}) }
@@ -317,7 +317,7 @@ function ManageAppointmentValidated({ appointment, initialAction, request, canAs
 const ManageAppointment = withFormValidation(ManageAppointmentValidated);
 
 
-type FormProps = { request: (path: string, init?: RequestInit) => Promise<any>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; initialClient?: Client; initialServiceId?: number; cancel: () => void; complete: (id: number, message?: string) => void };
+type FormProps = { request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>; practitionerMode: boolean; canScheduleOthers: boolean; canAddClients: boolean; canApproveOnsiteArea: boolean; initialClient?: Client; initialServiceId?: number; cancel: () => void; complete: (id: number, message?: string) => void };
 function BookingFormValidated({ request, practitionerMode, canScheduleOthers, canAddClients, canApproveOnsiteArea, initialClient, initialServiceId, cancel, complete }: FormProps) {
   const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
@@ -387,7 +387,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   ));
   useEffect(() => {
     const controller = new AbortController();
-    void request(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); setPreferredLocation(data.default_location_id ? String(data.default_location_id) : ''); } })
+    void request<{ combinations: Combination[]; rooms: Room[]; default_location_id: number | null }>(`/booking-options${practitionerMode ? '?scope=practitioner' : ''}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) { setOptions(data.combinations); setRooms(data.rooms); setPreferredLocation(data.default_location_id ? String(data.default_location_id) : ''); } })
       .catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [request]);
@@ -412,13 +412,13 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   }, [initialServiceId, options, service]);
   useEffect(() => {
     const term = clientQuery.trim();
-    setClients([]); setClientMore(false); (formValidation.clear(), setClientError('')); setClientSearched(false);
+    setClients([]); setClientMore(false); formValidation.clear(); setClientError(''); setClientSearched(false);
     if (client || (term.length < 2 && !clientBirthdate)) { setClientBusy(false); return; }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setClientBusy(true);
       const params=new URLSearchParams();if(term.length>=2)params.set('q',term);if(clientBirthdate)params.set('date_of_birth',clientBirthdate);if(practitionerMode)params.set('scope','practitioner');
-      void request(`/booking-clients?${params.toString()}`, { signal: controller.signal })
+      void request<{ items: Client[]; has_more: boolean }>(`/booking-clients?${params.toString()}`, { signal: controller.signal })
         .then(data => { if (!controller.signal.aborted) { setClients(data.items); setClientMore(data.has_more); setClientSearched(true); } })
         .catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setClientError(cause instanceof Error ? cause.message : t('Unable to search clients.')); })
         .finally(() => { if (!controller.signal.aborted) setClientBusy(false); });
@@ -428,7 +428,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   useEffect(() => {
     if(!client||mode!=='mobile'){setClientAddressState('idle');return;}
     const controller=new AbortController();setClientAddressState('loading');setCoverage(null);setDestination(emptyDestination());
-    void request(`/booking-clients/${client.id}/address`,{signal:controller.signal})
+    void request<{ address: Destination | null }>(`/booking-clients/${client.id}/address`,{signal:controller.signal})
       .then(data=>{if(controller.signal.aborted)return;if(data.address){setDestination({...data.address,instructions:data.address.instructions??''});setClientAddressState('saved');}else setClientAddressState('missing');})
       .catch(()=>{if(!controller.signal.aborted)setClientAddressState('error');});
     return()=>controller.abort();
@@ -439,14 +439,14 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
     const controller = new AbortController();
     approvalLookup.current = controller;
     setApprovalLoading(true);
-    void request('/address-coverage/approval', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }), signal:controller.signal })
+    void request<{ approved: boolean }>('/address-coverage/approval', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }), signal:controller.signal })
       .then(result => { if (!controller.signal.aborted) setAreaApproved(Boolean(result.approved) && selected?.mobile_free_radius_km == null); }).catch(() => {})
       .finally(() => { if (!controller.signal.aborted) setApprovalLoading(false); });
     return () => controller.abort();
   }, [request,client?.id,mode,location,service,practitioner,destination.address_line1,destination.address_line2,destination.city,destination.province,destination.postal_code,destination.country,addressComplete,options]);
-  const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); (formValidation.clear(), setError('')); };
+  const clearSlots = () => { setSlot(null); setRoom(''); setSlots([]); setSearched(false); formValidation.clear(); setError(''); };
   const createClient = async (event: FormEvent) => {
-    event.preventDefault(); setNewClientBusy(true); (formValidation.clear(), setNewClientError('')); setDuplicateClients([]);
+    event.preventDefault(); setNewClientBusy(true); formValidation.clear(); setNewClientError(''); setDuplicateClients([]);
     try {
       const created: Client = await request('/clients', { method: 'POST', body: JSON.stringify({ ...newClient, preferred_contact: 'email', status: 'active' }) });
       setClient(created); setCreatedClientId(Number(created.id)); setAddingClient(false); setClientQuery(''); setClientBirthdate(''); setClients([]);
@@ -460,7 +460,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
     if (!client || createdClientId !== Number(client.id) || !window.confirm(t('Send a private portal invitation to {{email}}?', { email: client.email }))) return;
     setInvitationBusy(true); setInvitationStatus(''); setInvitationLink('');
     try {
-      const result = await request(`/clients/${client.id}/invitations`, { method: 'POST', body: JSON.stringify({ delivery: 'email' }) });
+      const result = await request<{ delivery: string; token?: string }>(`/clients/${client.id}/invitations`, { method: 'POST', body: JSON.stringify({ delivery: 'email' }) });
       if (result.delivery === 'email_accepted') setInvitationStatus(t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.'));
       else { setInvitationStatus(t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.')); setInvitationLink(`${portalLink('client/invite')}#token=${result.token}`); }
     } catch (cause) { formValidation.capture(cause); setInvitationStatus(cause instanceof Error ? cause.message : t('Unable to send the invitation.')); }
@@ -469,23 +469,23 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   const findSlots = async (event: FormEvent) => {
     event.preventDefault(); if (!selected) return; setBusy(true); clearSlots();
     try {
-      const data = await request(`/availability?location_id=${location}&service_id=${service}&practitioner_id=${practitioner}&delivery_mode=${mode}&date_from=${date}&date_to=${date}`);
+      const data = await request<{ availability: Slot[] }>(`/availability?location_id=${location}&service_id=${service}&practitioner_id=${practitioner}&delivery_mode=${mode}&date_from=${date}&date_to=${date}`);
       setSlots(data.availability.filter((item: Slot) => Number(item.duration_option_id) === Number(duration))); setSearched(true);
     } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Unable to load times.')); }
     finally { setBusy(false); }
   };
   const validateCoverage = async () => {
     if (!client || !selected || !addressComplete) return;
-    setCoverageBusy(true); setCoverage(null); (formValidation.clear(), setError('')); clearSlots();
+    setCoverageBusy(true); setCoverage(null); formValidation.clear(); setError(''); clearSlots();
     try {
-      const result = await request('/address-coverage/validate', { method: 'POST', body: JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
+      const result = await request<CoverageValidation>('/address-coverage/validate', { method: 'POST', body: JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
       setDestination(result.destination); setCoverage(result);
     } catch (cause) { formValidation.capture(cause); if(cause instanceof RequestError && [401,403,404].includes(cause.status)){approvalLookup.current?.abort();setApprovalLoading(false);setAreaApproved(false);setCoverage(null);clearSlots();} setError(cause instanceof Error ? cause.message : t('Unable to validate this address.')); }
     finally { setCoverageBusy(false); }
   };
   const approveCoverage = async () => {
     if (!client || !coverage || !selected || !canApproveOnsiteArea || !window.confirm(t('I independently confirm this visit address fits clinic travel policy for this practitioner, service, and base location. Save this approval for future bookings?'))) return;
-    setApprovalBusy(true); (formValidation.clear(), setError(''));
+    setApprovalBusy(true); formValidation.clear(); setError('');
     try {
       await request('/address-coverage/approve', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination, address_validation_token:coverage.token }) });
       approvalLookup.current?.abort();
@@ -495,7 +495,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   };
   const revokeCoverage = async () => {
     if (!client || !selected || !canApproveOnsiteArea || !window.confirm(t('Remove this On-Site approval? Future bookings will require a new distance check.'))) return;
-    setApprovalBusy(true); (formValidation.clear(), setError(''));
+    setApprovalBusy(true); formValidation.clear(); setError('');
     try {
       await request('/address-coverage/revoke', { method:'POST', body:JSON.stringify({ client_id:Number(client.id), location_id:Number(location), service_id:Number(service), practitioner_id:Number(practitioner), destination }) });
       approvalLookup.current?.abort();
@@ -505,10 +505,10 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   };
   const confirm = async () => {
     if (sending.current || !client || !selected || !slot) return;
-    sending.current = true; setBusy(true); (formValidation.clear(), setError(''));
+    sending.current = true; setBusy(true); formValidation.clear(); setError('');
     const payload = pendingRef.current ?? { delivery_mode:mode, ...(mode==='mobile'?{destination,...(!areaApproved&&coverage?{address_validation_token:coverage.token}:{})}:{}), quoted_base_price_cents:Number(selected.base_price_cents),quoted_mobile_fee_cents:mobileFee, client_id: Number(client.id), location_id: Number(location), service_id: Number(service), practitioner_id: Number(practitioner), duration_option_id: Number(duration), starts_at: slot.starts_at, ...(needsRoom ? { room_id: Number(room) } : {}), idempotency_key: crypto.randomUUID() };
     pendingRef.current = payload; setPending(payload);
-    try { const result = await request('/appointments', { method: 'POST', body: JSON.stringify(payload) }); pendingRef.current = null; setPending(null); complete(result.id); }
+    try { const result = await request<{ id: number }>('/appointments', { method: 'POST', body: JSON.stringify(payload) }); pendingRef.current = null; setPending(null); complete(result.id); }
     catch (cause) { formValidation.capture(cause);
       const rejected = cause instanceof RequestError && cause.status >= 400 && cause.status < 500 && cause.code !== 'invalid_response';
       const coverageRejected = cause instanceof RequestError && ['coverage_validation_required','invalid_coverage_validation','coverage_validation_mismatch','coverage_validation_expired'].includes(cause.code);
@@ -538,7 +538,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
           {clientMore && <Alert severity="info">{t('Showing the first 25 matches. Continue typing to narrow the results.')}</Alert>}
         </Stack>}
         {!client && canAddClients && <Box>
-          <Button variant="outlined" onClick={() => { setAddingClient(value => !value); (formValidation.clear(), setNewClientError('')); setDuplicateClients([]); }}>{t(addingClient ? 'Cancel new client' : 'Add new client')}</Button>
+          <Button variant="outlined" onClick={() => { setAddingClient(value => !value); formValidation.clear(); setNewClientError(''); setDuplicateClients([]); }}>{t(addingClient ? 'Cancel new client' : 'Add new client')}</Button>
           {addingClient && <Stack component="form" onSubmit={event => void createClient(event)} spacing={2} sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Alert severity="info">{t('Search for an existing client before creating a record. Saving a record does not link a sign-in account.')}</Alert>
             <Grid container spacing={2}>

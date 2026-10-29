@@ -41,7 +41,7 @@ function PractitionerNotificationsForm() {
     setSearchParams(next);
   };
   const load = useCallback(async () => {
-    setLoading(true); (formValidation.clear(), setError(''));
+    setLoading(true); formValidation.clear(); setError('');
     try {
       const token = await getAccessToken();
       const params = new URLSearchParams({ page: String(page) });

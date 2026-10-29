@@ -46,7 +46,7 @@ export function UserAccountMenu() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const avatarRequest = useRef(0);
-  const { account, configured, isAuthenticated, signOut, getAccessToken } =
+  const { configured, isAuthenticated, signOut, getAccessToken } =
     useStaffAuth();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);

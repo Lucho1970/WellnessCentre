@@ -5,18 +5,18 @@ import { formatCad } from '../i18n/format';
 
 type Context = { version: number; fee_cents: number; assessed_fee_cents: number; waived: boolean; reason: string | null; can_waive: boolean };
 export function OnsiteFeeWaiver({ appointmentId, request, changed, onBusyChange }: {
-  appointmentId: number; request: (path: string, init?: RequestInit) => Promise<any>;
+  appointmentId: number; request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
   changed: (version: number) => void; onBusyChange: (busy: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
   const [data, setData] = useState<Context | null>(null);
   const [reason, setReason] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  useEffect(() => { let active = true; void request(`/appointments/${appointmentId}/travel-fee`).then(value => { if (active) setData(value); }).catch(cause => { if (active) setError(cause.message); }); return () => { active = false; }; }, [appointmentId, request]);
+  useEffect(() => { let active = true; void request<Context>(`/appointments/${appointmentId}/travel-fee`).then(value => { if (active) setData(value); }).catch(cause => { if (active) setError(cause.message); }); return () => { active = false; }; }, [appointmentId, request]);
   const waive = async () => {
     if (!data || busy) return;
     setBusy(true); onBusyChange(true); setError('');
     try {
-      const value = await request(`/appointments/${appointmentId}/travel-fee/waive`, { method: 'POST', body: JSON.stringify({ version: data.version, reason }) });
+      const value = await request<Context>(`/appointments/${appointmentId}/travel-fee/waive`, { method: 'POST', body: JSON.stringify({ version: data.version, reason }) });
       setData(value); setReason(''); changed(value.version);
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('Unable to waive travel fee.')); }
     finally { setBusy(false); onBusyChange(false); }

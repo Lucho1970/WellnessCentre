@@ -7,7 +7,7 @@ import './discovery.css';
 export function DiscoverySettings() {
   const {t}=useTranslation(),{getAccessToken}=useStaffAuth();
   const [settings,setSettings]=useState<{extra_km:number;cap_km:number;revision:number}|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
-  const request=useCallback(async(body?:unknown)=>apiRequest<any>('/application/discovery-settings',{method:body?'PUT':'GET',headers:{Authorization:`Bearer ${await getAccessToken()}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),[getAccessToken]);
+  const request=useCallback(async(body?:unknown)=>apiRequest<{extra_km:number;cap_km:number;revision:number}>('/application/discovery-settings',{method:body?'PUT':'GET',headers:{Authorization:`Bearer ${await getAccessToken()}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}),[getAccessToken]);
   const load=useCallback(()=>{setError('');void request().then(setSettings).catch(cause=>setError(cause.message));},[request]);
   useEffect(load,[load]);
   return <section className="discovery-ui"><h2>{t('Location discovery settings')}</h2><p>{t('These limits apply across all clinics. Discovery never overrides a practitioner’s booking limit.')}</p>
@@ -20,10 +20,10 @@ export function DiscoverySettings() {
   </section>;
 }
 
-export function DiscoveryPreferences({request}:{request:(path:string,body?:unknown)=>Promise<any>}) {
+export function DiscoveryPreferences({request}:{request:<T = unknown>(path:string,body?:unknown)=>Promise<T>}) {
   const {t}=useTranslation();const [items,setItems]=useState<{service_id:number;name:string;allow_extra:boolean}[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  useEffect(()=>{let active=true;void request('/profile/discovery-preferences').then(data=>{if(active)setItems(Array.isArray(data.items)?data.items:[]);}).catch(cause=>{if(active)setError(cause.message);});return()=>{active=false;};},[request]);
+  useEffect(()=>{let active=true;void request<{ items: { service_id: number; name: string; allow_extra: boolean }[] }>('/profile/discovery-preferences').then(data=>{if(active)setItems(Array.isArray(data.items)?data.items:[]);}).catch(cause=>{if(active)setError(cause.message);});return()=>{active=false;};},[request]);
   return <section className="discovery-ui"><h3>{t('Extra-distance travel enquiries')}</h3><p>{t('Allow clients just beyond your normal limit to ask about travel. This does not change your fees, maximum booking distance or other clinics.')}</p>{error&&<p role="alert">{error}</p>}
-    {items.map(item=><label className="discovery-check" key={item.service_id}><input type="checkbox" disabled={busy} checked={item.allow_extra} onChange={event=>{const allow_extra=event.target.checked;setItems(current=>current.map(row=>row.service_id===item.service_id?{...row,allow_extra}:row));setBusy(true);setError('');void request('/profile/discovery-preferences',{service_id:item.service_id,allow_extra}).then(data=>setItems(data.items)).catch(cause=>{setItems(current=>current.map(row=>row.service_id===item.service_id?item:row));setError(cause.message);}).finally(()=>setBusy(false));}}/>{item.name}</label>)}
+    {items.map(item=><label className="discovery-check" key={item.service_id}><input type="checkbox" disabled={busy} checked={item.allow_extra} onChange={event=>{const allow_extra=event.target.checked;setItems(current=>current.map(row=>row.service_id===item.service_id?{...row,allow_extra}:row));setBusy(true);setError('');void request<{ items: { service_id: number; name: string; allow_extra: boolean }[] }>('/profile/discovery-preferences',{service_id:item.service_id,allow_extra}).then(data=>setItems(data.items)).catch(cause=>{setItems(current=>current.map(row=>row.service_id===item.service_id?item:row));setError(cause.message);}).finally(()=>setBusy(false));}}/>{item.name}</label>)}
   </section>;
 }

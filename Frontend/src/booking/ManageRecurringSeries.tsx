@@ -18,11 +18,11 @@ function ManageRecurringSeriesForm({ id, request, close, complete, client = fals
   const [reload, setReload] = useState(0);
   const key = useRef(crypto.randomUUID()), sending = useRef(false);
   useUnsavedChanges(Boolean(result || reason || Object.keys(starts).length));
-  useEffect(() => { let active = true; void request(`/recurring-series/${id}`).then(data => { if (active) setSeries(data); }).catch(cause => { formValidation.capture(cause); if (active) setError(cause.message); }); return () => { active = false; }; }, [id, request, reload]);
+  useEffect(() => { let active = true; void request<Series>(`/recurring-series/${id}`).then(data => { if (active) setSeries(data); }).catch(cause => { formValidation.capture(cause); if (active) setError(cause.message); }); return () => { active = false; }; }, [id, request, reload]);
   useEffect(() => { setResult(null); key.current = crypto.randomUUID(); }, [action, reason, starts]);
   const send = async (apply: boolean) => {
     if (!series || sending.current) return;
-    sending.current = true; setBusy(true); (formValidation.clear(), setError(''));
+    sending.current = true; setBusy(true); formValidation.clear(); setError('');
     try {
       const response = readSeriesResult(await request(`/recurring-series/${id}${apply ? '' : '/preview'}`, { method: 'POST', body: JSON.stringify({ action, reason, idempotency_key: key.current, items: series.items.map(item => ({ appointment_id: item.appointment_id, version: item.version, ...(action === 'cancel' ? { expected_cancellation_fee_cents: item.cancellation_fee_cents } : { starts_at: starts[item.appointment_id] }) })), ...(apply ? { preview_token: result?.preview_token } : {}) }) }));
       setResult(response); setUncertain(false);
@@ -40,7 +40,7 @@ function ManageRecurringSeriesForm({ id, request, close, complete, client = fals
     <Typography variant="h5">{t('Manage future series')} #{id}</Typography>
     <Alert severity="info">{t('Only the future active appointments listed here will change. Past and canceled appointments stay in history. All listed changes must pass validation before any are saved.')}</Alert>
     {error && <Alert severity="error">{error}</Alert>}
-    {!series && error && <Button onClick={() => { (formValidation.clear(), setError('')); setResult(null); setStarts({}); setReload(value => value + 1); }}>{t('Reload series')}</Button>}
+    {!series && error && <Button onClick={() => { formValidation.clear(); setError(''); setResult(null); setStarts({}); setReload(value => value + 1); }}>{t('Reload series')}</Button>}
     {!series && !error && <CircularProgress />}
     {series && <>
       <Typography>{t('Location timezone')}: {series.timezone}</Typography>
@@ -69,9 +69,9 @@ function OccurrenceTimeValidated({ item, request, timezone, disabled, chosen, ch
   const { t, i18n } = useTranslation();
   const [date, setDate] = useState(''), [slots, setSlots] = useState<Slot[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const search = async () => {
-    setBusy(true); (formValidation.clear(), setError(''));
+    setBusy(true); formValidation.clear(); setError('');
     try {
-      const data = await request(`/appointments/${item.appointment_id}/availability?date_from=${date}&date_to=${date}`);
+      const data = await request<{ availability: Slot[] }>(`/appointments/${item.appointment_id}/availability?date_from=${date}&date_to=${date}`);
       // Match the existing duration and room; series changes preserve their booking terms.
       const appointment = item.duration_option_id;
       setSlots(data.availability.filter((slot: Slot) => Number(slot.duration_option_id) === Number(appointment) && (item.room_id === null || slot.available_room_ids.map(Number).includes(item.room_id))));

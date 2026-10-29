@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Box, Button, Checkbox, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage } from '../shared/api';
 import { useUnsavedChanges } from '../shared/UnsavedChanges';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
@@ -47,7 +46,7 @@ function StaffNotificationSettingsForm() {
     void request('').then((data: Preferences) => { setSaved(data); setForm(data); }).catch(e => setError(e instanceof Error ? e.message : t('Unable to load notification preferences.')));
   }, []);
   const perform = async (action: () => Promise<void>) => {
-    setBusy(true); (formValidation.clear(), setError('')); setMessage('');
+    setBusy(true); formValidation.clear(); setError(''); setMessage('');
     try { await action(); } catch (e) { formValidation.capture(e); setError(e instanceof Error ? e.message : t('Unable to update notification preferences.')); }
     finally { setBusy(false); }
   };

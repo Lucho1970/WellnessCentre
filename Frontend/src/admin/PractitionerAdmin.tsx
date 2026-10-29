@@ -52,7 +52,7 @@ function PractitionerAdminForm() {
   }, [items, query]);
 
   const load = useCallback(async (preferredId?: number | null) => {
-    setLoading(true); (formValidation.clear(), setLoadError(''));
+    setLoading(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken();
       const [locationResponse, practitionerResponse] = await Promise.all([fetch(`${api}/locations`), fetch(`${api}/admin/practitioners`, { headers: { Authorization: `Bearer ${token}` } })]);
@@ -72,13 +72,13 @@ function PractitionerAdminForm() {
 
   const setAddField = <K extends keyof NewForm>(key: K, value: NewForm[K]) => setAddForm(current => ({ ...current, [key]: value }));
   const setEditField = <K extends keyof EditForm>(key: K, value: EditForm[K]) => setEditing(current => current ? { ...current, [key]: value } : null);
-  const startNew = () => { if(central?.central_enabled)return; formGuard.markClean(); setAddForm(newForm(String(locations[0]?.id ?? ''))); setEditing(null); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); (formValidation.clear(), setPanelError('')); setPanelMode('details'); };
-  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.practitioner_id); setEditing(editForm(item, String(locations[0]?.id ?? ''))); (formValidation.clear(), setPanelError('')); setPanelMode('edit'); };
-  const closePanel = () => { if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; formGuard.markClean(); setPanelMode(null); setEditing(null); (formValidation.clear(), setPanelError('')); };
+  const startNew = () => { if(central?.central_enabled)return; formGuard.markClean(); setAddForm(newForm(String(locations[0]?.id ?? ''))); setEditing(null); formValidation.clear(); setPanelError(''); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); formValidation.clear(); setPanelError(''); setPanelMode('details'); };
+  const startEdit = (item = selected) => { if (!item) return; formGuard.markClean(); setSelectedId(item.practitioner_id); setEditing(editForm(item, String(locations[0]?.id ?? ''))); formValidation.clear(); setPanelError(''); setPanelMode('edit'); };
+  const closePanel = () => { if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return; formGuard.markClean(); setPanelMode(null); setEditing(null); formValidation.clear(); setPanelError(''); };
 
   const create = async (event: FormEvent) => {
-    event.preventDefault(); setSaving(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    event.preventDefault(); setSaving(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/practitioners/onboard`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...addForm, location_id: Number(addForm.location_id) }) });
@@ -91,7 +91,7 @@ function PractitionerAdminForm() {
     finally { setSaving(false); }
   };
   const saveEdit = async (event: FormEvent) => {
-    event.preventDefault(); if (!editing) return; setSaving(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    event.preventDefault(); if (!editing) return; setSaving(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken();
       const response = await fetch(`${api}/admin/practitioners/${editing.practitioner_id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...editing, location_id: Number(editing.location_id) }) });
@@ -132,7 +132,7 @@ export const PractitionerAdmin = withFormValidation(PractitionerAdminForm);
 
 function PractitionerDetails({ item, edit }: { item: Practitioner; edit: () => void }) {
   const { t } = useTranslation();
-  const rows = [[t('First name'), item.given_name || t('Not set')], [t('Last name'), item.family_name || t('Not set')], [t('Preferred public name'), item.preferred_name || t('Not set')], [t('Internal display name'), item.display_name], [t('Account status'), t(item.status === 'active' ? 'Active' : 'Inactive')], [t('Practitioner availability'), t(Boolean(Number(item.active)) ? 'Available' : 'Unavailable')], [t('Discipline'), item.discipline], [t('Credentials'), item.credentials || t('Not set')], [t('Clinic location'), item.locations || t('No active location')], [t('Booking management'), t(item.booking_mode === 'practitioner_managed' ? 'Practitioner managed' : 'Clinic managed')], [t('Microsoft sign-in email'), item.email]];
+  const rows = [[t('First name'), item.given_name || t('Not set')], [t('Last name'), item.family_name || t('Not set')], [t('Preferred public name'), item.preferred_name || t('Not set')], [t('Internal display name'), item.display_name], [t('Account status'), t(item.status === 'active' ? 'Active' : 'Inactive')], [t('Practitioner availability'), t(Number(item.active) ? 'Available' : 'Unavailable')], [t('Discipline'), item.discipline], [t('Credentials'), item.credentials || t('Not set')], [t('Clinic location'), item.locations || t('No active location')], [t('Booking management'), t(item.booking_mode === 'practitioner_managed' ? 'Practitioner managed' : 'Clinic managed')], [t('Microsoft sign-in email'), item.email]];
   return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{rows.map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack><Button variant="contained" startIcon={<Pencil size={17}/>} onClick={edit}>{t('Edit')}</Button><PractitionerQualifications key={item.practitioner_id} practitionerId={item.practitioner_id} admin globalRegistered={item.global_registered} /></Stack>;
 }
 

@@ -5,7 +5,6 @@ import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, D
 import { Eye, Pencil, Plus, Save, Search, Settings2, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
-import { apiErrorMessage } from '../shared/api';
 import { formatCad } from '../i18n/format';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
 import { ServiceAssignments } from './ServiceAssignments';
@@ -104,7 +103,7 @@ function ServiceAdminForm() {
   };
   const load = useCallback(async (preferredId?: number | null) => {
     const current = ++generation.current; setLoaded(false);
-    setBusy(true); (formValidation.clear(), setLoadError(''));
+    setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
@@ -139,15 +138,15 @@ function ServiceAdminForm() {
     buffer_before_minutes: String(service.buffer_before_minutes), buffer_after_minutes: String(service.buffer_after_minutes),
     display_order: String(service.display_order), requires_room: Boolean(Number(service.requires_room)), recurrence_allowed: Boolean(Number(service.recurrence_allowed)), active: Boolean(Number(service.active)), published: Boolean(Number(service.published)),
   });
-  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); (formValidation.clear(), setPanelError('')); setPanelMode('new'); };
-  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelMode('details'); (formValidation.clear(), setPanelError('')); };
+  const startNew = () => { formGuard.markClean(); setEditingId(null); setForm(blank()); formValidation.clear(); setPanelError(''); setPanelMode('new'); };
+  const showDetails = () => { if (!selected) return; formGuard.markClean(); setPanelMode('details'); formValidation.clear(); setPanelError(''); };
   const startEdit = (service = selected) => {
     if (!service) return;
-    formGuard.markClean(); setSelectedId(service.id); setEditingId(service.id); setForm(serviceForm(service)); (formValidation.clear(), setPanelError('')); setPanelMode('edit');
+    formGuard.markClean(); setSelectedId(service.id); setEditingId(service.id); setForm(serviceForm(service)); formValidation.clear(); setPanelError(''); setPanelMode('edit');
   };
   const closePanel = () => {
     if (formGuard.dirty && !window.confirm(t('Discard your unsaved changes?'))) return;
-    formGuard.markClean(); setPanelMode(null); setEditingId(null); (formValidation.clear(), setPanelError(''));
+    formGuard.markClean(); setPanelMode(null); setEditingId(null); formValidation.clear(); setPanelError('');
   };
   const openAssignments = (service = selected) => { if (service) setAssignmentServiceId(service.id); };
   const closeAssignments = () => {
@@ -158,7 +157,7 @@ function ServiceAdminForm() {
   const removeDuration = (key: string) => field('duration_options', form.duration_options.filter(option => option.key !== key));
 
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); (formValidation.clear(), setPanelError('')); setSaved('');
+    event.preventDefault(); setBusy(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const durationOptions = form.duration_options.map(option => ({ minutes: Number(option.minutes), price_cents: Math.round(Number(option.price) * 100) }));
       const cancellationValue = form.cancellation_fee_type === 'fixed' ? Math.round(Number(form.cancellation_fee_value) * 100) : form.cancellation_fee_type === 'percentage' ? Math.round(Number(form.cancellation_fee_value) * 100) : 0;
@@ -205,7 +204,7 @@ function ServiceAdminForm() {
         {filteredItems.map(service => {
           const serviceOptions = options(service);
           return <ListItemButton key={service.id} selected={selectedId === service.id} onClick={() => setSelectedId(service.id)} divider sx={{ py: 1.75, px: 2.5 }}>
-            <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{service.name}</Typography><Chip size="small" variant="outlined" label={service.category_name ?? t('Uncategorized')}/><Chip size="small" color={Boolean(Number(service.published)) ? 'primary' : 'default'} label={t(Boolean(Number(service.published)) ? 'Published' : 'Not published')}/><Chip size="small" color={Boolean(Number(service.active)) ? 'success' : 'default'} label={t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')}/></Stack>} secondary={<>{serviceOptions.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')} · {t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')}</>} />
+            <ListItemText primary={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography fontWeight={750}>{service.name}</Typography><Chip size="small" variant="outlined" label={service.category_name ?? t('Uncategorized')}/><Chip size="small" color={Number(service.published) ? 'primary' : 'default'} label={t(Number(service.published) ? 'Published' : 'Not published')}/><Chip size="small" color={Number(service.active) ? 'success' : 'default'} label={t(Number(service.active) ? 'Active' : 'Inactive')}/></Stack>} secondary={<>{serviceOptions.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')} · {t(Number(service.requires_room) ? 'Room required' : 'No room required')}</>} />
           </ListItemButton>;
         })}
         {!busy && filteredItems.length === 0 && <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">{t(query ? 'No matching services' : 'No services yet')}</Typography><Typography color="text.secondary" mb={2}>{t(query ? 'Try a different service name.' : 'Create the first service offered by the clinic.')}</Typography>{!query && <Button variant="contained" startIcon={<Plus size={17}/>} disabled={!loaded || busy} onClick={startNew}>{t('New service')}</Button>}</Box>}
@@ -237,18 +236,18 @@ export const ServiceAdmin = withFormValidation(ServiceAdminForm);
 function ServiceDetails({ service, options, money, edit, assignments }: { service: Service; options: DurationOption[]; money: (cents: number) => string; edit: () => void; assignments: () => void }) {
   const { t } = useTranslation();
   const rows = [
-    [t('Status'), t(Boolean(Number(service.active)) ? 'Active' : 'Inactive')],
-    [t('Public catalogue'), t(Boolean(Number(service.published)) ? 'Published' : 'Not published')],
+    [t('Status'), t(Number(service.active) ? 'Active' : 'Inactive')],
+    [t('Public catalogue'), t(Number(service.published) ? 'Published' : 'Not published')],
     [t('Public URL'), `/services/${service.slug}`],
     [t('Display order'), String(service.display_order)],
     [t('Category'), service.category_name ?? t('Uncategorized')],
     [t('Duration and price options'), options.map(option => t('{{minutes}} min — {{price}}', { minutes: option.minutes, price: money(option.price_cents) })).join(' · ')],
-    [t('Room requirement'), t(Boolean(Number(service.requires_room)) ? 'Room required' : 'No room required')],
+    [t('Room requirement'), t(Number(service.requires_room) ? 'Room required' : 'No room required')],
     [t('Lead time'), t('{{minutes}} minutes', { minutes: service.lead_time_minutes })],
     [t('Booking horizon'), t('{{days}} days', { days: service.booking_horizon_days })],
     [t('Cancellation policy'), service.cancellation_fee_type === 'none' ? t('No cancellation fee') : t('{{fee}} within {{minutes}} minutes', { fee: service.cancellation_fee_type === 'fixed' ? money(service.cancellation_fee_value) : `${service.cancellation_fee_value / 100}%`, minutes: service.cancellation_window_minutes })],
     [t('Buffers'), t('{{before}} min before · {{after}} min after', { before: service.buffer_before_minutes, after: service.buffer_after_minutes })],
-    [t('Recurring bookings'), t(Boolean(Number(service.recurrence_allowed)) ? 'Allowed' : 'Not allowed')],
+    [t('Recurring bookings'), t(Number(service.recurrence_allowed) ? 'Allowed' : 'Not allowed')],
   ];
   return <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}>
     {service.description && <Box><Typography variant="overline" color="text.secondary">{t('Description')}</Typography><Typography>{service.description}</Typography></Box>}

@@ -12,7 +12,7 @@ type Assignment = {
   mobile_radius_km: number | null; mobile_free_radius_km: number | null;
   travel_buffer_minutes: number; mobile_fee_cents: number;
 };
-type Request = (path: string, body?: unknown) => Promise<any>;
+type Request = <T = unknown>(path: string, body?: unknown) => Promise<T>;
 
 const TravelForm = withFormValidation(function TravelForm({ item, request, saved }: { item: Assignment; request: Request; saved: (item: Assignment) => void }) {
   const { t, i18n } = useTranslation();
@@ -26,7 +26,7 @@ const TravelForm = withFormValidation(function TravelForm({ item, request, saved
   const submit = async (event: FormEvent) => {
     event.preventDefault(); validation.clear(); setError(''); setBusy(true);
     try {
-      const updated = await request(`/profile/travel-settings/${item.service_id}`, {
+      const updated = await request<Assignment>(`/profile/travel-settings/${item.service_id}`, {
         revision: item.revision, mobile_radius_km: Number(radius),
         mobile_free_radius_km: free === '' ? null : Number(free),
         travel_buffer_minutes: Number(buffer), mobile_fee_cents: Math.round(Number(fee) * 100),
@@ -69,7 +69,7 @@ export function PractitionerTravelSettings() {
   }, [getAccessToken, t]);
   useEffect(() => {
     let active = true; setLoading(true); setError(''); setMessage('');
-    void request('/profile/travel-settings').then(data => { if (active) setItems(data.items); })
+    void request<{ items: Assignment[] }>('/profile/travel-settings').then(data => { if (active) setItems(data.items); })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : t('Unable to load or save travel settings.')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };

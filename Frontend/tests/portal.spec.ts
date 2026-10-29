@@ -351,8 +351,8 @@ test('session travel fee can be waived before issuing a receipt', async ({ page 
 test('clinic template and service credentials feed a manual session receipt', async ({ page }) => {
   await fixtures(page, ['super_admin']);
   const appointment = { id: 41, client_name: 'Test Client', service_name: 'Massage', practitioner_name: 'Practitioner', location_name: 'Main', timezone: 'America/Toronto', room_id: null, room_name: null, duration_option_id: 1, starts_at: '2026-01-02 14:00:00', ends_at: '2026-01-02 15:00:00', status: 'completed', version: 1, delivery_mode: 'clinic', destination_snapshot: null, travel_buffer_minutes: 0, base_price_cents: 10000, mobile_fee_cents: 0 };
-  const context: any = { enabled: true, can_edit_template: true, template: null, profile: null, template_version: 0, profile_version: 0, appointment: { ...appointment, base_cents: 10000, travel_cents: 0 }, items: [] };
-  let issued: any;
+  const context: { enabled: boolean; can_edit_template: boolean; template: Record<string, unknown> | null; profile: Record<string, unknown> | null; template_version: number; profile_version: number; appointment: typeof appointment & { base_cents: number; travel_cents: number }; items: { id: number; number: string; appointment_id: number; status: string; service_name: string; practitioner_name: string; total_cents: number }[] } = { enabled: true, can_edit_template: true, template: null, profile: null, template_version: 0, profile_version: 0, appointment: { ...appointment, base_cents: 10000, travel_cents: 0 }, items: [] };
+  let issued: Record<string, unknown>;
   await page.route('**/api/v1/appointments?**', route => route.fulfill({ json: { data: [appointment] } }));
   await page.route('**/api/v1/appointments/41', route => route.fulfill({ json: { data: appointment } }));
   await page.route('**/api/v1/appointments/41/logistics-notes', route => route.fulfill({ json: { data: { notes: [], truncated: false } } }));
@@ -838,7 +838,7 @@ test("services use a list-first command bar and selected services can be assigne
       requires_room: 0,
     },
   ];
-  let createdService: Record<string, any> | undefined;
+  let createdService: Record<string, unknown> | undefined;
   let savedAssignment: unknown;
   await page.route("**/api/v1/admin/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -1211,7 +1211,7 @@ test("staff client creation saves a reusable service address with manual fallbac
   page,
 }) => {
   await fixtures(page, ["super_admin"]);
-  let saved: Record<string, any> | undefined;
+  let saved: Record<string, unknown> | undefined;
   await page.route("**/api/v1/clients**", (route) => {
     if (route.request().method() === "POST") {
       saved = route.request().postDataJSON();
@@ -1471,7 +1471,7 @@ test("mobile-only booking captures destination and price without requesting a ro
   page,
 }) => {
   await fixtures(page, ["super_admin"]);
-  let booking: Record<string, any> | undefined;
+  let booking: Record<string, unknown> | undefined;
   let availabilityMode = "";
   let addressFetches = 0;
   await page.route("**/api/v1/booking-options", (route) =>

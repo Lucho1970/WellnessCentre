@@ -69,19 +69,19 @@ function NotificationStatusAdminForm() {
     return (normalizeNumericIds(body.data) as ReminderSchedule[]).map(row => ({ ...row, minutes_before: Number(row.minutes_before) }));
   }, [getAccessToken]);
   const openReminders = async () => {
-    setReminderOpen(true); setReminderBusy(true); setReminderReady(false); setReminders([]); (formValidation.clear(), setReminderError(''));
+    setReminderOpen(true); setReminderBusy(true); setReminderReady(false); setReminders([]); formValidation.clear(); setReminderError('');
     try { setReminders(await reminderRequest()); setReminderReady(true); }
     catch (cause) { formValidation.capture(cause); if(cause instanceof ApiError && [401,403,404].includes(cause.status)){setSelected(null);setData(null);void load();} setReminderError(cause instanceof Error ? cause.message : t('Unable to load reminder settings.')); }
     finally { setReminderBusy(false); }
   };
   const changeReminders = async (method: string, path: string, payload: object) => {
-    setReminderBusy(true); (formValidation.clear(), setReminderError(''));
+    setReminderBusy(true); formValidation.clear(); setReminderError('');
     try { setReminders(await reminderRequest(method, path, payload)); void load(); }
     catch (cause) { formValidation.capture(cause); if(cause instanceof ApiError && [401,403,404].includes(cause.status)){setReminders([]);setReminderReady(false);setSelected(null);setData(null);void load();} setReminderError(cause instanceof Error ? cause.message : t('Unable to save reminder settings.')); }
     finally { setReminderBusy(false); }
   };
   const load = useCallback(async () => {
-    setLoading(true); (formValidation.clear(), setError(''));
+    setLoading(true); formValidation.clear(); setError('');
     try {
       const token = await getAccessToken();
       const params = new URLSearchParams({ page: String(page) });
@@ -99,10 +99,10 @@ function NotificationStatusAdminForm() {
   }, [getAccessToken, page, status, channel, period, t]);
   useEffect(() => { void load(); }, [load]);
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.page_size ?? 25)));
-  const openEvent = (item: Event) => { setAccessNotice(''); setSelected(item); setReviewOutcome('no_longer_needed'); setCheckedProvider(false); setCheckedRecipient(false); (formValidation.clear(), setReviewError('')); };
+  const openEvent = (item: Event) => { setAccessNotice(''); setSelected(item); setReviewOutcome('no_longer_needed'); setCheckedProvider(false); setCheckedRecipient(false); formValidation.clear(); setReviewError(''); };
   const review = async (decision: 'resolve' | 'retry') => {
     if (!selected) return;
-    setReviewBusy(true); (formValidation.clear(), setReviewError(''));
+    setReviewBusy(true); formValidation.clear(); setReviewError('');
     try {
       const token = await getAccessToken();
       const response = await fetch(`${apiBaseUrl}/admin/notifications/${selected.id}/review`, {

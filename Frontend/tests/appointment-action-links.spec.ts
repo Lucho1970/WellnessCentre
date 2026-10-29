@@ -16,7 +16,7 @@ async function fixture(page:Page,signedIn=true,linked=true){
   await page.route('**/api/v1/customer/appointment-links/resolve',route=>route.fulfill({json:{data:{appointment}}}));
 }
 test('appointment link survives sign-in, hides the token and changes nothing until confirmation',async({page})=>{
-  await fixture(page,false);let resolves=0,changes:unknown[]=[];
+  await fixture(page,false);let resolves=0;const changes:unknown[]=[];
   await page.route('**/api/v1/customer/appointment-links/resolve',route=>{resolves++;expect(route.request().method()).toBe('POST');expect(route.request().postDataJSON()).toEqual({token});return route.fulfill({json:{data:{appointment}}});});
   await page.route('**/api/v1/customer/appointments/41/cancellation-preview',route=>route.fulfill({json:{data:{fee_cents:2500,currency:'CAD'}}}));
   await page.route('**/api/v1/customer/appointments/41',route=>{changes.push(route.request().postDataJSON());return route.fulfill({json:{data:{...appointment,status:'canceled_by_client'}}});});
