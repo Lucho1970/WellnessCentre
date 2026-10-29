@@ -18,7 +18,7 @@ final class AccessAudit
     private ?int $actorClinic = null;
     private ?string $applicantFingerprint = null;
     private const CONTAINERS = [
-        'application','submissions','categories','taxes','capabilities','rooms','data','items','versions','appointments','appointment','clients','client','practitioners','practitioner',
+        'held_sms','notices','deliveries','application','submissions','categories','taxes','capabilities','rooms','data','items','versions','appointments','appointment','clients','client','practitioners','practitioner',
         'users','user','profile','events','notes','note','messages','forms','tasks','receipts','notifications',
         'invitations','claims','entries','series','history','changes','widgets','results','records','amendments',
         'upcoming','recent','next_appointment','follow_ups','time_off_follow_ups','combinations','locations','services',
@@ -36,6 +36,7 @@ final class AccessAudit
         'amendment_id'=>'form_amendment',
     ];
     private const ENTITIES = [
+        'communications'=>'communication','notices'=>'communication_notice','deliveries'=>'sms_delivery','held_sms'=>'notification',
         'practitioner-applications'=>'practitioner_application',
         'service-imports'=>'service_import',
         'dashboard-widgets'=>'dashboard_widget','reminder-schedules'=>'reminder_schedule','reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',

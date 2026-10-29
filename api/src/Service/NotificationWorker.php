@@ -8,19 +8,31 @@ use Throwable;
 
 final class NotificationWorker
 {
+    private readonly ?SmsDeliveryGuard $budgetGuard;
+    private readonly ?ClinicMailRouter $clinicMail;
     public function __construct(
         private readonly PDO $pdo,
         private readonly GraphMailClient $mailer,
         private readonly string $clientPortalUrl,
         private readonly ?VoipMsSmsClient $sms = null,
         private readonly bool $appointmentActionLinksEnabled = false,
-    ) {}
+        ?SmsDeliveryGuard $budgetGuard = null,
+        ?ClinicMailRouter $clinicMail = null,
+    ) {
+        $enabled=static fn(string $key)=>filter_var($_ENV[$key]??getenv($key)?:'false',FILTER_VALIDATE_BOOL);
+        $this->budgetGuard=$budgetGuard??($enabled('SMS_BUDGET_ENFORCEMENT_ENABLED')?new SmsDeliveryGuard($pdo):null);
+        $this->clinicMail=$clinicMail??($enabled('AUTOMATED_COMMUNICATIONS_ENABLED')?new ClinicMailRouter($pdo,$mailer):null);
+    }
 
     /** @return array{sent:int,retry:int,review:int,canceled:int} */
     public function run(int $limit = 20, ?int $appointmentId = null): array
     {
         $limit = max(1, min(100, $limit));
         if ($appointmentId !== null && $appointmentId < 1) throw new \InvalidArgumentException('Invalid appointment ID.');
+        $noticeLimit=0;
+        if($appointmentId===null && $limit>=3 && filter_var($_ENV['AUTOMATED_COMMUNICATIONS_ENABLED']??getenv('AUTOMATED_COMMUNICATIONS_ENABLED')?:'false',FILTER_VALIDATE_BOOL)){
+            (new CommunicationNotices($this->pdo))->scan();$noticeLimit=max(1,intdiv($limit,3));$limit-=$noticeLimit;
+        }
         // The former worker might have reached Graph before stopping. Never resend
         // an expired lease automatically because Graph sendMail is not idempotent.
         $this->pdo->exec("UPDATE notification_events SET status='needs_review',lease_token=NULL,leased_until=NULL,last_error='Worker stopped while sending; delivery outcome is unknown' WHERE status='sending' AND leased_until<UTC_TIMESTAMP()");
@@ -37,14 +49,15 @@ final class NotificationWorker
                         || ($event['channel'] === 'sms' && strtotime((string)$details['scheduled_at'] . ' UTC') < time() - 3600)
                         || (str_starts_with((string)$details['event_code'], 'staff_') && !StaffNotificationRecipient::allowed($this->pdo,$details));
                     $staffNotice = !$superseded && str_starts_with((string)$details['event_code'], 'staff_');
-                    $portalUrl = $superseded ? $this->clientPortalUrl : ClinicPortalUrl::resolve($this->pdo,(int)$details['clinic_id'],$this->clientPortalUrl);
+                    $portalUrl = $superseded ? $this->clientPortalUrl : ClinicPortalUrl::resolve($this->pdo,(int)$details['clinic_id'],$this->clientPortalUrl,($this->budgetGuard||$this->clinicMail)?true:null);
+                    $mailRoute=(!$superseded && $event['channel']==='email' && $this->clinicMail)?$this->clinicMail->route((int)$details['clinic_id'],(int)$details['appointment_id'],$staffNotice):['mailer'=>$this->mailer,'reply_to'=>null];
                     if (!$superseded && !$staffNotice && $event['channel'] === 'email') {
                         $details['appointment_action_url'] = (new AppointmentActionLinks($this->pdo, $this->appointmentActionLinksEnabled))->issue($details, $portalUrl);
                     }
                     $message = $superseded ? null : ($event['channel'] === 'sms'
                         ? StaffAppointmentSms::compose($details, $portalUrl)
                         : ($staffNotice ? StaffAppointmentEmail::compose($details, $portalUrl) : AppointmentEmail::compose($details, $portalUrl)));
-                    $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $portalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $this->mailer->senderAddress(), (string)$event['recipient_address']);
+                    $calendar = $superseded || $staffNotice || $event['channel'] === 'sms' || $details['event_code'] === 'appointment_reminder' ? null : AppointmentCalendar::compose($details, $portalUrl, $details['event_code'] === 'booking_cancellation' ? 'CANCEL' : 'REQUEST', $mailRoute['mailer']->senderAddress(), (string)$event['recipient_address']);
                 } catch (Throwable $e) {
                     $this->finish($event, 'needs_review', 'Notification could not be prepared (' . get_class($e) . ').');
                     $summary['review']++;
@@ -58,10 +71,18 @@ final class NotificationWorker
                 try {
                     $providerId = null;
                     if ($event['channel'] === 'sms') {
-                        $providerId = $this->sms->send((string)$event['recipient_address'], $message);
+                        $authorization=$this->budgetGuard?->authorize($details,$message);
+                        $sender=$authorization?$this->sms->forSender($authorization['sender_did']):$this->sms;
+                        $providerId = $sender->send((string)$event['recipient_address'], $message);
+                        $this->budgetGuard?->accepted((int)$event['id'],$providerId);
                     } else {
-                        $this->mailer->send((string)$event['recipient_address'], $message['subject'], $message['body'], $calendar);
+                        $mailRoute['mailer']->send((string)$event['recipient_address'], $message['subject'], $message['body'], $calendar,$mailRoute['reply_to']);
                     }
+                } catch (\Wellness\Http\ApiException $e) {
+                    $review=$e->errorCode==='sms_already_submitted';
+                    $this->finish($event,$review?'needs_review':'canceled','Spending policy: '.$e->errorCode);
+                    $summary[$review?'review':'canceled']++;
+                    continue;
                 } catch (SmsSendException $e) {
                     // A provider response or timeout cannot prove the message was not sent.
                     $this->finish($event, 'needs_review', $e->getMessage());
@@ -83,6 +104,7 @@ final class NotificationWorker
                 $summary['sent']++;
             } finally { $consentLock->release(); }
         }
+        if($noticeLimit){$notices=(new CommunicationNoticeWorker($this->pdo,$this->mailer,(string)($_ENV['APPLICATION_ADMIN_HOST']??getenv('APPLICATION_ADMIN_HOST')?:'portal.copihue.ca')))->run($noticeLimit);foreach($summary as $key=>$_)$summary[$key]+=$notices[$key];}
         return $summary;
     }
 

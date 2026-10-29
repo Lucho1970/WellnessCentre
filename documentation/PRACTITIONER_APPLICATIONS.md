@@ -1,5 +1,9 @@
 # Wellnexa practitioner applications
 
+**28 October extension:** [Automated communications](AUTOMATED_COMMUNICATIONS.md) adds a
+separately gated transactional email outbox for application changes and trial reminders.
+The original slice descriptions below retain their historical deployment boundaries.
+
 Implemented on `feature/practitioner-applications`, following central billing administration.
 This is the Wellnexa joining workflow; company signup and tenant provisioning remain separate.
 No hosted database, identity provider, messaging, payment service or deployment is changed.

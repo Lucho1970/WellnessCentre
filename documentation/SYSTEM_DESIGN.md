@@ -1,5 +1,13 @@
 # Wellness Centre — System Design
 
+**Communications extension, 28 October 2026:** Migration 056 adds the operational outbox,
+clinic sender/tariff/suppression settings and notification-to-ledger bindings. Application
+events enqueue atomically; scheduled scans materialize current trial/cost notices. Staff SMS
+reserves and claims under pool locks after current entitlement/consent checks; uncertainty
+retains the original period commitment. Managed sends require a clinic-specific sender and
+host. Central reconciliations join audit and money mutations in one transaction. See
+[Automated communications](AUTOMATED_COMMUNICATIONS.md) for defaults and provider boundaries.
+
 **Practitioner applications, 27 October 2026:** Migration 055 adds clinic-scoped application
 settings, immutable terms/submissions, identity-bound status, reasoned review events and
 idempotent activation. Separate external-practitioner status routes work before membership;

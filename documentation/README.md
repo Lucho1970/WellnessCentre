@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Automated communications and SMS budget enforcement](AUTOMATED_COMMUNICATIONS.md): operational email outbox, trial/cost alerts, clinic senders, guarded staff SMS, reconciliation and migration 056.
+
 - [Wellnexa practitioner applications](PRACTITIONER_APPLICATIONS.md): signed application/review, retained consent history, guarded membership/trial activation, migration 055 and default-off rollout gates.
 
 - [Central billing administration](BILLING_ADMINISTRATION.md): versioned plans, clinic/practitioner trials, funded SMS cohort, cost dashboard/alerts, audited overhead and migration 054.

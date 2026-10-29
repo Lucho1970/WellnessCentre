@@ -1,5 +1,10 @@
 # Central billing administration and SMS cost monitoring
 
+**28 October extension:** [Automated communications](AUTOMATED_COMMUNICATIONS.md) adds opt-in
+runtime enforcement for existing staff SMS, threshold/trial emails, explicit clinic senders
+and provider-cost reconciliation. Reserve each current month’s known overhead here before
+enabling funded sends. The earlier slice description below records its original boundaries.
+
 26 October 2026. Implemented on `feature/billing-administration`, based on the committed
 registration foundation `41a45a9`. This implements the administration and monitoring stage of
 [Registration, subscriptions and communications](REGISTRATION_BILLING_PLAN.md).

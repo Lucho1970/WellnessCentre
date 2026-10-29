@@ -1,5 +1,10 @@
 # Wellness Centre internal API
 
+[Automated communications and SMS budgets](../documentation/AUTOMATED_COMMUNICATIONS.md)
+documents migration 056, default-off automation/enforcement flags, clinic senders, cost and
+opt-out review, operational notices and reconciliation. Funded beta SMS requires the guard;
+legacy SMS mode is retained only for existing deployments while the new flag is off.
+
 Practitioner application/review and guarded trial activation are documented in
 [Practitioner applications](../documentation/PRACTITIONER_APPLICATIONS.md). Migration 055 and
 default-off application/activation flags are required; durable external practitioner sign-in

@@ -15,6 +15,7 @@ final class GraphMailClient
         private readonly string $clientId,
         private readonly string $clientSecret,
         private readonly string $fromAddress,
+        private readonly ?\Closure $requester = null,
     ) {
         if (!preg_match('/^[0-9a-f-]{36}$/i', $tenantId) || !preg_match('/^[0-9a-f-]{36}$/i', $clientId)
             || $clientSecret === '' || !filter_var($fromAddress, FILTER_VALIDATE_EMAIL)) {
@@ -24,13 +25,19 @@ final class GraphMailClient
 
     public function senderAddress(): string { return $this->fromAddress; }
 
-    public function send(string $recipient, string $subject, string $content, ?string $calendar = null): void
+    public function forSender(string $address): self
+    {
+        $client=new self($this->tenantId,$this->clientId,$this->clientSecret,$address,$this->requester);
+        $client->accessToken=$this->accessToken;$client->tokenExpiresAt=$this->tokenExpiresAt;return $client;
+    }
+
+    public function send(string $recipient, string $subject, string $content, ?string $calendar = null, ?string $replyTo = null): void
     {
         if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
             throw new MailSendException('Recipient email address is invalid.', false);
         }
         $token = $this->accessToken();
-        $body = json_encode(self::mailPayload($recipient, $subject, $content, $calendar), JSON_THROW_ON_ERROR);
+        $body = json_encode(self::mailPayload($recipient, $subject, $content, $calendar, $replyTo), JSON_THROW_ON_ERROR);
         $url = 'https://graph.microsoft.com/v1.0/users/' . rawurlencode($this->fromAddress) . '/sendMail';
         [$status, $retryAfter] = $this->request($url, [
             'Authorization: Bearer ' . $token,
@@ -40,13 +47,14 @@ final class GraphMailClient
         throw new MailSendException('Graph sendMail returned HTTP ' . $status . '.', $status === 429 || $status >= 500, false, $retryAfter);
     }
 
-    public static function mailPayload(string $recipient, string $subject, string $content, ?string $calendar = null): array
+    public static function mailPayload(string $recipient, string $subject, string $content, ?string $calendar = null, ?string $replyTo = null): array
     {
         $message = [
             'subject' => $subject,
             'body' => ['contentType' => 'Text', 'content' => $content],
             'toRecipients' => [['emailAddress' => ['address' => $recipient]]],
         ];
+        if($replyTo!==null){if(!filter_var($replyTo,FILTER_VALIDATE_EMAIL))throw new MailSendException('Reply address is invalid.',false);$message['replyTo']=[['emailAddress'=>['address'=>$replyTo]]];}
         if ($calendar !== null) $message['attachments'] = [[
             '@odata.type' => '#microsoft.graph.fileAttachment',
             'name' => 'appointment.ics',
@@ -80,6 +88,7 @@ final class GraphMailClient
     /** @return array{int,int,string} */
     private function request(string $url, array $headers, string $body, bool $mailRequest): array
     {
+        if($this->requester)return ($this->requester)($url,$headers,$body,$mailRequest);
         $handle = curl_init($url);
         if ($handle === false) throw new MailSendException('Could not start Graph request.', !$mailRequest, $mailRequest);
         $responseHeaders = [];

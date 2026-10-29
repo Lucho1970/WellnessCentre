@@ -574,6 +574,7 @@ final class Api
         $this->accessAudit?->applicationActor($actor);
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        if(preg_match('#^clinics/([1-9][0-9]*)/communications(.*)$#D',$path,$m))return (new \Wellness\Service\CommunicationsAdministrationService($this->database,$this->config))->handle($actor,(int)$m[1],$request->method,$m[2],$request->body,$request->correlationId);
         if(preg_match('#^clinics/([1-9][0-9]*)/practitioner-applications(.*)$#D',$path,$m))return (new \Wellness\Service\PractitionerApplicationService($this->database,$this->config))
             ->admin($actor,(int)$m[1],$request->method,$m[2],$request->body,$request->correlationId);
         if ($path==='billing' || str_starts_with($path,'billing/')) return (new \Wellness\Service\BillingAdministrationService($this->database,$this->config))

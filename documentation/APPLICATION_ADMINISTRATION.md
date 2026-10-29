@@ -1,5 +1,9 @@
 # Central application administration
 
+The **Communications** tab configures verified clinic senders, conservative SMS estimates,
+opt-outs, operational notice review and actual-cost reconciliation. See
+[Automated communications](AUTOMATED_COMMUNICATIONS.md) for migration 056 and rollout gates.
+
 The **Practitioner applications** tab provides clinic intake settings, reviewed joining terms,
 private review/history and independent approval before applicant-controlled trial activation.
 See [Practitioner applications](PRACTITIONER_APPLICATIONS.md) for migration 055, default-off

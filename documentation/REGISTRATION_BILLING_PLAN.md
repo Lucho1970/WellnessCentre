@@ -122,8 +122,12 @@ health, retry failures and prevent duplication with provider-generated notificat
    for migration 055 and existing-member exceptions. Activation remains default-off pending
    independent-practitioner privacy and hosted identity acceptance. Credential/publication
    checks stay separate; application emails and subscription enforcement are later work.
-4. **Communication integration:** sender setup, provider/segment estimates, reminder worker,
-   conversion/reconciliation, opt-out enforcement, budget fallback and monitoring.
+4. **Communication integration (initial implementation on feature/automated-communications):**
+   transactional application/trial/budget emails, explicit clinic routing, segment estimates,
+   funded staff-SMS spending guard, suppression and operational monitoring. See
+   [Automated communications](AUTOMATED_COMMUNICATIONS.md) for migration 056. Provider cost/FX
+   import and opt-out synchronization currently require operator review; automated provider
+   adapters, patient SMS consent, paid sender provisioning and custom email connections remain.
 5. **Paid conversion:** agreed rates/terms, provider setup, hosted collection, finalized invoices,
    reconciliation, grace/restriction/recovery and cancellation journeys before beta expiry.
 6. **Company registration:** verified owner approval, resumable provisioning, tenant setup and

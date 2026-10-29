@@ -1,5 +1,82 @@
 import { test, expect, type Page } from "@playwright/test";
 
+async function communicationsFixture(page:Page){
+  await authentication(page);
+  await page.route('**/api/v1/application/me',route=>route.fulfill({json:{data:{id:1}}}));
+  await page.route('**/api/v1/application/clinics',route=>route.fulfill({json:{data:{items:[{id:4,name:'Wellnexa'}]}}}));
+  const state={writes:[] as any[],uncertain:false,denied:false,data:{
+    settings:{revision:1,email_enabled:true,sms_enabled:false,mail_from:'clinic@example.test',reply_to:'reply@example.test',alert_email:'operator@example.test',sms_from_did:'4165550100',cad_micros_per_segment:7500,fixed_cad_micros:0,tariff_valid_until:'2026-11-15 12:00:00',opt_out_checked_at:'2026-10-28 12:00:00'},
+    gates:{automated_email:true,sms_budgets:true},suppressed_count:1,health:{needs_review:1,overdue:0,stale_leases:0},held_sms:[] as {id:number;last_error:string;scheduled_at:string}[],events:[],members:[{id:7,display_name:'Practitioner One',reply_email:null,reply_active:false,reply_version:0}],
+    notices:[{id:8,kind:'application',recipient_kind:'operator',recipient_address:'operator@example.test',status:'needs_review',attempt_count:1,created_at:'2026-10-28 12:00:00'}],
+    deliveries:[{id:9,segments:1,estimated_cents:1,actual_cents:null,status:'submitted',provider_message_id:'synthetic-provider',period_start:'2026-10-01'}],
+  }};
+  await page.route('**/api/v1/application/clinics/4/communications**',route=>{
+    if(state.denied)return route.fulfill({status:403,json:{error:{code:'application_admin_required',message:'Forbidden'}}});
+    if(route.request().method()==='POST'){state.writes.push({path:new URL(route.request().url()).pathname,body:route.request().postDataJSON()});if(state.uncertain){state.uncertain=false;return route.fulfill({status:503,json:{error:{code:'unavailable',message:'Temporary failure.'}}});}return route.fulfill({json:{data:{revision:2}}});}
+    return route.fulfill({json:{data:state.data}});
+  });
+  await page.goto('http://localhost:5185/admin/');await page.getByRole('tab',{name:'Communications',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Configure communications',exact:true})).toBeVisible();return state;
+}
+
+test('communications configuration submits exact conservative CAD rates and explicit readiness',async({page})=>{
+  const state=await communicationsFixture(page);await page.getByRole('button',{name:'Configure communications',exact:true}).click();const dialog=page.getByRole('dialog');
+  await dialog.getByRole('checkbox',{name:'Enable budgeted staff SMS'}).check();
+  await dialog.getByRole('checkbox',{name:'I verified sender ownership, Graph authorization and the approved SMS number.'}).check();
+  await dialog.getByRole('checkbox',{name:'I synchronized provider opt-outs and consent records. This review is valid for 24 hours.'}).check();
+  await dialog.getByRole('textbox',{name:'Conservative CAD cost per segment'}).fill('0.0075');
+  await dialog.getByRole('textbox',{name:'Reason for change'}).fill('Reviewed provider sender, costs and opt-outs.');
+  await dialog.getByRole('button',{name:'Save communications change'}).click();
+  await expect(page.getByText('Communications saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({revision:1,sms_enabled:true,cad_micros_per_segment:7500,fixed_cad_micros:0,senders_verified:true,opt_out_reviewed:true});
+});
+
+test('communications uncertain saves freeze editing and retry the identical request',async({page})=>{
+  const state=await communicationsFixture(page);state.uncertain=true;await page.getByRole('button',{name:'Manage an SMS opt-out'}).click();const dialog=page.getByRole('dialog');
+  await dialog.getByRole('textbox',{name:'Destination number (+1 Canadian format)'}).fill('+14165550101');await dialog.getByRole('textbox',{name:'Reason for change'}).fill('Recorded provider STOP request.');
+  await dialog.getByRole('button',{name:'Save communications change'}).click();await expect(dialog.getByRole('textbox',{name:'Destination number (+1 Canadian format)'})).toBeDisabled();
+  await dialog.getByRole('button',{name:'Retry communications change'}).click();await expect(page.getByText('Communications saved.')).toBeVisible();expect(state.writes[1]).toEqual(state.writes[0]);
+});
+
+test('SMS reconciliation carries prior cost and proof of provider review',async({page})=>{
+  const state=await communicationsFixture(page);await page.getByRole('button',{name:'Reconcile SMS 9'}).click();const dialog=page.getByRole('dialog');
+  await dialog.getByRole('textbox',{name:'Actual cost in CAD'}).fill('0.08');await dialog.getByRole('checkbox',{name:'I checked the exact provider record, original period, conversion and final cost.'}).check();await dialog.getByRole('textbox',{name:'Reason for change'}).fill('Confirmed final converted provider cost.');
+  await dialog.getByRole('button',{name:'Save communications change'}).click();await expect(page.getByText('Communications saved.')).toBeVisible();expect(state.writes[0].body).toMatchObject({outcome:'provider_accepted',actual_cents:8,expected_actual_cents:null,checked_provider_history:true});
+});
+
+test('notice review identifies its bound operational recipient and preserves the attempt count',async({page})=>{
+  const state=await communicationsFixture(page);await page.getByRole('button',{name:'Review notice 8'}).click();const dialog=page.getByRole('dialog');
+  await expect(dialog.getByRole('textbox',{name:'Recorded notice recipient'})).toHaveValue('operator@example.test');
+  await dialog.getByRole('checkbox',{name:'I checked provider history and the intended recipient.'}).check();await dialog.getByRole('textbox',{name:'Reason for change'}).fill('Reviewed exact recipient and provider acceptance.');
+  await dialog.getByRole('button',{name:'Save communications change'}).click();await expect(page.getByText('Communications saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({decision:'resolve',attempt_count:1,checked_provider_history:true});
+});
+
+test('communications revocation clears private configuration and delivery controls',async({page})=>{
+  const state=await communicationsFixture(page);state.denied=true;await page.getByRole('button',{name:'Refresh communications',exact:true}).click();await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByRole('button',{name:'Configure communications',exact:true})).toHaveCount(0);await expect(page.getByText(/synthetic-provider/)).toHaveCount(0);
+});
+
+test('communications explains a missing monthly overhead reservation without exposing patient details',async({page})=>{
+  const state=await communicationsFixture(page);state.data.held_sms.push({id:17,last_error:'Spending policy: sms_overhead_not_reviewed',scheduled_at:'2026-10-28 12:00:00'});
+  await page.getByRole('button',{name:'Refresh communications',exact:true}).click();
+  await expect(page.getByText(/Reserve or confirm this month’s shared number costs in Billing/)).toBeVisible();
+});
+
+test('practitioner patient-facing reply address requires a distinct reviewed sharing decision',async({page})=>{
+  const state=await communicationsFixture(page);await page.getByRole('button',{name:'Set practitioner reply address'}).click();const dialog=page.getByRole('dialog');
+  await dialog.getByRole('combobox',{name:'Practitioner membership'}).click();await page.getByRole('option',{name:'Practitioner One'}).click();
+  await expect(dialog.getByRole('textbox',{name:'Patient-facing reply email'})).toHaveValue('');
+  await dialog.getByRole('textbox',{name:'Patient-facing reply email'}).fill('shared-replies@example.test');
+  await dialog.getByRole('checkbox',{name:'I verified this address and the practitioner explicitly agreed to share it with patients.'}).check();
+  await dialog.getByRole('textbox',{name:'Reason for change'}).fill('Verified address ownership and patient-facing consent.');
+  await dialog.getByRole('button',{name:'Save communications change'}).click();await expect(page.getByText('Communications saved.')).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({membership_id:7,email:'shared-replies@example.test',active:true,sharing_confirmed:true,version:0});
+});
+
+test('French mobile communications editor stays inside the viewport',async({page})=>{
+  await communicationsFixture(page);await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'FR',exact:true}).click();await page.getByRole('button',{name:'Configurer les communications',exact:true}).click();await expect(page.getByRole('textbox',{name:'Adresse d’envoi vérifiée de la clinique'})).toHaveValue('clinic@example.test');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/communications-mobile-fr.png',fullPage:true,animations:'disabled'});
+});
+
 async function applicationFixture(page: Page) {
   await authentication(page);
   await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1 } } }));

@@ -80,6 +80,7 @@ final class PractitionerApplicationService
     {
         $this->q('INSERT INTO practitioner_application_events(clinic_id,application_id,application_administrator_id,applicant_identity_id,action,reason,details,correlation_id) VALUES(?,?,?,?,?,?,?,?)',
             [$clinic,$app,$actor instanceof ApplicationAdminContext?$actor->id:null,is_int($actor)?$actor:null,$action,$reason,json_encode($details,JSON_THROW_ON_ERROR),substr($cid,0,128)]);
+        if($app!==null && $this->config->automatedCommunicationsEnabled)(new CommunicationNotices($this->database->connection()))->application($clinic,$app,(int)$this->database->connection()->lastInsertId());
     }
     public function admin(ApplicationAdminContext $actor,int $clinic,string $method,string $tail,array $body,string $cid): array
     {

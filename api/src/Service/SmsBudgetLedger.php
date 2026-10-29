@@ -12,7 +12,7 @@ use Wellness\Http\ApiException;
 /** Internal accounting only. No public routes, provider calls or reminder activation. */
 final class SmsBudgetLedger
 {
-    public function __construct(private readonly Database $database) {}
+    public function __construct(private readonly Database|PDO $database,private readonly bool $joinTransaction=false) {}
 
     public function enroll(int $poolId, int $membershipId): void
     {
@@ -30,11 +30,11 @@ final class SmsBudgetLedger
     }
 
     /** A stable reference identifies ONE delivery. Replayed entries must never trigger a new send. */
-    public function reserve(int $poolId, int $membershipId, string $reference, int $estimatedCadCents, DateTimeImmutable $now): array
+    public function reserve(int $poolId, int $membershipId, string $reference, int $estimatedCadCents, DateTimeImmutable $now, ?\Closure $bind = null): array
     {
         self::reference($reference);
         self::amount($estimatedCadCents, false);
-        return $this->locked($poolId, function (PDO $pdo, array $pool) use ($membershipId, $reference, $estimatedCadCents, $now): array {
+        return $this->locked($poolId, function (PDO $pdo, array $pool) use ($membershipId, $reference, $estimatedCadCents, $now, $bind): array {
             $this->eligible($pdo, $pool, $membershipId);
             $q = $pdo->prepare("SELECT 1 FROM sms_budget_members WHERE pool_id=? AND membership_id=? AND status='active'");
             $q->execute([$pool['id'], $membershipId]);
@@ -42,6 +42,7 @@ final class SmsBudgetLedger
             $previous = $this->entry($pdo, (int)$pool['id'], $reference);
             if ($previous) {
                 if ((int)$previous['membership_id'] !== $membershipId || (int)$previous['estimated_cents'] !== $estimatedCadCents) $this->deny('sms_reference_conflict');
+                if($bind)$bind($pdo,$pool);
                 return $previous + ['created' => false];
             }
             $month = SubscriptionPolicy::month($now, $pool['timezone']);
@@ -57,14 +58,15 @@ final class SmsBudgetLedger
             $pdo->prepare("INSERT INTO sms_budget_entries(pool_id,period_start,membership_id,reference,estimated_cents,status) VALUES(?,?,?,?,?,'reserved')")
                 ->execute([$pool['id'], $month, $membershipId, $reference, $estimatedCadCents]);
             $this->totals($pdo, (int)$pool['id'], $membershipId, $month, $estimatedCadCents, 0);
+            if($bind)$bind($pdo,$pool);
             return $this->entry($pdo, (int)$pool['id'], $reference) + ['created' => true];
         });
     }
 
     /** Claim once BEFORE contacting the provider. A timeout retains the reservation for reconciliation. */
-    public function claim(int $poolId, int $membershipId, string $reference, DateTimeImmutable $now): bool
+    public function claim(int $poolId, int $membershipId, string $reference, DateTimeImmutable $now, ?\Closure $authorize = null): bool
     {
-        return $this->locked($poolId, function (PDO $pdo, array $pool) use ($poolId, $membershipId, $reference, $now): bool {
+        return $this->locked($poolId, function (PDO $pdo, array $pool) use ($poolId, $membershipId, $reference, $now, $authorize): bool {
             $this->eligible($pdo, $pool, $membershipId);
             $q = $pdo->prepare("SELECT status FROM sms_budget_members WHERE pool_id=? AND membership_id=?");
             $q->execute([$poolId, $membershipId]);
@@ -82,6 +84,7 @@ final class SmsBudgetLedger
                 if (!SubscriptionPolicy::budgetAllows((int)$budget['limit_cents'], (int)$budget['spent_cents'],
                     (int)$budget['reserved_cents'] - (int)$row['estimated_cents'], (int)$row['estimated_cents'])) $this->deny('sms_budget_exhausted');
             }
+            if($authorize)$authorize($pdo,$pool);
             $pdo->prepare("UPDATE sms_budget_entries SET status='submitted' WHERE id=?")->execute([$row['id']]);
             return true;
         });
@@ -138,10 +141,11 @@ final class SmsBudgetLedger
 
     private function locked(int $poolId, callable $work, bool $requireActive = true): mixed
     {
-        $pdo = $this->database->connection();
-        if ($pdo->inTransaction()) throw new \LogicException('SMS ledger owns its transaction.');
+        $pdo = $this->database instanceof PDO ? $this->database : $this->database->connection();
+        $own=!$pdo->inTransaction();
+        if (!$own&&!$this->joinTransaction) throw new \LogicException('SMS ledger owns its transaction.');
         try {
-            $pdo->beginTransaction();
+            if($own)$pdo->beginTransaction();
             // Every mutation takes the same pool row first: both limits and cohort slots serialize.
             $q = $pdo->prepare('SELECT * FROM sms_budget_pools WHERE id=? FOR UPDATE');
             $q->execute([$poolId]);
@@ -149,12 +153,25 @@ final class SmsBudgetLedger
             if (!$pool) $this->deny('sms_pool_not_found');
             if ($requireActive && $pool['status'] !== 'active') $this->deny('sms_pool_inactive');
             $result = $work($pdo, $pool);
-            $pdo->commit();
+            if($own)$pdo->commit();
             return $result;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($own&&$pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
+    }
+
+    /** Explicit audited provider correction; never rewrites estimates or the original period. */
+    public function correct(int $poolId,int $member,string $reference,int $expectedActual,int $actual): void
+    {
+        self::amount($actual,true);self::amount($expectedActual,true);
+        $this->locked($poolId,function(PDO $pdo)use($poolId,$member,$reference,$expectedActual,$actual):void{
+            $row=$this->ownedEntry($pdo,$poolId,$member,$reference);
+            if($row['status']!=='settled'||(int)$row['actual_cents']!==$expectedActual)$this->deny('sms_reconciliation_changed');
+            $pdo->prepare('UPDATE sms_budget_periods SET spent_cents=spent_cents-?+? WHERE pool_id=? AND period_start=?')->execute([$expectedActual,$actual,$poolId,$row['period_start']]);
+            $pdo->prepare('UPDATE sms_budget_member_periods SET spent_cents=spent_cents-?+? WHERE pool_id=? AND membership_id=? AND period_start=?')->execute([$expectedActual,$actual,$poolId,$member,$row['period_start']]);
+            $pdo->prepare('UPDATE sms_budget_entries SET actual_cents=? WHERE id=?')->execute([$actual,$row['id']]);
+        },false);
     }
 
     private function eligible(PDO $pdo, array $pool, int $membershipId): void

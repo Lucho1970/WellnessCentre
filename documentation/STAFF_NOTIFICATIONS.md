@@ -1,5 +1,10 @@
 # Staff appointment notifications
 
+The [communications extension](AUTOMATED_COMMUNICATIONS.md) adds separately gated clinic
+senders and runtime spending checks for the SMS channel described below. The funded beta
+requires `SMS_BUDGET_ENFORCEMENT_ENABLED`, current entitlement/funding, reviewed costs/opt-outs
+and current-month overhead. Provider uncertainty retains commitments until reconciliation.
+
 Staff sign-in identity (`users.email` and the Entra identity link) is separate from operational notification destinations. Each staff member can open **My profile → Appointment notifications** and opt into email notices for appointments assigned to them as a practitioner. They can use their work email, a verified personal email, or both. Creating, changing, or canceling an appointment queues minimal bilingual staff email alongside the existing client email. Staff email includes the appointment time and a staff-portal link, but no client name, address, service, notes, or calendar attachment. Existing client email behavior is unchanged.
 
 Practitioners have a read-only **My notifications** page at `/practitioner/notifications`. Its API lists only booking notice events with the current actor's `recipient_user_id` and clinic, restricted to the three staff booking event codes. It never returns other practitioners' notices, client notification events, or provider error text. Status, channel, and today/last-seven-days filters use the same activity-time rules as the Operations notification dashboard. A notice may link to its appointment through the existing practitioner-scoped appointment route; the appointment API independently enforces current access. `needs_review` is informational here—only Clinic Admin and Super Admin may investigate, resolve, or retry through the separate Operations workflow.

@@ -1,5 +1,13 @@
 # Wellness Centre — Master Requirements
 
+**Automated communications, 28 October 2026:** Operational application/trial/budget emails and
+funded staff-SMS enforcement are implemented behind separate default-off flags. Migration 056
+adds clinic senders, suppression controls, one-attempt SMS bindings, auditable reconciliation
+and a transactional outbox. Unknown provider outcomes retain commitments. Provider cost/FX and
+opt-out synchronization remain reviewed operator processes; patient SMS, paid resource setup,
+paid conversion and general account restriction remain separate work. See
+[Automated communications](AUTOMATED_COMMUNICATIONS.md).
+
 **Practitioner applications, 27 October 2026:** Signed external practitioners can submit and
 revise a clinic application with explicit terms acceptance. Central operators independently
 review identity/eligibility before approval; applicant-controlled activation starts a

@@ -21,6 +21,9 @@ final class VoipMsSmsClient
     }
 
     /** Returns the provider message ID when available. */
+    public function forSender(string $did): self
+    { return new self($this->username,$this->password,$did,$this->requester); }
+
     public function send(string $recipient, string $message): ?string
     {
         if (!CanadianSmsNumber::isAllowed($recipient) || $message === '' || strlen($message) > 160 || preg_match('/[^\x20-\x7E]/', $message)) {

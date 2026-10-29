@@ -12,6 +12,7 @@ import { FormLibrary } from '../forms/FormLibrary';
 import { GlobalPractitionerAdmin } from '../admin/GlobalPractitionerAdmin';
 import { BillingAdmin } from '../admin/BillingAdmin';
 import { PractitionerApplicationAdmin } from '../admin/PractitionerApplicationAdmin';
+import { CommunicationsAdmin } from '../admin/CommunicationsAdmin';
 import { apiRequest } from '../shared/api';
 import '../i18n';
 
@@ -37,7 +38,7 @@ function Administration() {
       <Button onClick={() => { void auth.signOut().catch(() => setError(t('Unable to sign out. Please try again.'))); }}>{t('SignOut')}</Button>
       {state === 'checking' && <Typography role="status">{t('Checking application access…')}</Typography>}
       {state === 'denied' && <Alert severity="error">{t('Application administration access could not be confirmed. Contact the application owner or try again.')}</Alert>}
-      {state === 'allowed' && <><Tabs variant="scrollable" scrollButtons="auto" value={section} onChange={(_, value: number) => { if ((section === 5 || section === 6) && billingDirty && !window.confirm(t('Discard your unsaved changes?'))) return; setSection(value); }} aria-label={t('Application administration')}><Tab label={t('Clinics')}/><Tab label={t('Global practitioners')}/><Tab label={t('Form library')}/><Tab label={t('Practitioner enquiries')}/><Tab label={t('Location discovery settings')}/><Tab label={t('Billing')}/><Tab label={t('Practitioner applications')}/></Tabs>{section === 0 ? <ClinicAdmin/> : section === 1 ? <GlobalPractitionerAdmin/> : section === 2 ? <FormLibrary central/> : section === 3 ? <PractitionerEnquiries central/> : section === 4 ? <DiscoverySettings/> : section === 5 ? <BillingAdmin onDirtyChange={setBillingDirty}/> : <PractitionerApplicationAdmin onDirtyChange={setBillingDirty}/>}</>}
+      {state === 'allowed' && <><Tabs variant="scrollable" scrollButtons="auto" value={section} onChange={(_, value: number) => { if ((section >= 5) && billingDirty && !window.confirm(t('Discard your unsaved changes?'))) return; setSection(value); }} aria-label={t('Application administration')}><Tab label={t('Clinics')}/><Tab label={t('Global practitioners')}/><Tab label={t('Form library')}/><Tab label={t('Practitioner enquiries')}/><Tab label={t('Location discovery settings')}/><Tab label={t('Billing')}/><Tab label={t('Practitioner applications')}/><Tab label={t('Communications')}/></Tabs>{section === 0 ? <ClinicAdmin/> : section === 1 ? <GlobalPractitionerAdmin/> : section === 2 ? <FormLibrary central/> : section === 3 ? <PractitionerEnquiries central/> : section === 4 ? <DiscoverySettings/> : section === 5 ? <BillingAdmin onDirtyChange={setBillingDirty}/> : section === 6 ? <PractitionerApplicationAdmin onDirtyChange={setBillingDirty}/> : <CommunicationsAdmin onDirtyChange={setBillingDirty}/>}</>}
     </>}
   </Stack>;
 }
