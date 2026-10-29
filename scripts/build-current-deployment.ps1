@@ -35,9 +35,15 @@ try {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $website=Join-Path $destination 'wellnexa-website.zip'
 [IO.Compression.ZipFile]::CreateFromDirectory((Join-Path $repo 'Wellnexa/dist'),$website,[IO.Compression.CompressionLevel]::Optimal,$false)
-foreach($name in @('PILOT_SAFETY_CONTROLS.md','API_REQUEST_BODY_LIMITS.md','FRONTEND_QUALITY_GATES.md','COMPLIANCE_AUDIT_2026-10-29.md','ONTARIO_HEALTH_APPLICATION_STANDARD.md','PROVIDER_EVIDENCE.md','AUTOMATED_COMMUNICATIONS.md','PRACTITIONER_APPLICATIONS.md','BILLING_ADMINISTRATION.md','SERVICE_IMPORT.md')){
+$referenceNames=@('PILOT_SAFETY_CONTROLS.md','API_REQUEST_BODY_LIMITS.md','FRONTEND_QUALITY_GATES.md','COMPLIANCE_AUDIT_2026-10-29.md','ONTARIO_HEALTH_APPLICATION_STANDARD.md','PROVIDER_EVIDENCE.md','AUTOMATED_COMMUNICATIONS.md','PRACTITIONER_APPLICATIONS.md','BILLING_ADMINISTRATION.md','SERVICE_IMPORT.md','EMAIL_DELIVERY.md')
+foreach($name in $referenceNames){
     Copy-Item -LiteralPath (Join-Path $repo "documentation/$name") -Destination $destination
 }
+# Preserve the normative standard's repository-relative documentation links too.
+Copy-Item -LiteralPath (Join-Path $repo 'AGENTS.md') -Destination $destination
+$referenceDirectory=Join-Path $destination 'documentation'
+New-Item -ItemType Directory -Path $referenceDirectory | Out-Null
+foreach($name in ($referenceNames+@($guide,'DEPLOYMENT_LAYOUT.md'))){Copy-Item -LiteralPath (Join-Path $repo "documentation/$name") -Destination $referenceDirectory}
 Copy-Item -LiteralPath (Join-Path $repo "documentation/$guide") -Destination (Join-Path $destination 'README.md')
 $manifestPath=Join-Path $destination 'manifest.json'
 $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json

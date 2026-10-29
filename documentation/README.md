@@ -1,6 +1,7 @@
 # Wellness Centre Documentation
 
 - [Full deployment build — 29 October 2026](CURRENT_APP_RELEASE_2026-10-29.md): cumulative package upload map, schema/configuration checks, pilot activation and hosted acceptance.
+- [Deployment build verification](DEPLOYMENT_BUILD_2026-10-29.md): exact package source, clean restores/audits, browser/PHP checks, archive review and remaining gates.
 
 - [API request-body limits](API_REQUEST_BODY_LIMITS.md): bounded capture on every API path, preserved strict policies, HTTP/SQL regression and remaining hosting controls (F-09).
 
