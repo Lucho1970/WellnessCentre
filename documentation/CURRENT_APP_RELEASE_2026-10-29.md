@@ -47,8 +47,9 @@ From clean committed source, restore each frontend with `npm ci`, audit both loc
 
 ```powershell
 ./scripts/build-current-deployment.ps1 -ReleaseName YOUR-UNIQUE-RELEASE-NAME
+./scripts/verify-current-deployment.ps1 -ReleaseDirectory deployments/YOUR-UNIQUE-RELEASE-NAME
 ```
 
-The established builder installs the private Composer lock with `--no-dev`. Production browser settings come from the existing private local build configuration; they are public identifiers/settings once compiled. Private API credentials and pilot allowlists must stay outside ZIPs. Archive hashes and inventory are in `manifest.json` and `release-files.json`. Generated packages remain ignored by Git; build scripts and this guide are versioned.
+The established builder installs the private Composer lock with `--no-dev`. If the Windows CLI's already installed ZIP extension is disabled, the wrapper loads it through a temporary build-only scan directory and restores the process setting afterward; no global PHP configuration or deployed extension is changed. Production browser settings come from the existing private local build configuration; they are public identifiers/settings once compiled. Private API credentials and pilot allowlists must stay outside ZIPs. Archive hashes and inventory are in `manifest.json` and `release-files.json`. The verifier checks archive safety/checksums, runtime source and built-output equality, lock hashes and selected credential signatures; it does not replace hosted acceptance. Generated packages remain ignored by Git; build scripts and this guide are versioned.
 
 RELEASE STATUS: NOT READY FOR RELEASE

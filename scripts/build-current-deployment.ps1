@@ -4,7 +4,23 @@ $repo=Split-Path $PSScriptRoot -Parent
 $guide='CURRENT_APP_RELEASE_2026-10-29.md'
 # The established builder checks committed source, validates production settings,
 # builds all clinic surfaces and installs the exact private Composer lock.
-& (Join-Path $PSScriptRoot 'build-deployment.ps1') -ReleaseName $ReleaseName -DeploymentGuide $guide
+$previousScanDirectory=[Environment]::GetEnvironmentVariable('PHP_INI_SCAN_DIR','Process')
+try {
+    $zipEnabled=& php -r 'echo extension_loaded("zip") ? "yes" : "no";'
+    if($zipEnabled -ne 'yes'){
+        # Enable the already installed PHP zip extension for this build process
+        # only, so Composer uses locked distribution archives rather than clones.
+        $phpRoot=Split-Path (Get-Command php).Source -Parent
+        $zipDll=Join-Path $phpRoot 'ext/php_zip.dll'
+        if(-not (Test-Path -LiteralPath $zipDll)){throw 'The existing PHP runtime needs zip support for distribution installs.'}
+        $scanDirectory=Join-Path $repo ('.tmp/build-php-'+[guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $scanDirectory | Out-Null
+        ('extension="'+$zipDll.Replace('\','/')+'"') | Set-Content -LiteralPath (Join-Path $scanDirectory 'zip.ini') -Encoding utf8
+        [Environment]::SetEnvironmentVariable('PHP_INI_SCAN_DIR',($previousScanDirectory+[IO.Path]::PathSeparator+$scanDirectory),'Process')
+        if((& php -r 'echo extension_loaded("zip") ? "yes" : "no";') -ne 'yes'){throw 'Build-only zip extension did not load.'}
+    }
+    & (Join-Path $PSScriptRoot 'build-deployment.ps1') -ReleaseName $ReleaseName -DeploymentGuide $guide
+} finally {[Environment]::SetEnvironmentVariable('PHP_INI_SCAN_DIR',$previousScanDirectory,'Process')}
 $destination=Join-Path $repo "deployments/$ReleaseName"
 $previousWebsitePortal=[Environment]::GetEnvironmentVariable('VITE_PORTAL_URL','Process')
 Push-Location (Join-Path $repo 'Wellnexa')
