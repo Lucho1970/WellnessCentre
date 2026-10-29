@@ -1,5 +1,11 @@
 # Wellness Centre internal API
 
+[Provider evidence](../documentation/PROVIDER_EVIDENCE.md) documents migration 057 and
+`PROVIDER_EVIDENCE_ENABLED=false`: reviewed normalized CSV previews, fixed CAD/USD conversion,
+exact message reconciliation and sender-specific STOP enforcement. Once using imported STOP
+records, retain this flag and disable SMS through its master/clinic switch when needed.
+Native VoIP.ms synchronization and live delivery acceptance remain separate work.
+
 [Automated communications and SMS budgets](../documentation/AUTOMATED_COMMUNICATIONS.md)
 documents migration 056, default-off automation/enforcement flags, clinic senders, cost and
 opt-out review, operational notices and reconciliation. Funded beta SMS requires the guard;
@@ -172,6 +178,6 @@ Queued texts older than one hour are canceled instead of being sent late.
 Text bodies contain no client name, address, service, or other clinical details.
 They link to the authenticated practitioner schedule and stay within one
 160-character SMS. Provider uncertainty goes to `needs_review` rather than
-being retried automatically, to avoid duplicate texts. Incoming SMS and STOP
-handling are not yet integrated; confirm VoIP.ms requirements before enabling
-live delivery.
+being retried automatically, to avoid duplicate texts. Native incoming SMS is not integrated.
+Migration 057 supplies reviewed STOP evidence imports; the daily provider opt-out review
+remains required before managed live delivery. See the provider-evidence guide above.

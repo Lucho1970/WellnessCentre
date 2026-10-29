@@ -5,6 +5,10 @@ Migration 056 adds the central **Communications** tab, operational email outbox 
 No hosted migration, sender, phone number, provider account, message, payment or deployment
 was performed by this work. New runtime flags default off.
 
+The follow-up [Provider evidence](PROVIDER_EVIDENCE.md) slice adds migration 057 and a separate
+default-off flag for reviewed normalized CSV charge/STOP imports, recorded CAD/USD conversion
+and shared-sender STOP enforcement. It does not establish complete native synchronization.
+
 ## Delivered behavior
 
 - Application submissions, decisions, withdrawals and activations queue generic applicant and
@@ -60,9 +64,10 @@ Explicit provider-confirmed no-send releases an unsubmitted reservation or settl
 attempt to zero; it never permits another send under that notification reference. Acceptance
 does not establish handset delivery.
 
-Automatic provider cost import, FX conversion, suppression synchronization and delivery receipts
-remain adapters to implement against a verified provider contract. Until then, operators enter
-actual costs and synchronize provider STOP requests here. Suppressions store hashes of canonical
+Native provider cost import, suppression synchronization and delivery receipts remain adapters
+to implement against a verified provider contract. Migration 057 supports reviewed normalized
+imports and approved fixed FX conversion; manual reconciliation remains available for unmatched
+attempts and adjustments. Operators still inspect provider STOP requests. Suppressions store hashes of canonical
 Canadian `+1` destinations. Unblocking requires renewed opt-in/provider-clearance confirmation.
 SMS stops when the provider opt-out review is over 24 hours old. The attestation records the
 operator’s review; it does not inspect the provider account.

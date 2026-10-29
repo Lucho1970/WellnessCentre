@@ -20,7 +20,7 @@ final class NotificationWorker
         ?ClinicMailRouter $clinicMail = null,
     ) {
         $enabled=static fn(string $key)=>filter_var($_ENV[$key]??getenv($key)?:'false',FILTER_VALIDATE_BOOL);
-        $this->budgetGuard=$budgetGuard??($enabled('SMS_BUDGET_ENFORCEMENT_ENABLED')?new SmsDeliveryGuard($pdo):null);
+        $this->budgetGuard=$budgetGuard??(($enabled('SMS_BUDGET_ENFORCEMENT_ENABLED')||$enabled('PROVIDER_EVIDENCE_ENABLED'))?new SmsDeliveryGuard($pdo):null);
         $this->clinicMail=$clinicMail??($enabled('AUTOMATED_COMMUNICATIONS_ENABLED')?new ClinicMailRouter($pdo,$mailer):null);
     }
 
@@ -41,6 +41,7 @@ final class NotificationWorker
             $event = $this->claim($appointmentId);
             if ($event === null) break;
             $consentLock=new ConsentLock($this->pdo);
+            $providerLock=null;
             try {
                 try {
                     $consentLock->acquire((int)$this->eventClinic((int)$event['id']));
@@ -71,6 +72,7 @@ final class NotificationWorker
                 try {
                     $providerId = null;
                     if ($event['channel'] === 'sms') {
+                        $providerLock=$this->budgetGuard?->lockSender($details);
                         $authorization=$this->budgetGuard?->authorize($details,$message);
                         $sender=$authorization?$this->sms->forSender($authorization['sender_did']):$this->sms;
                         $providerId = $sender->send((string)$event['recipient_address'], $message);
@@ -102,7 +104,7 @@ final class NotificationWorker
                 }
                 $this->finish($event, 'sent', null, 0, $providerId);
                 $summary['sent']++;
-            } finally { $consentLock->release(); }
+            } finally { $providerLock?->release();$consentLock->release(); }
         }
         if($noticeLimit){$notices=(new CommunicationNoticeWorker($this->pdo,$this->mailer,(string)($_ENV['APPLICATION_ADMIN_HOST']??getenv('APPLICATION_ADMIN_HOST')?:'portal.copihue.ca')))->run($noticeLimit);foreach($summary as $key=>$_)$summary[$key]+=$notices[$key];}
         return $summary;

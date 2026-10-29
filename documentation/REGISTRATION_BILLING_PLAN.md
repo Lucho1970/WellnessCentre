@@ -114,20 +114,23 @@ health, retry failures and prevent duplication with provider-generated notificat
    plan/trial subscription management, audited funding enrollment and overhead reservations,
    cost dashboard with on-screen thresholds and reconciliation exceptions. See
    [Central billing administration](BILLING_ADMINISTRATION.md) for migration 054 and rollout.
-   Email alerts, automatic provider reconciliation and actual subscription enforcement remain
-   in the communications/paid-conversion stages.
+   Email alerts are implemented in stage 4; native provider synchronization and general paid
+   subscription enforcement remain in the communications/paid-conversion stages.
 3. **Wellnexa registration (implemented on feature/practitioner-applications):** signed
    application/review, independent code confirmation, retained terms/submissions, onboarding
    checklist and guarded six-month activation. See [Practitioner applications](PRACTITIONER_APPLICATIONS.md)
    for migration 055 and existing-member exceptions. Activation remains default-off pending
    independent-practitioner privacy and hosted identity acceptance. Credential/publication
-   checks stay separate; application emails and subscription enforcement are later work.
+   checks stay separate; stage 4 supplies application emails, while general paid subscription
+   enforcement remains later work.
 4. **Communication integration (initial implementation on feature/automated-communications):**
    transactional application/trial/budget emails, explicit clinic routing, segment estimates,
    funded staff-SMS spending guard, suppression and operational monitoring. See
-   [Automated communications](AUTOMATED_COMMUNICATIONS.md) for migration 056. Provider cost/FX
-   import and opt-out synchronization currently require operator review; automated provider
-   adapters, patient SMS consent, paid sender provisioning and custom email connections remain.
+   [Automated communications](AUTOMATED_COMMUNICATIONS.md) for migration 056. The follow-up
+   [Provider evidence](PROVIDER_EVIDENCE.md) slice on `feature/provider-reconciliation` adds
+   migration 057, reviewed normalized CSV charge/STOP imports, fixed CAD/USD conversion and
+   shared-sender suppression. Native provider synchronization, patient SMS consent, paid sender
+   provisioning and custom email connections remain.
 5. **Paid conversion:** agreed rates/terms, provider setup, hosted collection, finalized invoices,
    reconciliation, grace/restriction/recovery and cancellation journeys before beta expiry.
 6. **Company registration:** verified owner approval, resumable provisioning, tenant setup and

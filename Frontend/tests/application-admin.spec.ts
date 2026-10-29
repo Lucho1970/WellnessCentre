@@ -4,7 +4,7 @@ async function communicationsFixture(page:Page){
   await authentication(page);
   await page.route('**/api/v1/application/me',route=>route.fulfill({json:{data:{id:1}}}));
   await page.route('**/api/v1/application/clinics',route=>route.fulfill({json:{data:{items:[{id:4,name:'Wellnexa'}]}}}));
-  const state={writes:[] as any[],uncertain:false,denied:false,data:{
+  const state={writes:[] as any[],uncertain:false,denied:false,data:{provider_evidence_available:false,
     settings:{revision:1,email_enabled:true,sms_enabled:false,mail_from:'clinic@example.test',reply_to:'reply@example.test',alert_email:'operator@example.test',sms_from_did:'4165550100',cad_micros_per_segment:7500,fixed_cad_micros:0,tariff_valid_until:'2026-11-15 12:00:00',opt_out_checked_at:'2026-10-28 12:00:00'},
     gates:{automated_email:true,sms_budgets:true},suppressed_count:1,health:{needs_review:1,overdue:0,stale_leases:0},held_sms:[] as {id:number;last_error:string;scheduled_at:string}[],events:[],members:[{id:7,display_name:'Practitioner One',reply_email:null,reply_active:false,reply_version:0}],
     notices:[{id:8,kind:'application',recipient_kind:'operator',recipient_address:'operator@example.test',status:'needs_review',attempt_count:1,created_at:'2026-10-28 12:00:00'}],
@@ -18,6 +18,41 @@ async function communicationsFixture(page:Page){
   await page.goto('http://localhost:5185/admin/');await page.getByRole('tab',{name:'Communications',exact:true}).click();
   await expect(page.getByRole('button',{name:'Configure communications',exact:true})).toBeVisible();return state;
 }
+
+async function providerFixture(page:Page){
+  const parent=await communicationsFixture(page);parent.data.provider_evidence_available=true;
+  const state={writes:[] as {path:string;body:any}[],uncertain:false,stale:false,report:{id:51,status:'preview',statement_reference:'October statement',preview_hash:'a'.repeat(64),can_apply:true,fx:{rate_micros:1370000,date:'2026-10-01',reference:'Verified source'},rows:[{line:2,type:'charge',reference:'provider-001',sender_did:'4165550100',currency:'USD',amount_micros:17500,status:'ready',actual_cents:3}]}};
+  await page.route('**/api/v1/application/clinics/4/provider-evidence**',route=>{
+    const path=new URL(route.request().url()).pathname;
+    if(route.request().method()==='POST'){const body=route.request().postDataJSON();state.writes.push({path,body});if(state.uncertain){state.uncertain=false;return route.fulfill({status:503,json:{error:{code:'unavailable'}}});}if(state.stale&&path.endsWith('/apply'))return route.fulfill({status:409,json:{error:{code:'provider_evidence_changed'}}});return route.fulfill({json:{data:path.endsWith('/preview')?state.report:{id:51,status:'applied'}}});}
+    return route.fulfill({json:{data:path.endsWith('/51')?state.report:{items:[]}}});
+  });
+  await page.getByRole('button',{name:'Refresh communications',exact:true}).click();await expect(page.getByRole('heading',{name:'Provider evidence imports'})).toBeVisible();return state;
+}
+async function fillProvider(page:Page){
+  await page.getByLabel('Normalized provider CSV').setInputFiles({name:'normalized.csv',mimeType:'text/csv',buffer:Buffer.from('type,reference,sender_did,destination,occurred_at,currency,amount\ncharge,provider-001,4165550100,+14165550101,2026-10-01 12:00:00,USD,0.0175')});
+  await page.getByRole('textbox',{name:'Provider statement reference',exact:true}).fill('October statement');await page.getByRole('textbox',{name:'CAD per USD (up to six decimal places)'}).fill('1.370000');await page.getByRole('textbox',{name:'Conversion quote date (YYYY-MM-DD)'}).fill('2026-10-01');await page.getByRole('textbox',{name:'Conversion evidence reference'}).fill('Verified source');await page.getByRole('textbox',{name:'Reason for change',exact:true}).fill('Reviewed exact provider statement and conversion.');
+}
+
+test('provider evidence preview shows conversion and requires both apply attestations',async({page})=>{
+  const state=await providerFixture(page);await fillProvider(page);await expect(page.getByRole('combobox',{name:/^Clinic\b/})).toBeDisabled();await page.getByRole('button',{name:'Preview provider evidence'}).click();
+  await expect(page.getByText('USD 0.0175',{exact:true})).toBeVisible();const apply=page.getByRole('button',{name:'Apply reviewed provider evidence'});await expect(apply).toBeDisabled();
+  await page.getByRole('checkbox',{name:'I verified the exact provider records, sender ownership and STOP classifications.'}).check();await page.getByRole('checkbox',{name:'I verified the amounts and conversion evidence. Imported STOP applies to this sender across clinics.'}).check();await apply.click();await expect(page.getByText('Provider evidence changes saved.')).toBeVisible();
+  expect(state.writes[0].body.usd_cad_rate).toBe('1.370000');expect(state.writes[1].body).toMatchObject({preview_hash:'a'.repeat(64),provider_records_verified:true,conversion_verified:true});
+});
+
+test('uncertain provider preview freezes the original file request for exact retry',async({page})=>{
+  const state=await providerFixture(page);state.uncertain=true;await fillProvider(page);await page.getByRole('button',{name:'Preview provider evidence'}).click();await expect(page.getByLabel('Normalized provider CSV')).toBeDisabled();await page.getByRole('button',{name:'Retry provider evidence request'}).click();await expect(page.getByText('USD 0.0175',{exact:true})).toBeVisible();expect(state.writes[1]).toEqual(state.writes[0]);
+});
+
+test('a changed provider preview clears stale approval and requires a new file',async({page})=>{
+  const state=await providerFixture(page);await fillProvider(page);await page.getByRole('button',{name:'Preview provider evidence'}).click();await page.getByRole('checkbox',{name:'I verified the exact provider records, sender ownership and STOP classifications.'}).check();await page.getByRole('checkbox',{name:'I verified the amounts and conversion evidence. Imported STOP applies to this sender across clinics.'}).check();state.stale=true;await page.getByRole('button',{name:'Apply reviewed provider evidence'}).click();await expect(page.getByRole('button',{name:'Apply reviewed provider evidence'})).toHaveCount(0);await expect(page.getByRole('button',{name:'Preview provider evidence'})).toBeDisabled();
+});
+
+test('French provider imports preserve an unfinished file and support a reviewed STOP clearance',async({page})=>{
+  const state=await providerFixture(page);await fillProvider(page);await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'FR',exact:true}).click();await expect(page.getByRole('textbox',{name:'Référence du relevé du fournisseur'})).toHaveValue('October statement');
+  await page.getByRole('textbox',{name:'Numéro d’envoi du fournisseur (10 chiffres)'}).fill('4165550100');await page.getByRole('textbox',{name:'Numéro destinataire (format canadien +1)'}).fill('+14165550101');await page.getByRole('textbox',{name:'Date du nouveau consentement (UTC : AAAA-MM-JJ HH:mm:ss)'}).fill('2026-10-01 13:00:00');await page.getByRole('checkbox',{name:'J’ai vérifié le nouveau consentement et la levée du blocage chez le fournisseur pour cette destination et cet expéditeur.'}).check();await page.getByRole('button',{name:'Lever le STOP du fournisseur examiné'}).click();await expect(page.getByText('Modifications des preuves enregistrées.')).toBeVisible();expect(state.writes[0].body).toMatchObject({sender_did:'4165550100',destination:'+14165550101',provider_clearance_verified:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
 
 test('communications configuration submits exact conservative CAD rates and explicit readiness',async({page})=>{
   const state=await communicationsFixture(page);await page.getByRole('button',{name:'Configure communications',exact:true}).click();const dialog=page.getByRole('dialog');

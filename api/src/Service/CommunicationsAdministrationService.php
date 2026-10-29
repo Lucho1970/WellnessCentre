@@ -39,7 +39,7 @@ final class CommunicationsAdministrationService
     {
         $s=$this->q('SELECT * FROM clinic_communications WHERE clinic_id=?',[$clinic])->fetch()?:['clinic_id'=>$clinic,'revision'=>0,'email_enabled'=>false,'sms_enabled'=>false,'mail_from'=>'','reply_to'=>'','alert_email'=>'','sms_from_did'=>'','cad_micros_per_segment'=>null,'fixed_cad_micros'=>0,'tariff_valid_until'=>null,'opt_out_checked_at'=>null];
         $s['email_enabled']=(bool)$s['email_enabled'];$s['sms_enabled']=(bool)$s['sms_enabled'];
-        return ['settings'=>$s,'gates'=>['automated_email'=>$this->config->automatedCommunicationsEnabled,'sms_budgets'=>$this->config->smsBudgetEnforcementEnabled],
+        return ['settings'=>$s,'provider_evidence_available'=>$this->config->providerEvidenceEnabled,'gates'=>['automated_email'=>$this->config->automatedCommunicationsEnabled,'sms_budgets'=>$this->config->smsBudgetEnforcementEnabled],
             'notices'=>$this->q('SELECT id,kind,recipient_kind,recipient_address,status,attempt_count,last_error,created_at,sent_at FROM communication_notices WHERE clinic_id=? ORDER BY id DESC LIMIT 100',[$clinic])->fetchAll(),
             'deliveries'=>$this->q('SELECT d.notification_event_id id,d.segments,d.estimated_cents,d.provider_message_id,e.status,e.actual_cents,e.period_start,e.reference FROM sms_notification_deliveries d JOIN sms_budget_pools p ON p.id=d.pool_id JOIN sms_budget_entries e ON e.pool_id=d.pool_id AND e.reference=d.reference WHERE p.clinic_id=? ORDER BY d.notification_event_id DESC LIMIT 100',[$clinic])->fetchAll(),
             'suppressed_count'=>(int)$this->q('SELECT COUNT(*) FROM sms_suppressions WHERE clinic_id=? AND active=1',[$clinic])->fetchColumn(),

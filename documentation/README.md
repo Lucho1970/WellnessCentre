@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Reviewed SMS provider evidence](PROVIDER_EVIDENCE.md): normalized charge/STOP imports, recorded CAD/USD conversion, atomic reconciliation, sender-wide opt-outs and migration 057.
+
 - [Automated communications and SMS budget enforcement](AUTOMATED_COMMUNICATIONS.md): operational email outbox, trial/cost alerts, clinic senders, guarded staff SMS, reconciliation and migration 056.
 
 - [Wellnexa practitioner applications](PRACTITIONER_APPLICATIONS.md): signed application/review, retained consent history, guarded membership/trial activation, migration 055 and default-off rollout gates.

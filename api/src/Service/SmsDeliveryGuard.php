@@ -10,8 +10,16 @@ use Wellness\Http\ApiException;
 /** Called while the notification worker holds the clinic consent lock. */
 final class SmsDeliveryGuard
 {
-    public function __construct(private readonly PDO $pdo) {}
+    private readonly bool $providerEvidenceEnabled;
+    public function __construct(private readonly PDO $pdo,?bool $providerEvidenceEnabled=null)
+    { $this->providerEvidenceEnabled=$providerEvidenceEnabled??filter_var($_ENV['PROVIDER_EVIDENCE_ENABLED']??getenv('PROVIDER_EVIDENCE_ENABLED')?:'false',FILTER_VALIDATE_BOOL); }
     private function q(string $sql,array $values=[]): \PDOStatement {$q=$this->pdo->prepare($sql);$q->execute($values);return $q;}
+    public function lockSender(array $event): ?ProviderSenderLock
+    {
+        if(!$this->providerEvidenceEnabled)return null;
+        $did=$this->q('SELECT sms_from_did FROM clinic_communications WHERE clinic_id=?',[$event['clinic_id']])->fetchColumn();
+        if(!$did)self::deny('sms_configuration_not_ready');$lock=new ProviderSenderLock($this->pdo);$lock->acquire([$did]);return $lock;
+    }
 
     /** A successful result authorizes exactly one provider attempt, never another on replay. */
     public function authorize(array $event,string $message): array
@@ -39,6 +47,7 @@ final class SmsDeliveryGuard
                 if(!$this->q("SELECT 1 FROM sms_budget_entries WHERE pool_id=? AND period_start=? AND membership_id IS NULL AND status IN ('reserved','settled') LIMIT 1",[$pool['id'],$period])->fetchColumn())self::deny('sms_overhead_not_reviewed');
                 $current=$this->settings((int)$event['clinic_id']);if((int)$current['revision']!==(int)$settings['revision'])self::deny('sms_sender_changed');
                 if($this->q('SELECT 1 FROM sms_suppressions WHERE clinic_id=? AND number_hash=? AND active=1',[$event['clinic_id'],hash('sha256',(string)$event['recipient_address'])])->fetchColumn())self::deny('sms_opted_out');
+                if($this->providerEvidenceEnabled && $this->q('SELECT 1 FROM provider_sender_stops WHERE sender_did=? AND number_hash=? AND (cleared_after IS NULL OR last_stop_at>=cleared_after)',[$settings['sms_from_did'],hash('sha256',(string)$event['recipient_address'])])->fetchColumn())self::deny('sms_opted_out');
                 $sub=$this->q("SELECT s.*,v.features,v.scope,v.currency FROM billing_accounts b JOIN billing_subscriptions s ON s.billing_account_id=b.id AND s.status<>'canceled' JOIN subscription_plan_versions v ON v.id=s.plan_version_id WHERE b.clinic_id=? AND b.membership_id=? AND b.currency='CAD' FOR UPDATE",[$event['clinic_id'],$member['id']])->fetch();
                 if(!$sub || $sub['scope']!=='practitioner' || $sub['currency']!=='CAD' || !SubscriptionPolicy::hasFeature($sub,json_decode($sub['features'],true,512,JSON_THROW_ON_ERROR),'sms_reminders',$now))self::deny('sms_not_entitled');
                 if(!$this->q("SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND r.code='practitioner'",[$event['recipient_user_id']])->fetchColumn())self::deny('sms_recipient_changed');

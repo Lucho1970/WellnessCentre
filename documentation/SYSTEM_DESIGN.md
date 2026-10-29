@@ -1,5 +1,13 @@
 # Wellness Centre — System Design
 
+**Provider evidence, 29 October 2026:** Migration 057 persists normalized batches, immutable
+charge receipts and sender-DID/destination-hash STOP state. Exact reference/sender/clinic/contact
+matching and reviewed integer CAD/USD conversion replace budget commitments transactionally.
+Canonical preview fingerprints detect concurrent ledger/consent changes; sender advisory locks
+span final authorization and transport across clinics sharing a number. Audited later consent
+can clear provider suppression without clearing local manual blocks. The default-off importer
+does not certify complete provider synchronization. See [Provider evidence](PROVIDER_EVIDENCE.md).
+
 **Communications extension, 28 October 2026:** Migration 056 adds the operational outbox,
 clinic sender/tariff/suppression settings and notification-to-ledger bindings. Application
 events enqueue atomically; scheduled scans materialize current trial/cost notices. Staff SMS

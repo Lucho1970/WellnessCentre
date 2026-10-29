@@ -3,6 +3,10 @@
 The **Communications** tab configures verified clinic senders, conservative SMS estimates,
 opt-outs, operational notice review and actual-cost reconciliation. See
 [Automated communications](AUTOMATED_COMMUNICATIONS.md) for migration 056 and rollout gates.
+Migration 057 additionally supplies reviewed normalized provider CSV previews, exact charge
+matching, immutable conversion evidence and shared-sender STOP enforcement behind a separate
+default-off flag. See [Provider evidence](PROVIDER_EVIDENCE.md). Native provider synchronization
+still requires the authenticated provider contract.
 
 The **Practitioner applications** tab provides clinic intake settings, reviewed joining terms,
 private review/history and independent approval before applicant-controlled trial activation.

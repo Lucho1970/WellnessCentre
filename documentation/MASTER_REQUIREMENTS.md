@@ -1,5 +1,11 @@
 # Wellness Centre — Master Requirements
 
+**Provider evidence, 29 October 2026:** Migration 057 adds reviewed normalized CSV charge/STOP
+imports, exact message matching, approved fixed CAD/USD conversion and immutable receipts.
+Shared-sender STOP enforcement serializes with actual sends, with explicit later consent to
+clear. The new flag defaults off; complete provider synchronization and its daily review gate
+remain separate. See [Provider evidence](PROVIDER_EVIDENCE.md).
+
 **Automated communications, 28 October 2026:** Operational application/trial/budget emails and
 funded staff-SMS enforcement are implemented behind separate default-off flags. Migration 056
 adds clinic senders, suppression controls, one-attempt SMS bindings, auditable reconciliation

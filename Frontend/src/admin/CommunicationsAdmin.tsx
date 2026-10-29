@@ -5,11 +5,12 @@ import { useStaffAuth } from '../auth/AuthProvider';
 import { ApiError, apiRequest } from '../shared/api';
 import { Alert, TextField, useFormValidation, withFormValidation } from '../shared/FormValidation';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
+import { ProviderEvidenceAdmin } from './ProviderEvidenceAdmin';
 
 type Settings={revision:number;email_enabled:boolean;sms_enabled:boolean;mail_from:string;reply_to:string;alert_email:string;sms_from_did:string;cad_micros_per_segment:number|null;fixed_cad_micros:number;tariff_valid_until:string|null;opt_out_checked_at:string|null};
 type Notice={id:number;kind:string;recipient_kind:string;recipient_address?:string|null;status:string;attempt_count:number;created_at:string};
 type Delivery={id:number;segments:number;estimated_cents:number;actual_cents:number|null;status:string;provider_message_id:string|null;period_start:string};
-type Data={settings:Settings;gates:{automated_email:boolean;sms_budgets:boolean};suppressed_count:number;health:{needs_review:number;overdue:number;stale_leases:number};notices:Notice[];deliveries:Delivery[];held_sms:{id:number;last_error:string;scheduled_at:string}[];members:{id:number;display_name:string;reply_email:string|null;reply_active:boolean;reply_version:number}[];events:{action:string;reason:string;created_at:string}[]};
+type Data={provider_evidence_available?:boolean;settings:Settings;gates:{automated_email:boolean;sms_budgets:boolean};suppressed_count:number;health:{needs_review:number;overdue:number;stale_leases:number};notices:Notice[];deliveries:Delivery[];held_sms:{id:number;last_error:string;scheduled_at:string}[];members:{id:number;display_name:string;reply_email:string|null;reply_active:boolean;reply_version:number}[];events:{action:string;reason:string;created_at:string}[]};
 type Draft={kind:'settings'|'suppression'|'delivery'|'notice'|'reply';values:Record<string,string>;flags:Record<string,boolean>;target?:Notice|Delivery};
 type Operation={path:string;body:Record<string,unknown>};
 const noticeLabels:Record<string,string>={application:'Application update',trial_ending:'Trial ending',trial_expired:'Trial ended',budget:'SMS budget alert'};
@@ -27,13 +28,15 @@ const holdReasons:Record<string,string>={
 };
 function micros(value:string):number { if(!/^\d+(\.\d{1,6})?$/.test(value))throw new Error('Enter a nonnegative CAD amount with at most six decimal places.');const [whole,fraction='']=value.split('.');const result=Number(whole)*1000000+Number(fraction.padEnd(6,'0'));if(!Number.isSafeInteger(result)||result>100000000)throw new Error('Enter a CAD amount within the supported range.');return result; }
 function CommunicationsForm({onDirtyChange}:{onDirtyChange?:(dirty:boolean)=>void}) {
-  const {t,i18n}=useTranslation();const {getAccessToken}=useStaffAuth();const validation=useFormValidation();const guard=useUnsavedForm();
+  const {t,i18n}=useTranslation();const {getAccessToken,account}=useStaffAuth();const validation=useFormValidation();const guard=useUnsavedForm();
+  const [providerDirty,setProviderDirty]=useState(false);
   const [clinics,setClinics]=useState<{id:number;name:string}[]>([]),[clinic,setClinic]=useState(''),[data,setData]=useState<Data|null>(null);
   const [draft,setDraft]=useState<Draft|null>(null),[pending,setPending]=useState<Operation|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);const sequence=useRef(0);
-  useEffect(()=>{onDirtyChange?.(guard.dirty);},[guard.dirty,onDirtyChange]);useEffect(()=>()=>onDirtyChange?.(false),[onDirtyChange]);
+  useEffect(()=>{onDirtyChange?.(guard.dirty||providerDirty);},[guard.dirty,providerDirty,onDirtyChange]);useEffect(()=>()=>onDirtyChange?.(false),[onDirtyChange]);
   const fail=useCallback((cause:unknown)=>{validation.capture(cause);setError(cause instanceof Error?cause.message:t('Unable to load communications.'));if(cause instanceof ApiError&&[401,403,404,409].includes(cause.status)){setData(null);setClinics([]);setDraft(null);setPending(null);guard.markClean();}},[validation.capture,t,guard.markClean]);
   const load=useCallback(async()=>{const version=++sequence.current;setBusy(true);try{const headers={Authorization:`Bearer ${await getAccessToken()}`};const [list,result]=await Promise.all([apiRequest<{items:{id:number;name:string}[]}>('/application/clinics',{headers}),clinic?apiRequest<Data>(`/application/clinics/${clinic}/communications`,{headers}):Promise.resolve(null)]);if(version!==sequence.current)return;setClinics(list.items);setData(result);setError('');if(!clinic&&list.items.length)setClinic(String(list.items[0].id));}catch(cause){if(version===sequence.current)fail(cause);}finally{if(version===sequence.current)setBusy(false);}},[clinic,getAccessToken,fail]);
-  useEffect(()=>{setData(null);void load();return()=>{sequence.current++;};},[load]);
+  const loadRef=useRef(load);loadRef.current=load;
+  useEffect(()=>{setData(null);void loadRef.current();return()=>{sequence.current++;};},[clinic,account?.homeAccountId]);
   const open=(kind:Draft['kind'],target?:Notice|Delivery)=>{if(!data)return;validation.clear();setSaved(false);setError('');const s=data.settings;let values:Record<string,string>={reason:''};let flags:Record<string,boolean>={};
     if(kind==='settings'){values={...values,mail_from:s.mail_from,reply_to:s.reply_to,alert_email:s.alert_email,sms_from_did:s.sms_from_did,rate:s.cad_micros_per_segment===null?'':String(Number(s.cad_micros_per_segment)/1000000),fixed:String(Number(s.fixed_cad_micros)/1000000),tariff_valid_until:s.tariff_valid_until??''};flags={email_enabled:s.email_enabled,sms_enabled:s.sms_enabled,senders_verified:false,opt_out_reviewed:false};}
     if(kind==='suppression'){values={...values,number:''};flags={active:true,opt_in_confirmed:false};}
@@ -58,7 +61,7 @@ function CommunicationsForm({onDirtyChange}:{onDirtyChange?:(dirty:boolean)=>voi
   return <Stack spacing={2}>
     <Typography variant="h5">{t('Communications')}</Typography><Typography>{t('Manage clinic senders, operational email notices and the spending guard for existing staff booking texts. Email follows current recipient preferences independently.')}</Typography>
     {error&&!draft&&<Alert severity="error">{error}</Alert>}{saved&&<Alert severity="success">{t('Communications saved.')}</Alert>}
-    <Stack direction={{xs:'column',sm:'row'}} spacing={2}><TextField select label={t('Clinic')} value={clinic} disabled={busy||!!draft} onChange={e=>setClinic(e.target.value)}>{clinics.map(c=><MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}</TextField><Button disabled={busy||!!draft} onClick={()=>void load()}>{t('Refresh communications')}</Button></Stack>
+    <Stack direction={{xs:'column',sm:'row'}} spacing={2}><TextField select label={t('Clinic')} value={clinic} disabled={busy||!!draft||providerDirty} onChange={e=>setClinic(e.target.value)}>{clinics.map(c=><MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}</TextField><Button disabled={busy||!!draft||providerDirty} onClick={()=>void load()}>{t('Refresh communications')}</Button></Stack>
     {busy&&<Typography role="status">{t('Loading…')}</Typography>}
     {data&&<>
       <Alert severity="info">{t('Unconfirmed SMS costs remain committed until reconciliation. Fixed number costs are maintained separately in Billing. No number or mailbox is purchased here.')}</Alert>
@@ -70,6 +73,7 @@ function CommunicationsForm({onDirtyChange}:{onDirtyChange?:(dirty:boolean)=>voi
       {(data.held_sms??[]).map(item=><Alert severity="warning" key={item.id}>{t('SMS attempt {{id}}',{id:item.id})}: {t(holdReasons[item.last_error.replace('Spending policy: ','')]??'Held by spending or recipient policy. Review current settings, funding, consent and entitlement before sending a new notice.')}</Alert>)}
       {data.notices.map(n=><Paper variant="outlined" key={n.id} sx={{p:2}}><Typography>{t(noticeLabels[n.kind]??n.kind)} · {t(statusLabels[n.status]??n.status)} · {n.created_at} UTC</Typography>{n.status==='needs_review'&&<Button disabled={busy||!!draft} onClick={()=>open('notice',n)}>{t('Review notice {{id}}',{id:n.id})}</Button>}</Paper>)}
       <Typography variant="h6">{t('Recent budgeted SMS attempts')}</Typography>{data.deliveries.map(d=><Paper variant="outlined" key={d.id} sx={{p:2}}><Stack spacing={1}><Typography>{t('SMS attempt {{id}}',{id:d.id})} · {t(statusLabels[d.status]??d.status)} · {d.period_start}</Typography><Typography>{t('Segments: {{segments}}. Reserved estimate: {{estimate}}. Confirmed cost: {{actual}}.',{segments:d.segments,estimate:money(d.estimated_cents),actual:d.actual_cents===null?t('Awaiting reconciliation'):money(d.actual_cents)})}</Typography><Typography sx={{overflowWrap:'anywhere'}}>{t('Provider reference: {{reference}}',{reference:d.provider_message_id??t('Not confirmed')})}</Typography>{d.status!=='released'&&<Button disabled={busy||!!draft} onClick={()=>open('delivery',d)}>{t('Reconcile SMS {{id}}',{id:d.id})}</Button>}</Stack></Paper>)}
+      {data.provider_evidence_available&&<ProviderEvidenceAdmin key={clinic} clinic={clinic} onDirtyChange={setProviderDirty} disabled={busy||!!draft}/>}
     </>}
     <Dialog open={!!draft} onClose={busy||pending?undefined:close} fullWidth maxWidth="sm" aria-labelledby="communications-title"><DialogTitle id="communications-title">{t('Review communications change')}</DialogTitle><DialogContent><Stack component="form" id="communications-form" onSubmit={submit} spacing={2} sx={{pt:1}}>
       {error&&<Alert severity="error">{error}</Alert>}{pending&&!busy&&<Alert severity="warning">{t('Save outcome is uncertain. Retry the same communications change before editing.')}</Alert>}

@@ -49,6 +49,7 @@ final readonly class Config
         public bool $externalStaffAuthEnabled = false,
         public bool $automatedCommunicationsEnabled = false,
         public bool $smsBudgetEnforcementEnabled = false,
+        public bool $providerEvidenceEnabled = false,
     ) {}
 
     public static function fromEnvironment(): self
@@ -102,6 +103,7 @@ final readonly class Config
             filter_var($value('STAFF_EXTERNAL_AUTH_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             filter_var($value('AUTOMATED_COMMUNICATIONS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             filter_var($value('SMS_BUDGET_ENFORCEMENT_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            filter_var($value('PROVIDER_EVIDENCE_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
         );
     }
 

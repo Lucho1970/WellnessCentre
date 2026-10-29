@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$MySqlDirectory,
     [string]$PhpExecutable = 'php',
     [ValidateRange(1024, 65535)][int]$Port = 13337,
-    [ValidateSet('automated-communications.php','practitioner-applications.php','billing-administration.php','subscription-foundation.php','travel-enquiry-inbox.php','booking-client-access.php')][string]$IntegrationTest = 'travel-enquiry-inbox.php'
+    [ValidateSet('provider-evidence.php','automated-communications.php','practitioner-applications.php','billing-administration.php','subscription-foundation.php','travel-enquiry-inbox.php','booking-client-access.php')][string]$IntegrationTest = 'travel-enquiry-inbox.php'
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
