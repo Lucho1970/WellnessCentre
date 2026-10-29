@@ -114,7 +114,7 @@ final class Api
             }
             if (str_starts_with($request->path,'/api/v1/public/discovery/') || $request->path==='/api/v1/profile/discovery-preferences' || str_starts_with($request->path,'/api/v1/travel-enquiries')) {
                 $this->clinicContext->assertActive($this->database);header('Cache-Control: no-store');
-                $discovery=$this->discovery();
+                $discovery=$this->discovery($request->correlationId);
                 if($request->path==='/api/v1/public/discovery/options'&&$request->method==='GET')Response::json(['data'=>$discovery->options()],200,$request->correlationId);
                 if($request->path==='/api/v1/public/discovery/search'&&$request->method==='POST')Response::json(['data'=>$discovery->search($this->clinicContext->clinicId,$request->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'))],200,$request->correlationId);
                 if($request->path==='/api/v1/profile/discovery-preferences'&&in_array($request->method,['GET','PUT'],true))Response::json(['data'=>$discovery->preferences($this->user($request),$request->method==='PUT'?$request->body:null,$request->correlationId)],200,$request->correlationId);
@@ -691,14 +691,14 @@ final class Api
         };
     }
 
-    private function discovery(): \Wellness\Service\LocationDiscoveryService
+    private function discovery(?string $correlationId=null): \Wellness\Service\LocationDiscoveryService
     {
-        return new \Wellness\Service\LocationDiscoveryService($this->database,$this->config);
+        return new \Wellness\Service\LocationDiscoveryService($this->database,$this->config,mapsClient:new \Wellness\Service\DiscoveryMapsClient($this->config->googleMapsApiKey,correlationId:$correlationId));
     }
     private function travelRoute(AuthContext $actor,Request $request,string $path): array
     {
         header('Cache-Control: no-store');
-        $service=new \Wellness\Service\TravelEnquiryService($this->database,$this->discovery());
+        $service=new \Wellness\Service\TravelEnquiryService($this->database,$this->discovery($request->correlationId));
         if($path==='travel-enquiries/unread-count'&&$request->method==='GET')return $service->unreadCount($actor);
         if($path==='travel-enquiries'&&$request->method==='GET')return $service->list($actor,$request->query);
         if($path==='travel-enquiries'&&$request->method==='POST')return $service->create($actor,$request->body,$request->correlationId);

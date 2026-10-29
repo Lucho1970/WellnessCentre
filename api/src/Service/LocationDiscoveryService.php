@@ -13,7 +13,7 @@ final class LocationDiscoveryService
 {
     private int $providerCalls=0;
     private float $started;
-    public function __construct(private readonly Database $database,private readonly Config $config,private readonly ?Closure $transport=null) {$this->started=microtime(true);}
+    public function __construct(private readonly Database $database,private readonly Config $config,private readonly ?Closure $transport=null,private readonly ?DiscoveryMapsClient $mapsClient=null) {$this->started=microtime(true);}
 
     public function settings(): array
     {
@@ -177,34 +177,7 @@ final class LocationDiscoveryService
         if(++$this->providerCalls>40||microtime(true)-$this->started>18)throw new ApiException(503,'discovery_preparing','Travel areas are being prepared. Please retry the search.');
         $this->limit('maps-global',5000,gmdate('Ymd'));
         if($this->config->googleMapsApiKey==='')throw new ApiException(503,'maps_not_configured','Location search is not configured. Please contact the clinic.');
-        $key=$this->config->googleMapsApiKey;$headers=[];$body=null;
-        if($operation==='geocode')$url='https://maps.googleapis.com/maps/api/geocode/json?'.http_build_query(['address'=>$payload['address'],'components'=>'country:CA','key'=>$key]);
-        else{
-            $url='https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix';$headers=['Content-Type: application/json','X-Goog-Api-Key: '.$key,'X-Goog-FieldMask: originIndex,destinationIndex,distanceMeters,status,condition'];
-            $waypoint=fn($p)=>['waypoint'=>['location'=>['latLng'=>$p]]];
-            $body=json_encode(['origins'=>array_map($waypoint,$payload['origins']),'destinations'=>[$waypoint($payload['destination'])],'travelMode'=>'DRIVE','routingPreference'=>'TRAFFIC_UNAWARE'],JSON_THROW_ON_ERROR);
-        }
-        $curl=curl_init($url);$response='';
-        try{
-            curl_setopt_array($curl,[CURLOPT_HTTPHEADER=>$headers,CURLOPT_CONNECTTIMEOUT=>4,CURLOPT_TIMEOUT=>20,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_WRITEFUNCTION=>static function($handle,string $chunk)use(&$response):int{if(strlen($response)+strlen($chunk)>1048576)return 0;$response.=$chunk;return strlen($chunk);}]);
-            if($body!==null)curl_setopt_array($curl,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$body]);
-            if(curl_exec($curl)===false||(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE)!==200)throw new ApiException(503,'maps_unavailable','Location search is temporarily unavailable. Try again.');
-        }finally{curl_close($curl);}
-        try{$data=json_decode($response,true,32,JSON_THROW_ON_ERROR);}catch(Throwable){throw new ApiException(503,'maps_unavailable','Location search is temporarily unavailable. Try again.');}
-        if(!is_array($data))throw new ApiException(503,'maps_unavailable','Location search is temporarily unavailable. Try again.');
-        if($operation==='geocode'){
-            if(!in_array($data['status']??'',['OK','ZERO_RESULTS'],true))throw new ApiException(503,'maps_unavailable','Location search is temporarily unavailable. Try again.');
-            $result=$data['results'][0]??null;
-            if(($data['status']??'')!=='OK'||count($data['results']??[])!==1||!$result||($result['partial_match']??false))throw new ApiException(422,'location_not_found','Use a more specific Canadian city, postal code or address.');
-            return ['latitude'=>$result['geometry']['location']['lat'],'longitude'=>$result['geometry']['location']['lng']];
-        }
-        $result=[];
-        foreach($data as $item){
-            if(!isset($item['originIndex']))throw new ApiException(503,'maps_unavailable','Driving distances are temporarily unavailable.');
-            if(($item['status']['code']??0)!==0)throw new ApiException(503,'maps_unavailable','Driving distances are temporarily unavailable.');
-            $result[(int)$item['originIndex']]=($item['condition']??'')==='ROUTE_EXISTS'&&isset($item['distanceMeters'])?(int)$item['distanceMeters']:null;
-        }
-        return $result;
+        return ($this->mapsClient??new DiscoveryMapsClient($this->config->googleMapsApiKey))->call($operation,$payload);
     }
     public function preferences(AuthContext $actor,?array $body=null,string $cid=''): array
     {

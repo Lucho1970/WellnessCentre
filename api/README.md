@@ -1,5 +1,7 @@
 # Wellness Centre internal API
 
+For `maps_unavailable`, see [Wellnexa maps diagnostics](../documentation/WELLNEXA_MAPS_DIAGNOSTICS.md): existing provider contracts, redacted correlation diagnostics and the private configuration/Google preflight.
+
 See [API request-body limits](../documentation/API_REQUEST_BODY_LIMITS.md) for the 2 MiB fallback, existing stricter route limits, local HTTP regression evidence and remaining hosting abuse controls.
 
 ## Pilot safeguards

@@ -23,6 +23,24 @@ foreach([null,[],['latitude'=>91,'longitude'=>0],['latitude'=>0,'longitude'=>INF
 $result=$discovery->search(1,['point'=>$point],'synthetic-ip');$assert(count($result['matches'])===1,'Extended match discovered');$match=$result['matches'][0];
 $assert($match['status']==='enquiry_only'&&$match['starting_price_cents']===10000,'Enquiry status and eligible price');
 $assert(!preg_match('/address_line|postal_code|distance_meters|origin|latitude/',json_encode($match)),'Public match reveals no origin or exact distance');
+// Exercise real provider serialization and diagnostics rather than only
+// the normalized fake. Private addresses stay in geocoding, not Routes.
+$wireCalls=[];$wireLogs=[];
+$wireClient=new \Wellness\Service\DiscoveryMapsClient('synthetic-server-key',function($url,$headers,$raw)use(&$wireCalls,$assert):array{
+    $operation=parse_url($url,PHP_URL_HOST)==='maps.googleapis.com'?'geocode':'routes';$wireCalls[]=$operation;
+    if($operation==='geocode')return ['status'=>200,'errno'=>0,'body'=>json_encode(['status'=>'OK','results'=>[['geometry'=>['location'=>['lat'=>43.65,'lng'=>-79.38]]]]])];
+    $sent=json_decode($raw,true,32,JSON_THROW_ON_ERROR);
+    foreach($sent['origins'] as $origin)$assert($origin['waypoint']['location']['latLng']===['latitude'=>43.65,'longitude'=>-79.38]&&!isset($origin['waypoint']['address']),'Practitioner origin retains its geocoded coordinate waypoint');
+    $assert($sent['destinations'][0]['waypoint']['location']['latLng']===['latitude'=>43.65,'longitude'=>-79.38],'Geocoded search point uses numeric coordinates');
+    return ['status'=>200,'errno'=>0,'body'=>json_encode(array_map(static fn($index)=>['originIndex'=>$index,'destinationIndex'=>0,'condition'=>'ROUTE_EXISTS','status'=>['code'=>0],'distanceMeters'=>60000],array_keys($sent['origins'])))];
+},static function($event)use(&$wireLogs):void{$wireLogs[]=$event;},'synthetic-discovery-wire');
+$wireConfig=new \Wellness\Config(...array_replace(get_object_vars($config),['googleMapsApiKey'=>'synthetic-server-key']));
+$pdo->exec('DELETE FROM discovery_geocodes;DELETE FROM discovery_distances');
+$wireResult=(new LocationDiscoveryService($database,$wireConfig,mapsClient:$wireClient))->search(1,['area'=>'Synthetic public city'],'synthetic-wire-ip');
+$assert($wireCalls===['geocode','geocode','routes'],'Cold search geocodes search point and private origin before the route matrix');
+$assert(count($wireResult['matches'])===1&&$wireResult['matches'][0]['status']==='enquiry_only','Cold address search reaches real request serialization and returns a match');
+$assert($wireLogs===[]&&!preg_match('/Synthetic Street|address_line|distance_meters|origin/',json_encode($wireResult)),'Wire search still protects private origins and adds no success diagnostics');
+$pdo->exec('DELETE FROM discovery_geocodes;DELETE FROM discovery_distances');
 $assert($discovery->search(1,['point'=>$point,'only_within'=>true],'synthetic-ip')['matches']===[],'Normal coverage filter');
 $before=count($calls);$discovery->search(1,['point'=>$point],'synthetic-ip');$assert(count($calls)===$before,'Private map cache avoids repeat provider calls');
 $assert($discovery->search(2,['point'=>$point],'synthetic-ip')['matches']===[],'Clinic isolation');

@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Wellnexa maps diagnostics](WELLNEXA_MAPS_DIAGNOSTICS.md): provider-vs-routing investigation, private four-file diagnostic patch and safe operator checks.
+
 - [Full deployment build — 29 October 2026](CURRENT_APP_RELEASE_2026-10-29.md): cumulative package upload map, schema/configuration checks, pilot activation and hosted acceptance.
 - [Deployment build verification](DEPLOYMENT_BUILD_2026-10-29.md): exact package source, clean restores/audits, browser/PHP checks, archive review and remaining gates.
 
