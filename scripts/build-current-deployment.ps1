@@ -59,7 +59,10 @@ foreach($file in Get-ChildItem -LiteralPath $destination -File -Filter '*.zip'){
     $archive=[IO.Compression.ZipFile]::OpenRead($file.FullName)
     try {
         if($archive.Entries.Count -eq 0){throw "Empty archive: $($file.Name)"}
-        if(@($archive.Entries | Where-Object {$_.FullName -match '(^|/)(\.env[^/]*|\.git|node_modules)(/|$)|\.map$'}).Count){throw "Unexpected private/development file: $($file.Name)"}
+        if(@($archive.Entries | Where-Object {
+            $fontMap=$file.Name -eq 'wellness-api-private.zip' -and $_.FullName -match '^vendor/dompdf/php-font-lib/maps/[a-zA-Z0-9_-]+\.map$'
+            $_.FullName -match '(^|/)(\.env[^/]*|\.git|node_modules)(/|$)' -or ($_.FullName -match '\.map$' -and -not $fontMap)
+        }).Count){throw "Unexpected private/development file: $($file.Name)"}
         $manifest.archives += [ordered]@{file=$file.Name;bytes=$file.Length;entries=$archive.Entries.Count;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
     } finally {$archive.Dispose()}
 }

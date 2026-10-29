@@ -23,7 +23,8 @@ foreach($record in $manifest.archives){
         $names=@{}
         foreach($entry in $zip.Entries){
             $name=$entry.FullName
-            if($name -match '(^|/)\.\.(/|$)|^/|^[a-zA-Z]:|\\|(^|/)(\.env[^/]*|\.git|node_modules)(/|$)|\.map$'){throw "Unsafe/private/development entry in $($record.file): $name"}
+            $fontMap=$record.file -eq 'wellness-api-private.zip' -and $name -match '^vendor/dompdf/php-font-lib/maps/[a-zA-Z0-9_-]+\.map$'
+            if($name -match '(^|/)\.\.(/|$)|^/|^[a-zA-Z]:|\\|(^|/)(\.env[^/]*|\.git|node_modules)(/|$)' -or ($name -match '\.map$' -and -not $fontMap)){throw "Unsafe/private/development entry in $($record.file): $name"}
             if($names.ContainsKey($name)){throw "Duplicate archive entry: $name"};$names[$name]=$true
             $entries++
             if($name -match '\.(php|js|mjs|json|html|css|sql|md|txt|xml|pem|key|crt|cer|yml|yaml)$|(^|/)\.htaccess$'){
