@@ -140,4 +140,58 @@ administrator and account owner for provider/MFA; privacy/security/custodian for
 real-data/session/vendor gates. The existing dependency-tooling and broader release findings
 in the 38-control ledger are not waived by the owner's selection of a live test host.
 
+## Prepared artifact and local acceptance
+
+Prepared review directory: `deployments/2026-11-01-practitioner-pilot/`, with a same-named
+outer ZIP. Package/application source: **`6808300d02a9ea37a7455c813d6e7d787d05906a`**;
+runtime application code is unchanged from `f2e3157`. The new test/runbook commits do not
+change the production API, schema, dependency locks, identity grants or provider endpoints.
+The manifest explicitly records enabled browser flags and that hosted settings/accounts
+remain unchanged; the current root README points to this runbook rather than presenting
+the historical 29 October browser flag state as current. All seven archives are cumulative
+review material; the actual upload set still needs deployed-revision/preflight review.
+
+The existing full builder passed canonical Frontend lint/content/2,532 translations/strict
+TypeScript/all three builds, exact locked production Composer install and Wellnexa build.
+The archive verifier passed **237 checks**, **seven ZIPs / 2,172 entries**, and signature-scanned
+**2,089 text entries**. Its single pinned public dependency documentation-key fixture remains
+the previously reviewed JWT README; no application secret was found by that bounded scan.
+No private environment or test-account addresses are included.
+
+Both `npm ci` restores passed with unchanged lock hashes. Frontend's install reported the
+existing esbuild postinstall approval warning; no install policy was changed. Current audits:
+Frontend full audit exits 1 with **11 moderate build-tree findings**, runtime audit exits 0
+with zero findings, Wellnexa audit exits 0 with zero findings. Composer validation/audit and
+local non-dev platform checks passed. Large-bundle notices, four existing Wellnexa lint
+warnings and terminal color-precedence warnings remain documented, not suppressed.
+
+`Frontend: npx playwright test --config playwright.build.config.ts --reporter=line` passed
+**15/15** against the existing default-off output (18.4 s). With process
+`BUILD_PRACTITIONER_SIGN_IN=1`, the same command passed **15/15** against this enabled artifact
+(22.7 s). The new check verifies workforce separation, both visible provider choices and the
+real compiled MSAL authorization request's exact staff SPA/API scope, callback and absence of
+rejected hints. Broker metadata/final navigation are intercepted; it authenticates no real
+account. Its synthetic screenshot was inspected and is included as a preview.
+
+`Frontend: npx playwright test --config playwright.applications.config.ts --reporter=line`
+initially passed 14/15: the first anonymous mobile page lacked its button before the existing
+five-second assertion elapsed. The retained review found no page error or failed HTTP status;
+the development staff-bootstrap module took about 2.3 seconds. Cold-start loading is a possible
+explanation, not a proven root cause. An unchanged complete rerun passed **15/15** (41.4 s),
+with no timeout, assertion, retry or product change to accommodate the failure.
+
+`Wellnexa: npm run lint` passed with its four existing warnings;
+`npm run test:browser -- --reporter=line` passed **24/24** (33.1 s), and
+`npx playwright test --config playwright.applications.config.ts --reporter=line` passed
+**1/1** (6.0 s). Final browser coverage here is **55 distinct tests** with an additional
+15-case default/enabled build execution; the initial failed run is separately recorded.
+The 285-case default Frontend suite, central-admin and invitation suites from the earlier
+source checkpoint were not rerun for these test/runbook-only source additions. Hosted
+provider/MFA, account approval/activation/disable, DB history/backup/headers and actual
+clinical-record boundaries are still untested on Wellnexa.
+
+The normal Inactive SQL/HTTP acceptance, original OpenSSL environment failures and final
+**36 + 119 checks on each database engine** are recorded in the linked 38-control ledger.
+No passing local test authorizes the live deployment or closes that ledger's remaining gates.
+
 RELEASE STATUS: NOT READY FOR RELEASE

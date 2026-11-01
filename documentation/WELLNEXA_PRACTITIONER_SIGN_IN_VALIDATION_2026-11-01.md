@@ -100,6 +100,7 @@ Implementation/provider-save authorization is not release or real-PHI acceptance
 | `Frontend/.env.example` | Default-off public social-button rollout gate; no credential. |
 | `Frontend/playwright.applications.config.ts` | Exercise both provider choices with synthetic external staff configuration. |
 | `Frontend/tests/practitioner-applications.spec.ts` | Preserve registration tests and cover entry separation, actual bridge request construction, malicious URL hints, denial recovery, callback failure and French zoom/keyboard behavior. |
+| `Frontend/tests/build.smoke.spec.ts` | Verify default-off and explicitly enabled production artifacts, workforce separation and the compiled MSAL staff-broker request without authenticating a live account. |
 | `Wellnexa/src/Join.tsx` | Add the returning-practitioner link separately from intake. |
 | `Wellnexa/.env.example` | Document the existing durable external-authentication gate for the website entry link. |
 | `Wellnexa/tests/applications/entry.spec.ts` | Verify both joining and sign-in destinations use the configured clinic portal. |
@@ -111,6 +112,7 @@ Implementation/provider-save authorization is not release or real-PHI acceptance
 | `documentation/PRACTITIONER_APPLICATIONS.md` | Point to the current provider entry and live acceptance boundary. |
 | `documentation/GOOGLE_PRACTITIONER_ROLLOUT.md` | Preserve historical setup and distinguish the new two-provider implementation from hosted acceptance. |
 | `documentation/FRONTEND_QUALITY_GATES.md` | Record the new dated moderate tooling advisory without rewriting historical audit results. |
+| `documentation/WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md` | Approved live host/account scope, observed disabled feature, exact artifact settings, ordinary disable/departure procedure and package/test evidence. |
 
 ## Dependencies, permission/consent and endpoint changes
 
@@ -278,6 +280,15 @@ All final disposable servers stopped; only synthetic logs/data are retained loca
 does not establish hosted UI offboarding or complete operational departure (publication,
 future bookings, SMS funding, pending communications and billing require separate review).
 
+Prepared artifact source is **`6808300d02a9ea37a7455c813d6e7d787d05906a`**. The live-test
+runbook records exact additional restore/audit/build/browser/archive commands and results,
+including the failed first development-browser case and unchanged full confirmation. Both
+frontends were restored from locks; their hashes and runtime versions above remain unchanged.
+The package enables only the documented browser capabilities; no hosted configuration/account
+was modified and full hosted acceptance remains pending. The old 382-case checkpoint is not
+claimed to have been repeated. No new runtime dependency, schema, API permission, legal terms
+or external endpoint/data flow was added by this follow-up. Generated packages stay ignored.
+
 All decisions below are **1 November 2026, Codex**, against the application source revision
 recorded above and this report's files/tests. Human owner names/signatures have not been
 supplied: role labels below are **unassigned accountable roles**, not claimed appointments.
@@ -322,7 +333,7 @@ for its applicable scope.
 | DEV-06 | Partial | No new runtime dependencies, polling or SQL queries; fixed-size provider choices. Existing chunk notices and volume performance remain. | Performance/build: review bundle/performance budgets and representative load. |
 | REL-01 | Partial | This 38-control source/test ledger is supplied; named accountable owners and human decisions remain absent. | Release owner: assign names and collect dated decisions. |
 | REL-02 | Partial | Exact local commands/results and synthetic boundary above; defaults omit dedicated suites, which are run explicitly. Hosted acceptance remains separate. | QA/release: verify final checkpoint and required operational scenarios. |
-| REL-03 | Missing | No new release artifact/provenance/hosted rehearsal/backup rollback proof created by this implementation. | Release/operations: produce approved artifact and hosted synthetic acceptance. |
+| REL-03 | Partial | Pilot artifact at source 6808300 has manifest/lock hashes and 237 local archive checks; full hosted rehearsal/backup rollback proof remain absent. | Release/operations: approve actual upload set and complete hosted synthetic acceptance/rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; flags are default off and unresolved controls are not waived by tests. | Accountable owners: resolve or lawfully approve applicable internal exceptions. |
 | REL-05 | Partial | User authorized implementation, exact MSA association and two-account synthetic testing on Wellnexa. Hosted feature is disabled; no production code deployment/schema/new API grant or operational sign-off. | Release/custodian/privacy/security/clinical: approve actual rollout scope/configuration and retain backup/rollback evidence. |
 | REL-06 | Implemented (report scope) | Requested/result scope, file purposes, exact versions/commands, flows, findings, omissions, owners/actions and rollback recorded. | Release owner: verify final source SHA and completion report. |
