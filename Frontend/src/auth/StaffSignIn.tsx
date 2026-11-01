@@ -5,15 +5,17 @@ import { LogIn, ShieldCheck } from 'lucide-react';
 import { useStaffAuth } from './AuthProvider';
 import { apiRequest } from '../shared/api';
 import { useTranslation } from 'react-i18next';
+import { PractitionerSignInOptions } from './PractitionerSignInOptions';
+import { practitionerIdentityEnabled, type PractitionerProvider } from './practitionerIdentity';
 
 type StaffAccess = { roles: string[]; permissions: string[] };
 
 function StaffSignInForm({ children }: { children: (access: StaffAccess) => ReactNode }) {
   const formValidation = useFormValidation();
-  const externalAvailable = import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' || import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' || import.meta.env.VITE_STAFF_EXTERNAL_AUTH_ENABLED === 'true';
+  const externalAvailable = practitionerIdentityEnabled;
   const externalStaff = externalAvailable && sessionStorage.getItem('wellness.staff.provider') === 'external';
   const { t } = useTranslation();
-  const { account, configured, isAuthenticated, sessionExpired, signIn, getAccessToken } = useStaffAuth();
+  const { account, configured, isAuthenticated, sessionExpired, signInError, signIn, signOut, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const [access, setAccess] = useState<(StaffAccess & { account: string }) | null>(null);
@@ -30,24 +32,29 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [getAccessToken, isAuthenticated, sessionExpired, accountKey, retry, t]);
-  const login = async () => {
+  const login = async (provider?: PractitionerProvider) => {
     setBusy(true); formValidation.clear(); setError('');
-    try { await signIn(); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); }
+    try { await signIn(provider); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); }
     finally { setBusy(false); }
   };
   if (!isAuthenticated) return <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, maxWidth: 650, mx: 'auto' }}>
     <Stack spacing={2} alignItems="center" textAlign="center"><ShieldCheck size={44} color="#176b62" />
-      <Typography variant="h4" component="h1">{t('Staff portal')}</Typography>
+      <Typography variant="h4" component="h1">{t(externalStaff ? 'Practitioner sign-in' : 'Staff portal')}</Typography>
       <Typography color="text.secondary">{externalStaff ? t('Invited practitioners sign in with their approved staff account.') : t('Admins, practitioners, reception, and accounting staff sign in with their organization Microsoft account.')}</Typography>
       {!configured && <Alert severity="warning">{t('Staff sign-in is not configured for this environment. Please contact the administrator.')}</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
-      <Button variant="contained" size="large" startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <LogIn size={18} />} disabled={busy || !configured} onClick={() => void login()}>{externalStaff ? t('Invited practitioner sign-in') : t('Sign in with Microsoft')}</Button>
-      {externalAvailable && <Button href={`${import.meta.env.BASE_URL}staff/${externalStaff ? 'login' : 'external'}`}>{externalStaff ? t('Existing workforce staff sign-in') : t('Invited practitioner sign-in')}</Button>}
+      {signInError && <Alert severity="error">{signInError}</Alert>}
+      {externalStaff ? <PractitionerSignInOptions disabled={busy || !configured} onSignIn={provider => void login(provider)} fallbackLabel="Invited practitioner sign-in"/> : <Button variant="contained" size="large" startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <LogIn size={18} />} disabled={busy || !configured} onClick={() => void login()}>{t('Sign in with Microsoft')}</Button>}
+      {externalAvailable && <Button href={`${import.meta.env.BASE_URL}staff/${externalStaff ? 'login' : 'external'}`}>{externalStaff ? t('Existing workforce staff sign-in') : t('Practitioner sign-in')}</Button>}
+      {externalStaff && import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && <Button href={`${import.meta.env.BASE_URL}staff/apply`}>{t('Apply or check your practitioner application')}</Button>}
       <Button href={`${import.meta.env.BASE_URL}client`}>{t('Client sign in / booking')}</Button>
     </Stack>
   </Paper>;
-  if (sessionExpired) return <Alert severity="warning" action={<Button color="inherit" disabled={busy} onClick={() => void login()}>{t('Sign in again')}</Button>}>{t('Your staff session has expired. Sign in with Microsoft to continue.')}</Alert>;
-  if (error) return <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>;
+  if (sessionExpired) return <Alert severity="warning" action={<Button color="inherit" disabled={busy} onClick={() => void login()}>{t('Sign in again')}</Button>}>{t(externalStaff ? 'Your practitioner session has expired. Sign in again with your original account.' : 'Your staff session has expired. Sign in with Microsoft to continue.')}</Alert>;
+  if (error) return <Stack spacing={2}><Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>{externalStaff && <>
+    {import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && <Button href={`${import.meta.env.BASE_URL}staff/apply`}>{t('Apply or check your practitioner application')}</Button>}
+    <Button disabled={busy} onClick={() => { setBusy(true); void signOut().catch(cause => { setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); setBusy(false); }); }}>{t('SignOut')}</Button>
+  </>}</Stack>;
   if (busy || access?.account !== accountKey) return <Stack alignItems="center" py={4}><CircularProgress /><Typography mt={2}>{t('Verifying staff access…')}</Typography></Stack>;
   if (!access.roles.length) return <Alert severity="warning">{t('This account has no active staff permissions. Please contact the clinic administrator.')}</Alert>;
   return <div key={accountKey}>{children({ roles: access.roles, permissions: access.permissions })}</div>;

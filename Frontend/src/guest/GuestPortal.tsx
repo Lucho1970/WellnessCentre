@@ -8,6 +8,7 @@ import { publicLink } from '../shared/urls';
 import { GuestCatalogue } from './GuestCatalogue';
 import { GuestPractitionerDetails } from './GuestPractitionerDetails';
 import { GuestBooking } from './GuestBooking';
+import { practitionerIdentityEnabled } from '../auth/practitionerIdentity';
 
 function hasRecentClientSession() {
   try {
@@ -44,8 +45,8 @@ export function GuestPortal() {
         <Button href={import.meta.env.BASE_URL} size="small">{t('Treatments')}</Button>
         <Button href={`${import.meta.env.BASE_URL}client`} size="small">{t('My appointments')}</Button>
         <Button href={`${import.meta.env.BASE_URL}client${hasClientSession ? '' : '?return=browse'}`} variant="contained" size="small">{t(hasClientSession ? 'My account' : 'Log in')}</Button>
-        <Button href={`${import.meta.env.BASE_URL}staff/login`} variant="outlined" size="small">{t('Staff sign in')}</Button>
-        {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <Button href={`${import.meta.env.BASE_URL}staff/external`} size="small">{t('Invited practitioner sign-in')}</Button>}
+        <Button href={`${import.meta.env.BASE_URL}staff/login`} variant="outlined" size="small">{t(practitionerIdentityEnabled ? 'Clinic staff sign-in' : 'Staff sign in')}</Button>
+        {practitionerIdentityEnabled && <Button href={`${import.meta.env.BASE_URL}staff/external`} size="small">{t('Practitioner sign-in')}</Button>}
         <LanguageSwitcher/>
       </Stack>
     </Toolbar></Container></AppBar>

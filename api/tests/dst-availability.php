@@ -15,7 +15,9 @@ final class DstStatement extends PDOStatement
         if (str_contains($this->sql, 'FROM services s')) $this->rows = [[
             'offers_mobile' => 1, 'offers_clinic' => 1, 'requires_room' => 0,
             'travel_buffer_minutes' => 0, 'mobile_fee_cents' => 0, 'base_price_cents' => 10000,
-            'lead_time_minutes' => 0, 'booking_horizon_days' => 365,
+            // The next annual transition can be 371 days away on transition day.
+            // This synthetic horizon keeps DST assertions running year-round.
+            'lead_time_minutes' => 0, 'booking_horizon_days' => 400,
             'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0,
             'duration_option_id' => 1, 'duration_minutes' => 60, 'timezone' => 'America/Toronto',
         ]];
@@ -42,7 +44,7 @@ $nextSunday = static function (int $month, int $ordinal) use ($now): string {
         $date = new DateTimeImmutable(sprintf('%d-%02d-01 00:00:00', $year, $month), new DateTimeZone('America/Toronto'));
         $first = $date->modify('first sunday of this month');
         $candidate = $first->modify('+' . ($ordinal - 1) . ' weeks');
-        if ($candidate > $now->modify('+1 day') && $candidate < $now->modify('+365 days')) return $candidate->format('Y-m-d');
+        if ($candidate > $now->modify('+1 day') && $candidate < $now->modify('+400 days')) return $candidate->format('Y-m-d');
     }
     throw new RuntimeException('No DST test date falls inside the booking horizon.');
 };

@@ -7,5 +7,6 @@ export default defineConfig({
   webServer: (Array.isArray(base.webServer) ? base.webServer : []).map(server => ({ ...server, env: {
     ...server.env, VITE_STAFF_INVITATIONS_ENABLED: 'false',
     VITE_PRACTITIONER_APPLICATIONS_ENABLED: 'true', VITE_STAFF_EXTERNAL_AUTH_ENABLED: 'true',
+    VITE_PRACTITIONER_SOCIAL_SIGN_IN_ENABLED: 'true',
   } })),
 });

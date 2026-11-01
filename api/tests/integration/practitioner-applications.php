@@ -195,6 +195,36 @@ try {
     $check($http('wellnexa.test','/api/v1/practitioner-applications/me',$pendingToken,array_replace($httpBody,['services'=>str_repeat('x',66000)]))[0]===413,'Applicant body bounded before parsing');
     $audit=$pdo->query("SELECT metadata FROM access_audit_events WHERE actor_type='practitioner_applicant' AND outcome='success' ORDER BY id DESC LIMIT 1")->fetchColumn();$meta=json_decode($audit,true);
     $check(isset($meta['applicant_fingerprint']) && strlen($meta['applicant_fingerprint'])===64 && !str_contains($audit,'http@example.test') && !str_contains($audit,'ciamlogin.com'),'Applicant audit stores fingerprint and resources, never contact details or raw claims');
+    // Brokered social identities keep the same exact staff API trust and independent approval.
+    // idp is informational: these are synthetic Entra-signed tokens, not provider acceptance.
+    foreach(['google'=>'accounts.google.com','microsoft'=>'login.live.com'] as $provider=>$upstream){
+        $socialToken=$signed(array_replace($externalClaims,['sub'=>'social-'.$provider,'idp'=>$upstream,'roles'=>['Wellness.SuperAdmin']]));
+        $check($http('wellnexa.test','/api/v1/practitioner-applications/me',$signed(array_replace($externalClaims,['iss'=>'https://'.$upstream])))[0]===401,$provider.' upstream tokens cannot replace the trusted external broker');
+        $applicationPath='/api/v1/practitioner-applications';
+        $registration=$key(array_replace($profile,['email'=>$provider.'@example.test','given_name'=>'Synthetic '.$provider]));
+        $submitted=$http('wellnexa.test',$applicationPath.'/me',$socialToken,$registration);
+        $check($submitted[0]===200&&$submitted[1]['data']['status']==='submitted',$provider.' brokered identity submits through real HTTP');
+        $check($http('wellnexa.test','/api/v1/auth/me',$socialToken)[0]===403,$provider.' registration grants no staff access');
+        $check($http('wellnexa.test',$applicationPath.'/activate',$socialToken,$key(['version'=>1,'accept_terms'=>true,'terms_id'=>$offer['terms']['id']]))[0]===409,$provider.' cannot activate without independent approval');
+        $own=$http('wellnexa.test',$applicationPath.'/me',$socialToken)[1]['data']['application'];
+        $decision=$key(array_replace($review,['version'=>1,'verification_code'=>$own['verification_code']]));
+        $check($http('portal.test','/api/v1/application/clinics/1/practitioner-applications/'.$own['id'].'/review',$adminToken,$decision)[0]===200,$provider.' central review verifies exact application');
+        $check($http('wellnexa.test','/api/v1/auth/me',$socialToken)[0]===403,$provider.' approval alone grants no workspace');
+        $activation=$key(['version'=>2,'accept_terms'=>true,'terms_id'=>$offer['terms']['id']]);
+        $activated=$http('wellnexa.test',$applicationPath.'/activate',$socialToken,$activation);
+        $check($activated[0]===200&&$activated[1]['data']['status']==='activated',$provider.' applicant explicitly activates approved membership');
+        $check($http('wellnexa.test',$applicationPath.'/activate',$socialToken,$activation)[1]['data']===$activated[1]['data'],$provider.' activation replay creates no extra trial');
+        $access=$http('wellnexa.test','/api/v1/auth/me',$socialToken);
+        $check($access[0]===200&&$access[1]['data']['roles']===['practitioner'],$provider.' is limited to practitioner despite injected directory role');
+        $check($http('other.test','/api/v1/auth/me',$socialToken)[0]===403,$provider.' membership does not extend to another clinic');
+        $check($http('portal.test','/api/v1/application/clinics/1/practitioner-applications',$socialToken)[0]===401,$provider.' cannot become central reviewer');
+        $check($http('wellnexa.test','/api/v1/auth/me?disabled=1',$socialToken)[0]===200,$provider.' approved sign-in remains when intake closes');
+        $otherIdentity=$signed(array_replace($externalClaims,['sub'=>'unlinked-'.$provider,'email'=>$provider.'@example.test']));
+        $check($http('wellnexa.test','/api/v1/auth/me',$otherIdentity)[0]===403,$provider.' same email never links another identity');
+        $pdo->prepare("UPDATE staff_memberships m JOIN practitioner_applications a ON a.membership_id=m.id SET m.status='revoked' WHERE a.id=?")->execute([$own['id']]);
+        $check($http('wellnexa.test','/api/v1/auth/me',$socialToken)[0]===403,$provider.' current membership revocation denies the same token');
+        $check($http('wellnexa.test',$applicationPath.'/activate',$socialToken,$activation)[0]===403,$provider.' stale activation replay cannot restore revoked access');
+    }
 } finally {
     if(is_resource($process)){proc_terminate($process);foreach($pipes as $pipe)if(is_resource($pipe))fclose($pipe);proc_close($process);}
     unlink($fixture);unlink($router);

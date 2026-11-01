@@ -5,6 +5,7 @@ import { useStaffAuth } from './AuthProvider';
 import { ApiError, apiRequest } from '../shared/api';
 import { Alert, TextField, useFormValidation, withFormValidation } from '../shared/FormValidation';
 import { useUnsavedForm } from '../shared/UnsavedChanges';
+import { PractitionerSignInOptions } from './PractitionerSignInOptions';
 
 type Offer = { available: boolean; enabled: boolean; activation_available: boolean; terms: { id: number; version: number; content: string } | null; plan: { id: number; name: string; base_monthly_cents: number | string | null } | null };
 type Profile = { given_name: string; family_name: string; email: string; phone: string; discipline: string; credentials: string; service_area: string; services: string; enquiry_reference: string };
@@ -54,12 +55,13 @@ function ApplicationForm() {
     <Typography variant="h4" component="h1">{t('Apply to join the clinic')}</Typography>
     <Typography>{t('Use your dedicated practitioner account to submit an application and follow its review. Applying does not grant clinic access or publish your profile.')}</Typography>
     {error && <Alert severity="error">{error}</Alert>}
+    {auth.signInError && <Alert severity="error">{auth.signInError}</Alert>}
     <Stack direction="row" spacing={1}><Button disabled={busy} onClick={() => { if (!guard.dirty || window.confirm(t('Discard your unsaved changes?'))) void load(); }}>{t('Refresh application')}</Button>{auth.isAuthenticated && <Button disabled={busy} onClick={() => { if (!guard.dirty || window.confirm(t('Discard your unsaved changes?'))) void auth.signOut().catch(fail); }}>{t('SignOut')}</Button>}</Stack>
     {busy && <Typography role="status">{t('Loading…')}</Typography>}
     {!auth.configured && state?.offer.available && <Alert severity="info">{t('Practitioner sign-in is not configured. Contact the clinic.')}</Alert>}
     {pending && !busy && <><Alert severity="warning">{t('The save outcome is uncertain. Retry the same application change before editing.')}</Alert><Button onClick={() => void perform(pending)}>{t('Retry application change')}</Button></>}
     {state && !app && !state.offer.enabled && <Alert severity="info">{t('Practitioner applications are currently closed. You can still contact the clinic about joining.')}</Alert>}
-    {!auth.isAuthenticated && state?.offer.available && <><Button variant="contained" disabled={!auth.configured || busy} onClick={() => void auth.signIn().catch(fail)}>{t(state.offer.enabled?'Sign in or register to apply':'Sign in to check your application')}</Button><Button href={`${import.meta.env.BASE_URL}staff/login`}>{t('Existing workforce staff sign-in')}</Button></>}
+    {!auth.isAuthenticated && state?.offer.available && <><PractitionerSignInOptions disabled={!auth.configured || busy} onSignIn={provider => void auth.signIn(provider).catch(fail)} fallbackLabel={state.offer.enabled ? 'Sign in or register to apply' : 'Sign in to check your application'}/><Button href={`${import.meta.env.BASE_URL}staff/login`}>{t('Existing workforce staff sign-in')}</Button></>}
     {state && (editable || app?.status === 'approved') && <>
       <Alert severity="info">{t('Eligible new memberships receive six calendar months free after approval and activation. There is no automatic paid conversion or retroactive trial charge. SMS funding is assigned separately.')}</Alert>
       {state.offer.plan && <Typography>{state.offer.plan.name} · {state.offer.plan.base_monthly_cents === null ? t('Regular pricing has not been set. No dollar estimate is available yet.') : t('Published monthly base rate: {{amount}}. Other agreed charges are described in the joining terms.', { amount: money(state.offer.plan.base_monthly_cents) })}</Typography>}

@@ -10,7 +10,7 @@ async function fixture(page: Page, signedIn = true) {
   };
   await page.route('**/src/auth/AuthProvider.tsx', route => route.fulfill({ contentType: 'application/javascript', body: `
     const account=${signedIn ? "{homeAccountId:'alice',name:'Alice',username:'alice@example.test'}" : 'null'};
-    const auth={account,configured:true,isAuthenticated:!!account,signIn:async()=>{window.testLogin=true},signOut:async()=>{},getAccessToken:async()=>'synthetic-token'};
+    const auth={account,configured:true,isAuthenticated:!!account,signIn:async(provider)=>{window.testLogin=provider??'picker'},signOut:async()=>{},getAccessToken:async()=>'synthetic-token'};
     export const msalInstance={initialize:async()=>{},handleRedirectPromise:async()=>null,getActiveAccount:()=>account,getAllAccounts:()=>account?[account]:[],setActiveAccount:()=>{}};
     export const selectStaffAccount=()=>account;export const StaffAuthProvider=({children})=>children;export const useStaffAuth=()=>auth;
   ` }));
@@ -45,10 +45,10 @@ function approved() { return { ...profile, id: 7, version: 2, status: 'approved'
 test('anonymous mobile application entry chooses practitioner identity and retains language', async ({ page }) => {
   const state = await fixture(page, false); await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${host}/staff/apply`);
-  await expect(page.getByRole('button', { name: 'Sign in or register to apply' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBe('external');
-  await page.getByRole('button', { name: 'Sign in or register to apply' }).click();
-  expect(await page.evaluate(() => (window as Window & { testLogin?: boolean }).testLogin)).toBe(true);
+  await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
+  expect(await page.evaluate(() => (window as Window & { testLogin?: string }).testLogin)).toBe('google');
   await page.goto(`${host}/staff/apply?lang=fr`);
   await expect(page.getByRole('heading', { name: 'Présenter une candidature à la clinique' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -138,11 +138,75 @@ test('application-only entry uses the real dedicated practitioner MSAL configura
   await page.route('**/api/runtime-config.php', route => route.fulfill({ json: {} }));
   await page.route('**/api/v1/**', route => route.fulfill({ json: { data: route.request().url().endsWith('/site-config') ? { name: 'Test clinic' } : { available: true, enabled: false, activation_available: false, terms: null, plan: null } } }));
   await page.goto(`${host}/staff/apply`);
-  await expect(page.getByRole('button', { name: 'Sign in to check your application' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue with personal Microsoft account', exact: true })).toBeVisible();
   const configuration = await page.evaluate(async () => {
     const module = await import(/* @vite-ignore */ '/src/auth/AuthProvider.tsx');
     const auth = module.msalInstance.getConfiguration().auth;
     return { external: module.externalStaff, client: auth.clientId, authority: auth.authority, redirect: auth.redirectUri };
   });
   expect(configuration).toEqual({ external: true, client: '77777777-7777-7777-7777-777777777777', authority: 'https://teststaff.ciamlogin.com/44444444-4444-4444-4444-444444444444', redirect: `${host}/staff/external` });
+});
+
+test('the public portal separates practitioner and clinic workforce entry points', async ({ page }) => {
+  await fixture(page, false); await page.goto(host);
+  await expect(page.getByRole('link', { name: 'Clinic staff sign-in', exact: true })).toHaveAttribute('href', '/staff/login');
+  await page.getByRole('link', { name: 'Practitioner sign-in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Practitioner sign-in', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Existing workforce staff sign-in', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Sign in with Microsoft', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBeNull();
+});
+
+for (const [label, hint] of [['Continue with Google', 'google'], ['Continue with personal Microsoft account', 'login.live.com']]) {
+  test(`${label} uses the external staff scope and fixed issuer routing`, async ({ page }) => {
+    await page.route('**/api/runtime-config.php', route => route.fulfill({ json: {} }));
+    await page.route('**/api/v1/**', route => route.fulfill({ json: { data: route.request().url().endsWith('/site-config') ? { name: 'Synthetic clinic' } : { available: true, enabled: true, activation_available: false, terms: null, plan: null } } }));
+    await page.goto(`${host}/staff/apply?domain_hint=evil.example&login_hint=someone@example.test&redirect_uri=https://evil.example`);
+    await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
+    await page.evaluate(async () => {
+      const module = await import(/* @vite-ignore */ '/src/auth/AuthProvider.tsx');
+      // Keep the real bridge/request construction. Replace only the navigation effect.
+      module.msalInstance.loginRedirect = async (request: unknown) => { (window as Window & { capturedLogin?: unknown }).capturedLogin = request; };
+    });
+    await page.getByRole('button', { name: label, exact: true }).click();
+    expect(await page.evaluate(() => (window as Window & { capturedLogin?: unknown }).capturedLogin)).toEqual({ scopes: ['api://88888888-8888-8888-8888-888888888888/access_as_staff'], prompt: 'login', domainHint: hint });
+  });
+}
+
+test('personal Microsoft selection remains usable in French at mobile width and 200 percent zoom', async ({ page }) => {
+  await fixture(page, false); await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${host}/staff/external?lang=fr`);
+  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  const microsoft = page.getByRole('button', { name: 'Continuer avec un compte Microsoft personnel', exact: true });
+  await microsoft.focus(); await expect(microsoft).toBeFocused(); await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => (window as Window & { testLogin?: string }).testLogin)).toBe('microsoft');
+  const overflow = await page.evaluate(() => [...document.querySelectorAll('h1,button,a,p,header')].filter(el => el.getBoundingClientRect().right > innerWidth + 1).map(el => ({ tag: el.tagName, text: el.textContent, right: el.getBoundingClientRect().right })));
+  expect(overflow).toEqual([]);
+  await page.screenshot({ path: 'test-results/practitioner-applications/practitioner-signin-fr-zoom.png', fullPage: true });
+});
+
+test('an unapproved practitioner can reach their application after portal access denial', async ({ page }) => {
+  const state = await fixture(page); await page.goto(`${host}/staff/external`);
+  await expect(page.getByRole('link', { name: 'Apply or check your practitioner application' })).toBeVisible();
+  await page.getByRole('link', { name: 'Apply or check your practitioner application' }).click();
+  await expect(page.getByRole('heading', { name: 'Apply to join the clinic' })).toBeVisible();
+  expect(state.privateRequests).toContain('/api/v1/auth/me');
+  expect(state.privateRequests).not.toContain('/api/v1/clients');
+});
+
+test('a rejected identity callback renders recovery without exposing provider diagnostics', async ({ page }) => {
+  const pageErrors: string[] = []; page.on('pageerror', error => pageErrors.push(error.message));
+  await page.route('**/api/runtime-config.php', route => route.fulfill({ json: {} }));
+  await page.route('**/api/v1/**', route => route.fulfill({ json: { data: { name: 'Synthetic clinic' } } }));
+  await page.route('**/src/auth/AuthProvider.tsx', async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, body: await response.text() + '\nmsalInstance.handleRedirectPromise = async () => { throw new Error("Synthetic private provider diagnostic"); };' });
+  });
+  await page.goto(`${host}/staff/external`);
+  await expect(page.getByText('Sign-in could not be completed. Try again or choose another sign-in method.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toBeEnabled();
+  await expect(page.getByText('Synthetic private provider diagnostic')).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
 });

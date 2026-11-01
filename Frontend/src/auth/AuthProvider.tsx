@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { selectAccount } from './accountSelection';
 import i18n from '../i18n';
 import { claimStaffSessionRecovery, clearStaffSessionRecovery, needsInteractiveStaffAuth } from './staffSessionRecovery';
+import { practitionerIdentityEnabled, practitionerLoginParameters, practitionerSocialSignInEnabled, type PractitionerProvider } from './practitionerIdentity';
 
-export const externalStaff = __APP_SURFACE__ !== 'application-admin' && (import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' || import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' || import.meta.env.VITE_STAFF_EXTERNAL_AUTH_ENABLED === 'true') && sessionStorage.getItem('wellness.staff.provider') === 'external';
+export const externalStaff = __APP_SURFACE__ !== 'application-admin' && practitionerIdentityEnabled && sessionStorage.getItem('wellness.staff.provider') === 'external';
 const tenantId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_TENANT_ID : import.meta.env.VITE_ENTRA_TENANT_ID) ?? '';
 const spaClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_SPA_CLIENT_ID : import.meta.env.VITE_ENTRA_SPA_CLIENT_ID) ?? '';
 const apiClientId = (externalStaff ? import.meta.env.VITE_STAFF_EXTERNAL_API_CLIENT_ID : import.meta.env.VITE_ENTRA_API_CLIENT_ID) ?? '';
@@ -29,21 +30,26 @@ export function selectStaffAccount(preferred = msalInstance.getActiveAccount()) 
   return selectAccount(msalInstance.getAllAccounts(), preferred, tenantId, externalStaff ? [externalHost,`${tenantId}.ciamlogin.com`] : ['login.windows.net', 'login.microsoftonline.com', 'login.microsoft.com', 'sts.windows.net']);
 }
 
-type StaffAuthValue = { account: AccountInfo | null; configured: boolean; isAuthenticated: boolean; sessionExpired: boolean; signIn: () => Promise<void>; signOut: () => Promise<void>; getAccessToken: () => Promise<string> };
+type StaffAuthValue = { account: AccountInfo | null; configured: boolean; isAuthenticated: boolean; sessionExpired: boolean; signInError: string | null; signIn: (provider?: PractitionerProvider) => Promise<void>; signOut: () => Promise<void>; getAccessToken: () => Promise<string> };
 const StaffAuthContext = createContext<StaffAuthValue | null>(null);
 let sessionRecoveryRedirect: Promise<void> | null = null;
 
-function StaffAuthBridge({ children }: PropsWithChildren) {
+function StaffAuthBridge({ children, redirectFailed = false }: PropsWithChildren<{ redirectFailed?: boolean }>) {
   const { t } = useTranslation();
   const { instance, accounts } = useMsal();
-  const account = useMemo(() => selectStaffAccount(instance.getActiveAccount()), [instance, accounts]);
+  const account = useMemo(() => redirectFailed ? null : selectStaffAccount(instance.getActiveAccount()), [instance, accounts, redirectFailed]);
   const isAuthenticated = Boolean(account);
   const [sessionExpired, setSessionExpired] = useState(false);
-  const signIn = useCallback(async () => {
+  const signIn = useCallback(async (provider?: PractitionerProvider) => {
     if (!configured) throw new Error(t('Microsoft Entra staff sign-in is not configured.'));
+    if (provider && (!externalStaff || !practitionerSocialSignInEnabled)) throw new Error(t('Practitioner sign-in is not configured. Contact the clinic.'));
     if (sessionRecoveryRedirect) return sessionRecoveryRedirect;
     clearStaffSessionRecovery();
-    await instance.loginRedirect({ scopes: apiScopes, prompt: 'select_account' });
+    if (!externalStaff) { await instance.loginRedirect({ scopes: apiScopes, prompt: 'select_account' }); return; }
+    const previous = instance.getActiveAccount();
+    instance.setActiveAccount(null);
+    try { await instance.loginRedirect({ scopes: apiScopes, ...practitionerLoginParameters(provider) }); }
+    catch (error) { instance.setActiveAccount(previous); throw error; }
   }, [instance, t]);
   const signOut = useCallback(async () => { await instance.logoutRedirect({ account: account ?? undefined, postLogoutRedirectUri: portalRoot }); }, [account, instance]);
   const getAccessToken = useCallback(async () => {
@@ -59,16 +65,18 @@ function StaffAuthBridge({ children }: PropsWithChildren) {
       if (!needsInteractiveStaffAuth(error)) throw error;
       setSessionExpired(true);
       if (!sessionRecoveryRedirect && claimStaffSessionRecovery()) {
-        sessionRecoveryRedirect = instance.loginRedirect({ scopes: apiScopes, prompt: 'select_account' });
+        if (externalStaff) instance.setActiveAccount(null);
+        sessionRecoveryRedirect = instance.loginRedirect({ scopes: apiScopes, ...(externalStaff ? practitionerLoginParameters() : { prompt: 'select_account' }) });
       }
       try { await sessionRecoveryRedirect; } catch { /* The sign-in button remains available. */ }
       finally { sessionRecoveryRedirect = null; }
-      throw new Error(t('Your staff session has expired. Sign in with Microsoft to continue.'), { cause: error });
+      throw new Error(t(externalStaff ? 'Your practitioner session has expired. Sign in again with your original account.' : 'Your staff session has expired. Sign in with Microsoft to continue.'), { cause: error });
     }
   }, [account, instance, t]);
-  const value = useMemo(() => ({ account, configured, isAuthenticated, sessionExpired, signIn, signOut, getAccessToken }), [account, getAccessToken, isAuthenticated, sessionExpired, signIn, signOut]);
+  const signInError = redirectFailed ? t('Sign-in could not be completed. Try again or choose another sign-in method.') : null;
+  const value = useMemo(() => ({ account, configured, isAuthenticated, sessionExpired, signInError, signIn, signOut, getAccessToken }), [account, getAccessToken, isAuthenticated, sessionExpired, signInError, signIn, signOut]);
   return <StaffAuthContext.Provider value={value}>{children}</StaffAuthContext.Provider>;
 }
 
-export function StaffAuthProvider({ children }: PropsWithChildren) { return <MsalProvider instance={msalInstance}><StaffAuthBridge>{children}</StaffAuthBridge></MsalProvider>; }
+export function StaffAuthProvider({ children, redirectFailed }: PropsWithChildren<{ redirectFailed?: boolean }>) { return <MsalProvider instance={msalInstance}><StaffAuthBridge redirectFailed={redirectFailed}>{children}</StaffAuthBridge></MsalProvider>; }
 export function useStaffAuth() { const value = useContext(StaffAuthContext); if (!value) throw new Error('useStaffAuth must be used within StaffAuthProvider.'); return value; }

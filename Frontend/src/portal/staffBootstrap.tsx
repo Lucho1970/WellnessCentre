@@ -10,8 +10,11 @@ export async function bootstrap() {
   // the iframe could start another token request and make renewal time out.
   if (window.self !== window.top) return;
   await msalInstance.initialize();
-  const result = await msalInstance.handleRedirectPromise();
-  const account = selectStaffAccount(result?.account ?? msalInstance.getActiveAccount());
+  let result = null;
+  let redirectFailed = false;
+  try { result = await msalInstance.handleRedirectPromise(); }
+  catch { redirectFailed = true; } // Render a safe recovery state; never expose raw provider errors.
+  const account = redirectFailed ? null : selectStaffAccount(result?.account ?? msalInstance.getActiveAccount());
   msalInstance.setActiveAccount(account);
-  createRoot(document.getElementById('root')!).render(<React.StrictMode><AppProviders><StaffAuthProvider><PortalApp /></StaffAuthProvider></AppProviders></React.StrictMode>);
+  createRoot(document.getElementById('root')!).render(<React.StrictMode><AppProviders><StaffAuthProvider redirectFailed={redirectFailed}><PortalApp /></StaffAuthProvider></AppProviders></React.StrictMode>);
 }

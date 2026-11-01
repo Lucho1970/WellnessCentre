@@ -90,7 +90,7 @@ export function PortalApp() {
               <Button href={publicLink()} size="small">
                 {t("Public website")}
               </Button>
-              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}>
                 <LanguageSwitcher />
                 {!applicationPath && <UserAccountMenu />}
               </Stack>

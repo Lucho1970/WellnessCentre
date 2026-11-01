@@ -6,6 +6,7 @@ import {
   type MouseEvent,
 } from "react";
 import { useStaffProfile } from './useStaffProfile';
+import { practitionerIdentityEnabled } from './practitionerIdentity';
 import {
   Avatar,
   Box,
@@ -98,12 +99,13 @@ export function UserAccountMenu() {
     return (
       <Button
         component={Link}
-        to="/staff/login"
+        to={practitionerIdentityEnabled && sessionStorage.getItem('wellness.staff.provider') === 'external' ? '/staff/external' : '/staff/login'}
         variant="contained"
         size="small"
+        sx={{ minWidth: 0, maxWidth: '100%', overflowWrap: 'anywhere' }}
         startIcon={<LogIn size={17} />}
       >
-        {t("Staff sign in")}
+        {t(practitionerIdentityEnabled && sessionStorage.getItem('wellness.staff.provider') === 'external' ? 'Practitioner sign-in' : 'Staff sign in')}
       </Button>
     );
   const name = profile?.display_name || t("Staff member");
