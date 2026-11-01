@@ -321,4 +321,55 @@ old assets and preserves schema/new audit/application records. Private configura
 require its separately preserved current copy if later changed. The host's pending server
 copy, restore rehearsal, full hosted acceptance and accountable sign-offs remain unresolved.
 
+## Hosted asset gate passed before entry-page replacement
+
+1 November 2026, **18:23 UTC** (America/Toronto date: 1 November), documentation baseline
+`05e9e5ef73849e266c36c8a5c1c65cdcf616a188`. The owner reported completing the asset merge in
+Beyond Compare and requested verification before applying entry pages. No entry-page or
+configuration upload was performed by this check.
+
+Expected bytes and SHA-256 values were read directly from **all asset members** of the
+three original verified archives at application source `6808300`, rather than trusting
+an HTTP 200 or the transfer ZIP's changed-file subset. This covers **72 distinct assets**:
+68 shared-portal assets, two central-administration assets and two Wellnexa website assets.
+The 64 changed JS files in `01-assets.zip` are included, along with the unchanged assets
+required by the complete builds.
+
+| Anonymous HTTPS target | Checks | Result |
+| --- | --- | --- |
+| `https://wellnexa.copihue.ca/assets/...` | 68 | All HTTP 200, exact expected bytes/SHA-256, valid JS/CSS MIME. |
+| `https://livinlively.copihue.ca/assets/...` | 68 | All HTTP 200, exact expected bytes/SHA-256, valid JS/CSS MIME. |
+| `https://portal.copihue.ca/admin/assets/...` | 2 | Both HTTP 200, exact expected bytes/SHA-256, valid JS/CSS MIME. |
+| `https://wellnexa.ca/assets/...` | 2 | Both HTTP 200, exact expected bytes/SHA-256, valid JS/CSS MIME. |
+| Both clinic roots, central `/admin/`, Wellnexa website root | 4 | All HTTP 200 and byte-identical to the previous private HTML backups. Entry pages have not switched. |
+
+**140/140 asset URL checks and 4/4 previous-entry-page checks passed, zero failures.**
+Canonical URLs were requested with normal verified TLS, no cache-busting parameter and
+no certificate override. Requests used PowerShell `Invoke-WebRequest -Uri $target.url
+-TimeoutSec 25` in `ForEach-Object -Parallel ... -ThrottleLimit 4`; response bytes came from
+`$response.RawContentStream.ToArray()`, with SHA-256 calculated using
+`[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()`.
+JS MIME types were checked against browser-supported JavaScript types, and CSS against
+`text/css`. The Python standard-library `ZipFile` target inventory and PowerShell results
+remain ignored under `.tmp/`; neither contains authentication or patient data:
+
+- `practitioner-hosted-pre-entry-targets.json`, SHA-256
+  `9bea52907ded7cfd0779a1d691c3a938c21ce2844f8f7923e1810549ca5c9db3`.
+- `practitioner-hosted-pre-entry-results.json`, SHA-256
+  `5fffcc7d84074e9d7c318be1ce22544847bb2a0cd3093588a24ccf0a93456bab`.
+
+The **asset integrity gate is passed** for applying `02-entry-pages.zip` to `/public_html`
+under the existing deployment approval. Replace only its three HTML entry pages and retain
+all old and new assets. Recheck the deployed entry bytes, compiled routes, both clinic
+intakes and separate workforce/practitioner authentication afterward. This is static hosted
+asset acceptance, not successful provider/MFA, application approval/activation, trial,
+normal Inactive testing, database restore or real-PHI release acceptance.
+
+No source/runtime dependency, permission, identity approval, API endpoint/data flow, private
+configuration, account or additional schema change was made. The two maintained documents
+record this checkpoint; broad local builds/suites were not repeated for a read-only hosted
+integrity check. Rollback still restores the three prior HTML files while retaining assets
+and all database/application/audit records. Existing accountable-owner and operational gates
+remain open.
+
 RELEASE STATUS: NOT READY FOR RELEASE

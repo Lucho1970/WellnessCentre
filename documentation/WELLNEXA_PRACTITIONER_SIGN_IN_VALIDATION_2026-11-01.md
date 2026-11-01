@@ -309,6 +309,15 @@ ZIPs reproduce 67 exact members of the verified artifact, with manifests/hashes 
 configuration or data. No live feature flag, identity approval, membership, terms or account
 changed. These facts qualify REL-03/05 below; full hosted acceptance remains pending.
 
+After the owner's Beyond Compare asset merge, the **1 November 18:23 UTC static asset gate
+passed**: 140 canonical HTTPS checks covering all 72 distinct asset files across both clinic
+hosts, central administration and Wellnexa matched the original archive bytes/SHA-256 with
+valid JS/CSS MIME; four previous HTML entry-page checks also passed unchanged. Zero failures.
+The runbook records commands, inventory/result hashes and exact scope. This satisfies the
+static asset prerequisite for the already approved HTML step; no provider/account, private-configuration,
+API/dependency/permission or further schema change was made. Full hosted acceptance remains
+pending after the entry-page replacement.
+
 All decisions below are **1 November 2026, Codex**, against the application source revision
 recorded above and this report's files/tests. Human owner names/signatures have not been
 supplied: role labels below are **unassigned accountable roles**, not claimed appointments.
@@ -353,7 +362,7 @@ for its applicable scope.
 | DEV-06 | Partial | No new runtime dependencies, polling or SQL queries; fixed-size provider choices. Existing chunk notices and volume performance remain. | Performance/build: review bundle/performance budgets and representative load. |
 | REL-01 | Partial | This 38-control source/test ledger is supplied; named accountable owners and human decisions remain absent. | Release owner: assign names and collect dated decisions. |
 | REL-02 | Partial | Exact local commands/results and synthetic boundary above; defaults omit dedicated suites, which are run explicitly. Hosted acceptance remains separate. | QA/release: verify final checkpoint and required operational scenarios. |
-| REL-03 | Partial | Pilot artifact at source 6808300 has 237 archive checks; approved 053–055 imports/schema checks passed. Private export/file backups inspected; extraction failed, two unreferenced assets uploaded, 67 exact transfer members repackaged for Beyond Compare. Entry pages/configuration unchanged; restoration and hosted identity acceptance pending. | Release/operations: verify remaining assets before switching HTML and complete hosted acceptance/rollback. |
+| REL-03 | Partial | Source 6808300 artifact has 237 archive checks; approved 053–055 imports/schema checks passed. After Beyond Compare merge, 140/140 asset URL checks (72 distinct files) and 4/4 unchanged-entry checks passed. Entry pages/configuration unchanged; restoration and hosted identity acceptance pending. | Release/operations: apply the approved three HTML files, verify routes/intake and complete hosted acceptance/rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; flags are default off and unresolved controls are not waived by tests. | Accountable owners: resolve or lawfully approve applicable internal exceptions. |
 | REL-05 | Partial | User authorized implementation, exact MSA association, two-account synthetic testing, controlled pilot deployment and existing 053–055 DDL after backup verification. Those migrations succeeded; file/configuration rollout and accountable operational sign-offs remain pending. No new API grant. | Release/custodian/privacy/security/clinical: retain scoped approval, file-backup/restore and hosted acceptance evidence. |
 | REL-06 | Implemented (report scope) | Requested/result scope, file purposes, exact versions/commands, flows, findings, omissions, owners/actions and rollback recorded. | Release owner: verify final source SHA and completion report. |
