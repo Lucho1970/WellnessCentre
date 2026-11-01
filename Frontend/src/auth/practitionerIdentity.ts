@@ -12,7 +12,8 @@ export function practitionerLoginParameters(provider?: PractitionerProvider) {
   if (provider !== undefined && provider !== 'google' && provider !== 'microsoft') {
     throw new Error('Unsupported practitioner sign-in provider.');
   }
-  // External ID issuer acceleration: MSA is a custom OIDC provider with the
-  // login.live.com issuer. These hints never change our API token trust.
-  return { prompt: 'login', ...(provider ? { domainHint: provider === 'google' ? 'google' : 'login.live.com' } : {}) };
+  // The live tenant rejects google/login.live.com acceleration (AADSTS90023/90072).
+  // Open its supported provider picker for either choice; retain the staff authority
+  // and scope, and never use a provider hint supplied through the page URL.
+  return { prompt: 'login' };
 }

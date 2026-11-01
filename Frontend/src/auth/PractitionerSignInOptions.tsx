@@ -11,6 +11,7 @@ export function PractitionerSignInOptions({ disabled, onSignIn, fallbackLabel }:
   return <Stack spacing={1} sx={{ width: '100%', maxWidth: 420 }}>
     {practitionerSocialSignInEnabled && <>
       <Typography>{t('Use your own Google or personal Microsoft account. A clinic-issued account is not required.')}</Typography>
+      <Typography variant="body2">{t('On the next screen, choose Google or Microsoft account to continue.')}</Typography>
       <Button variant="contained" disabled={disabled} onClick={() => onSignIn('google')}>{t('Continue with Google')}</Button>
       <Button variant="outlined" disabled={disabled} onClick={() => onSignIn('microsoft')}>{t('Continue with personal Microsoft account')}</Button>
     </>}

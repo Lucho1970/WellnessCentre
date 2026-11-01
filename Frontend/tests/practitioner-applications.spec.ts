@@ -159,25 +159,27 @@ test('the public portal separates practitioner and clinic workforce entry points
   expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBeNull();
 });
 
-for (const [label, hint] of [['Continue with Google', 'google'], ['Continue with personal Microsoft account', 'login.live.com']]) {
-  test(`${label} uses the external staff scope and fixed issuer routing`, async ({ page }) => {
+for (const label of ['Continue with Google', 'Continue with personal Microsoft account']) {
+  test(`${label} uses the external staff provider picker without rejected issuer hints`, async ({ page }) => {
     await page.route('**/api/runtime-config.php', route => route.fulfill({ json: {} }));
     await page.route('**/api/v1/**', route => route.fulfill({ json: { data: route.request().url().endsWith('/site-config') ? { name: 'Synthetic clinic' } : { available: true, enabled: true, activation_available: false, terms: null, plan: null } } }));
     await page.goto(`${host}/staff/apply?domain_hint=evil.example&login_hint=someone@example.test&redirect_uri=https://evil.example`);
     await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
+    await expect(page.getByText('On the next screen, choose Google or Microsoft account to continue.', { exact: true })).toBeVisible();
     await page.evaluate(async () => {
       const module = await import(/* @vite-ignore */ '/src/auth/AuthProvider.tsx');
       // Keep the real bridge/request construction. Replace only the navigation effect.
       module.msalInstance.loginRedirect = async (request: unknown) => { (window as Window & { capturedLogin?: unknown }).capturedLogin = request; };
     });
     await page.getByRole('button', { name: label, exact: true }).click();
-    expect(await page.evaluate(() => (window as Window & { capturedLogin?: unknown }).capturedLogin)).toEqual({ scopes: ['api://88888888-8888-8888-8888-888888888888/access_as_staff'], prompt: 'login', domainHint: hint });
+    expect(await page.evaluate(() => (window as Window & { capturedLogin?: unknown }).capturedLogin)).toEqual({ scopes: ['api://88888888-8888-8888-8888-888888888888/access_as_staff'], prompt: 'login' });
   });
 }
 
 test('personal Microsoft selection remains usable in French at mobile width and 200 percent zoom', async ({ page }) => {
   await fixture(page, false); await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${host}/staff/external?lang=fr`);
+  await expect(page.getByText('À l’écran suivant, choisissez Google ou Compte Microsoft pour continuer.', { exact: true })).toBeVisible();
   await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
   const microsoft = page.getByRole('button', { name: 'Continuer avec un compte Microsoft personnel', exact: true });
   await microsoft.focus(); await expect(microsoft).toBeFocused(); await page.keyboard.press('Enter');

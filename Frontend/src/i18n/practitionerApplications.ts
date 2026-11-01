@@ -5,6 +5,7 @@ const fr={
   'Continue with Google':'Continuer avec Google',
   'Continue with personal Microsoft account':'Continuer avec un compte Microsoft personnel',
   'Choose another sign-in method':'Choisir une autre méthode de connexion',
+  'On the next screen, choose Google or Microsoft account to continue.':'À l’écran suivant, choisissez Google ou Compte Microsoft pour continuer.',
   'Use your own Google or personal Microsoft account. A clinic-issued account is not required.':'Utilisez votre compte Google ou Microsoft personnel. Un compte fourni par la clinique n’est pas nécessaire.',
   'Use the same sign-in account each time. Clinic approval is required before practitioner access is granted.':'Utilisez le même compte à chaque connexion. L’approbation de la clinique est requise avant d’accorder l’accès de praticien.',
   'Your practitioner session has expired. Sign in again with your original account.':'Votre session de praticien a expiré. Reconnectez-vous avec votre compte initial.',
