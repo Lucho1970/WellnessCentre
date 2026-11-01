@@ -23,9 +23,10 @@ to practitioner sign-in, independently of its application form.
 
 With the social sign-in build gate enabled, the practitioner screen and anonymous application
 screen offer **Continue with Google**, **Continue with personal Microsoft account**, and
-**Choose another sign-in method**. A clinic-issued account is not required. The last option
-opens the configured practitioner user flow without a provider hint; it can recover from
-provider-specific routing problems and support an existing approved email-code account.
+**Choose another sign-in method**. A clinic-issued account is not required.
+All three buttons open the configured practitioner provider picker without a provider hint.
+The bilingual guidance asks users to choose Google or Microsoft account on the next screen;
+the other-method option also supports an existing approved email-code account.
 The application does not switch its authority or API trust on a provider error.
 
 Use the same sign-in account and method after registration. Matching email addresses do not
@@ -69,9 +70,11 @@ configured issuer, tenant, staff API audience, authorized staff SPA and `access_
 Direct Google/MSA tokens, client tokens and workforce tokens do not become practitioner
 application credentials. Provider hints and upstream `idp` claims grant no privilege.
 
-The browser uses fixed documented issuer acceleration: `domain_hint=google` and
-`domain_hint=login.live.com`. Request parameters cannot supply another hint, callback or
-authority. Practitioner interactive requests use `prompt=login` and clear the active-account
+Live checks after the provider save still rejected the documented `domain_hint=google`
+(`AADSTS90023`) and `domain_hint=login.live.com` (`AADSTS90072`) shortcuts. The application
+therefore sends **no provider hint** for either button and uses the working provider picker.
+Request parameters cannot supply another hint, callback or authority. Practitioner
+interactive requests use `prompt=login` and clear the active-account
 hint before starting, avoiding the workforce remembered-account picker. A failed navigation
 start restores the previous active account. Workforce requests retain `prompt=select_account`.
 The existing MSAL code/PKCE/nonce/state handling is retained; this is not a new token verifier.
@@ -82,7 +85,7 @@ and [issuer acceleration](https://learn.microsoft.com/en-us/entra/external-id/cu
 These describe provider capabilities, not evidence that this tenant is configured or that a
 particular account has passed live sign-in.
 
-## Live provider configuration to verify
+## Live provider configuration and remaining verification
 
 The [7 October rollout record](GOOGLE_PRACTITIONER_ROLLOUT.md) identifies the external tenant
 and dedicated staff registrations. Treat these as recorded identifiers to inspect, not current
@@ -93,9 +96,26 @@ A public entry check on 1 November reached the dedicated staff user flow with th
 callback and displayed Google. The documented personal Microsoft issuer-hint request returned
 `AADSTS90072`, rather than the intended independent account federation. This confirms a live
 entry failure; it does not by itself identify every missing/misassociated cloud setting.
-No account was created, token exchanged or membership approved. Inspect the custom MSA
-provider and staff user-flow association; do not substitute B2B guest invitations or workforce
-accounts for the requested self-service practitioner registration.
+No credentials were entered or application membership approved during that initial check.
+
+After the user authenticated the admin browser and explicitly approved saving the change,
+the existing **Microsoft account** OIDC provider was added to
+**WellnessPractitionersSignUpSignIn** in tenant
+`0a3841c6-b244-410d-821f-bbd9ccd1b5e2`. Before this change it had zero user-flow associations;
+the flow selected only Google and email one-time codes. After Save, Google and Microsoft
+account were selected and Save/Discard were disabled. A fresh public authorization request
+for the dedicated staff SPA displayed both provider buttons. Email codes were retained.
+The flow's Applications view contained only the dedicated staff SPA
+`2ccf904c-2b78-4348-9acb-72773d931416`; the client and workforce applications were not changed.
+
+The existing MSA provider uses broker client `0615ffd8-79b2-43b5-9d1c-162b8823904c`, consumer
+discovery, `https://login.live.com`, code response and `openid profile email`. Its subject and
+email mappings use the upstream claims; no verified-email constant was fabricated. No new
+registration, secret, API grant or credential rotation was needed. Both public provider
+buttons reached Entra's phone MFA enrollment screen with a cached session.
+No phone number/code was supplied or enrollment completed. This
+is partial routing evidence, not a completed login, policy review or hosted approval test.
+Do not substitute B2B guest invitations for self-service practitioner registration.
 
 In the correct external tenant, inspect the dedicated practitioner SPA, API and associated
 user flow before changing anything. Do not alter the client flow or workforce recovery app.
@@ -108,8 +128,11 @@ user flow before changing anything. Do not alter the client flow or workforce re
    and select Google in the **practitioner** user flow. Reuse a verified provider instead of
    creating a duplicate; do not expose its secret in browser configuration or documents.
 3. For personal Microsoft accounts, inspect for an existing suitable registration/provider.
-   If absent, create a dedicated broker Web application supporting **Personal Microsoft accounts
-   only**, with the exact federation callbacks described in Microsoft's OIDC instructions.
+   Reuse the inspected existing provider. If replacement is separately authorized, Microsoft's
+   current MSA guide specifies a broker Web application supporting organizational and personal
+   Microsoft accounts, with the exact federation callbacks described in its instructions.
+   Keep consumer discovery for this personal-account federation; this does not widen the
+   clinic workforce application's authority or the PHP API's trusted issuers.
    Use its client ID and confidential credential only inside Entra's provider configuration.
    Record the credential owner, expiry, secure custody and rotation procedure privately.
 4. Configure the custom OIDC provider according to Microsoft's MSA guide: consumer discovery
@@ -121,9 +144,9 @@ user flow before changing anything. Do not alter the client flow or workforce re
 5. Preserve the approved MFA and Conditional Access requirements. Independently verify actual
    enforcement for both provider types and administrator recovery. Do not disable a policy to
    make a test pass. A local `mfa_required` field is not evidence of provider enforcement.
-6. Verify the provider picker and each accelerated route on the actual browser/tenant. If
-   acceleration fails, the unhinted method picker remains available; investigate the provider
-   configuration instead of substituting another authentication realm.
+6. Verify the provider picker and both selected-provider journeys on the actual browser/tenant.
+   Keep hints omitted while acceleration fails. Any future shortcut needs a new live check
+   before changing the application; do not substitute another authentication realm.
 
 Upstream federation registration supplies identity authentication only. Do not grant Graph,
 mail, clinical API or directory administrator permissions to that application. A new provider
@@ -181,5 +204,10 @@ Do not disable durable external authentication for active practitioners as a con
 that can lock them out. Preserve memberships, trials, consent and audit history. Restore
 approved provider/callback settings through a deliberate operator change; do not delete or
 recreate identities to bypass an application conflict. No data/schema downgrade is needed.
+For the 1 November cloud change specifically, an approved rollback would deselect only
+Microsoft account in the practitioner flow and Save, retaining Google/email codes and all
+identities. That removes future MSA authentication through this flow; it does not revoke
+already issued tokens. Apply the approved session/membership revocation process separately
+if required. No cloud rollback was executed or tested.
 
 RELEASE STATUS: NOT READY FOR RELEASE

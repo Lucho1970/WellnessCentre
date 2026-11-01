@@ -4,7 +4,9 @@
 two-provider source implementation and exact Google/personal Microsoft setup are documented
 in [Wellnexa practitioner sign-in](WELLNEXA_PRACTITIONER_SIGN_IN.md). See its
 [current validation ledger](WELLNEXA_PRACTITIONER_SIGN_IN_VALIDATION_2026-11-01.md) for the
-Conditional Access admin-session blocker and unverified live provider/MFA/callback acceptance.
+saved practitioner-flow Microsoft provider association, live routing results and remaining
+MFA/callback/hosted acceptance gaps. The cached CLI Conditional Access failure is historical;
+the user supplied an authenticated admin browser for the narrowly approved provider change.
 Do not treat historical application IDs, policy descriptions or local tests as current cloud
 verification or permission to enable real-data access.
 
