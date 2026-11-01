@@ -6,6 +6,9 @@ are retained. This branch does not merge or deploy itself. The separate blog-doc
 its PDF are unrelated and preserved. See the dated
 [validation and control ledger](WELLNEXA_PRACTITIONER_SIGN_IN_VALIDATION_2026-11-01.md)
 for the exact application revision, tests, limitations and all 38 control decisions.
+The [live-test rollout and retirement runbook](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md)
+records the owner's subsequent approval of Wellnexa and two specific provider accounts,
+the observed disabled hosted feature and the ordinary Inactive account test.
 
 ## User experience
 

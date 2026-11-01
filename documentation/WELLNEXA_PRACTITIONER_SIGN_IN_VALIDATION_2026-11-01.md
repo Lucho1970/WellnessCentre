@@ -245,6 +245,39 @@ was produced, and the social-button build flag remains default off pending rollo
 
 ## All 38 controls: dated evidence and next action
 
+Subsequent live-test scope: the owner explicitly approved Wellnexa itself and two named
+Google/MSA accounts, with dummy professional details and ordinary account disable afterward.
+Addresses remain private. This resolves the host/account-selection question, not the hosted
+deployment, pilot identity, record-boundary or terms/access approvals. Anonymous live checks
+returned HTTP 200 with all three public application/activation availability fields false;
+both dedicated paths still showed workforce entry. No live account mutation occurred.
+See the [live test/retirement runbook](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md).
+
+Normal retirement regression source **`04475b5223483d9440948f419237ce2045365ea7`** adds
+20 checks to the existing application integration suite. The normal `AdminService::updateStaff`
+Inactive action is exercised for both providers, including scoped administration denial,
+same-token workspace denial, activation replay refusal, preserved history/audit and explicit
+reactivation without a new trial. There is no production API/schema/dependency change.
+
+Commands from the repository root (final reruns):
+
+- `php -l api/tests/integration/practitioner-applications.php`: exit 0.
+- `php api/tests/staff-access.php`: exit 0, staff creation authorization checks passed.
+- `php api/tests/external-staff-auth.php`: exit 0, 35 token checks passed.
+- With process `OPENSSL_CONF=C:/Program Files/Git/usr/ssl/openssl.cnf`,
+  `./scripts/test-recurring-sql.ps1 -MariaDbDirectory .tmp/recurrence-db-runtime/package/mariadb-11.4.8-winx64 -Port 13340 -IntegrationTest practitioner-applications.php`:
+  exit 0, **36 ledger + 119 application checks** on MariaDB 11.4.8.
+- With the same process OpenSSL setting,
+  `./scripts/test-mysql57-sql.ps1 -MySqlDirectory C:/Users/duran/AppData/Local/Temp/wellness-mysql57-c02a74656b4f4ed29aa543c2dfc8fa3e/mysql-5.7.44-winx64 -Port 13341 -IntegrationTest practitioner-applications.php`:
+  exit 0, **36 ledger + 119 application checks** on MySQL 5.7.44.
+
+Both initial SQL attempts failed at RSA fixture generation because the local OpenSSL setting
+was omitted. Both disposable servers stopped. Supplying the established configuration and
+rerunning fixed the environment without changing assertions, production code or JWT security.
+All final disposable servers stopped; only synthetic logs/data are retained locally. This
+does not establish hosted UI offboarding or complete operational departure (publication,
+future bookings, SMS funding, pending communications and billing require separate review).
+
 All decisions below are **1 November 2026, Codex**, against the application source revision
 recorded above and this report's files/tests. Human owner names/signatures have not been
 supplied: role labels below are **unassigned accountable roles**, not claimed appointments.
@@ -268,7 +301,7 @@ for its applicable scope.
 | PRIV-06 | Unverified | No automatic record deletion or retention changes; actual record/identity/provider-log schedules/holds unapproved here. | Custodian/records: approve profession/class schedules and disposal/restore tests. |
 | PRIV-07 | Unverified | No operational breach rehearsal/sign-off performed. | Incident/privacy lead: approve and rehearse applicable notification runbook. |
 | AUTH-01 | Implemented (local scope) | Existing supported MSAL and exact backend JWT checks retained; synthetic raw-upstream/client/workforce denial and brokered flows pass. Saved picker and partial MFA entry observed; full live trust unverified. | Identity/security: verify actual issuer/apps/scopes, callback and MFA in hosting. |
-| AUTH-02 | Partial | Current central grant, practitioner-only role, clinic membership, same-email denial and revocation pass locally; no clinical support reach added. | Security/custodian: complete hosted role/record/consent tests. |
+| AUTH-02 | Partial | Current central grant, practitioner-only role, clinic membership, same-email denial, revocation and ordinary Inactive/restore checks pass locally on both engines; no clinical support reach added. | Security/custodian: complete hosted role/record/consent and normal disable tests. |
 | AUTH-03 | Partial | Safe callback/recovery UI; cached-session phone MFA enrollment screen observed, not completed. No approved idle/absolute/MFA/departure evidence supplied. | Identity/security: approve session design and verify both providers' policies. |
 | AUTH-04 | Partial | New choice/error state does not store tokens; existing MSAL sessionStorage and existing invitation/session exceptions remain unresolved. | Security: approve a time-bounded exception or separately implement approved session architecture before real data. |
 | AUTH-05 | Partial | Source scope remains `access_as_staff`; no API/Graph/mail grants changed. Dedicated staff-only flow association observed and existing MSA enabled with user approval. Full deployed grant inventory unavailable. | Identity/operations: inventory exact runtime grants and provider credential access. |
@@ -291,7 +324,7 @@ for its applicable scope.
 | REL-02 | Partial | Exact local commands/results and synthetic boundary above; defaults omit dedicated suites, which are run explicitly. Hosted acceptance remains separate. | QA/release: verify final checkpoint and required operational scenarios. |
 | REL-03 | Missing | No new release artifact/provenance/hosted rehearsal/backup rollback proof created by this implementation. | Release/operations: produce approved artifact and hosted synthetic acceptance. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; flags are default off and unresolved controls are not waived by tests. | Accountable owners: resolve or lawfully approve applicable internal exceptions. |
-| REL-05 | Partial | User authorized implementation and exact existing-MSA provider association; Save and public picker verified. No production code deployment/schema/new API grant or operational sign-off. | Release/custodian/privacy/security/clinical: record remaining approvals, configuration rollback and ownership. |
+| REL-05 | Partial | User authorized implementation, exact MSA association and two-account synthetic testing on Wellnexa. Hosted feature is disabled; no production code deployment/schema/new API grant or operational sign-off. | Release/custodian/privacy/security/clinical: approve actual rollout scope/configuration and retain backup/rollback evidence. |
 | REL-06 | Implemented (report scope) | Requested/result scope, file purposes, exact versions/commands, flows, findings, omissions, owners/actions and rollback recorded. | Release owner: verify final source SHA and completion report. |
 
 ## Rollback and remaining action owners

@@ -43,6 +43,44 @@ test("English and French resource catalogs contain the same keys", () => {
   expect(Object.keys(fr).sort()).toEqual(Object.keys(en).sort());
 });
 
+test("built practitioner rollout retains separate workforce login and the staff broker boundary", async ({ page }, info) => {
+  await page.route("**/api/v1/**", route => route.fulfill({ json: { data: { name: "Synthetic rollout clinic" } } }));
+  const root = `${portalOrigin}${info.config.metadata.portalBase}`;
+  await page.goto(`${root}staff/login`);
+  await expect(page.getByRole("button", { name: "Sign in with Microsoft", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toHaveCount(0);
+  await page.goto(`${root}staff/external`);
+  // Set BUILD_PRACTITIONER_SIGN_IN=1 only for the explicitly enabled pilot artifact.
+  // Ordinary production builds must continue to keep this capability off by default.
+  if (process.env.BUILD_PRACTITIONER_SIGN_IN !== "1") {
+    await expect(page.getByRole("heading", { name: "Staff portal", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toHaveCount(0);
+    return;
+  }
+  await expect(page.getByRole("heading", { name: "Practitioner sign-in", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with personal Microsoft account", exact: true })).toBeVisible();
+  await expect(page.getByText("On the next screen, choose Google or Microsoft account to continue.", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/build/practitioner-pilot.png", fullPage: true });
+  let authorizationRequest = "";
+  await page.route("https://copihuewellnessclientsdev.ciamlogin.com/**", route => {
+    if (!new URL(route.request().url()).pathname.endsWith("/authorize")) {
+      const broker = "https://copihuewellnessclientsdev.ciamlogin.com/0a3841c6-b244-410d-821f-bbd9ccd1b5e2";
+      return route.fulfill({ json: { authorization_endpoint: `${broker}/oauth2/v2.0/authorize`, token_endpoint: `${broker}/oauth2/v2.0/token`, issuer: `${broker}/v2.0`, end_session_endpoint: `${broker}/oauth2/v2.0/logout`, jwks_uri: `${broker}/discovery/v2.0/keys` } });
+    }
+    authorizationRequest = route.request().url();
+    return route.fulfill({ contentType: "text/plain", body: "Synthetic provider boundary; no live account authentication." });
+  });
+  await page.getByRole("button", { name: "Continue with Google", exact: true }).click();
+  await expect.poll(() => authorizationRequest).not.toBe("");
+  const request = new URL(authorizationRequest);
+  expect(request.pathname).toBe("/0a3841c6-b244-410d-821f-bbd9ccd1b5e2/oauth2/v2.0/authorize");
+  expect(request.searchParams.get("client_id")).toBe("2ccf904c-2b78-4348-9acb-72773d931416");
+  expect(request.searchParams.get("scope")?.split(" ")).toContain("api://28c7d80a-53fc-45a0-8653-2f5b7d646087/access_as_staff");
+  expect(request.searchParams.get("redirect_uri")).toBe(`${root}staff/external`);
+  expect(request.searchParams.get("prompt")).toBe("login");
+  expect(request.searchParams.get("domain_hint")).toBeNull();
+});
+
 test("public website destination changes after refresh without rebuilding", async ({
   page,
 }, info) => {

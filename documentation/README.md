@@ -1,6 +1,7 @@
 # Wellness Centre Documentation
 
 - [Wellnexa practitioner sign-in](WELLNEXA_PRACTITIONER_SIGN_IN.md): separate Google/personal Microsoft entry, approval/activation, saved practitioner provider setup, rollout and recovery; [1 November validation/control ledger](WELLNEXA_PRACTITIONER_SIGN_IN_VALIDATION_2026-11-01.md) records source-bound tests, live provider-picker evidence and remaining hosted acceptance gates.
+- [Wellnexa live practitioner test and retirement](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md): owner-approved host/account scope, observed disabled hosted feature, reviewable rollout settings and normal Inactive/departure checks.
 
 - [Wellnexa maps diagnostics](WELLNEXA_MAPS_DIAGNOSTICS.md): provider-vs-routing investigation, private four-file diagnostic patch and safe operator checks.
 
