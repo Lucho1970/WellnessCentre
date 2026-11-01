@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Wellnexa practitioner sign-in](WELLNEXA_PRACTITIONER_SIGN_IN.md): separate Google/personal Microsoft entry, approval/activation, provider setup, rollout and recovery; [1 November validation/control ledger](WELLNEXA_PRACTITIONER_SIGN_IN_VALIDATION_2026-11-01.md) records source-bound evidence and live acceptance blockers.
+
 - [Wellnexa maps diagnostics](WELLNEXA_MAPS_DIAGNOSTICS.md): provider-vs-routing investigation, private four-file diagnostic patch and safe operator checks.
 
 - [Full deployment build — 29 October 2026](CURRENT_APP_RELEASE_2026-10-29.md): cumulative package upload map, schema/configuration checks, pilot activation and hosted acceptance.

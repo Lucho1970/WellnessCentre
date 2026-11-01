@@ -1,5 +1,11 @@
 # Wellnexa practitioner applications
 
+**1 November sign-in extension:** The separate practitioner entry and application page now
+support explicit Google and personal Microsoft provider choices behind a default-off build
+gate. Workforce clinic login stays separate. See [Practitioner sign-in](WELLNEXA_PRACTITIONER_SIGN_IN.md)
+and its [current validation ledger](WELLNEXA_PRACTITIONER_SIGN_IN_VALIDATION_2026-11-01.md).
+Synthetic approval/activation tests do not establish live federation, MFA or hosted acceptance.
+
 **28 October extension:** [Automated communications](AUTOMATED_COMMUNICATIONS.md) adds a
 separately gated transactional email outbox for application changes and trial reminders.
 The original slice descriptions below retain their historical deployment boundaries.

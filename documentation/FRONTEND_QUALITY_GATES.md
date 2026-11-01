@@ -1,5 +1,12 @@
 # Frontend quality gates — pilot preparation
 
+**1 November audit follow-up:** The current practitioner-sign-in checkpoint reports 11
+moderate build-tree package findings for minimatch glob-pattern amplification, with zero
+runtime findings. The older zero-advisory results below are historical. See the
+[dated sign-in validation ledger](WELLNEXA_PRACTITIONER_SIGN_IN_VALIDATION_2026-11-01.md) for
+locked versions, advisory classification and the unassigned security/build remediation owner.
+No forced audit fix, major downgrade or dependency change was applied.
+
 29 October 2026. Follow-up to findings F-02 (missing frontend lint tooling) and F-03 (build dependency advisories) in the [baseline audit](COMPLIANCE_AUDIT_2026-10-29.md). Implementation starts from `38ac97a1e41ee3acf6212ea2ba30f4c6cd4f2f7d` on `bugs/frontend-quality-gates`. Historical audit results are retained; this document records the new validation and its limits.
 
 ## Changes

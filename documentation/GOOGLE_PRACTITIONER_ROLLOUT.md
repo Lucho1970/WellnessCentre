@@ -1,5 +1,13 @@
 # Google practitioner pilot: a new Esther account
 
+**1 November follow-up:** This is the historical October configuration record. The current
+two-provider source implementation and exact Google/personal Microsoft setup are documented
+in [Wellnexa practitioner sign-in](WELLNEXA_PRACTITIONER_SIGN_IN.md). See its
+[current validation ledger](WELLNEXA_PRACTITIONER_SIGN_IN_VALIDATION_2026-11-01.md) for the
+Conditional Access admin-session blocker and unverified live provider/MFA/callback acceptance.
+Do not treat historical application IDs, policy descriptions or local tests as current cloud
+verification or permission to enable real-data access.
+
 The owner chose a fresh practitioner account on 7 October 2026. Existing clients are test records; no identity or client-data migration is required. Do not run the Esther identity migration SQL for this rollout. Do not delete test records as part of authentication setup.
 
 ## Provider configuration
