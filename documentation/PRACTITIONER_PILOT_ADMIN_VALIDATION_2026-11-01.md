@@ -4,9 +4,42 @@ Reviewer: Codex, source/local testing only. Branch `feature/practitioner-pilot-a
 based on `6845e30` from the ongoing practitioner sign-in work. Implementation revision:
 **`07febd06c49f9ef90995a946ca7d338a725b36d5`**. Final artifact checks are recorded
 separately after the package build; subsequent documentation does not change application code.
-No merge, migration 058, managed approval, account creation or hosted configuration
-change has been performed for this addition. The existing unrelated untracked PDF remains
+The owner subsequently applied migration 058; see the hosted follow-up immediately below.
+The agent has performed no merge, schema write, managed approval, account creation or hosted
+configuration change for this addition. The existing unrelated untracked PDF remains
 untouched and excluded. Implementation authorization does not establish organizational approval.
+
+## Hosted follow-up after the owner's database update
+
+1 November 2026. The owner answered the exact 058/prepared-pilot deployment question with
+“I updated the database.” Read-only inspection of the existing authenticated phpMyAdmin
+window showed the `wellness_centre` result screen and three successful CREATE TABLE results
+(0.0047, 0.0032 and 0.0026 seconds) for the supplied access/events/requests migration. No
+migration statement was replayed and no clinical/identity rows were selected. This is evidence
+of the owner's successful statements, not yet a full inspection of the resulting objects.
+
+A read-only information_schema/count query was prepared at ignored
+`.tmp/practitioner-pilot-058-verify.sql`. It selects table engine, column definitions/counts,
+foreign-key counts and counts of the three new tables only; it has **not been executed**.
+Computer-use input first reported an unavailable cached element, then timed out. Window
+selection/state was refreshed; capture was black and activation failed with
+`failed to activate captured window`. App input stopped after recovery failed; the owner
+was asked to bring phpMyAdmin forward and ensure the desktop is unlocked. No security
+dialog/settings or password manager was automated. No hosting upload/configuration change
+was attempted. A current pre-058 backup was not found in the previously identified private
+backup directory (the last known copy remains 31 October); its existence elsewhere is unknown.
+
+Independent repeat package verification passed **239 checks / 7 archives / 2,174 entries**.
+All three prepared transfer ZIP hashes match the preceding table. Repeat HTTPS checks using
+Windows trust (no TLS bypass) returned 200 for each clinic's public application offer:
+`available=false`, `enabled=false`, `activation_available=false`, no plan/terms. Anonymous
+central `/api/v1/application/me` returned 401. An initial Python HTTPS attempt returned
+URLError and supplied no hosted evidence; the Windows-trust requests above succeeded.
+Application source/dependencies/permissions/external data flows remain unchanged. The generated
+release manifest records build-time migration status; this dated follow-up records the later
+owner action. Schema, fresh backup, file/configuration deployment and hosted acceptance remain
+open. Existing 38-control statuses below are qualified by this follow-up; REL-05 now has the
+owner-applied migration evidence but not verified backup/restore or completed operations.
 
 ## Result and boundaries
 
@@ -34,7 +67,8 @@ No anonymous/pre-allowlist write endpoint is added. Raw upstream provider tokens
 Migration **058**, requiring verified 032/040/049 prerequisites, adds exactly three tables:
 `practitioner_pilot_access`, `practitioner_pilot_events`, `practitioner_pilot_requests`.
 It does not require the disabled communications updates 056/057. It seeds no grants/flags,
-changes no clinical records and charges nobody. **Its hosted application is not approved.**
+changes no clinical records and charges nobody. **The owner reports applying it; three
+successful SQL results were observed, with full schema/backup verification pending.**
 
 New first-party API routes on the existing central host, using the existing application-admin
 workforce token and active explicit database grant:

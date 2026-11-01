@@ -1,5 +1,16 @@
 # Practitioner pilot access administration
 
+**1 November hosted follow-up:** The owner reports applying migration 058. The existing
+phpMyAdmin `wellness_centre` SQL result screen shows three successful CREATE TABLE results
+for the pilot access, events and requests objects. The agent did not replay the migration.
+Detailed resulting-schema verification and a current backup check remain pending: computer
+control could read the result screen but failed to activate the browser after recovery.
+No new API, assets, HTML, private flag or approval has been deployed by this follow-up.
+Both clinic public intake endpoints still report unavailable/closed, without plan or terms;
+anonymous central `/application/me` still returns 401. The package verifier again passed
+239 checks and all three transfer ZIP hashes remain unchanged. See the
+[current evidence ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
+
 1 November 2026. Development on `feature/practitioner-pilot-admin`, continuing the
 authorized Wellnexa Google/personal-Microsoft sign-in work. The owner requested managing
 allowed practitioners in the Admin portal after both test accounts reached the existing
@@ -59,7 +70,7 @@ normal controls; no promise of remotely erasing data is made.
 
 ## Proposed schema and release gate
 
-**Migration 058 is not approved for or applied to the hosted database.** It adds three
+**Migration 058 was applied by the owner; detailed schema/backup verification is pending.** It adds three
 tables only: `practitioner_pilot_access`, `practitioner_pilot_events` and
 `practitioner_pilot_requests`. It seeds no approval, membership, role, term, price or flag.
 The access row holds clinic, product identity, operator label, pending/approved/revoked
