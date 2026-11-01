@@ -97,11 +97,15 @@ validation includes **67 signed external-token checks**, **16 private preflight 
 **80 pilot-policy checks**, **55 request-body HTTP checks**, and the full **45-case central
 Admin browser suite**, including nine new pilot cases. MySQL 5.7 passed **36 ledger + 62
 managed-pilot SQL/HTTP/concurrency checks** plus the existing **36 + 119 application flow**
-checks; the final MariaDB/broad checkpoint and artifact evidence are recorded in the
+checks. Final MariaDB also passed 36 + 62; all six browser configurations total
+**393 passes with two existing skips**, and the clean package has **239 artifact checks**.
+Exact source, commands, package/transfer hashes and limitations are recorded in the
 [current 38-control ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
 
-No support-reference patch or new feature has yet been deployed. Complete the final package
-review, current backup verification, exact 058 approval, hosted gate/registration/activation/
+No support-reference patch or new feature has yet been deployed. The reviewable source package and Beyond Compare transfer set are prepared under
+`deployments/2026-11-01-practitioner-pilot-admin` and
+`deployments/2026-11-01-practitioner-pilot-admin-transfer`. Verify a current backup and
+obtain exact 058 approval, then complete hosted gate/registration/activation/
 normal departure acceptance and accountable review before opening the flow. An Admin pilot
 approval still cannot supply membership, application approval, payment entitlement or a role.
 

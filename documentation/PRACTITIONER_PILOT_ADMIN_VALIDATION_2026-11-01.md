@@ -155,11 +155,12 @@ runtime dependency or advisory is introduced by this change.
 | Exact command (working directory) | Result |
 | --- | --- |
 | `npm run lint` and `npx tsc --noEmit` (Frontend) | Exit 0, zero lint warnings. |
-| `npm run build` (Frontend) | Earlier full build passed lint, 4 content entries, 2,566 EN/FR translations, strict types and all three surfaces. Final clean package build recorded after source checkpoint. |
+| `npm run build` (Frontend) | Final clean package build passed lint, 4 content entries, 2,566 EN/FR translations, strict types and all three surfaces (public, portal, central). Existing chunk warnings retained. |
 | `npm test` (Frontend) | Exit 0; **285 passed, 2 pre-existing optional-fixture skips**, 287 total. |
 | `npx playwright test --config playwright.application-admin.config.ts` (Frontend) | Final full suite **45 passed**, including nine new pilot cases. |
 | `npx playwright test --config playwright.applications.config.ts --reporter=line` (Frontend) | **17 passed**, including two own-reference EN/FR denial/retry cases. |
 | `npx playwright test --config playwright.invitations.config.ts --reporter=line` (Frontend) | **7 passed**. |
+| Process `BUILD_PRACTITIONER_SIGN_IN=1`; `npx playwright test --config playwright.build.config.ts` (Frontend) | Final pilot artifact **15 passed**. Initial run omitted this test setting, so its default-off expectation failed (14 passed/1 failed); correct explicitly enabled pilot setting then passed all 15 without test changes. Ordinary default-off artifact variant not rerun here. |
 | `npm ci` (Frontend) | Exit 0; exact lock restore, 350 packages; 11 known moderate build findings. npm reported esbuild 0.25.12 postinstall is not in allowScripts; no new script approval/setting was added. Final build verifies usability. |
 | `npm ci` (Wellnexa) | Exit 0; exact lock restore, 30 packages, no audit findings. |
 | `npm run lint`, `npm run build`, `npm run test:browser` (Wellnexa) | Exit 0; four existing lint warnings, build passed and **24 browser cases passed**. |
@@ -178,6 +179,58 @@ Default Playwright omits central Admin, practitioner applications, invitations a
 smoke suites; dedicated configurations are necessary and reported separately. Hosted provider
 flows, representative load, full accessibility, restoration and organizational evidence remain
 excluded as listed below. No broad SQL sweep of unrelated modules or hosted abuse test was run.
+
+## Final package and transfer verification
+
+Implementation source is `07febd06c49f9ef90995a946ca7d338a725b36d5`; package source is
+**`73bfd14d96e8038e9b3a40a9c4b17f5ab59be545`**, which adds only the evidence/source binding.
+Application code is identical. Final package command from repository root:
+
+```
+./scripts/build-current-deployment.ps1 -ReleaseName 2026-11-01-practitioner-pilot-admin
+./scripts/verify-current-deployment.ps1 -ReleaseDirectory deployments/2026-11-01-practitioner-pilot-admin
+```
+
+Process-only build settings match the preceding controlled pilot: invitations false;
+practitioner applications, durable external auth and social choices true; the same existing
+public external tenant/subdomain/SPA/API identifiers from the previous manifest. These values
+are recorded in generated `manifest.json`; no private environment file is packaged. This is
+build configuration, not live API/clinic enablement. The builder restored Composer's exact
+lock into a clean private staging directory (`--no-dev --prefer-dist --optimize-autoloader
+--no-interaction`): ten installs, no updates/removals. Frontend/Wellnexa exact `npm ci`
+restores passed; all three lock hashes remain unchanged. No install-script approval was added.
+
+Verifier: **239 checks, seven archives, 2,174 entries, 2,091 text signature scans**, one pinned
+public JWT README key example reviewed. No unexpected secret/private/development file or
+source-map entries. Manifest SHA-256:
+`5f0d476a0f46eb6d6a2e76ca97628aa25ef00e17c4fe27576f31044f89d119b9`.
+058 SHA-256: `0e66ab365bbd253bc2f2d1b52050c5109b9eefcf4bfb8b6c5f214d95fd5a371e`.
+Private API comparison to the previous package: exactly nine intended runtime files plus
+three generated Composer metadata files changed; no removals/dependency version changes.
+The Wellnexa website ZIP is byte-identical to the preceding package. Four external staff
+public identifiers are present in the final portal. Three `http://localhost` bundle candidates
+were inspected: React Router's non-browser base fallback, superseded by the actual window
+origin; they are not configured API/callback/delivery endpoints. No TLS check was disabled.
+
+Prepared, **not uploaded**, Beyond Compare transfer set:
+`D:/Dev/WelnessCentre/deployments/2026-11-01-practitioner-pilot-admin-transfer`.
+
+| File | Target / verified contents | SHA-256 |
+| --- | --- | --- |
+| `00-api-private.zip` | `/wellness-api`, outside public root; 2,059 entries, 8,388,884 bytes; exact private package copy, no .env. | `6e72874ee6a1f54aa578d3182f92ccd81a307c8990486d677f8425f1a7aa91dc` |
+| `01-assets.zip` | Merge into `/public_html`, 63 changed JS assets under shared portal/central Admin; 1,170,742 bytes. Preserve old assets. | `0bdd1084e7e35596c1f5c4bc2057c8a60d0383e1c5c4b15ee72a922af756f12f` |
+| `02-entry-pages.zip` | Merge into `/public_html` only after HTTPS asset verification; two HTML files, 842 bytes. | `9178e0f70ee7bdf5e4af52756c852dba237f568f5722204e10cb57e6fcaf0830` |
+
+All 65 public transfer members were byte-compared to source archives. The standalone SQL
+contains exactly three CREATE TABLE statements. Transfer README/manifest/SQL stay outside
+public upload; private settings stay outside all ZIPs. Do not mirror/delete hosting folders.
+New package/transfer files remain ignored, not substitutes for versioned source/docs/tests.
+
+Distinct final browser totals: **393 passed, two existing optional-fixture skips** across the
+six explicitly listed configurations/surfaces. Failed exploratory/reconfigured runs above are
+retained and not counted as passes. Final API evidence is 61 root scripts/254 syntax files,
+62 new SQL/HTTP/concurrency checks on each engine plus the existing application flow suite.
+None of these results closes hosted/organizational gates.
 
 ## Hosted evidence and exclusions
 
@@ -229,7 +282,7 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | AUTH-03 | Partial | Principal-bound UI cleanup; pilot revocation only additional gate. Identity/security: approve idle/absolute/MFA/lost-device and normal departure procedures. |
 | AUTH-04 | Partial | New draft/reference stays in memory; no new token storage. Existing MSAL sessionStorage exception unresolved. Security: approve time-bounded exception or separate architecture remediation. |
 | AUTH-05 | Partial | Same existing central admin grant/scope, no Graph/provider permission changes. Identity/operations: inventory actual deployed grants and DB lock/runtime privileges. |
-| SEC-01 | Partial | Synthetic tests, private files/PDF/builds excluded; final artifact scan pending. Build/security: complete package and indicated history review. |
+| SEC-01 | Partial | Synthetic tests, private files/PDF/builds excluded; 239 package checks/signature scan passed. Build/security: complete indicated history/PHI review and accountable artifact acceptance. |
 | SEC-02 | Partial | No transport relaxation; private DB/lock usage follows existing transport. Infrastructure: verify TLS/encryption/backups and rehearse restoration. |
 | SEC-03 | Partial | New admin responses no-store; exact central host restriction. Operations: verify final hosted headers/cache/CORS/session behavior. |
 | SEC-04 | Implemented (local changed scope) | Exact reference realm/fields, prepared SQL, bounded scalar validators, case-sensitive identity columns, safe React text. Security: independent review and hosted acceptance. |
@@ -240,13 +293,13 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | SEC-09 | Partial | No sends, new message template or patient content; delivery gates preserved. Privacy/operations: approve actual sender/recipient/CASL evidence before enabling channels. |
 | DEV-01 | Implemented (task scope) | Dedicated feature branch, existing work/PDF preserved, instructions/config/locks/migrations/docs reviewed. Maintainer: review/push/merge only within authority. |
 | DEV-02 | Implemented (local scope) | Focused changes, no new any/ts-ignore/skips/dependency or suppressed failure; initial defects recorded. Maintainer/security: independent review. |
-| DEV-03 | Partial | Locks unchanged; exact versions/audits above; 11 moderate build findings unresolved. Build/security: exposure decision/remediation and clean release restore. |
+| DEV-03 | Partial | Locks unchanged; exact versions/audits above; 11 moderate build findings unresolved. Build/security: exposure decision/remediation; exact frontend/website/private-Composer restores now passed. |
 | DEV-04 | Partial | Real lint/types/build/browser/PHP/dual-engine checks recorded; hosted acceptance still separate. QA/release: finish final checkpoint and provider flows. |
 | DEV-05 | Partial | EN/FR modal, labels, keyboard/unsaved guards, focus restoration and mobile checks. Accessibility/legal/product: full AT/contrast/zoom and applicability review. |
 | DEV-06 | Partial | No polling/dependencies; bounded indexed queries and identity-scoped locks. Build/performance: assess existing chunks, clinic-lock contention and representative scale. |
 | REL-01 | Partial | This dated 38-control ledger/file/test matrix; named human owners/decisions absent. Release owner: assign and retain evidence. |
 | REL-02 | Partial | Local commands/results and failures recorded; dedicated suites explicitly required. QA: verify final counts and operational omissions. |
-| REL-03 | Partial | Old hosted static evidence does not verify this addition; final new artifact/058/rollback rehearsal pending. Operations/release: complete exact source package and hosted synthetic acceptance. |
+| REL-03 | Partial | Old hosted static evidence does not verify this addition; new artifact has 239 local checks and explicit provenance; 058/hosted/restore rehearsal pending. Operations/release: complete hosted synthetic acceptance and rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no failed/pending control waived by local tests. Accountable owners: resolve or approve lawful scoped internal exceptions. |
 | REL-05 | Partial | Implementation authorized; new 058 not approved/applied, no feature flags/roles broadened live. Release/custodian/security/privacy/clinical: exact DDL approval after backup, deployment and acceptance/signatures. |
 | REL-06 | Implemented (report scope) | File purposes, versions/flows, commands, findings, limits, owners and rollback recorded; final checkpoint to bind exact source. Release owner: confirm report. |
