@@ -289,6 +289,17 @@ was modified and full hosted acceptance remains pending. The old 382-case checkp
 claimed to have been repeated. No new runtime dependency, schema, API permission, legal terms
 or external endpoint/data flow was added by this follow-up. Generated packages stay ignored.
 
+The subsequent authorized hosted checkpoint applied existing migrations **053, 054 and 055**
+once, in order, after verifying the owner's private SQL export structure. Hosted imports
+completed **9 + 10 + 8 statements**; a read-only query confirmed **18 tables**, the supporting
+unique index, three subscription columns and practitioner audit actor, with no application
+settings, applications or billing accounts seeded. MySQL is **5.7.44** and the live API reports
+PHP **8.4.27**. The initial read-only verification query's database-name resolution error and
+corrected results, source hashes, backup limits, screenshots and pending file-copy job are
+recorded in the [live-test runbook](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md#authorized-hosted-database-checkpoint).
+No live application files/settings or test accounts have changed at this checkpoint. The
+prepared artifact remains immutable; no new runtime dependency, grant or endpoint was added.
+
 All decisions below are **1 November 2026, Codex**, against the application source revision
 recorded above and this report's files/tests. Human owner names/signatures have not been
 supplied: role labels below are **unassigned accountable roles**, not claimed appointments.
@@ -317,7 +328,7 @@ for its applicable scope.
 | AUTH-04 | Partial | New choice/error state does not store tokens; existing MSAL sessionStorage and existing invitation/session exceptions remain unresolved. | Security: approve a time-bounded exception or separately implement approved session architecture before real data. |
 | AUTH-05 | Partial | Source scope remains `access_as_staff`; no API/Graph/mail grants changed. Dedicated staff-only flow association observed and existing MSA enabled with user approval. Full deployed grant inventory unavailable. | Identity/operations: inventory exact runtime grants and provider credential access. |
 | SEC-01 | Partial | Private files/attachments excluded; limited source/build credential-pattern checks recorded at final checkpoint. Not an exhaustive Git-history scan. | Security/build: complete artifact and indicated history review/rotation if needed. |
-| SEC-02 | Unverified | No TLS checks disabled or new database connection design; hosted encryption, keys, DB transport and restores unverified. | Infrastructure/security: supply encryption/patching/restore evidence. |
+| SEC-02 | Partial | Private SQL export structure verified before approved DDL; no TLS checks disabled. Actual restoration, hosted encryption, keys and DB transport remain unverified. | Infrastructure/security: supply encryption/patching/restore evidence. |
 | SEC-03 | Partial | Same-origin configured callbacks and fixed provider choices; hosted per-host headers/cache/session acceptance not performed. | Operations/security: verify every portal/API host and shared-device behavior. |
 | SEC-04 | Implemented (changed scope) | Closed provider enumeration; rejected issuer hints removed; malicious hint/callback query ignored in actual bridge tests; existing prepared SQL verifier flow unchanged. | Security: complete cloud OIDC/profile and missing-claim acceptance. |
 | SEC-05 | Partial | Existing application request/rate/batch bounds retained and exercised; identity-provider abuse controls and representative load unverified. | Security/identity: verify hosted abuse/rate limits and failure handling. |
@@ -325,7 +336,7 @@ for its applicable scope.
 | SEC-07 | Partial | Rejected callback shows generic recovery without raw diagnostic; broader provider/proxy/web logging remains unverified. | Operations/security: inspect/redact external and infrastructure logs. |
 | SEC-08 | Partial | Endpoint/field/scope inventory and MSA provider association/configuration recorded; full provider credential/retention/contracts/support approval not supplied. | Privacy/security/vendor owner: approve actual subprocessor flows and credential lifecycle. |
 | SEC-09 | Partial | No clinical email/SMS/calendar content or new app messages; provider registration/MFA communications remain outside app guard. | Privacy/operations: approve recipient/CASL classification and vendor handling. |
-| DEV-01 | Implemented (task scope) | Instructions, preserved Git state, dedicated branch, package/lock/config/migration/deployment/docs inspected; no merge/deploy. | Maintainer: review and integrate under authorized workflow. |
+| DEV-01 | Implemented (task scope) | Instructions, preserved Git state, dedicated branch, package/lock/config/migration/deployment/docs inspected; no merge. Explicitly authorized existing 053–055 migrations applied after backup check; application-file rollout pending. | Maintainer: review and integrate under authorized workflow. |
 | DEV-02 | Implemented (local scope) | Focused source review; no new any/ts-ignore/dependency or weakened lint/tests; callback catch maps to visible safe recovery. | Maintainer/security: independent human code review. |
 | DEV-03 | Partial | Locks unchanged, current audits and exact versions recorded; 11 moderate build records remain; clean release restore not performed. | Build/security: review compatible minimatch remediation and release restore. |
 | DEV-04 | Partial | Listed lint/types/build/local browser/PHP/SQL checks; initial fixture/layout failures recorded and corrected. Omitted hosted scenarios explicit. | QA/release: finish hosted/provider acceptance and retain final results. |
@@ -333,9 +344,9 @@ for its applicable scope.
 | DEV-06 | Partial | No new runtime dependencies, polling or SQL queries; fixed-size provider choices. Existing chunk notices and volume performance remain. | Performance/build: review bundle/performance budgets and representative load. |
 | REL-01 | Partial | This 38-control source/test ledger is supplied; named accountable owners and human decisions remain absent. | Release owner: assign names and collect dated decisions. |
 | REL-02 | Partial | Exact local commands/results and synthetic boundary above; defaults omit dedicated suites, which are run explicitly. Hosted acceptance remains separate. | QA/release: verify final checkpoint and required operational scenarios. |
-| REL-03 | Partial | Pilot artifact at source 6808300 has manifest/lock hashes and 237 local archive checks; full hosted rehearsal/backup rollback proof remain absent. | Release/operations: approve actual upload set and complete hosted synthetic acceptance/rollback. |
+| REL-03 | Partial | Pilot artifact at source 6808300 has manifest/lock hashes and 237 local archive checks; approved hosted 053–055 imports and schema checks passed. Export structure verified; full restoration, application-file rollout and hosted identities remain unverified. | Release/operations: verify file backups and complete hosted synthetic acceptance/rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; flags are default off and unresolved controls are not waived by tests. | Accountable owners: resolve or lawfully approve applicable internal exceptions. |
-| REL-05 | Partial | User authorized implementation, exact MSA association and two-account synthetic testing on Wellnexa. Hosted feature is disabled; no production code deployment/schema/new API grant or operational sign-off. | Release/custodian/privacy/security/clinical: approve actual rollout scope/configuration and retain backup/rollback evidence. |
+| REL-05 | Partial | User authorized implementation, exact MSA association, two-account synthetic testing, controlled pilot deployment and existing 053–055 DDL after backup verification. Those migrations succeeded; file/configuration rollout and accountable operational sign-offs remain pending. No new API grant. | Release/custodian/privacy/security/clinical: retain scoped approval, file-backup/restore and hosted acceptance evidence. |
 | REL-06 | Implemented (report scope) | Requested/result scope, file purposes, exact versions/commands, flows, findings, omissions, owners/actions and rollback recorded. | Release owner: verify final source SHA and completion report. |
 
 ## Rollback and remaining action owners

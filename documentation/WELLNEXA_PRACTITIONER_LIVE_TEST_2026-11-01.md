@@ -194,4 +194,62 @@ The normal Inactive SQL/HTTP acceptance, original OpenSSL environment failures a
 **36 + 119 checks on each database engine** are recorded in the linked 38-control ledger.
 No passing local test authorizes the live deployment or closes that ledger's remaining gates.
 
+## Authorized hosted database checkpoint
+
+1 November 2026, continuation from source `686d071d9ccf6ea257c6364d8df691076e898c6e`.
+The owner explicitly authorized the controlled pilot deployment and subsequently authorized
+applying existing migrations **053, 054 and 055 in order after backup verification**. These
+are separate approvals under REL-05; neither is approval for real-PHI acceptance, unrelated
+schema changes, broader identity permissions or merging this branch.
+
+The owner identified a private local SQL backup dated 31 October. A bounded local check
+confirmed a nonempty **1,734,146-byte** phpMyAdmin export naming `wellness_centre`, containing
+**120 CREATE TABLE statements**, 95 INSERT statements and a final COMMIT marker. No record
+contents were displayed, copied into fixtures, uploaded or committed. This verifies export
+structure, not successful restoration, completeness of every row or a current RPO/RTO.
+
+Authenticated phpMyAdmin metadata checks found none of the 18 feature tables and no
+`uq_billing_membership_clinic` index before execution. Hosted database version was
+**MySQL 5.7.44**; the anonymous API reported **PHP 8.4.27**. Each exact versioned source script
+was selected separately through the database-level importer with foreign-key checks enabled,
+zero skipped queries, UTF-8 and SQL compatibility NONE:
+
+| Existing source migration | Hosted result | Source SHA-256 |
+| --- | --- | --- |
+| `api/database/migrations/053_subscription_foundation.sql` | Success, 9 statements | `8c4086e3f8e77d9d60a6c372c6f0c003ebfd71e5bb81b136cb6a997446a5a6ed` |
+| `api/database/migrations/054_billing_administration.sql` | Success, 10 statements | `07f57aa044148aeb1ad63171e1782cb23b4d8014b1734c9a020d68330b50a231` |
+| `api/database/migrations/055_practitioner_applications.sql` | Success, 8 statements | `18bd46e69edaf59ecf7ff6ece13a65311e64571f6be1ddc78ca0ff7d026ffffd` |
+
+Post-execution read-only checks confirmed **18/18 tables**, the unique membership index,
+all three 054 subscription columns, and the new practitioner-applicant audit actor. Application
+settings, applications and billing accounts each contained **zero rows**. No joining terms,
+plans, prices, account enrollment, payment collection or SMS activation were seeded. No
+migration 056/057, patient deletion or schema downgrade was performed.
+
+The first post-execution verification SELECT failed with MySQL 1109 because its UNION
+resolved unqualified application-table names in `information_schema`. Explicitly qualifying
+the three count targets with `wellness_centre` corrected this read-only query; all seven
+result checks then passed. The migrations themselves succeeded on their first execution
+and were not replayed. phpMyAdmin also displayed its existing SQL-debug-info warning;
+the separate import success banners and final SELECT results are the acceptance evidence.
+
+Local ignored screenshots `hosted-migration-053.png`, `hosted-migration-054.png`,
+`hosted-migration-055.png` and `hosted-migration-verification.png` under `.tmp/` record the
+non-identifying schema results. They are not packaged or committed. The immutable prepared
+artifact remains at application source `6808300`; no application source, dependency lock,
+runtime grant or new endpoint changed during this database checkpoint.
+
+The private server-side API rollback copy was submitted earlier at
+`/wellness-rollbacks-2026-11-01-practitioner/wellness-api`. Netfirms still reports the copy
+in progress; 12 immediate items are visible, but recursive completeness is not yet verified.
+No live application archive has been uploaded or private configuration changed. Verify that
+copy and back up the affected public directories before replacing files. Provider sign-in,
+application submission/review/activation and ordinary Inactive account testing remain pending.
+
+Rollback preserves the additive schema and any subsequent application/audit/trial rows;
+do not drop the new tables or restore the older database over newer operational records.
+Restore matching previous files/settings only after a verified file backup. The release
+operator still owns backup restoration evidence and file rollout; the existing identity,
+clinic, privacy/security/custodian and clinical acceptance responsibilities remain open.
+
 RELEASE STATUS: NOT READY FOR RELEASE
