@@ -300,6 +300,15 @@ recorded in the [live-test runbook](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.m
 No live application files/settings or test accounts have changed at this checkpoint. The
 prepared artifact remains immutable; no new runtime dependency, grant or endpoint was added.
 
+Further file-transfer evidence is in the same runbook's **Direct file transfer after
+hosting-tool failure** section: current private configuration preserved and locally
+preflighted; API ZIP staged but extraction failed before any successful rollout; API health
+and closed intake on both clinics rechecked; two unreferenced JS assets uploaded. The three
+entry pages remain unchanged. The owner selected Beyond Compare; two assets-first transfer
+ZIPs reproduce 67 exact members of the verified artifact, with manifests/hashes and no
+configuration or data. No live feature flag, identity approval, membership, terms or account
+changed. These facts qualify REL-03/05 below; full hosted acceptance remains pending.
+
 All decisions below are **1 November 2026, Codex**, against the application source revision
 recorded above and this report's files/tests. Human owner names/signatures have not been
 supplied: role labels below are **unassigned accountable roles**, not claimed appointments.
@@ -344,7 +353,7 @@ for its applicable scope.
 | DEV-06 | Partial | No new runtime dependencies, polling or SQL queries; fixed-size provider choices. Existing chunk notices and volume performance remain. | Performance/build: review bundle/performance budgets and representative load. |
 | REL-01 | Partial | This 38-control source/test ledger is supplied; named accountable owners and human decisions remain absent. | Release owner: assign names and collect dated decisions. |
 | REL-02 | Partial | Exact local commands/results and synthetic boundary above; defaults omit dedicated suites, which are run explicitly. Hosted acceptance remains separate. | QA/release: verify final checkpoint and required operational scenarios. |
-| REL-03 | Partial | Pilot artifact at source 6808300 has manifest/lock hashes and 237 local archive checks; approved hosted 053–055 imports and schema checks passed. Export structure verified; full restoration, application-file rollout and hosted identities remain unverified. | Release/operations: verify file backups and complete hosted synthetic acceptance/rollback. |
+| REL-03 | Partial | Pilot artifact at source 6808300 has 237 archive checks; approved 053–055 imports/schema checks passed. Private export/file backups inspected; extraction failed, two unreferenced assets uploaded, 67 exact transfer members repackaged for Beyond Compare. Entry pages/configuration unchanged; restoration and hosted identity acceptance pending. | Release/operations: verify remaining assets before switching HTML and complete hosted acceptance/rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; flags are default off and unresolved controls are not waived by tests. | Accountable owners: resolve or lawfully approve applicable internal exceptions. |
 | REL-05 | Partial | User authorized implementation, exact MSA association, two-account synthetic testing, controlled pilot deployment and existing 053–055 DDL after backup verification. Those migrations succeeded; file/configuration rollout and accountable operational sign-offs remain pending. No new API grant. | Release/custodian/privacy/security/clinical: retain scoped approval, file-backup/restore and hosted acceptance evidence. |
 | REL-06 | Implemented (report scope) | Requested/result scope, file purposes, exact versions/commands, flows, findings, omissions, owners/actions and rollback recorded. | Release owner: verify final source SHA and completion report. |

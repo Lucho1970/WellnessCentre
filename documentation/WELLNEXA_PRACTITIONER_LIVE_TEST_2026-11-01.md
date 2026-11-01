@@ -252,4 +252,73 @@ Restore matching previous files/settings only after a verified file backup. The 
 operator still owns backup restoration evidence and file rollout; the existing identity,
 clinic, privacy/security/custodian and clinical acceptance responsibilities remain open.
 
+## Direct file transfer after hosting-tool failure
+
+Further 1 November 2026 operational evidence, following documentation commit `4c27518`:
+
+- The owner supplied the browser download location. The current private `.env` download is
+  **3,972 bytes**, with the same parsed settings as the project copy despite formatting
+  differences. A separate copy was preserved outside the repository. Only approved public
+  identifiers, flags and allowlist counts were printed; no credentials or identity subjects
+  were displayed. Current configuration has pilot mode enabled, **two workforce identities**,
+  empty email/SMS allowlists, and mail/SMS sending disabled.
+- `php api/bin/pilot-preflight.php --env <private-downloaded-env>` passed, exit 0. A separate
+  private candidate adds only `BILLING_ADMIN_ENABLED`, `PRACTITIONER_APPLICATIONS_ENABLED`,
+  `PRACTITIONER_APPLICATION_ACTIVATION_ENABLED` and `STAFF_EXTERNAL_AUTH_ENABLED` as true;
+  its local preflight also passed. **That candidate has not been uploaded.** Clinic settings,
+  legal terms and exact external-practitioner pilot identities remain separate gates.
+- The owner's private backup directory contains the API (2,109 files), shared portal
+  (80 files), central portal (14 files) and Wellnexa website (11 files). Anonymous HTTPS
+  reads of the three current HTML entry pages matched their backup copies. Initial Python
+  HTTPS attempts returned URL errors; PowerShell used normal verified OS TLS successfully.
+  No certificate validation was disabled. Restoration remains untested.
+- The approved API ZIP uploaded to private `/wellness-api/wellness-api-private.zip` at
+  100%. Archive Gateway selected that exact path and output `/wellness-api`, then reported
+  **`Error unable to make temp directory`**. No successful extraction is claimed and it was
+  not replayed. API health still returned HTTP 200; both clinics' public application metadata
+  remained disabled/unavailable. No application account or private configuration changed.
+- To assess the necessary transfer, all 2,057 candidate runtime/dependency files were compared
+  against the private API backup: **2,049 byte-identical**, five identical after newline
+  normalization, and three differing only in generated Composer classmaps/root revision.
+  The classmaps add the already present `DiscoveryMapsClient`; the root reference changes
+  from `f738e22` to `6808300`. No dependency version differs. This is backup comparison,
+  not proof of the exact current hosted files. No API feature-source change is required by
+  the practitioner sign-in patch; preserve the existing API and verify its behavior.
+- A native bulk upload selected 62 changed shared-portal assets, but HTTP SHA-256 checks
+  verified only **two**: `AddressEntry-DMuFyRIZ.js` and `api-CAzSqCHG.js`. The other 60 requests
+  returned HTTP 200 with nonmatching bodies (SPA fallback is not file acceptance). The
+  old entry page was preserved, so those two new assets are unreferenced. Do not switch
+  HTML until all required assets pass integrity checks. Old hashed assets were not deleted.
+
+The owner uses **Beyond Compare** to merge a ZIP's contents into the existing hosting
+connection. Prepared ignored directory:
+`deployments/2026-11-01-practitioner-direct-upload/`. Both ZIPs target `/public_html` and
+contain the site's existing directory names, without another enclosing release directory:
+
+| Transfer ZIP | Exact contents | SHA-256 |
+| --- | --- | --- |
+| `01-assets.zip` | 64 changed JS assets across `wellness-common-portal/assets`, `wellness-portal/admin/assets` and `wellnexa.ca/assets`; two may already compare equal | `b718bb55f558614ac222667fcdc48cf068bf647e9e8705292d81614492768f48` |
+| `02-entry-pages.zip` | Only the three changed HTML entry pages at their existing paths | `6a6725cb64da6aca9b21ad8ac46a85f13b6f600977bb68540bbd0aa8cf1a3277` |
+
+All **67 members** were checked byte-for-byte against the corresponding original verified
+archives at application source `6808300d02a9ea37a7455c813d6e7d787d05906a`. ZIP integrity,
+member-path/type allowlists and bounded private-key/token-signature checks passed. The
+adjacent manifest records member hashes, original archive and destination; neither it nor
+the adjacent README belongs in the public website. No private `.env`, PHP backend, SQL,
+patient records, test identities or dependencies are in these two transfer ZIPs.
+
+Use the existing verified encrypted FTPS/SFTP connection. Merge **assets first**, preserving
+every existing remote file; do not mirror deletions. Verify all hosted asset bytes/hashes,
+then apply the three HTML entry pages and verify both clinic hosts, central administration,
+Wellnexa entry and separate workforce/practitioner paths. These transfer files do not enable
+registration or grant access. Google/MSA authentication, application/terms acceptance,
+review, activation, trial and ordinary Inactive tests remain pending. No additional broad
+build/test rerun was needed for this documentation/byte-copy packaging step; the original
+artifact's recorded test limits still apply.
+
+Rollback restores the three previous HTML entry files from their private backups, retains
+old assets and preserves schema/new audit/application records. Private configuration would
+require its separately preserved current copy if later changed. The host's pending server
+copy, restore rehearsal, full hosted acceptance and accountable sign-offs remain unresolved.
+
 RELEASE STATUS: NOT READY FOR RELEASE
