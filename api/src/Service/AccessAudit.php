@@ -37,7 +37,7 @@ final class AccessAudit
     ];
     private const ENTITIES = [
         'communications'=>'communication','notices'=>'communication_notice','deliveries'=>'sms_delivery','held_sms'=>'notification',
-        'practitioner-applications'=>'practitioner_application',
+        'practitioner-applications'=>'practitioner_application','pilot-practitioners'=>'practitioner_pilot_access',
         'service-imports'=>'service_import',
         'dashboard-widgets'=>'dashboard_widget','reminder-schedules'=>'reminder_schedule','reviewers'=>'user','privacy-audit'=>'audit_event','clients'=>'client','booking-clients'=>'client','appointments'=>'appointment','today'=>'appointment',
         'next-onsite'=>'appointment','calendar'=>'appointment','receipts'=>'session_receipt','receipt'=>'session_receipt',

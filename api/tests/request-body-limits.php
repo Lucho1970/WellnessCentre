@@ -54,6 +54,8 @@ PHP);
         ['/api/v1/application/billing/plans',65536], ['/api/v1/practitioner-applications/me',65536],
         ['/api/v1/application/provider-evidence/preview',65536],
         ['/api/v1/application/clinics/3/communications/settings',65536],
+        ['/api/v1/application/clinics/3/pilot-practitioners',65536],
+        ['/api/v1/application/clinics/3/pilot-practitioners/7/approve',65536],
     ] as [$path,$limit]) {
         [$status,$data] = $call($path, $payload($limit));
         $check($status === 200 && $data['bytes'] === $limit - 8, 'Exact byte limit is accepted: '.$path);

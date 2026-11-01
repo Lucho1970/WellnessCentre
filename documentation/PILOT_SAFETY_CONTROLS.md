@@ -1,5 +1,13 @@
 # Pilot access and delivery safeguards
 
+**1 November addition:** [Practitioner pilot administration](PRACTITIONER_PILOT_ADMIN.md)
+adds a separately gated central Admin workflow and proposed migration 058. With
+`PRACTITIONER_PILOT_ACCESS_ENABLED=true`, external practitioner approvals use the database
+for the server-resolved clinic; mixed static external approvals are rejected. Workforce/client
+lists and all delivery restrictions below remain applicable. This addition is not deployed;
+see its [current ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md). Historical
+validation below does not verify the new feature.
+
 29 October 2026. Implementation starts from `9851733` (the frontend quality-gate work) on `feature/pilot-access-delivery-guards`. This adds opt-in pilot restrictions using the existing database. It does not create/reset a database, migrate records, create tester accounts, grant roles, enable providers or change private hosted configuration.
 
 ## Behavior and boundaries

@@ -1,5 +1,24 @@
 # Wellnexa practitioner live-test rollout and account retirement
 
+## Latest checkpoint: entry pages live, both provider returns at pilot gate
+
+The owner uploaded the prepared assets and three entry pages using Beyond Compare.
+140 HTTPS asset checks matched 72 distinct files; nine entry/body checks matched after
+separately diagnosing stale website-root cache and rechecking the normal canonical root.
+Rendered workforce Microsoft entry remains separate from the independent provider picker.
+Google initially reported AADSTS50011 for the missing Wellnexa staff SPA callback. The callback
+appeared during authenticated admin inspection (the agent did not perform Save); a fresh
+Google attempt and the owner-completed personal Microsoft attempt both returned to Wellnexa
+and the existing pilot denial. Account addresses/subjects/tokens are not retained here.
+
+The owner then requested allowed-practitioner management in central Admin. Work continues on
+`feature/practitioner-pilot-admin`; see the [operator guide](PRACTITIONER_PILOT_ADMIN.md) and
+[38-control/evidence ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md). New migration
+058 is not approved/applied, the new feature/flag is not hosted, and neither account has
+submitted/accepted terms or been approved/activated/retired. The host still has disabled
+mail/SMS and closed application settings. Prior steps below are retained as their dated
+observations; they do not supersede this current checkpoint.
+
 1 November 2026. Continuation on `feature/wellnexa-practitioner-signin`. The owner explicitly
 approved using **Wellnexa itself** and one named Google and one named personal Microsoft
 account for synthetic practitioner testing. Their addresses remain in the private chat rather

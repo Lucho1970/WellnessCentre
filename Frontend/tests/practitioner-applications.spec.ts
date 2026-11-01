@@ -212,3 +212,25 @@ test('a rejected identity callback renders recovery without exposing provider di
   await expect(page.getByText('Synthetic private provider diagnostic')).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });
+
+for (const language of ['en', 'fr']) {
+  test(`pilot support reference stays readable and clears after retry in ${language}`, async ({ page }) => {
+    const state = await fixture(page);
+    const reference = 'WPI1 ' + Array.from({ length: 22 }, () => 'synthetic-reference-group-12345678').join(' ');
+    let approved = false;
+    await page.route('**/api/v1/auth/me', route => approved
+      ? route.fulfill({ json: { data: { roles: [], permissions: [] } } })
+      : route.fulfill({ status: 403, json: { error: { code: 'pilot_access_denied', fields: { ID: reference } } } }));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${host}/staff/external?lang=${language}`);
+    const support = page.getByText(`ID: ${reference}`, { exact: true });
+    await expect(support).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toHaveCount(0);
+    approved = true;
+    await page.getByRole('button', { name: language === 'fr' ? 'Réessayer' : 'Retry', exact: true }).click();
+    await expect(support).toHaveCount(0);
+    expect(state.privateRequests).not.toContain('/api/v1/clients');
+    expect(state.writes).toEqual([]);
+  });
+}

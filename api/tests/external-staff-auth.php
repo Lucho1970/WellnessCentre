@@ -62,4 +62,66 @@ foreach(['applications','durable'] as $mode){
     check($adapter->verify($sign($claims))->subject==='staff-subject');
     denied(fn()=>$adapter->verify($sign($customerClaims)),401);
 }
+// A denied pilot user can report their own verified tuple without sharing tokens.
+// Preserve the caller's environment; no hosted configuration or data is used.
+$pilotKeys=['PILOT_MODE','PILOT_ALLOWED_IDENTITIES','PILOT_ALLOWED_EMAILS','PILOT_ALLOWED_SMS'];
+$savedPilot=[];
+foreach($pilotKeys as $name)$savedPilot[$name]=[array_key_exists($name,$_ENV),$_ENV[$name]??null,getenv($name)];
+$setPilot=static function(string $name,string $value):void{$_ENV[$name]=$value;putenv($name.'='.$value);};
+try {
+    $setPilot('PILOT_MODE','true');
+    foreach(array_slice($pilotKeys,1) as $name)$setPilot($name,'[]');
+    $referenceFor=static function(string $token)use($auth):string{
+        try{$auth->verify($token);}catch(ApiException $e){
+            check($e->status===403&&$e->errorCode==='pilot_access_denied');
+            check(array_keys($e->fields)===['ID']&&is_string($e->fields['ID']));
+            return $e->fields['ID'];
+        }
+        throw new RuntimeException('Pilot unexpectedly allowed an unapproved identity');
+    };
+    $token=$sign($claims+['email'=>'private@example.test','name'=>'Private name','roles'=>['Wellness.SuperAdmin']]);
+    $reference=$referenceFor($token);
+    check(str_starts_with($reference,'WPI1 '));
+    $tuple=json_decode(JWT::urlsafeB64Decode(str_replace(' ','',substr($reference,5))),true,8,JSON_THROW_ON_ERROR);
+    check($tuple===['adapter'=>'entra-external-staff','issuer'=>$claims['iss'],'subject'=>$claims['sub']]);
+    check(!str_contains($reference,$token)&&!str_contains(json_encode($tuple),'private@example.test')&&!isset($tuple['roles']));
+    check($referenceFor($token)===$reference);
+    $otherReference=$referenceFor($sign(array_replace($claims,['sub'=>'other-provider-subject'])));
+    check($otherReference!==$reference);
+    $longReference=$referenceFor($sign(array_replace($claims,['sub'=>str_repeat('s',255)])));
+    check(max(array_map('strlen',explode(' ',$longReference)))<=32);
+    foreach([
+        $sign(array_replace($claims,['aud'=>$clientApi])),
+        $sign(array_replace($claims,['azp'=>$clientSpa])),
+        $sign(array_replace($claims,['iss'=>'https://other.test'])),
+        $sign(array_replace($claims,['exp'=>time()-120])),
+        $sign(array_replace($claims,['scp'=>'access_as_client'])),
+        JWT::encode($claims,$other,'RS256','test'),
+        $reference,
+    ] as $badToken){
+        try{$auth->verify($badToken);}catch(ApiException $e){check($e->errorCode!=='pilot_access_denied'&&$e->fields===[]);continue;}
+        throw new RuntimeException('Invalid token unexpectedly accepted');
+    }
+    $setPilot('PILOT_ALLOWED_IDENTITIES',json_encode([$tuple],JSON_THROW_ON_ERROR));
+    check($auth->verify($token)->subject===$claims['sub']&&$auth->verify($token)->directoryRoles===[]);
+    $setPilot('PILOT_ALLOWED_IDENTITIES','[]');
+    check($referenceFor($token)===$reference);
+    $managedConfig=new Config('test',false,'test',[],'',3306,'','','','workforce','workforce-api','access_as_user',300,
+        staffInvitationsEnabled:true,staffExternalTenantId:$tenant,staffExternalSubdomain:'teststaff',staffExternalApiClientId:$api,staffExternalSpaClientId:$spa,practitionerPilotAccessEnabled:true);
+    denied(fn()=>(new ExternalStaffAuthenticator($managedConfig,$loader))->verify($token),503);
+    $calls=0;
+    $managed=new ExternalStaffAuthenticator($managedConfig,$loader,function($verified)use(&$calls,$claims):void{check($verified->subject===$claims['sub']);$calls++;});
+    check($managed->verify($token)->directoryRoles===[] && $calls===1);
+    denied(fn()=>$managed->verify($sign(array_replace($claims,['aud'=>'wrong']))),401);
+    check($calls===1);
+    $blocked=new ExternalStaffAuthenticator($managedConfig,$loader,fn()=>throw new ApiException(403,'pilot_access_denied','Pilot denied'));
+    try{$blocked->verify($token);throw new RuntimeException('Managed denial ignored');}catch(ApiException $e){check($e->fields['ID']===$reference);}
+    $setPilot('PILOT_MODE','false');
+    check((new ExternalStaffAuthenticator($managedConfig,$loader))->verify($token)->subject===$claims['sub']);
+} finally {
+    foreach($savedPilot as $name=>[$present,$value,$process]){
+        if($present)$_ENV[$name]=$value;else unset($_ENV[$name]);
+        if($process===false)putenv($name);else putenv($name.'='.$process);
+    }
+}
 echo "$checks external staff token checks passed.\n";

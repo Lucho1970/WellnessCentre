@@ -1,5 +1,12 @@
 # Wellnexa practitioner Google and personal Microsoft sign-in
 
+**Current pilot management:** [Admin pilot access](PRACTITIONER_PILOT_ADMIN.md) adds
+clinic-scoped pending/approve/revoke/history using the existing central administrator grant.
+Its default-off managed gate needs separately approved migration 058 and hosted validation.
+Both approved test accounts have returned from their providers to Wellnexa's pilot denial;
+registration, activation and normal Inactive retirement remain pending. See the
+[current evidence ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
+
 1 November 2026. Implementation branch: `feature/wellnexa-practitioner-signin`, based on
 `0aec293` so the existing quality gates, pilot safeguards, request limits and deployment fixes
 are retained. This branch does not merge or deploy itself. The separate blog-document task and

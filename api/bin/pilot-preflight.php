@@ -9,13 +9,19 @@ try {
     else throw new RuntimeException('Usage: php api/bin/pilot-preflight.php [--env private-env-file]');
     if (!is_file($envFile)) throw new RuntimeException('The requested private environment file is unavailable.');
     \Wellness\Config::loadEnvFile($envFile);
-    $summary = \Wellness\PilotPolicy::fromEnvironment()->summary();
+    $policy = \Wellness\PilotPolicy::fromEnvironment();
+    $managed = (string)($_ENV['PRACTITIONER_PILOT_ACCESS_ENABLED'] ?? getenv('PRACTITIONER_PILOT_ACCESS_ENABLED') ?: 'false');
+    if (!in_array($managed,['true','false'],true) || ($managed==='true' && $policy->hasExternalApprovals())) {
+        throw new RuntimeException('Invalid managed practitioner pilot configuration.');
+    }
+    $summary = $policy->summary();
     echo json_encode($summary, JSON_THROW_ON_ERROR).PHP_EOL;
     if (!$summary['enabled'] || $summary['identities'] < 1) {
         fwrite(STDERR, "Pilot access is not configured for testers. No provider or database connection was attempted.\n");
         exit(2);
     }
     echo "Pilot configuration is valid; empty delivery lists block delivery.\n";
+    if ($managed==='true') echo "Managed practitioner pilot access requires hosted database and scoped administrator acceptance.\n";
     echo "This checks configuration only. Verify deployed identities, roles, synthetic records, sender/reply/calendar addresses, workers and rollback before inviting testers.\n";
 } catch (Throwable) {
     fwrite(STDERR, "Pilot preflight failed. Check the command, private file and PILOT_* configuration; no provider or database connection was attempted.\n");

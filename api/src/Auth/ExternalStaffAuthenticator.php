@@ -13,7 +13,11 @@ use Wellness\Http\ApiException;
 /** Dedicated application trust; client tokens cannot enter this adapter. */
 final class ExternalStaffAuthenticator implements IdentityAdapter
 {
-    public function __construct(private readonly Config $config, private readonly ?Closure $keyLoader = null) {}
+    public function __construct(
+        private readonly Config $config,
+        private readonly ?Closure $keyLoader = null,
+        private readonly ?Closure $pilotAccess = null,
+    ) {}
 
     public function isCandidate(?string $token): bool
     {
@@ -32,8 +36,28 @@ final class ExternalStaffAuthenticator implements IdentityAdapter
             throw new ApiException(503,'staff_identity_not_configured','Use separate staff application registrations.');
         }
         $claims=$this->claims($token);
-        \Wellness\PilotPolicy::fromEnvironment()->assertIdentity('entra-external-staff',$claims['iss'],$claims['sub']);
-        return new VerifiedIdentity('entra-external-staff',$claims['iss'],$claims['sub'],$claims['tid']);
+        $identity=new VerifiedIdentity('entra-external-staff',$claims['iss'],$claims['sub'],$claims['tid']);
+        try {
+            $policy=\Wellness\PilotPolicy::fromEnvironment();
+            if($this->config->practitionerPilotAccessEnabled && $policy->enabled){
+                if($this->pilotAccess===null)throw new ApiException(503,'pilot_administration_unavailable','Practitioner pilot administration is not available.');
+                ($this->pilotAccess)($identity);
+            } else $policy->assertIdentity($identity->adapter,$identity->issuer,$identity->subject);
+        } catch (ApiException $denial) {
+            if ($denial->errorCode !== 'pilot_access_denied') throw $denial;
+            // Own-account support metadata, only after every JWT check above succeeds.
+            // It is neither a bearer credential nor an approval: operators must verify
+            // account ownership before explicitly approving it in the pilot authority.
+            $reference = JWT::urlsafeB64Encode(json_encode([
+                'adapter'=>'entra-external-staff', 'issuer'=>$claims['iss'], 'subject'=>$claims['sub'],
+            ], JSON_THROW_ON_ERROR));
+            // ID is language-neutral. Short groups keep the existing accessible
+            // validation summary readable on narrow screens without a frontend rebuild.
+            throw new ApiException($denial->status, $denial->errorCode, $denial->getMessage(), [
+                'ID'=>'WPI1 '.implode(' ', str_split($reference, 32)),
+            ]);
+        }
+        return $identity;
     }
 
     private function claims(?string $token): array
@@ -75,7 +99,7 @@ final class ExternalStaffAuthenticator implements IdentityAdapter
             if (!in_array('access_as_staff', preg_split('/\s+/', trim($claims['scp'])) ?: [], true)) {
                 throw new ApiException(403, 'missing_scope', 'The staff API permission is missing.');
             }
-            return $claims; // Internal only. Never serialize raw token claims to the browser.
+            return $claims; // Internal map. Only the deliberate own-account pilot tuple above may be disclosed.
         } catch (ApiException $error) { throw $error; }
         catch (Throwable) { throw new ApiException(401, 'invalid_staff_token', 'Invited staff authorization is invalid or expired. Please sign in again.'); }
     }

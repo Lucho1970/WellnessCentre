@@ -11,6 +11,7 @@ import applicationAdmin from './applicationAdmin';
 import billing from './billing';
 import practitionerApplications from './practitionerApplications';
 import communications from './communications';
+import practitionerPilot from './practitionerPilot';
 import globalPractitioners from './globalPractitioners';
 import receipts from './receipts';
 import onsiteFees from './onsiteFees';
@@ -37,7 +38,7 @@ function initialLanguage(): SupportedLanguage {
 }
 
 void i18n.use(initReactI18next).init({
-  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en, ...billing.en, ...practitionerApplications.en, ...communications.en, ...globalPractitioners.en, ...receipts.en, ...onsiteFees.en, ...discovery.en, ...serviceImports.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr, ...billing.fr, ...practitionerApplications.fr, ...communications.fr, ...globalPractitioners.fr, ...receipts.fr, ...onsiteFees.fr, ...discovery.fr, ...serviceImports.fr } } },
+  resources: { en: { translation: { ...en, ...workLocations.en, ...staffInvitationErrors.en, ...staffProfileMessages.en, ...formValidationMessages.en, ...clinics.en, ...applicationAdmin.en, ...billing.en, ...practitionerApplications.en, ...communications.en, ...practitionerPilot.en, ...globalPractitioners.en, ...receipts.en, ...onsiteFees.en, ...discovery.en, ...serviceImports.en } }, fr: { translation: { ...fr, ...workLocations.fr, ...staffInvitationErrors.fr, ...staffProfileMessages.fr, ...formValidationMessages.fr, ...clinics.fr, ...applicationAdmin.fr, ...billing.fr, ...practitionerApplications.fr, ...communications.fr, ...practitionerPilot.fr, ...globalPractitioners.fr, ...receipts.fr, ...onsiteFees.fr, ...discovery.fr, ...serviceImports.fr } } },
   lng: initialLanguage(),
   fallbackLng: 'en',
   supportedLngs: supportedLanguages,

@@ -994,3 +994,101 @@ test("central sign-in uses the workforce scope and returns to the admin path des
   );
   expect(target.searchParams.get("code_challenge_method")).toBe("S256");
 });
+
+
+type PilotEntry = { id: number; clinic_id: number; label: string; status: 'pending' | 'approved' | 'revoked'; version: number; issuer: string; subject: string; identity_status: string; updated_at: string };
+async function pilotFixture(page: Page, enabled = true) {
+  await authentication(page);
+  await page.route('**/api/v1/application/me', route => route.fulfill({ json: { data: { id: 1, features: { practitioner_pilot_access: enabled } } } }));
+  await page.route('**/api/v1/application/clinics', route => route.fulfill({ json: { data: { items: [{ id: 4, name: 'Wellnexa' }, { id: 5, name: 'Other clinic' }] } } }));
+  const state = { writes: [] as { path: string; body: Record<string, unknown> }[], denied: false, uncertain: false, stale: false, inactive: false,
+    entry: { id: 7, clinic_id: 4, label: 'Synthetic Practitioner', status: 'pending', version: 1, issuer: 'https://synthetic.example.test/' + 'x'.repeat(100), subject: 'synthetic-subject', identity_status: 'active', updated_at: '2026-11-01 12:00:00' } as PilotEntry };
+  await page.route('**/api/v1/application/clinics/*/pilot-practitioners**', route => {
+    if (state.denied) return route.fulfill({ status: 403, json: { error: { code: 'application_admin_required', message: 'Administrator access revoked.' } } });
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'POST') {
+      const body: Record<string, unknown> = route.request().postDataJSON(); state.writes.push({ path: url.pathname, body });
+      if (state.uncertain && state.writes.length === 1) return route.fulfill({ status: 503, json: { error: { message: 'Save outcome unknown.' } } });
+      if (state.stale) return route.fulfill({ status: 409, json: { error: { message: 'Pilot access changed.' } } });
+      if (url.pathname.endsWith('/approve')) { state.entry.status = 'approved'; state.entry.version++; }
+      if (url.pathname.endsWith('/revoke')) { state.entry.status = 'revoked'; state.entry.version++; }
+      return route.fulfill({ json: { data: { id: 7, version: state.entry.version, status: state.entry.status } } });
+    }
+    if (url.pathname.endsWith('/7')) return route.fulfill({ json: { data: { entry: { ...state.entry, identity_status: state.inactive ? 'inactive' : 'active' }, events: [{ id: 1, action: 'record', reason: 'Synthetic operator verified reference', version: 1, created_at: '2026-11-01 12:00:00', operator_name: 'Operator' }] } } });
+    return route.fulfill({ json: { data: { items: url.pathname.includes('/5/') ? [] : [state.entry], next_before_id: null } } });
+  });
+  await page.goto('http://localhost:5185/admin/');
+  if (enabled) { await page.getByRole('tab', { name: 'Practitioner pilot access', exact: true }).click(); await expect(page.getByText('Synthetic Practitioner', { exact: true })).toBeVisible(); }
+  return state;
+}
+async function pilotRecord(page: Page) {
+  await page.getByRole('button', { name: 'Record practitioner pilot reference', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Practitioner pilot reference', exact: true }).fill('WPI1 synthetic-reference');
+  await page.getByRole('textbox', { name: 'Operator label', exact: true }).fill('Synthetic owned account');
+  await page.getByRole('textbox', { name: 'Reason for change', exact: true }).fill('Confirmed account ownership independently.');
+}
+
+test('pilot controls stay hidden when managed pilot administration is disabled', async ({ page }) => {
+  await pilotFixture(page, false); await expect(page.getByRole('tab', { name: 'Clinics', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Practitioner pilot access', exact: true })).toHaveCount(0);
+});
+test('recording a pilot reference sends a pending-only request without clinical privileges', async ({ page }) => {
+  const state = await pilotFixture(page); await pilotRecord(page);
+  await page.getByRole('button', { name: 'Save pending pilot entry', exact: true }).click();
+  await expect(page.getByText('Pilot access changes saved.')).toBeVisible();
+  expect(state.writes[0].path).toBe('/api/v1/application/clinics/4/pilot-practitioners');
+  expect(Object.keys(state.writes[0].body).sort()).toEqual(['label', 'reason', 'reference', 'request_key']);
+  expect(state.writes[0].body.request_key).toMatch(/^[0-9a-f-]{36}$/);
+  expect(state.entry.status).toBe('pending');
+});
+test('pilot approval requires verification and carries the current version and reason', async ({ page }) => {
+  const state = await pilotFixture(page); await page.getByRole('button', { name: 'Review pilot access for Synthetic Practitioner' }).click();
+  const dialog = page.getByRole('dialog'); await expect(dialog.getByText('Synthetic operator verified reference', { exact: false })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save pilot access decision' })).toBeDisabled();
+  await page.screenshot({ path: '../.tmp/practitioner-pilot-admin-en-review.png', fullPage: true, animations: 'disabled' });
+  await dialog.getByRole('checkbox', { name: 'I independently confirmed this account with its owner for this clinic.' }).check();
+  await dialog.getByRole('textbox', { name: 'Reason for change' }).fill('Verified the intended clinic and account.');
+  await dialog.getByRole('button', { name: 'Save pilot access decision' }).click(); await expect(page.getByText('Allowed for pilot', { exact: true })).toBeVisible();
+  expect(state.writes[0].body).toMatchObject({ version: 1, identity_verified: true, reason: 'Verified the intended clinic and account.' });
+  expect(state.writes[0].path).toMatch(/\/7\/approve$/);
+});
+test('uncertain pilot saves freeze input and retry the identical operation', async ({ page }) => {
+  const state = await pilotFixture(page); state.uncertain = true; await pilotRecord(page);
+  await page.getByRole('button', { name: 'Save pending pilot entry' }).click();
+  await expect(page.getByRole('textbox', { name: 'Operator label', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Retry pilot access change' }).click(); await expect(page.getByText('Pilot access changes saved.')).toBeVisible();
+  expect(state.writes[1]).toEqual(state.writes[0]);
+});
+test('stale pilot decisions clear private drafts and require a fresh review', async ({ page }) => {
+  const state = await pilotFixture(page); state.stale = true; await pilotRecord(page);
+  await page.getByRole('button', { name: 'Save pending pilot entry' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0); await expect(page.getByText('The information changed or conflicts with another update. Refresh and try again.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic Practitioner', { exact: true })).toHaveCount(0);
+});
+test('revoked administrator access clears pilot identity details on refresh', async ({ page }) => {
+  const state = await pilotFixture(page); state.denied = true; await page.getByRole('button', { name: 'Refresh pilot access' }).click();
+  await expect(page.getByText('You do not have permission to perform this action.', { exact: true })).toBeVisible(); await expect(page.getByText('Synthetic Practitioner', { exact: true })).toHaveCount(0);
+});
+test('French mobile pilot review preserves drafts and restores keyboard focus', async ({ page }) => {
+  await pilotFixture(page); await page.setViewportSize({ width: 390, height: 844 }); await pilotRecord(page);
+  await page.getByRole('button', { name: 'FR', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Libellé de gestion', exact: true })).toHaveValue('Synthetic owned account');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '../.tmp/practitioner-pilot-admin-fr-mobile.png', fullPage: true, animations: 'disabled' });
+  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Fermer', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  page.once('dialog', dialog => dialog.accept()); await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Enregistrer une référence de praticien pour le projet pilote', exact: true })).toBeFocused();
+});
+test('inactive revoked pilot identities remain viewable as history without an invalid approval option', async ({ page }) => {
+  const state = await pilotFixture(page); state.inactive = true; state.entry.status = 'revoked';
+  await page.getByRole('button', { name: 'Review pilot access for Synthetic Practitioner' }).click();
+  const dialog = page.getByRole('dialog'); await expect(dialog.getByText('Pilot decision history', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save pilot access decision' })).toHaveCount(0);
+  await expect(dialog.getByRole('combobox', { name: 'Pilot access decision' })).toHaveCount(0);
+});
+test('changing the selected clinic removes the previous clinic pilot entries', async ({ page }) => {
+  await pilotFixture(page); await page.getByRole('combobox', { name: /^Clinic/ }).click(); await page.getByRole('option', { name: 'Other clinic', exact: true }).click();
+  await expect(page.getByText('No practitioner pilot entries for this filter.')).toBeVisible(); await expect(page.getByText('Synthetic Practitioner', { exact: true })).toHaveCount(0);
+});

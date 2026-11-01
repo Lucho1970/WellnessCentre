@@ -14,6 +14,7 @@ final readonly class PilotPolicy
         private array $identities,
         private array $emails,
         private array $numbers,
+        private bool $hasExternalApprovals,
     ) {}
 
     public static function fromEnvironment(): self
@@ -26,7 +27,7 @@ final readonly class PilotPolicy
         };
         $flag = $read('PILOT_MODE', 'false');
         if (!in_array($flag, ['true', 'false'], true)) throw new \RuntimeException('PILOT_MODE must be true or false.');
-        $identities = [];
+        $identities = []; $hasExternalApprovals = false;
         foreach (self::list($read('PILOT_ALLOWED_IDENTITIES', '[]'), 'PILOT_ALLOWED_IDENTITIES') as $identity) {
             if (!is_array($identity) || count($identity) !== 3 || array_diff(array_keys($identity), ['adapter', 'issuer', 'subject'])
                 || !in_array($identity['adapter'] ?? null, ['entra-workforce', 'entra-external-staff', 'entra-customer'], true)
@@ -38,6 +39,7 @@ final readonly class PilotPolicy
                 throw new \RuntimeException('Invalid PILOT_ALLOWED_IDENTITIES configuration.');
             }
             $identities[self::identityKey($identity['adapter'], $identity['issuer'], $identity['subject'])] = true;
+            if ($identity['adapter'] === 'entra-external-staff') $hasExternalApprovals = true;
         }
         $emails = [];
         foreach (self::list($read('PILOT_ALLOWED_EMAILS', '[]'), 'PILOT_ALLOWED_EMAILS') as $email) {
@@ -50,7 +52,7 @@ final readonly class PilotPolicy
             if (!is_string($number) || !CanadianSmsNumber::isAllowed($number)) throw new \RuntimeException('Invalid PILOT_ALLOWED_SMS configuration.');
             $numbers[$number] = true;
         }
-        return new self($flag === 'true', $identities, $emails, $numbers);
+        return new self($flag === 'true', $identities, $emails, $numbers, $hasExternalApprovals);
     }
 
     private static function list(string $json, string $key): array
@@ -84,6 +86,9 @@ final readonly class PilotPolicy
     {
         return ['enabled' => $this->enabled, 'identities' => count($this->identities), 'emails' => count($this->emails), 'sms' => count($this->numbers)];
     }
+
+    /** Managed practitioner approvals must have one authority, without an env bypass. */
+    public function hasExternalApprovals(): bool { return $this->hasExternalApprovals; }
 
     public function assertIdentity(string $adapter, string $issuer, string $subject): void
     {

@@ -43,6 +43,7 @@ final readonly class Request
         $serviceImport = str_starts_with($requestPath, '/api/v1/admin/service-imports');
         $customer = $customer || str_contains($requestPath,'/practitioner-applications');
         $customer = $customer || str_contains($requestPath,'/provider-evidence');
+        $customer = $customer || preg_match('#^/api/v1/application/clinics/[0-9]+/pilot-practitioners(?:/|$)#D',$requestPath)===1;
         $customer = $customer || preg_match('#^/api/v1/application/clinics/[0-9]+/communications#',$requestPath)===1;
         // Preserve stricter existing policies. The fallback accommodates the existing
         // 1.1 MB encoded branding validator while bounding every other path/method.

@@ -40,6 +40,7 @@ final class Api
     private ?\Wellness\Auth\ExternalStaffAuthenticator $externalStaffAuth = null;
     private ?CustomerAuthenticator $customerAuth = null;
     private ?\Wellness\Service\AccessAudit $accessAudit = null;
+    private ?\Wellness\Service\PractitionerPilotAccessService $practitionerPilotAccess = null;
     private ?ClinicContext $clinicContext = null;
     private CatalogService $catalog;
     private AvailabilityService $availability;
@@ -72,7 +73,8 @@ final class Api
         $request=null;
         $this->accessAudit=new \Wellness\Service\AccessAudit($this->database);
         Response::beforeJson(function(array $payload,int $status)use(&$request):void{
-            $this->accessAudit->response($request,$payload,$status,$this->clinicContext?->clinicId);
+            try { $this->accessAudit->response($request,$payload,$status,$this->clinicContext?->clinicId); }
+            finally { $this->practitionerPilotAccess?->release(); }
         });
         try{
             $request=Request::capture();$this->cors($request);
@@ -577,6 +579,8 @@ final class Api
         $this->accessAudit?->applicationActor($actor);
         $service=new \Wellness\Service\ApplicationClinicService($this->database,new AuditLogger($this->database),$this->config);
         $path=substr($request->path,strlen('/api/v1/application/'));
+        if(preg_match('#^clinics/([1-9][0-9]{0,17})/pilot-practitioners(.*)$#D',$path,$m))return (new \Wellness\Service\PractitionerPilotAccessService($this->database,$this->config))
+            ->handle($actor,(int)$m[1],$request->method,$m[2],$request->query,$request->body,$request->correlationId);
         if(preg_match('#^clinics/([1-9][0-9]*)/provider-evidence(.*)$#D',$path,$m))return (new \Wellness\Service\ProviderEvidenceService($this->database,$this->config))->handle($actor,(int)$m[1],$request->method,$m[2],$request->body,$request->correlationId);
         if(preg_match('#^clinics/([1-9][0-9]*)/communications(.*)$#D',$path,$m))return (new \Wellness\Service\CommunicationsAdministrationService($this->database,$this->config))->handle($actor,(int)$m[1],$request->method,$m[2],$request->body,$request->correlationId);
         if(preg_match('#^clinics/([1-9][0-9]*)/practitioner-applications(.*)$#D',$path,$m))return (new \Wellness\Service\PractitionerApplicationService($this->database,$this->config))
@@ -597,7 +601,8 @@ final class Api
         if($request->method==='POST'&&$path==='form-library')return $library->submit($actor,$request->body,$request->correlationId);
         if($request->method==='GET'&&preg_match('#^form-library/(\d+)$#D',$path,$m))return $library->detail($actor,(int)$m[1]);
         if($request->method==='POST'&&preg_match('#^form-library/(\d+)/review$#D',$path,$m))return $library->review($actor,(int)$m[1],$request->body,$request->correlationId);
-        if ($request->method==='GET' && $path==='me') return ['id'=>$actor->id,'display_name'=>$actor->displayName,'email'=>$actor->email,'roles'=>['application_admin']];
+        if ($request->method==='GET' && $path==='me') return ['id'=>$actor->id,'display_name'=>$actor->displayName,'email'=>$actor->email,'roles'=>['application_admin'],
+            'features'=>['practitioner_pilot_access'=>$this->config->practitionerPilotAccessEnabled && PilotPolicy::fromEnvironment()->enabled]];
         if ($request->method==='GET' && $path==='clinics') return $service->list($actor);
         if ($request->method==='POST' && $path==='clinics') return $service->create($actor,$request->body,$request->correlationId);
         if ($request->method==='PATCH' && preg_match('#^clinics/(\d+)$#D',$path,$match)) return $service->configure($actor,(int)$match[1],$request->body,$request->correlationId);
@@ -754,7 +759,13 @@ final class Api
         return new \Wellness\Service\StaffInvitationService($this->database,$this->config,new AuditLogger($this->database));
     }
     private function externalStaff(): \Wellness\Auth\ExternalStaffAuthenticator
-    { return $this->externalStaffAuth ??= new \Wellness\Auth\ExternalStaffAuthenticator($this->config); }
+    {
+        return $this->externalStaffAuth ??= new \Wellness\Auth\ExternalStaffAuthenticator($this->config,null,function(\Wellness\Auth\VerifiedIdentity $identity):void{
+            if($this->clinicContext===null)throw new ApiException(503,'pilot_administration_unavailable','Practitioner pilot administration is not available.');
+            $this->practitionerPilotAccess ??= new \Wellness\Service\PractitionerPilotAccessService($this->database,$this->config);
+            $this->practitionerPilotAccess->assertAllowed($identity,$this->clinicContext->clinicId);
+        });
+    }
     private function staffInvitationClaim(Request $request): array
     {
         $this->clinicContext->assertActive($this->database);

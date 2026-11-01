@@ -50,11 +50,12 @@ final readonly class Config
         public bool $automatedCommunicationsEnabled = false,
         public bool $smsBudgetEnforcementEnabled = false,
         public bool $providerEvidenceEnabled = false,
+        public bool $practitionerPilotAccessEnabled = false,
     ) {}
 
     public static function fromEnvironment(): self
     {
-        PilotPolicy::fromEnvironment(); // Invalid pilot settings must not silently disable protection.
+        $pilotPolicy = PilotPolicy::fromEnvironment(); // Invalid pilot settings must not silently disable protection.
         $value = static fn(string $key, string $default = ''): string => (string)($_ENV[$key] ?? getenv($key) ?: $default);
         $required = static function (string $key) use ($value): string {
             $result = trim($value($key));
@@ -62,6 +63,11 @@ final readonly class Config
             return $result;
         };
 
+        $managedPilot = $value('PRACTITIONER_PILOT_ACCESS_ENABLED', 'false');
+        if (!in_array($managedPilot, ['true','false'], true)) throw new RuntimeException('PRACTITIONER_PILOT_ACCESS_ENABLED must be true or false.');
+        if ($managedPilot === 'true' && $pilotPolicy->hasExternalApprovals()) {
+            throw new RuntimeException('Migrate private external practitioner approvals before enabling managed pilot access.');
+        }
         return new self(
             $value('APP_ENV', 'production'),
             filter_var($value('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL),
@@ -105,6 +111,7 @@ final readonly class Config
             filter_var($value('AUTOMATED_COMMUNICATIONS_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             filter_var($value('SMS_BUDGET_ENFORCEMENT_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             filter_var($value('PROVIDER_EVIDENCE_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+            $managedPilot === 'true',
         );
     }
 
