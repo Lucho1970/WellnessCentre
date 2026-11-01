@@ -1,8 +1,9 @@
 # Practitioner pilot administration — 1 November 2026
 
 Reviewer: Codex, source/local testing only. Branch `feature/practitioner-pilot-admin`,
-based on `6845e30` from the ongoing practitioner sign-in work. Exact implementation
-revision and final artifact checks will be recorded after the source checkpoint.
+based on `6845e30` from the ongoing practitioner sign-in work. Implementation revision:
+**`07febd06c49f9ef90995a946ca7d338a725b36d5`**. Final artifact checks are recorded
+separately after the package build; subsequent documentation does not change application code.
 No merge, migration 058, managed approval, account creation or hosted configuration
 change has been performed for this addition. The existing unrelated untracked PDF remains
 untouched and excluded. Implementation authorization does not establish organizational approval.
@@ -159,6 +160,7 @@ runtime dependency or advisory is introduced by this change.
 | `npx playwright test --config playwright.application-admin.config.ts` (Frontend) | Final full suite **45 passed**, including nine new pilot cases. |
 | `npx playwright test --config playwright.applications.config.ts --reporter=line` (Frontend) | **17 passed**, including two own-reference EN/FR denial/retry cases. |
 | `npx playwright test --config playwright.invitations.config.ts --reporter=line` (Frontend) | **7 passed**. |
+| `npm ci` (Frontend) | Exit 0; exact lock restore, 350 packages; 11 known moderate build findings. npm reported esbuild 0.25.12 postinstall is not in allowScripts; no new script approval/setting was added. Final build verifies usability. |
 | `npm ci` (Wellnexa) | Exit 0; exact lock restore, 30 packages, no audit findings. |
 | `npm run lint`, `npm run build`, `npm run test:browser` (Wellnexa) | Exit 0; four existing lint warnings, build passed and **24 browser cases passed**. |
 | `php api/tests/external-staff-auth.php` (root) | **67 passed**. |
@@ -248,6 +250,18 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no failed/pending control waived by local tests. Accountable owners: resolve or approve lawful scoped internal exceptions. |
 | REL-05 | Partial | Implementation authorized; new 058 not approved/applied, no feature flags/roles broadened live. Release/custodian/security/privacy/clinical: exact DDL approval after backup, deployment and acceptance/signatures. |
 | REL-06 | Implemented (report scope) | File purposes, versions/flows, commands, findings, limits, owners and rollback recorded; final checkpoint to bind exact source. Release owner: confirm report. |
+
+## Private configuration preparation
+
+A separate private candidate at
+`D:/Dev/WellnessCentre-backup/practitioner-pilot-admin-settings/.env` preserves the previously
+reviewed pilot candidate and adds only `PRACTITIONER_PILOT_ACCESS_ENABLED=true`. It has not
+been uploaded. `php api/bin/pilot-preflight.php --env
+D:/Dev/WellnessCentre-backup/practitioner-pilot-admin-settings/.env` passed with pilot mode
+on, **two workforce approvals, zero email destinations, zero SMS destinations**. This only
+validates settings; it does not verify 058, hosted lock privileges or administrator acceptance.
+The current live file and previous candidate remain unchanged. No private candidate enters Git
+or the generated archives.
 
 ## Deployment and rollback implications
 
