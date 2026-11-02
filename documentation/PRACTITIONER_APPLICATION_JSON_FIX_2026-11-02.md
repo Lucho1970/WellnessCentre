@@ -1,6 +1,7 @@
 # Practitioner application review JSON compatibility — 2 November 2026
 
 Branch: `bugs/practitioner-application-json-encoding`, based on `1ffc2b1`.
+Implementation/package source: `d61a94cc628c485164db5483c3f292909d6dadbe`.
 Reviewer: Codex for the stated source, synthetic-test and hosted-observation scope.
 Continues the owner-authorized controlled rehearsal; no merge or general release approval.
 
@@ -96,6 +97,30 @@ required. Keep activation held during copy. After the owner copies the patch, re
 current application review, confirm exact preserved text/history, then continue the existing
 approved synthetic review/activation rehearsal. Do not resubmit/delete the application or
 relax guards to force a pass. The applicant must personally accept terms and activate.
+
+The one-file patch is prepared at
+`D:/Dev/WelnessCentre/deployments/2026-11-02-practitioner-application-json-fix`.
+Its payload comes from `git show` at the exact source above. Rollback uses the original
+verified private API archive's bytes. The initial builder correctly stopped on a byte
+comparison because that earlier package uses CRLF and committed source uses LF; normalized
+comparison confirmed identical prior source, and the final rollback retains the actual
+earlier archive bytes. No released file was overwritten during packaging recovery.
+
+| Artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| `01-api-application-json-fix.zip` | 7,778 | `4347b8e3f6be19376afa2c6c22599408b8a4a4dfc500c09216513c23eb20ae0e` |
+| New `src/Service/PractitionerApplicationService.php` | 32,432 | `4588f14583030147f634f7298622b38cfe1ceebc21d4b61abcc3697262d0c04d` |
+| `ROLLBACK-api-application-before.zip` | 7,682 | `e2f6c35c4d59e28c20d51f0b8029abc0e7c84b22166374b2f2c3d9bd2226bdc8` |
+| Previous service member | 32,501 | `f9177b862298fa7e0204762f274171eb05ca679d4548cdd06da834bd966cd0a0` |
+
+Both archives were reopened, checked for exactly the one expected member, CRC-checked and
+byte-compared with their source payloads. Narrow private-key/JWT and actual-test-email
+signature scans found no candidates; this is not an exhaustive security/privacy audit.
+No .env, logs, dumps, tests, dependencies, frontend files or source maps are included.
+Manifest records exact source/branch/build time, runtime/counts and all three lockfile hashes.
+Upload only the patch contents to `/wellness-api`; retain README/manifest/rollback locally.
+Preserve every other API file, including the previously deployed pilot-response fix.
+Remote private-file hash and corrected hosted review remain unverified pending owner copy.
 
 Rollback restores only the previous service file; retain the submitted application, consent,
 plan/terms, identity and audit records. It restores the prior review defect and is not a
