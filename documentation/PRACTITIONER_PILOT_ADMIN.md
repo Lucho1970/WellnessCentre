@@ -1,9 +1,12 @@
 # Practitioner pilot access administration
 
-**Prepared UI follow-up, not deployed:** [2 November reliability work](PRACTITIONER_UI_RELIABILITY_2026-11-02.md)
+**UI follow-up, assets verified; entry pages pending:** [2 November reliability work](PRACTITIONER_UI_RELIABILITY_2026-11-02.md)
 addresses explicit contact editing, dashboard account-denial rechecks, callback URL cleanup
 and readable pilot filters. The completed hosted rehearsal's restrictive resting state
-below remains current; local fixes and a package do not reopen access or establish release.
+below remains the last private-state checkpoint. All 138 hosted asset URLs match the
+reviewed v3 package, all three entry pages still match the previous version, and both
+public intake/activation offers remain closed. Static integrity does not establish
+hosted behavior acceptance or reopen access.
 
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive
 with original emails retained and both pilot entries revoked. The Microsoft session was

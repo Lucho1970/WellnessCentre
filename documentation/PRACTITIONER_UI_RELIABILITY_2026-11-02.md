@@ -1,8 +1,9 @@
 # Practitioner administration and sign-in UI reliability — 2 November 2026
 
 Branch `bugs/practitioner-ui-reliability`, based on `85ab55d`. Reviewer: Codex for the
-specified source, local synthetic tests and artifact checks only. No merge, hosted file
-replacement, account reactivation, grant or general-release approval is inferred.
+specified source, local synthetic tests and artifact checks only. The owner is copying
+the controlled frontend pilot update in stages; assets passed the hosted gate below.
+No merge, account reactivation, grant or general-release approval is inferred.
 
 Frontend implementation revision: `61202e541f5cbe89969cc805de227afeaf5e63c6`.
 The final public-surface isolation correction and package source are
@@ -45,7 +46,8 @@ This implements the four UI follow-ups from the completed hosted rehearsal:
 Both clinics' hosted intake/activation remain closed, the two test staff users remain
 Inactive and pilot-revoked, and mail/SMS remain disabled as recorded in the
 [previous hosted checkpoint](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md). This task makes
-no hosted settings/database/account write. The existing CAD 0 rehearsal trial/history is
+no hosted settings/database/account write. The owner-uploaded frontend assets are
+verified separately below. The existing CAD 0 rehearsal trial/history is
 retained. No consent wording, legal authority, external endpoint/data flow, runtime
 dependency/version, identity-provider grant or schema changes. The existing MSAL
 sessionStorage exception and broader session requirements remain unresolved.
@@ -205,7 +207,8 @@ anonymous verified-TLS checks confirmed their four primary JS/CSS assets have ex
 hashes/lengths and LivinLively's portal HTML matches the shared Wellnexa baseline. These
 are static rollback checks, not a restore rehearsal or all transitive-asset verification.
 Read-only public application offers still report intake/activation false for both clinics.
-No hosted file, setting, account, database, grant, worker or provider change was made.
+At package preparation, no hosted file, setting, account, database, grant, worker or
+provider change was made. The subsequent assets-only transfer is recorded below.
 
 1. Merge `01-assets.zip` contents into existing directories; preserve every old asset.
 2. Verify actual hosted bytes before replacing only the two `02-entry-pages.zip` files:
@@ -216,8 +219,10 @@ No hosted file, setting, account, database, grant, worker or provider change was
    records. No .env, API, SQL, marketing website or hosting security-file upload.
 
 The shared portal affects both clinics; it and central Admin require coordinated review.
-Production copy needs explicit authorization under REL-05 after the actual package and
-checks are ready; this development request does not authorize it. Before real tester access,
+Following review of this v3 package, the owner proceeded with the controlled frontend
+copy and confirmed assets uploaded. That authorization covers this staged file update;
+it does not approve reopening access, settings/schema changes or general release.
+Before real tester access,
 finish restricted hosted smoke checks (including actual autofill and both provider returns),
 headers/current boundaries/rollback and accountable privacy/security/clinical/release-owner
 decisions. Do not enable mail/SMS, intake, activation or test users to force a pass.
@@ -225,7 +230,53 @@ The existing staff PATCH still submits its required contact fields and has no ne
 version/concurrent-edit guard; resolving concurrent administrator edits is a separate
 backend review. Actual extension behavior, hosted revocation and both provider returns
 must be retested on the reviewed artifact. Keep the source branches for human review;
-implementation authorization does not authorize merging or deploying them.
+this controlled file-copy authorization does not authorize merging them.
+
+## Hosted assets gate — 2 November 2026
+
+The owner reported `01-assets.zip` uploaded. Against package source
+`f35e2b4c203436133257361652010d9c4ab51d69` and evidence revision
+`87db885159396c58b1cce0cba97bc798c1f82a3a`, anonymous HTTPS checks passed
+**138/138 asset URLs**: all 68 shared portal assets on each of Wellnexa and LivinLively,
+plus both central Admin assets. Every response was HTTP 200 with the expected JS/CSS
+MIME type, exact byte length and exact manifest SHA-256. An HTML fallback would fail
+these assertions. No redirect or TLS verification bypass was used.
+
+The current Wellnexa root, LivinLively root and central `/admin/` entry pages also
+passed **3/3** exact hash/length/HTML-type checks against the saved previous entries.
+Thus the new asset upload has not switched any entry page to the new build. At
+19:27 UTC, both public practitioner-application offers passed **2/2** checks with
+`data.enabled=false` and `data.activation_available=false`. No account, database,
+private configuration, provider, consent, dependency or external data-flow changes
+were made by these checks. Test-user and channel states were not re-read privately;
+the preceding restrictive checkpoint remains the last evidence for those states.
+
+Exact HTTP command, run in PowerShell 7.6.5 per public manifest-derived URL with
+four concurrent requests maximum:
+
+```powershell
+Invoke-WebRequest -Uri $target.url -TimeoutSec 25 -MaximumRedirection 0 -ErrorAction Stop
+```
+
+Response bytes came from `RawContentStream.ToArray()` and were compared using
+`[Security.Cryptography.SHA256]::HashData($payload)` and `$payload.Length`.
+The two public offer URLs were requested with the same options and explicitly checked
+for both false booleans. Both command batches exited 0; **143 checks passed, zero failed**.
+Public-only inventories/results remain local and ignored:
+
+| Local evidence under `.tmp/` | SHA-256 |
+| --- | --- |
+| `ui-hosted-pre-entry-targets.json` | `b992515511155138a8fab4894887e36b2fbf7f3e3c579e0727531649fbefcc43` |
+| `ui-hosted-pre-entry-results.json` | `93c2b4f2dc0313e53148e1ed6848c85d8b5e246774a80a373702deb6bc5ed771` |
+| `ui-hosted-pre-entry-offers.json` | `8b3ef1fe40b4ca4b77999b6ff06f5a189882c8b0c3a520383acc48bba51ea42d` |
+
+Next, the owner may replace only `wellness-common-portal/index.html` and
+`wellness-portal/admin/index.html` from this v3 `02-entry-pages.zip` under
+`/public_html`, preserving all previous assets. Entry-page hash checks and hosted
+render/behavior acceptance follow that copy. Static asset integrity does not establish
+provider, revocation, accessibility, private API, rollback-restoration or general-release
+acceptance. No builds/browser/PHP/SQL suites were repeated for this documentation-only
+checkpoint; the scoped local evidence above remains applicable.
 
 ## All 38 controls — scoped reassessment
 
@@ -271,9 +322,9 @@ Historical audits remain intact. This is a follow-up to the
 | DEV-06 | Partial | No runtime dependency or polling; source bounds unchanged. Build/performance: compare final chunks and representative access-recheck concurrency. |
 | REL-01 | Partial | This dated ledger and file matrix; named owner decisions absent. Release owner: assign and retain approvals. |
 | REL-02 | Implemented (local changed scope) | Exact frontend/website builds and dedicated/default browser configs pass; unchanged API/SQL exclusions explicit. QA: local success is not hosted acceptance. |
-| REL-03 | Partial | Final v3 source/lock/runtime/member hashes, 74 ZIP entries, independent readback and static rollback checks recorded; no hosted replacement. Operations/release: restricted hosted acceptance and actual restore. |
+| REL-03 | Partial | Final v3 source/lock/runtime/member hashes, 74 ZIP entries, independent readback and static rollback checks; 138 hosted assets and 3 previous entries match exactly, both public offers closed. Operations/release: new entry-page verification, restricted hosted behavior acceptance and actual restore. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no local result waives open gates. Accountable owners: resolve/sign scoped decisions. |
-| REL-05 | Partial | Development authorized; current hosted restrictions preserved. Release/privacy/security/clinical owners: review actual package before production authorization. |
+| REL-05 | Partial | Owner proceeded with reviewed controlled frontend copy; assets verified before entry handoff, both public offers closed. No permission/settings expansion. Release/privacy/security/clinical owners: remaining scoped operational and general-release decisions. |
 | REL-06 | Implemented (report scope) | Files/commands/flows/limits/rollback and final source/hash binding recorded. Release owner: confirm report and accountable decisions. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
