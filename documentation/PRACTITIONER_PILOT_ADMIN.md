@@ -7,8 +7,10 @@ below was rechecked in Staff access (both test practitioners Inactive) and centr
 (both pilot entries revoked). All 138 hosted asset URLs and all three new entry URLs
 match the reviewed v3 package; both public intake/activation offers remain closed.
 Central EN/FR filter rendering and unsaved contact edit/cancel passed scoped smoke checks.
-Fresh provider callbacks, mounted revocation and the final drawer dismissal remain
-unverified after browser safety stops. The linked report records exact limits; this
+The owner subsequently reported fresh Google and personal Microsoft sign-ins both
+returning to the expected pilot denial, with a screenshot of the denial screen.
+Post-return URL cleanup, mounted revocation and the final drawer dismissal remain
+unverified. The linked report records evidence sources and exact limits; this
 does not reopen access or establish general-release approval.
 
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive

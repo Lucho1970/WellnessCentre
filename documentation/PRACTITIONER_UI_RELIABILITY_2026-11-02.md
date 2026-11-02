@@ -339,9 +339,27 @@ changed. No build, local browser, PHP or SQL suites were rerun for documentation
 edits. The completed provider registration/approval/offboarding rehearsal predates this
 UI build and remains historical acceptance, not a new callback/revocation test.
 
+### Owner-completed provider returns — 2 November 2026
+
+After the documented deployment, the owner reported signing in with both designated
+Google and personal Microsoft test accounts and receiving the same pilot-denial message.
+The supplied screenshot shows Wellnexa's staff denial screen, Retry, application link
+and Sign out, with no practitioner workspace. This supports owner-reported successful
+provider returns followed by the expected application pilot restriction for both accounts.
+It is separate from agent-observed provider selection, token validation or server-log
+inspection. Pilot denial does not independently prove the Inactive membership check,
+because the pilot gate can reject access first. The previously observed Inactive states
+remain the evidence for membership status.
+
+The screenshot has no address bar, so OAuth query/fragment cleanup remains unverified.
+No identifying pilot-reference payload or screenshot was copied into the repository.
+No access was reapproved and no account, setting, billing, consent or messaging change
+was made for this evidence update. The documentation-only follow-up passed
+`git diff --check`; source/dependencies are unchanged and builds/browser/PHP/SQL suites
+were not repeated.
+
 Remaining acceptance is explicit: manually confirm the drawer is closed without saving;
-complete fresh Google and personal Microsoft returns and URL cleanup on this build
-with the designated accounts (both must remain blocked while Inactive/pilot-revoked);
+verify post-return URL cleanup on this build without sharing authentication parameters;
 and test live mounted-workspace removal after authority revocation in a separately
 approved synthetic scenario. Do not reactivate the departed test accounts or reopen
 intake to force those checks. Actual autofill/status-save protection, hosted keyboard
@@ -372,7 +390,7 @@ Historical audits remain intact. This is a follow-up to the
 | PRIV-05 | Unverified | No patient-rights workflow changes. Privacy operations: evidence access/correction process. |
 | PRIV-06 | Unverified | No deletion/retention change. Records/privacy: approve holds/backup/disposal and restore. |
 | PRIV-07 | Unverified | No incident exercise. Incident/privacy lead: rehearse runbook. |
-| AUTH-01 | Partial | Supported locked MSAL/JWT flow retained; callback fields removed after processing. Identity/security: real-provider hosted retest. |
+| AUTH-01 | Partial | Supported locked MSAL/JWT flow retained; owner reports both real provider returns followed by pilot denial on deployed build. Identity/security: hosted URL cleanup and independent provider/security acceptance remain. |
 | AUTH-02 | Partial | Revision-bound UI access and account-vs-resource denial tests; API role/clinic rules unchanged. Security/custodian: hosted cross-clinic/record negatives. |
 | AUTH-03 | Partial | Workspace clears on observed account denial; deliberate Retry/focus. Identity/security: idle/absolute/MFA/logout/lost-device and broader raw-fetch coverage. |
 | AUTH-04 | Partial | Signal/drafts in memory, no new token persistence. Security: resolve existing MSAL sessionStorage exception/design before real-data release. |
@@ -394,7 +412,7 @@ Historical audits remain intact. This is a follow-up to the
 | DEV-06 | Partial | No runtime dependency or polling; source bounds unchanged. Build/performance: compare final chunks and representative access-recheck concurrency. |
 | REL-01 | Partial | This dated ledger and file matrix; named owner decisions absent. Release owner: assign and retain approvals. |
 | REL-02 | Implemented (local changed scope) | Exact frontend/website builds and dedicated/default browser configs pass; unchanged API/SQL exclusions explicit. QA: local success is not hosted acceptance. |
-| REL-03 | Partial | Final v3 provenance/74 ZIP entries/static rollback; all 138 hosted assets and 3 new entry URLs match, both public offers closed; central EN/FR and staff edit/cancel smoke checks recorded. Operations/release: fresh provider callbacks, mounted revocation, unknown final drawer dismissal and actual restore remain. |
+| REL-03 | Partial | Final v3 provenance/74 ZIP entries/static rollback; 138 hosted assets/3 new entries match, both public offers closed; central EN/FR/staff edit/cancel observed and both fresh provider returns/pilot denial owner-reported. Operations/release: URL cleanup, mounted revocation, unknown final drawer dismissal and actual restore remain. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no local result waives open gates. Accountable owners: resolve/sign scoped decisions. |
 | REL-05 | Partial | Owner proceeded with reviewed controlled frontend copy; assets verified before entry handoff, both public offers closed. No permission/settings expansion. Release/privacy/security/clinical owners: remaining scoped operational and general-release decisions. |
 | REL-06 | Implemented (report scope) | Files/commands/flows/limits/rollback and final source/hash binding recorded. Release owner: confirm report and accountable decisions. |
