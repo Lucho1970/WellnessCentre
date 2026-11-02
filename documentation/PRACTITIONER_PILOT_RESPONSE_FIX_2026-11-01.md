@@ -1,6 +1,7 @@
 # Practitioner pilot approval response compatibility — 1 November 2026
 
 Branch: `bugs/practitioner-pilot-response-types`, based on pilot checkpoint `f4d3e4c`.
+Implementation/package source: `18e9b595ebb88bab55c25fdbd524ef9a1db5106d`.
 Reviewer: Codex for the stated code, synthetic-test and hosted-observation scope.
 This continues the authorized controlled pilot, not a general release or merge approval.
 
@@ -35,7 +36,11 @@ database-driver option, schema, identity protocol, provider grant or frontend ca
 | `api/src/Service/PractitionerPilotAccessService.php` | Normalize only the pilot response's numeric fields, including history; retain strict request validation. |
 | `api/tests/integration/practitioner-pilot-access.php` | Force string-returning PDO, assert numeric list/detail/history/HTTP responses and pass the returned version into real approval/revocation requests. |
 | `api/tests/integration/practitioner-pilot-http-fixture.php` | Exercise the same driver behaviour in the disposable signed-token HTTP fixture; never deployed. |
-| This document and pilot guide/ledger/runbook follow-ups | Record the hosted failure, pending account, regression, rollout and remaining acceptance. |
+| `documentation/PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md` | Current source, hosted failure, regression, patch/rollback and remaining acceptance. |
+| `documentation/PRACTITIONER_PILOT_ADMIN.md` | Operator checkpoint: pending Google entry, failed decision and Microsoft return. |
+| `documentation/PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md` | Qualify the existing 38-control ledger for the hosted failure and local correction. |
+| `documentation/WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md` | Current provider-return, pending entry and incomplete end-to-end flow. |
+| `documentation/README.md` | Link the response-fix evidence and rollout instructions. |
 
 Initial regression command, before the fix:
 
@@ -87,8 +92,25 @@ It returned to Wellnexa's pilot denial and displayed a distinct WPI1 reference. 
 has not been recorded or approved. The Google tab remains open and pending. Provider returns
 are verified independently; complete practitioner registration is not yet accepted.
 
-The current host still runs the pre-fix API file. A one-file private patch is being prepared;
-there is no additional migration, frontend upload or private configuration change. Preserve
+The one-file private patch is prepared at
+`D:/Dev/WelnessCentre/deployments/2026-11-01-practitioner-pilot-response-fix` and handed to the
+owner for copying; upload is **not confirmed yet**. There is no additional migration,
+frontend upload or private configuration change. Both generated archives were reopened,
+verified as exactly one expected member, CRC-checked and byte-compared with their sources.
+The new payload comes from `git show` at the exact source above, not uncommitted content.
+Rollback bytes come from the prior verified private release. A narrow private-key/JWT
+signature scan found zero candidates; this is not an exhaustive secret/privacy audit.
+Manifest includes source/branch/build time, existing lock hashes and runtime/test counts.
+
+| Artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| `01-api-response-fix.zip` | 4,457 | `8e5d9f2765362ca9f61040bdda2cff25d015fa8297084c4ecff9b229369b968b` |
+| New `src/Service/PractitionerPilotAccessService.php` | 15,349 | `1c1dd260b579fc83d415fd240ac7cef6041cabd32e392783d01daafaa5a05ec8` |
+| `ROLLBACK-api-response-before.zip` | 4,335 | `10ea9ea8947afa2043cde5dc466a7850f209969150c7cdc9f4f58d8e3c70429e` |
+| Previous service member | 14,927 | `83c7fe129b024243a4aefe895cb8953327be82bcbd8a13efc1498b320d2d635a` |
+
+Upload only the patch ZIP's contents into `/wellness-api`, outside `public_html`; retain
+rollback/README/manifest locally. Preserve
 the previous API artifact and configuration. After copying the exact replacement to
 `/wellness-api/src/Service/PractitionerPilotAccessService.php`, close the failed review,
 reload the entry and review its current version before retrying. Do not edit the database
