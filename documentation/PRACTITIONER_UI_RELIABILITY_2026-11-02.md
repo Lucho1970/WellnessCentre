@@ -431,8 +431,8 @@ Prepared audit reason:
 
 Access-setting saves are owner-handled under the Windows computer-use security-setting
 restriction. This is a tool operating boundary, not a new request for broad implementation
-authorization under REL-05. At this checkpoint no access save has been observed, and the
-live dashboard revocation test remains pending. Its eventual initial Active/allowed state
+authorization under REL-05. At that prepared checkpoint no access save had been observed,
+and the live dashboard revocation test remained pending. Its initial Active/allowed state
 and final Inactive/revoked state must both be verified; a prepared form is not an effective
 access decision or a hosted revocation pass.
 Preparation makes no hosted access/configuration or database write. Local recheck:
@@ -448,6 +448,42 @@ passed with intake/activation false (2/2), using the same bounded `Invoke-WebReq
 command above; redacted boolean results are in `.tmp/ui-revocation-retest-offers.json`.
 No source, dependency, scope/grant, endpoint, consent wording, schema or package change
 is proposed. The existing 38-control ledger remains applicable with this hosted case open.
+
+**Subsequent owner-save checkpoint:** The owner supplied a screenshot showing the
+existing Microsoft entry Allowed for pilot and an approval decision at
+`2026-11-02 21:25:23 UTC`, with the prepared controlled-retest reason. This is evidence
+of the owner-saved temporary pilot allowance, not staff activation. The owner then
+reported sign-in still denied. Read-only browser inspection observed the practitioner
+denial and the clinic Staff access list/drawer still showing this Microsoft test account
+Inactive, original contact values and practitioner role. Its status dropdown was open
+but still selected Inactive. Pilot approval does not override that independent inactive
+staff boundary; this does not establish a defect in dashboard revocation behavior.
+The owner was asked to select only Active and save the existing staff account, leaving
+the practitioner tab untouched for agent-observed Retry. No dashboard has yet been
+observed and no revocation pass is claimed. Microsoft pilot allowance is now temporarily
+effective according to the supplied saved-decision evidence; final Inactive/revoked
+cleanup remains required even if the live test cannot be completed. Google access,
+intake/activation, clinical relationships, trial/history and messaging are outside this
+temporary allowance and must remain at the prior restrictive checkpoint.
+
+**Live dashboard baseline observed:** Following the owner's staff-status save, the
+administrator list showed Staff access updated and the existing Microsoft practitioner
+Active. At `2026-11-02 21:53:59 UTC`, the agent observed its retained practitioner session
+at `/practitioner` with Dashboard, Your day at a glance, dashboard Refresh/customization,
+travel/visit widgets, zero visible visit metrics and No appointments scheduled today.
+User interaction was detected immediately before that observation, so the initial
+Retry/navigation is owner-performed or otherwise unverified; it is not claimed as an
+agent action. No patient record or appointment was opened. This is the required active
+mounted-workspace baseline, not yet the revocation result.
+
+The same test user's admin drawer was reopened and observed with original name/email,
+Active status and practitioner-only role. A geometry-unavailable click was recovered by
+fresh window selection/screenshot before the drawer was opened; no status save was
+issued by the agent. The owner was asked to save only Inactive, keep pilot allowance
+temporarily effective and leave the practitioner dashboard untouched. The agent will
+then trigger its in-app Refresh and verify workspace removal without full reload,
+followed by Retry denial and final pilot revocation. Until that sequence is observed,
+the Microsoft account's latest verified staff status is Active and cleanup is pending.
 
 ## All 38 controls — scoped reassessment
 

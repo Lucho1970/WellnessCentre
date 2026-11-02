@@ -23,7 +23,13 @@ verified Inactive/practitioner-only with all additional permissions unchecked. C
 Admin sign-in subsequently completed; both pilot entries remain revoked at the observed
 baseline. The Microsoft pilot review and unsaved audit reason are prepared. The owner
 was asked to save only its temporary pilot approval and existing Staff status Active;
-no temporary access save or dashboard revocation result has yet been observed.
+the owner's subsequent screenshot confirms its pilot approval was saved. Staff access
+still showed the Microsoft account Inactive on read-only inspection, so the owner was
+asked to save Active separately. That save was subsequently observed, and the existing
+Microsoft practitioner dashboard was verified open with no appointments today. The
+owner was then asked to save only Inactive while leaving pilot allowance effective and
+the dashboard untouched for the in-app Refresh test. The revocation result and final
+Inactive/pilot-revoked cleanup remain pending; latest observed staff status is Active.
 
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive
 with original emails retained and both pilot entries revoked. The Microsoft session was
