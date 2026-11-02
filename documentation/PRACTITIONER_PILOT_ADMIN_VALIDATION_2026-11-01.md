@@ -12,6 +12,19 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### 2 November current: owner activation and practitioner UI boundary passed
+
+The owner completed activation personally. The retained Microsoft session reaches the
+practitioner dashboard; own status remains activated on revisit, displays a 2 May 2027
+trial end and Pending for all setup/publication items. `/admin/users` is denied and the
+authorized Staff access form shows practitioner only. This adds scoped PRIV-02/AUTH-02/
+REL-03 observation, not a direct privileged-API or activation-request replay test. The
+owner must finish the normal Inactive save because browser autofill changed the unsaved
+email; no altered-email save was performed. Existing-session denial, final pilot revocation,
+gate closure and minimized hosted count/date checks remain pending. The password-manager
+popup and expired hosting authentication were handed to the owner. The full 38-control
+ledger remains qualified; no real-PHI/general-release or organizational sign-off is implied.
+
 ### 2 November latest: corrected hosted detail and synthetic approval passed
 
 After the owner copied the one-file patch, original immutable submission detail/history

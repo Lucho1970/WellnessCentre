@@ -7,6 +7,29 @@ Continues the owner-authorized controlled rehearsal; no merge or general release
 
 ## Hosted finding and current account state
 
+**Owner activation observed, 2 November:** The owner personally accepted activation terms
+and reported activated. The retained Microsoft session reached the practitioner dashboard.
+Its own application page reports Account activated and a trial end displayed as 2 May 2027,
+10:56:42 AM in the browser's locale. Services, availability, verified credentials and public
+profile publication all remain Pending. Revisiting the page retained activated status and
+offered Open practitioner portal rather than a second activation control. This is not a
+forged/replayed activation-request test. Direct clinic `/admin/users` navigation in that
+session displayed permission denial; the authorized clinic Staff access form independently
+shows only practitioner selected, with administrator/reception/accountant roles unchecked.
+This verifies the UI boundary and displayed role assignment, not a new direct privileged-API
+negative test. No clinical lists were manually opened or bookings/profile publication made.
+
+The ordinary Inactive draft was opened for the synthetic Microsoft staff user. Browser
+autofill replaced the email before save. The agent did not save that altered address;
+the owner was asked to restore the original approved address, retain only practitioner,
+and personally save Inactive because a password-manager popup is present. This save and
+same-session denial remain pending observation. Netfirms has also expired; the owner was
+asked to reopen phpMyAdmin for a minimized read-only membership/trial count/date check.
+No exact hosted membership/subscription count, UTC trial interval or final disabling is
+claimed from the activation screen alone. Google remains Inactive/pilot-revoked; Microsoft
+pilot-allowed. Wellnexa gates will be closed and Microsoft pilot revoked after the normal
+Inactive test. No additional source/dependency/permission/endpoint/consent-text change.
+
 **Subsequent hosted acceptance, 2 November:** After the owner confirmed the one-file
 patch upload, Admin detail opened successfully. The original synthetic credential/service
 text, punctuation, immutable submission version 1 and terms-confirmation event rendered.

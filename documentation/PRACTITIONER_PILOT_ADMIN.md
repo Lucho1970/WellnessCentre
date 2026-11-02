@@ -1,5 +1,15 @@
 # Practitioner pilot access administration
 
+**2 November current — owner activation passed:** The Microsoft session now reaches the
+practitioner dashboard; own status shows activated with trial ending 2 May 2027, all setup
+and publication checklist items Pending. Clinic Staff access shows practitioner only and
+the practitioner session is denied `/admin/users`. Normal Inactive save, same-session
+revocation and read-only database count/date verification remain pending. Browser autofill
+altered the unsaved email, so the owner was asked to restore the original and save Inactive;
+the wrong value was not saved by the agent. See the [live-test checkpoint](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md).
+Wellnexa activation is still enabled under pilot restriction, Microsoft allowed, Google
+Inactive/revoked. Earlier held-activation statements below describe historical checkpoints.
+
 **2 November latest — uploaded JSON patch and synthetic approval passed:** Admin now opens
 the original immutable submission history after the owner's one-file upload. Normal review
 approved the Microsoft rehearsal application at Virtual Clinic on the CAD 0 plan, with

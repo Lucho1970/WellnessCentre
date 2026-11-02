@@ -1,6 +1,26 @@
 # Wellnexa practitioner live-test rollout and account retirement
 
-## Latest checkpoint: Microsoft approved; activation handed to owner
+## Latest checkpoint: Microsoft activation passed; Inactive verification pending
+
+**Owner activation observed, 2 November:** The owner personally completed acceptance and
+activation. The Microsoft session reached the practitioner dashboard. Its own application
+reports Account activated and a displayed trial end of 2 May 2027 at 10:56:42 AM (browser
+locale). All four setup/publication checklist items remain Pending. Revisiting own status
+kept activated status and no second activation button. Clinic `/admin/users` is denied in
+the practitioner session; the authorized Staff access form independently shows practitioner
+only, with no administrator/reception/accountant roles. No clinical lists were manually
+opened, appointments made or profile published. Direct privileged-API denial, activation
+request replay and exact hosted membership/trial counts are not established by this UI check.
+
+Normal Inactive is selected in the synthetic staff user's unsaved drawer. Browser autofill
+replaced its email; the agent did not save the wrong value and asked the owner to restore
+the original approved email and save Inactive personally while the password-manager popup
+is present. Await the save, test the preserved Microsoft session while pilot still allowed,
+then revoke pilot access and close Wellnexa intake/activation. Netfirms expired, so the
+owner was also asked to reopen phpMyAdmin for minimized read-only count/date verification.
+Google remains Inactive/pilot-revoked. Do not infer final disabling or exact trial interval
+from displayed status alone. No additional code, schema, dependency, permission, external
+flow or terms-text change was made in these checks.
 
 **Activation handoff after approval, 2 November:** Admin successfully enabled Wellnexa's
 separate activation setting under the owner's existing explicit synthetic rehearsal approval.
