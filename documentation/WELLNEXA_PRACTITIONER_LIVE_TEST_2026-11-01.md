@@ -1,6 +1,82 @@
 # Wellnexa practitioner live-test rollout and account retirement
 
-## Latest checkpoint: entry pages live, both provider returns at pilot gate
+## Latest checkpoint: both provider pilot tests passed; registration still closed
+
+**2 November:** The owner authorized using the older Google profile and disabling it
+afterward. The original email and saved Wellnexa Inactive status were verified. Its preserved
+session remained denied with pilot access temporarily allowed; final pilot revocation was
+saved and verified. This completes Google's returning-profile/ordinary Inactive case, not
+a fresh Google registration.
+
+Microsoft was then recorded as **Wellnexa Test Microsoft**, with zero Wellnexa memberships
+confirmed by a scoped read-only aggregate. Pending Retry denied access. Approval saved, but
+the preserved session still could not enter the workspace; its own application page reported
+intake closed. Revocation saved, and Refresh application then returned pilot denial and
+removed the previous status message. The final aggregate confirms both pilot entries revoked,
+Google one retained membership with an Inactive staff user and zero active staff memberships,
+Microsoft zero memberships. Neither test created an application, activation or trial. These
+same-session checks did not inspect or prove byte-identical bearer replay.
+
+Google's earlier dashboard is explained by its October membership. Historical investigation
+and pending-state checkpoints below are retained, superseded by this current result. No new
+source, dependency, schema, provider permission, endpoint or external data flow changed in
+this operational follow-up. Mail/SMS and both clinics' intake remain closed. The owner must
+review the concrete proposal below before any new joining terms or plan is saved; the agent
+will not accept joining terms on the applicant's behalf.
+
+### Proposed Microsoft registration rehearsal — awaiting owner review
+
+This proposal is **not saved or enabled on the host** and is not the commercial beta offer.
+It prepares the remaining approved Microsoft account's new-registration test without choosing
+unconfirmed commercial pricing. The earlier CAD 10 per practitioner / CAD 100 clinic cap is
+an SMS spending allowance, not an agreed subscription price. Commercial cost estimates remain
+pending a separate real plan; a zero-price test cannot validate a meaningful paid estimate.
+
+| Setting | Proposed exact scope |
+| --- | --- |
+| Plan code / display name | `wellnexa-registration-rehearsal` / `Wellnexa registration rehearsal — synthetic test only` |
+| Scope / currency / monthly amount | Practitioner / CAD / 0 cents, solely for this synthetic rehearsal. No booking-fee rule, payment method, collection or paid conversion configured. |
+| Features | Booking, calendar and client management enabled for eventual practitioner workspace checks; reporting, SMS reminders, dedicated number and custom email disabled. No test booking or patient access. |
+| Trial | Existing six-calendar-month policy from activation, timezone `America/Toronto`; verify the actual stored start/end and exactly one subscription. |
+| Intake | Wellnexa only, while restrictive pilot mode stays on. Reapprove only the reviewed Microsoft pilot entry for this rehearsal. Keep Google revoked/Inactive and LivinLively closed. |
+| Activation | Initially closed; separately enable for the reviewed synthetic application only after approval and owner confirmation at the action. The clinic gate itself is clinic-wide, not an email allowlist. Close intake/activation at completion. |
+| Application | Label `Wellnexa Test Microsoft`; synthetic discipline, credentials, service area and services explicitly labelled test-only. Use only the owner's already approved contact information. No invented licence or verification of real professional qualifications. |
+| Completion | Owner accepts the displayed terms and activates; verify pending/approved workspace denial, practitioner-only access, trial and replay behavior, then ordinary Staff Inactive plus pilot revocation. Preserve identity/application/trial/audit history; no publication, real appointments or deletion. |
+| Unchanged safeguards | Existing operator grants, workforce/client identity, mail/SMS disabled, empty delivery lists and no external permission/configuration changes. |
+
+Proposed exact single terms field (both languages in one versioned record):
+
+> EN — Wellnexa controlled registration rehearsal. This account and application are for an
+> owner-approved synthetic test only. Enter no patient information, use no real professional
+> credentials, and do not publish a profile or offer appointments. Signing in or submitting an
+> application does not grant practitioner access. Clinic approval and your separate activation
+> are required. Activation starts a six-calendar-month test trial in America/Toronto. This
+> rehearsal plan costs CAD 0 and does not authorize charges or paid conversion. Email and SMS
+> delivery remain disabled. At completion the account will be made Inactive and pilot access
+> revoked; application and audit history will be retained. This rehearsal does not establish
+> professional credential verification or replace future commercial joining terms.
+>
+> FR — Essai contrôlé d’inscription à Wellnexa. Ce compte et cette demande servent uniquement
+> à un test avec des données fictives autorisé par le propriétaire. Ne saisissez aucune donnée
+> de patient ni aucun titre professionnel réel. Ne publiez aucun profil et n’offrez aucun
+> rendez-vous. La connexion ou l’envoi d’une demande n’accorde pas l’accès praticien.
+> L’approbation de la clinique et votre activation distincte sont requises. L’activation lance
+> un essai de six mois civils dans le fuseau America/Toronto. Ce forfait de test coûte 0 CAD
+> et n’autorise aucun prélèvement ni passage à un forfait payant. L’envoi de courriels et de
+> SMS reste désactivé. À la fin, le compte sera rendu inactif et l’accès au pilote sera révoqué;
+> l’historique de la demande et des décisions sera conservé. Ce test ne constitue pas une
+> vérification des titres professionnels et ne remplace pas de futures conditions commerciales.
+
+Before saving, the release owner must approve this exact test-only scope/wording and confirm
+that the permitted operator is authorized to record synthetic review attestations without
+claiming real credential verification. Record current settings/revision and fresh backup,
+save through Admin with a test reason, and verify the displayed plan/terms before asking the
+applicant to submit. If the owner prefers real beta terms/pricing, keep intake closed until
+those are provided and reviewed. This draft is not privacy/legal/clinical sign-off or a
+real-data release exception. Roll back settings by closing intake/activation and restoring
+the prior selection; retain the new plan version, terms, application and audit records.
+
+### Historical rollout observations
 
 The subsequent metadata check confirmed the Google identity already has an active Wellnexa
 practitioner membership from October 14, predating this rollout. Backup metadata independently
@@ -173,7 +249,9 @@ method used by the Staff access screen for both brokered provider identities. It
 normal listing, foreign-clinic and practitioner denials, Inactive-token denial, unavailable
 workspace, activation-replay denial, retained application/trial history, audit evidence and
 explicit reactivation without a new trial. The existing hard membership-revocation checks
-remain. This is local evidence; UI/hosted offboarding is still unverified.
+remain. This is local evidence; the hosted Google ordinary Inactive check is now verified in
+the latest checkpoint. Microsoft ordinary Inactive after new activation and full operational
+offboarding remain unverified.
 
 ## Rollback and acceptance limits
 

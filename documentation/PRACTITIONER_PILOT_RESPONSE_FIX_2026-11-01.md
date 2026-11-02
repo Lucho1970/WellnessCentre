@@ -7,6 +7,42 @@ This continues the authorized controlled pilot, not a general release or merge a
 
 ## Latest hosted retest and containment
 
+**2 November — Google returning-profile and Inactive test passed:** The owner chose to
+test the existing Google profile and disable it afterward. Browser autofill changed the
+email in the open Staff edit; no change was saved by the agent. Computer control stopped
+while dismissing suggestions because URL-policy detection could not identify the page.
+The owner completed the edit manually. The next observation verified **Staff access updated**,
+the original owner-approved email, practitioner role and **Inactive** on the Wellnexa row.
+
+The agent then temporarily reapproved the separate Google pilot entry with an explicit
+test reason. The preserved Google session's Retry returned an ordinary permission denial,
+with no pilot-reference field or workspace, while Admin showed Allowed for pilot. This
+verifies the ordinary Inactive restriction independently of pilot revocation; token byte
+identity was not inspected. Pilot access was then revoked again and its saved revoked state
+verified. Final state: **Google Wellnexa user Inactive; pilot entry revoked**. Other clinics'
+memberships and all clinical/application/audit records were preserved. No appointments,
+publication, subscription, sender or phone number was altered; full operational offboarding
+remains separate.
+
+**2 November — Microsoft pilot flow passed and revoked:** The distinct owner-confirmed
+Microsoft reference was recorded as **Wellnexa Test Microsoft**, pending for Wellnexa.
+Pending Retry denied access. A minimized live aggregate confirmed zero Wellnexa memberships
+before approval. Approval saved successfully, yet Retry still returned ordinary permission
+denial without a workspace. The own-application route reported intake closed. Admin revocation
+then saved, and Refresh application in the same signed-in tab returned pilot denial with its
+own reference and removed the prior application-status message. Token bytes were not inspected.
+Final read-only aggregate: both entries revoked; Google one retained membership, zero active
+staff memberships and one Inactive staff user; Microsoft zero memberships. The query selected
+only test labels/statuses/counts/date, not patient records or account identifiers, and made
+no SQL writes. No new application, activation, trial, financial transaction or delivery occurred.
+
+These results verify the hosted response patch's decision paths and the distinction between
+pilot approval and membership. They supersede the historical pending/investigation statements
+below. Google's prior workspace is explained by the pre-existing October membership, not
+observed automatic membership creation. Actual original authorization of that older mapping
+was not established. Full new registration/approval/activation remains untested while intake
+is closed without reviewed plan/terms; the owner selected returning/Inactive testing for Google.
+
 **Subsequent mapping result:** The minimized live aggregate executed successfully in
 phpMyAdmin after hosting/session recovery. The Google pilot entry is revoked; its exact
 identity was created October 8 and has **one active Wellnexa staff membership**, created
@@ -94,9 +130,9 @@ database-driver option, schema, identity protocol, provider grant or frontend ca
 | `api/tests/integration/practitioner-pilot-access.php` | Force string-returning PDO, assert numeric list/detail/history/HTTP responses and pass the returned version into real approval/revocation requests. |
 | `api/tests/integration/practitioner-pilot-http-fixture.php` | Exercise the same driver behaviour in the disposable signed-token HTTP fixture; never deployed. |
 | `documentation/PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md` | Current source, hosted failure, regression, patch/rollback and remaining acceptance. |
-| `documentation/PRACTITIONER_PILOT_ADMIN.md` | Operator checkpoint: pending Google entry, failed decision and Microsoft return. |
-| `documentation/PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md` | Qualify the existing 38-control ledger for the hosted failure and local correction. |
-| `documentation/WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md` | Current provider-return, pending entry and incomplete end-to-end flow. |
+| `documentation/PRACTITIONER_PILOT_ADMIN.md` | Current operator state: both entries revoked; Google Inactive; Microsoft without membership. |
+| `documentation/PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md` | Qualify the 38-control ledger with local correction and hosted decisions/Inactive evidence. |
+| `documentation/WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md` | Provider/decision results, incomplete activation and reviewable synthetic-only test proposal. |
 | `documentation/README.md` | Link the response-fix evidence and rollout instructions. |
 
 Initial regression command, before the fix:
@@ -175,9 +211,10 @@ reload the entry and review its current version before retrying. Do not edit the
 or weaken the request validator to force an approval. Roll back by restoring that one file;
 retain all pending entries, events, requests, identities and application/clinical records.
 
-Open acceptance: Google approve/revoke and membership separation; personal Microsoft
-callback/reference and equivalent pilot decisions; owner-reviewed joining terms/plan;
-registration/review/activation/six-month trial and ordinary Inactive for both accounts;
+Open acceptance: owner-reviewed joining terms/plan; new Microsoft registration/review/
+activation/six-month trial and subsequent ordinary Inactive. Google's returning/Inactive case
+is complete; fresh Google registration is outside the owner's selected existing-profile case.
+Both providers' pilot decisions and Microsoft's zero-membership separation passed as above;
 headers/session controls, actual restore and accountable release/privacy/security/clinical
 signatures. The narrow Admin status-selector label needs readability correction/retest.
 The Google callback also retained an OAuth response fragment in the address bar; cleanup

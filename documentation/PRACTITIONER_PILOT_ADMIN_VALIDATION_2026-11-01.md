@@ -5,13 +5,54 @@ based on `6845e30` from the ongoing practitioner sign-in work. Implementation re
 **`07febd06c49f9ef90995a946ca7d338a725b36d5`**. Final artifact checks are recorded
 separately after the package build; subsequent documentation does not change application code.
 The owner subsequently applied migration 058; see the hosted follow-up immediately below.
-The agent has performed no merge, schema write, managed approval, account creation or hosted
-configuration change for this addition. The existing unrelated untracked PDF remains
+At the original implementation checkpoint the agent had performed no merge, schema write,
+managed approval, account creation or hosted configuration change. Later authorized pilot
+decisions and the owner's Staff Inactive edit are recorded below. The unrelated untracked PDF remains
 untouched and excluded. Implementation authorization does not establish organizational approval.
 
 ## Hosted follow-up after the owner's database update
 
-### Current checkpoint: patch decision path passed; unexpected workspace contained
+### 2 November: Google returning-profile, ordinary Inactive and final revoke passed
+
+The owner chose existing-profile testing and completed the normal Staff access edit after
+browser autofill/URL-policy interruption. UI verified the original approved account email,
+practitioner role, saved Inactive status and success response. A separate temporary pilot
+reapproval saved, but Retry in the preserved Google session still denied permission without
+workspace access. Final pilot revocation saved and was verified in Admin. This establishes
+ordinary Inactive enforcement independently of the extra pilot gate; it does not prove exact
+bearer-byte replay, full operational offboarding, other-clinic status or fresh Google signup.
+No source/dependency/schema/configuration/provider flow changed in this operational follow-up.
+
+### 2 November final checkpoint: Microsoft pending, allow and revoke boundaries passed
+
+The distinct owner-confirmed Microsoft reference was recorded through central Admin, pending
+for Wellnexa. The live minimized aggregate confirmed zero memberships; pending Retry denied
+access. Approval saved, while the same session still received ordinary workspace permission
+denial. Its own application page reported intake closed. Revocation saved and Refresh
+application in the preserved session then returned pilot denial, removing the prior status.
+This is same-session behavior, not a claim of byte-identical bearer replay. A final refresh
+of the two-label read-only aggregate confirmed Google revoked / one retained membership /
+zero active staff memberships / one Inactive staff user, and Microsoft revoked / zero
+memberships. No direct SQL write, application submission, activation, trial, charge or send
+occurred. No patient record was manually opened; earlier automatically rendered dashboard
+content is qualified in the finding below. All identity/reference values stay private.
+
+The 38-control statuses below remain applicable, qualified by this dated hosted evidence:
+AUTH-01/02 now include both provider returns, pending/allow/revoke boundaries and Google's
+ordinary Inactive denial; SEC-04/06 and DEV-04 include successful hosted versioned decisions;
+REL-03/05 remain Partial because full new registration/activation, remote private-file hashes,
+restore and accountable approvals remain incomplete. The older membership explains Google's
+workspace outcome; an automatic-membership defect was not established. The historical
+investigation hold below is superseded by the owner-authorized returning-profile test and
+the verified Microsoft zero-membership result. No general clinical-access acceptance follows.
+
+This follow-up changes only the four maintained documentation files listed in the response
+fix report. `git diff --check` is the applicable documentation check; code suites are not
+rerun because the tested patch and lockfiles are unchanged. Exact previous commands, versions,
+failures and final counts remain in that report. A synthetic-only registration proposal is
+prepared in the live-test runbook; no proposed plan or terms have been saved on the host.
+
+### Earlier checkpoint: patch decision path passed; unexpected workspace contained
 
 **Subsequent read-only result:** phpMyAdmin recovered and the clinic-scoped aggregate
 completed: Google pilot status revoked, identity created October 8, one active Wellnexa

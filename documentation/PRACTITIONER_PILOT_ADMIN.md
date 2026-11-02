@@ -1,6 +1,25 @@
 # Practitioner pilot access administration
 
-**Latest checkpoint — patch decision path passed; Google access revoked for investigation:**
+**2 November checkpoint — Google existing-profile test complete:** With the owner's choice
+to use the older Google profile, normal Wellnexa Staff access was saved as Inactive and
+the original email verified. Temporarily allowing its pilot entry still produced permission
+denial in the preserved practitioner session. Pilot revocation was restored and verified.
+Google is now Inactive plus pilot-revoked; no records were deleted.
+
+**2 November final checkpoint — Microsoft pilot decisions passed:** The owner-confirmed
+Microsoft reference was recorded as **Wellnexa Test Microsoft**. Pending Retry denied access.
+A clinic-scoped read-only aggregate confirmed zero memberships before approval. Pilot approval
+saved, but the same session still could not enter the practitioner workspace. Its own
+application page reported intake closed. Revocation saved; Refresh application in that
+preserved session returned pilot denial and removed the prior application-status message.
+The final aggregate confirms both pilot entries revoked, Google one retained membership
+with an Inactive staff user and zero active staff memberships, Microsoft zero memberships.
+No application, activation or trial was created in this rehearsal. Full new registration
+requires the owner's review of the [proposed test plan and wording](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md#proposed-microsoft-registration-rehearsal--awaiting-owner-review).
+The dated checkpoints below are historical and are superseded by these final results;
+see the [current hosted record](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md).
+
+**Earlier checkpoint — patch decision path passed; Google access revoked for investigation:**
 The read-only live check subsequently confirmed an active Wellnexa practitioner membership
 from October 14 for the same Google identity; private backup metadata independently confirms
 the older mapping and approved account email. This explains the workspace outcome; pilot
