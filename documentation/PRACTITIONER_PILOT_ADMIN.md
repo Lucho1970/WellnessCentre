@@ -29,7 +29,14 @@ asked to save Active separately. That save was subsequently observed, and the ex
 Microsoft practitioner dashboard was verified open with no appointments today. The
 owner was then asked to save only Inactive while leaving pilot allowance effective and
 the dashboard untouched for the in-app Refresh test. The revocation result and final
-Inactive/pilot-revoked cleanup remain pending; latest observed staff status is Active.
+Inactive/pilot-revoked cleanup were pending at that baseline. The owner subsequently
+saved Inactive, independently verified in Staff access. The retained practitioner tab
+already showed denial with dashboard/widgets gone before agent Refresh/reload/navigation;
+deliberate Retry verified access again and remained denied. The exact initial background
+or visibility trigger was not traced. The scoped live removal/Retry check passed.
+Final pilot revocation is prepared in central Admin and awaits the owner's final save;
+latest observed Microsoft state is Inactive, denied, temporarily pilot-allowed. No code,
+dependency, billing/trial, clinical-record or messaging change is part of this retest.
 
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive
 with original emails retained and both pilot entries revoked. The Microsoft session was
