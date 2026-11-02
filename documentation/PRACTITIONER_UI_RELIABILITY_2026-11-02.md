@@ -1,8 +1,8 @@
 # Practitioner administration and sign-in UI reliability — 2 November 2026
 
 Branch `bugs/practitioner-ui-reliability`, based on `85ab55d`. Reviewer: Codex for the
-specified source, local synthetic tests and artifact checks only. The owner is copying
-the controlled frontend pilot update in stages; assets passed the hosted gate below.
+specified source, synthetic checks and scoped hosted observations only. The owner copied
+the controlled frontend pilot update; new assets and entry pages passed the hosted gates below.
 No merge, account reactivation, grant or general-release approval is inferred.
 
 Frontend implementation revision: `61202e541f5cbe89969cc805de227afeaf5e63c6`.
@@ -46,8 +46,8 @@ This implements the four UI follow-ups from the completed hosted rehearsal:
 Both clinics' hosted intake/activation remain closed, the two test staff users remain
 Inactive and pilot-revoked, and mail/SMS remain disabled as recorded in the
 [previous hosted checkpoint](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md). This task makes
-no hosted settings/database/account write. The owner-uploaded frontend assets are
-verified separately below. The existing CAD 0 rehearsal trial/history is
+no hosted settings/database/account write. The owner-uploaded frontend assets
+and entry pages are verified separately below. The existing CAD 0 rehearsal trial/history is
 retained. No consent wording, legal authority, external endpoint/data flow, runtime
 dependency/version, identity-provider grant or schema changes. The existing MSAL
 sessionStorage exception and broader session requirements remain unresolved.
@@ -270,13 +270,85 @@ Public-only inventories/results remain local and ignored:
 | `ui-hosted-pre-entry-results.json` | `93c2b4f2dc0313e53148e1ed6848c85d8b5e246774a80a373702deb6bc5ed771` |
 | `ui-hosted-pre-entry-offers.json` | `8b3ef1fe40b4ca4b77999b6ff06f5a189882c8b0c3a520383acc48bba51ea42d` |
 
-Next, the owner may replace only `wellness-common-portal/index.html` and
+At that checkpoint, the next step was to replace only `wellness-common-portal/index.html` and
 `wellness-portal/admin/index.html` from this v3 `02-entry-pages.zip` under
 `/public_html`, preserving all previous assets. Entry-page hash checks and hosted
 render/behavior acceptance follow that copy. Static asset integrity does not establish
 provider, revocation, accessibility, private API, rollback-restoration or general-release
 acceptance. No builds/browser/PHP/SQL suites were repeated for this documentation-only
-checkpoint; the scoped local evidence above remains applicable.
+checkpoint; the scoped local evidence above remains applicable. The subsequent entry
+upload and bounded hosted checks are recorded next.
+
+## Hosted entry pages and staff checks — 2 November 2026
+
+The owner subsequently confirmed the two entry files uploaded. At 20:04 UTC, the same
+verified-TLS PowerShell HTTP command and byte/hash/MIME assertions passed **141/141**
+responses: **138 assets plus all three new entry URLs** (Wellnexa root, LivinLively root,
+central `/admin/`). The shared portal's two host responses match the new shared entry;
+central matches its new entry. Both public application offers again passed **2/2**
+checks with intake and activation false. This is **143 passed, zero failed** after entry
+replacement, separate from the earlier 143-check assets-only gate. No unexpected redirect
+or HTML fallback was accepted. Source remains `f35e2b4c203436133257361652010d9c4ab51d69`;
+the documentation checkpoint being verified was `497a6ac949fbab10d83d73d4b2f3a9534b735ffc`.
+
+| Local evidence under `.tmp/` | SHA-256 |
+| --- | --- |
+| `ui-hosted-post-entry-targets.json` | `06e9ac6a9e4d5ba7c2fe17c38c12f102b404aead4920c73214ebbc7241853f09` |
+| `ui-hosted-post-entry-results.json` | `05d2521383d5d383384fabe456e41eb698683f684bf8d231306707b87ca5238c` |
+| `ui-hosted-post-entry-offers.json` | `c138dd6e1dbdf255376cc39170200975de51dfcdd03417a794c8dd25bcc22150` |
+
+Scoped observations through the existing Windows browser sessions:
+
+- Central Admin was reloaded from its new entry and loaded Application administration.
+  Practitioner pilot access showed readable English clinic/filter labels and explicitly
+  All pilot entries. The Wellnexa view showed both synthetic pilot entries revoked.
+  Switching to French displayed the full clinic/filter labels and revoked states; the
+  original English language was restored. This is a desktop visual/semantic smoke check,
+  not full accessibility or responsive hosted acceptance.
+- The existing Microsoft application session was reloaded and showed pilot denial,
+  without a practitioner dashboard. The Google practitioner session expired and returned
+  to the dedicated provider picker, which displayed both Google and Microsoft account
+  choices. A fresh provider return and callback cleanup were not completed on this build.
+  Do not treat the expired session as proof of post-login denial.
+- After the owner brought Staff access forward, its footer identified
+  `2026-11-02-practitioner-ui-reliability-v3`. Both designated test practitioners were
+  listed Inactive with their original email addresses. Only the synthetic Microsoft
+  entry was opened for editing. Its name/email initially lacked the accessibility
+  `settable` property, its status was Inactive, and only practitioner was selected among
+  the local roles. Explicit Edit name and email made both contact fields settable.
+  Changing only its unsaved synthetic display name, then Cancel name and email changes,
+  restored the original name/email and readonly fields; status remained Inactive.
+  No Save changes action was issued. The real password manager was not exercised.
+  Accessibility focus reporting was inconsistent, so hosted focus transfer is unverified;
+  the existing local focus assertions remain the evidence for that behavior.
+
+The Windows tool stopped the first session because it could not determine the current
+browser URL reliably. The owner explicitly resumed the check with Staff access foregrounded.
+It stopped again when dismissing the drawer with Cancel; that final drawer-close result
+is unknown. Both stops were obeyed immediately, without alternative automation to bypass
+the URL safety check. No account activation, role/status save, application, terms,
+subscription, provider configuration, database or messaging change was submitted by
+these checks. The prior CAD 0 trial and all histories remain retained. Mail/SMS settings
+were not freshly read; the preceding disabled-channel checkpoint remains their evidence.
+
+The evidence files were re-read with explicit count/pass assertions (141 HTTP results,
+two closed offers), all three local ZIP hashes/lengths were rechecked, and
+`git diff --check` was run for this documentation checkpoint. These checks passed;
+no source, runtime dependency/version, lockfile, permission, consent wording or endpoint
+changed. No build, local browser, PHP or SQL suites were rerun for documentation-only
+edits. The completed provider registration/approval/offboarding rehearsal predates this
+UI build and remains historical acceptance, not a new callback/revocation test.
+
+Remaining acceptance is explicit: manually confirm the drawer is closed without saving;
+complete fresh Google and personal Microsoft returns and URL cleanup on this build
+with the designated accounts (both must remain blocked while Inactive/pilot-revoked);
+and test live mounted-workspace removal after authority revocation in a separately
+approved synthetic scenario. Do not reactivate the departed test accounts or reopen
+intake to force those checks. Actual autofill/status-save protection, hosted keyboard
+focus, broader role/clinic negatives, headers, restore rehearsal and accountable
+privacy/security/clinical/release decisions remain open. No further package upload is
+needed for the already verified frontend update. Rollback still replaces only the two
+saved previous HTML entries while retaining all old assets and database/history records.
 
 ## All 38 controls — scoped reassessment
 
@@ -318,11 +390,11 @@ Historical audits remain intact. This is a follow-up to the
 | DEV-02 | Partial | No new any/ts-ignore/skips, narrow changes, initial failures retained; local diff reviewed. Maintainer/security: independent review remains. |
 | DEV-03 | Partial | Exact restores/unchanged locks; zero runtime/11 moderate frontend build findings. Build/security: outstanding build advisory exposure decision. |
 | DEV-04 | Partial | Real lint/types/content/i18n/builds and 406 passing distinct browser cases; 2 existing optional-fixture skips documented. QA: hosted checks and broader omitted scenarios remain. |
-| DEV-05 | Partial | Bilingual controls, explicit focus, filter keyboard/mobile/zoom-equivalent checks. Accessibility/product: real AT/contrast/themes/full zoom and actual extension handling. |
+| DEV-05 | Partial | Local bilingual/focus/mobile/zoom checks; hosted EN/FR pilot filter layout and explicit contact edit/cancel observed. Accessibility/product: hosted focus, real AT/contrast/themes/full zoom and actual extension handling remain. |
 | DEV-06 | Partial | No runtime dependency or polling; source bounds unchanged. Build/performance: compare final chunks and representative access-recheck concurrency. |
 | REL-01 | Partial | This dated ledger and file matrix; named owner decisions absent. Release owner: assign and retain approvals. |
 | REL-02 | Implemented (local changed scope) | Exact frontend/website builds and dedicated/default browser configs pass; unchanged API/SQL exclusions explicit. QA: local success is not hosted acceptance. |
-| REL-03 | Partial | Final v3 source/lock/runtime/member hashes, 74 ZIP entries, independent readback and static rollback checks; 138 hosted assets and 3 previous entries match exactly, both public offers closed. Operations/release: new entry-page verification, restricted hosted behavior acceptance and actual restore. |
+| REL-03 | Partial | Final v3 provenance/74 ZIP entries/static rollback; all 138 hosted assets and 3 new entry URLs match, both public offers closed; central EN/FR and staff edit/cancel smoke checks recorded. Operations/release: fresh provider callbacks, mounted revocation, unknown final drawer dismissal and actual restore remain. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no local result waives open gates. Accountable owners: resolve/sign scoped decisions. |
 | REL-05 | Partial | Owner proceeded with reviewed controlled frontend copy; assets verified before entry handoff, both public offers closed. No permission/settings expansion. Release/privacy/security/clinical owners: remaining scoped operational and general-release decisions. |
 | REL-06 | Implemented (report scope) | Files/commands/flows/limits/rollback and final source/hash binding recorded. Release owner: confirm report and accountable decisions. |
