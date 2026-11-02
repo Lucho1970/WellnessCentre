@@ -11,6 +11,64 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### Current verified checkpoint and owner upload handoff
+
+After the owner restored the browser, the prepared read-only query executed successfully.
+All three pilot tables are InnoDB, with **12/9/6 columns, 4/2/2 foreign keys and zero rows
+each**. The current private export additionally verified exact column names/order, primary
+keys, unique indexes and foreign-key columns/targets against migration 058. The phpMyAdmin
+aggregate result's no-unique-column warning only disables grid editing; no table mutation
+was performed by the agent and no clinical/identity rows were displayed.
+
+Current backup: `D:/Dev/WellnessCentre-backup/database/wellness_centre-2026-11-01-before-pilot-admin.sql`,
+**1,983,779 bytes**, SHA-256
+`f3b0e17d97199cecdafaa0762c62e7448ba369b713e8edf8be1a3adbab4247bc`.
+The HTTPS export has the expected database/header, 152 CREATE TABLE statements, 99 INSERT
+statements and COMMIT marker; the private copied bytes match. Only the three empty pilot
+objects' DDL was inspected for schema verification; records were not output or used as tests.
+This backup includes the owner-applied schema. Actual restoration remains untested.
+
+The earlier interrupted HTTPS configuration download completed as `D:/Downloads/env`
+(3,972 bytes). A private before-update copy is saved at
+`D:/Dev/WellnessCentre-backup/wellness-api.env.before-practitioner-admin-2026-11-01`.
+Semantic comparison against the reviewed private candidate found differences **only** in
+BILLING_ADMIN_ENABLED, PRACTITIONER_APPLICATIONS_ENABLED,
+PRACTITIONER_APPLICATION_ACTIVATION_ENABLED, STAFF_EXTERNAL_AUTH_ENABLED and
+PRACTITIONER_PILOT_ACCESS_ENABLED. Both preflights passed; current pilot mode is true, two
+workforce identities remain approved, delivery allowlists are empty, mail/SMS are false.
+No private setting/credential value was printed, changed live or added to an archive/Git.
+
+An ignored HTTPS upload stage, `.tmp/pa-https`, contains the 12 private delta files and 65
+public members byte-copied from the verified packages; no private configuration is included.
+Confirmed HTTPS uploads (all displayed 100% green checks):
+
+- `/wellness-api/src/Service/PractitionerPilotAccessService.php` (14,927 bytes).
+- `/wellness-api/src/Service/PractitionerPilotLock.php` (1,401 bytes).
+- `/wellness-api/src/Service/AccessAudit.php` (18,728 bytes; refreshed listing shows 18.29 KiB/new timestamp).
+- `/wellness-api/src/Config.php` (7,601 bytes).
+- `/wellness-api/src/PilotPolicy.php` (6,826 bytes).
+
+Remote byte hashes are not verified. No other source file upload, generated Composer
+metadata, public asset, HTML or private-flag change is confirmed. The owner requested taking
+over copies before the next file selection. Complete the full private ZIP merge to finish a
+consistent source/dependency artifact, then copy public assets and verify their HTTPS hashes
+before publishing the two HTML files. Leave private `.env` unchanged until those gates pass.
+Preserve `.env`, existing data and older hashed assets; do not mirror/delete directories.
+
+Read-only Beyond Compare profile inspection showed **FTP / port 21**, so the agent did not
+transfer through it or change its settings. Use a verified encrypted connection or Netfirms'
+HTTPS manager for the handoff. Native accessibility sometimes returned unrelated browser
+text; subsequent decisions used the intended window's screenshots. File-dialog long path
+input truncated, so the Service batch was selected with short basenames from its exact
+staging directory. Those three uploads completed. Competing user input and cross-monitor
+modal errors required fresh observation/activation; no action was taken on unrelated browser
+content. No authentication dialog, password manager, security setting or terminal UI was used.
+
+This supersedes the earlier pending schema/backup notes immediately below. Application
+source/dependencies/grants are unchanged from the tested checkpoint; only the five listed
+files are now hosted. Hosted full registration/approval/activation/retirement acceptance,
+operator/grant/lock tests, headers, rollback rehearsal and accountable signatures remain open.
+
 1 November 2026. The owner answered the exact 058/prepared-pilot deployment question with
 “I updated the database.” Read-only inspection of the existing authenticated phpMyAdmin
 window showed the `wellness_centre` result screen and three successful CREATE TABLE results

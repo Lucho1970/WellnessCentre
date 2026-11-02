@@ -1,5 +1,18 @@
 # Practitioner pilot access administration
 
+**Latest checkpoint — manual upload handoff:** Migration 058 verification completed: all
+three objects are InnoDB, with column counts 12/9/6 and foreign-key counts 4/2/2; each had
+zero rows. A fresh private database export was verified and saved before file changes.
+The freshly downloaded live configuration matches the reviewed candidate except for the
+five intended rollout flags; mail/SMS remain disabled and pilot mode/workforce approvals
+remain intact. Five supporting PHP files have uploaded through Netfirms HTTPS File Manager:
+the two new pilot services, AccessAudit, Config and PilotPolicy. No other upload is confirmed;
+the complete API package, public assets, HTML and settings still need deployment/verification.
+The owner requested taking over file copies. Use the three prepared transfer ZIPs described
+in the ledger; copy API/assets first and verify public asset hashes before the entry pages.
+The inspected Beyond Compare profile uses FTP on port 21; no profile setting was changed and
+no transfer was performed through it. Use verified encrypted transfer or the HTTPS manager.
+
 **1 November hosted follow-up:** The owner reports applying migration 058. The existing
 phpMyAdmin `wellness_centre` SQL result screen shows three successful CREATE TABLE results
 for the pilot access, events and requests objects. The agent did not replay the migration.
@@ -70,7 +83,7 @@ normal controls; no promise of remotely erasing data is made.
 
 ## Proposed schema and release gate
 
-**Migration 058 was applied by the owner; detailed schema/backup verification is pending.** It adds three
+**Migration 058 was applied by the owner; schema/key and current-backup checks passed.** It adds three
 tables only: `practitioner_pilot_access`, `practitioner_pilot_events` and
 `practitioner_pilot_requests`. It seeds no approval, membership, role, term, price or flag.
 The access row holds clinic, product identity, operator label, pending/approved/revoked
@@ -113,7 +126,7 @@ checks. Final MariaDB also passed 36 + 62; all six browser configurations total
 Exact source, commands, package/transfer hashes and limitations are recorded in the
 [current 38-control ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
 
-No support-reference patch or new feature has yet been deployed. The reviewable source package and Beyond Compare transfer set are prepared under
+Five supporting private PHP files are uploaded; the full pilot update and settings are not yet deployed. The reviewable source package and transfer set are prepared under
 `deployments/2026-11-01-practitioner-pilot-admin` and
 `deployments/2026-11-01-practitioner-pilot-admin-transfer`. Verify a current backup and
 obtain exact 058 approval, then complete hosted gate/registration/activation/
