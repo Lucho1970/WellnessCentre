@@ -11,7 +11,44 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
-### Current verified checkpoint and owner upload handoff
+### Current checkpoint after the owner's API and asset copies
+
+The owner reports completing the requested first two transfers, `00-api-private.zip` into
+`/wellness-api` and `01-assets.zip` into `/public_html`. No new private setting, approval,
+membership or application was created by these checks. `02-entry-pages.zip` remains held.
+
+Read-only `Invoke-WebRequest` requests using Windows TLS trust and `Cache-Control: no-cache`
+passed **144/144 static checks**: 140 asset URLs across 72 distinct JS/CSS members matched
+the current package's SHA-256, exact byte count and MIME type; four HTML entry URLs matched
+the previous package. The shared assets were checked on both clinic hosts, central assets
+on the central host and unchanged website assets on the website host. The old HTML matches
+confirm the intended staged rollout. Ignored reports:
+`.tmp/pilot-admin-hosted-pre-entry-targets.json` and
+`.tmp/pilot-admin-hosted-pre-entry-results.json`.
+
+All **9/9 API smoke checks** passed, recorded in ignored
+`.tmp/pilot-admin-hosted-api-after-manual-upload.json`:
+
+- Health returned 200 / `status=ok` on both clinic hosts and the central host.
+- Both public practitioner offers returned 200, with available/enabled/activation false
+  and no plan or terms.
+- Anonymous central application identity, central pilot list and Wellnexa staff identity
+  requests returned 401; the central pilot route on the clinic host returned 404.
+
+`./scripts/verify-current-deployment.ps1 -ReleaseDirectory deployments/2026-11-01-practitioner-pilot-admin`
+again passed **239 checks / 7 archives / 2,174 entries / 2,091 text signature scans**,
+including the existing pinned public README key example. Source remains
+`73bfd14d96e8038e9b3a40a9c4b17f5ab59be545`; no dependency, permission, consent,
+external endpoint or data-flow change was made in this follow-up.
+
+Remote private-file hashes and the owner's actual transfer transport remain unverified.
+Anonymous smoke checks cannot prove matching private code, authenticated authorization,
+database lock privileges or the complete practitioner flow. Next: copy the two entry pages,
+verify hosted hashes/routes, then coordinate the already reviewed private settings separately.
+Preserve `.env`, historical assets and all database records. Full acceptance and rollback
+rehearsal remain pending; this checkpoint supersedes older deployment-status notes below.
+
+### Earlier verified preparation and owner upload handoff
 
 After the owner restored the browser, the prepared read-only query executed successfully.
 All three pilot tables are InnoDB, with **12/9/6 columns, 4/2/2 foreign keys and zero rows
@@ -126,7 +163,7 @@ Migration **058**, requiring verified 032/040/049 prerequisites, adds exactly th
 `practitioner_pilot_access`, `practitioner_pilot_events`, `practitioner_pilot_requests`.
 It does not require the disabled communications updates 056/057. It seeds no grants/flags,
 changes no clinical records and charges nobody. **The owner reports applying it; three
-successful SQL results were observed, with full schema/backup verification pending.**
+successful SQL results, resulting structure/keys and the current private backup were verified.**
 
 New first-party API routes on the existing central host, using the existing application-admin
 workforce token and active explicit database grant:
@@ -304,7 +341,7 @@ public identifiers are present in the final portal. Three `http://localhost` bun
 were inspected: React Router's non-browser base fallback, superseded by the actual window
 origin; they are not configured API/callback/delivery endpoints. No TLS check was disabled.
 
-Prepared, **not uploaded**, Beyond Compare transfer set:
+Prepared transfer set (owner reports API/assets copied; entry pages still held):
 `D:/Dev/WelnessCentre/deployments/2026-11-01-practitioner-pilot-admin-transfer`.
 
 | File | Target / verified contents | SHA-256 |
@@ -339,9 +376,10 @@ are provider-return observations, not registration/activation/normal retirement 
 The prior approved 053–055 updates succeeded after backup verification. The existing host
 has two workforce pilot approvals, no static external approvals and no allowlisted delivery
 destinations. Mail/SMS stay disabled; Wellnexa intake/activation settings are still closed
-and no plan/terms have been published. The new 058 code/flag/UI is **not deployed**.
+and no plan/terms have been published. The owner reports the new API/assets copied;
+public hashes passed, but entry pages/private flags remain held. Schema 058 is verified.
 
-Excluded/unverified: hosted 058/grants/lock privileges, managed allow/revoke, registration →
+Excluded/unverified: hosted runtime grants/lock privileges, managed allow/revoke, registration →
 review → activation → ordinary Inactive for both real providers, MFA/idle/absolute/revocation
 policies, actual restoration, independent audit integrity/monitoring, representative load,
 full assistive-technology/contrast/theme/AODA assessment, and accountable organizational
@@ -391,9 +429,9 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | DEV-06 | Partial | No polling/dependencies; bounded indexed queries and identity-scoped locks. Build/performance: assess existing chunks, clinic-lock contention and representative scale. |
 | REL-01 | Partial | This dated 38-control ledger/file/test matrix; named human owners/decisions absent. Release owner: assign and retain evidence. |
 | REL-02 | Partial | Local commands/results and failures recorded; dedicated suites explicitly required. QA: verify final counts and operational omissions. |
-| REL-03 | Partial | Old hosted static evidence does not verify this addition; new artifact has 239 local checks and explicit provenance; 058/hosted/restore rehearsal pending. Operations/release: complete hosted synthetic acceptance and rollback. |
+| REL-03 | Partial | New assets: 140 hash/length/MIME matches; four old HTML matches; nine anonymous API checks; 239 local artifact checks. Schema/current backup verified, private hashes/authenticated acceptance/restore rehearsal pending. Operations/release: complete entry/configuration rollout and hosted synthetic acceptance/rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no failed/pending control waived by local tests. Accountable owners: resolve or approve lawful scoped internal exceptions. |
-| REL-05 | Partial | Implementation authorized; new 058 not approved/applied, no feature flags/roles broadened live. Release/custodian/security/privacy/clinical: exact DDL approval after backup, deployment and acceptance/signatures. |
+| REL-05 | Partial | Controlled rollout authorized; owner applied 058 and copied API/assets, structure/current backup verified. Entry pages/flags/managed approvals still held. Release/custodian/security/privacy/clinical: complete staged rollout, acceptance and accountable signatures. |
 | REL-06 | Implemented (report scope) | File purposes, versions/flows, commands, findings, limits, owners and rollback recorded; final checkpoint to bind exact source. Release owner: confirm report. |
 
 ## Private configuration preparation
@@ -410,9 +448,8 @@ or the generated archives.
 
 ## Deployment and rollback implications
 
-Prepare a fresh verified private database backup that includes the already applied 053–055
-objects. Obtain exact approval for 058, apply its three CREATE TABLE statements once, and
-verify structure before setting the new flag. Current settings have no static external
+The fresh verified private backup includes 053–055 and the owner-applied 058 objects;
+058 structure and keys are verified. Do not replay it. Current settings have no static external
 approvals to migrate; recheck before enabling. Preserve the two workforce entries, pilot
 mode and disabled mail/SMS. Deploy matching reviewed API/central/shared assets, verify hashes
 before HTML, then enable only the approved Wellnexa flow. Owner-reviewed joining terms/plan

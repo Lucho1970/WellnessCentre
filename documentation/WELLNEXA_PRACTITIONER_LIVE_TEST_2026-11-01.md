@@ -14,7 +14,10 @@ and the existing pilot denial. Account addresses/subjects/tokens are not retaine
 The owner then requested allowed-practitioner management in central Admin. Work continues on
 `feature/practitioner-pilot-admin`; see the [operator guide](PRACTITIONER_PILOT_ADMIN.md) and
 [38-control/evidence ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md). New migration
-058 is not approved/applied, the new feature/flag is not hosted, and neither account has
+058 was applied by the owner; resulting structure/keys and a current private backup are
+verified. The owner then copied the new API/assets: 140 HTTPS asset hash checks and nine
+anonymous API checks passed, while four HTML checks still match the previous release.
+The two new entry pages and private flags remain held. Neither account has
 submitted/accepted terms or been approved/activated/retired. The host still has disabled
 mail/SMS and closed application settings. Prior steps below are retained as their dated
 observations; they do not supersede this current checkpoint.

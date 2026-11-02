@@ -1,6 +1,18 @@
 # Practitioner pilot access administration
 
-**Latest checkpoint — manual upload handoff:** Migration 058 verification completed: all
+**Latest checkpoint — API/assets copied; entry pages held:** The owner reports copying
+`00-api-private.zip` and `01-assets.zip`. All **140 HTTPS asset checks** passed exact
+SHA-256, length and MIME checks across 72 distinct files. Four HTML entry checks still
+match the preceding release, confirming that the entry pages remain held. All **nine API
+smoke checks** passed: three health responses, both clinic intakes closed, three anonymous
+protected requests denied and the central pilot route absent on the clinic host. Private
+API byte hashes remain unverified; these checks do not establish authenticated acceptance.
+The next upload is `02-entry-pages.zip` into `/public_html`, merging the two HTML files
+without deleting older assets. Leave `.env` unchanged until entry verification completes.
+The package verifier again passed all 239 checks. See the
+[current evidence ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
+
+**Pre-upload preparation:** Migration 058 verification completed: all
 three objects are InnoDB, with column counts 12/9/6 and foreign-key counts 4/2/2; each had
 zero rows. A fresh private database export was verified and saved before file changes.
 The freshly downloaded live configuration matches the reviewed candidate except for the
@@ -13,7 +25,7 @@ in the ledger; copy API/assets first and verify public asset hashes before the e
 The inspected Beyond Compare profile uses FTP on port 21; no profile setting was changed and
 no transfer was performed through it. Use verified encrypted transfer or the HTTPS manager.
 
-**1 November hosted follow-up:** The owner reports applying migration 058. The existing
+**Earlier 1 November hosted follow-up, superseded by the checkpoints above:** The owner reports applying migration 058. The existing
 phpMyAdmin `wellness_centre` SQL result screen shows three successful CREATE TABLE results
 for the pilot access, events and requests objects. The agent did not replay the migration.
 Detailed resulting-schema verification and a current backup check remain pending: computer
@@ -126,10 +138,11 @@ checks. Final MariaDB also passed 36 + 62; all six browser configurations total
 Exact source, commands, package/transfer hashes and limitations are recorded in the
 [current 38-control ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
 
-Five supporting private PHP files are uploaded; the full pilot update and settings are not yet deployed. The reviewable source package and transfer set are prepared under
+The owner reports the full private API and public asset upload; public hashes and anonymous
+API checks passed. The new entry pages and private settings are still held. The packages are under
 `deployments/2026-11-01-practitioner-pilot-admin` and
-`deployments/2026-11-01-practitioner-pilot-admin-transfer`. Verify a current backup and
-obtain exact 058 approval, then complete hosted gate/registration/activation/
+`deployments/2026-11-01-practitioner-pilot-admin-transfer`. The current backup and
+owner-applied 058 structure are verified. Complete entry/settings deployment and hosted gate/registration/activation/
 normal departure acceptance and accountable review before opening the flow. An Admin pilot
 approval still cannot supply membership, application approval, payment entitlement or a role.
 
