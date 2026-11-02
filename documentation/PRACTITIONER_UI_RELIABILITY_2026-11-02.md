@@ -388,8 +388,8 @@ claimed by this preparation record.
    browser sessions. Verify the test identity, original email, existing practitioner-only
    membership and synthetic assignment scope. The owner subsequently confirmed the
    blocked practitioner tab uses the Microsoft test account and opened a separate
-   organization-administrator browser. Staff access is authenticated; central Admin
-   currently requires its own sign-in, which was handed to the owner.
+   organization-administrator browser. The owner completed central Admin's separate
+   sign-in, and the agent observed authenticated central and clinic administration.
 2. Temporarily allow only this existing pilot entry and set only this existing test staff
    account Active through normal administration. Preserve contacts, role/permission
    selections, application, membership, billing, trial dates and all history. These are
@@ -416,9 +416,25 @@ Before any save, the agent inspected the existing Microsoft test user's drawer:
 original contact values, Inactive status, only practitioner selected, and all additional
 scheduling/invitation/service-area and verified-consent permissions unchecked. The
 drawer was only inspected/scrolled; no status, role, contact or permission change was
-submitted. Central Admin then showed its sign-in screen, so authentication remains
-owner-handled. The live test is pending that sign-in and the reviewed temporary access
-saves. These are prerequisites, not a hosted revocation pass or failure.
+submitted. Central Admin initially required separate owner-handled sign-in. After the
+owner completed it, both existing Wellnexa test entries were observed revoked. The
+Microsoft entry's issuer/subject and prior decision history matched its existing synthetic
+rehearsal record; no new reference was created. Its review defaulted to Approve pilot
+access. The agent filled only the unsaved reason below and left the owner-confirmation
+checkbox unchecked; the save remained disabled. The separate Staff access drawer still
+contained the original Inactive/practitioner-only values. The owner was asked to perform
+the two temporary access saves and leave the practitioner tab untouched.
+
+Prepared audit reason:
+
+> Owner-authorized mounted-dashboard revocation retest. Temporarily allow only this existing synthetic Microsoft pilot entry and restore its existing practitioner access. Keep intake/activation closed; no publication, bookings, charges or messages. Return Staff access to Inactive, verify removal on in-app Refresh and denial on Retry, then revoke pilot access again. Preserve contacts, roles, permissions and all history.
+
+Access-setting saves are owner-handled under the Windows computer-use security-setting
+restriction. This is a tool operating boundary, not a new request for broad implementation
+authorization under REL-05. At this checkpoint no access save has been observed, and the
+live dashboard revocation test remains pending. Its eventual initial Active/allowed state
+and final Inactive/revoked state must both be verified; a prepared form is not an effective
+access decision or a hosted revocation pass.
 Preparation makes no hosted access/configuration or database write. Local recheck:
 `npx playwright test tests/portal.spec.ts --grep 'staff status saves|dashboard removes|record-level forbidden|access recheck fails|travel badge account denial|travel badge clears' --reporter=line`
 from Frontend passed **9/9**, exit 0, in 21.2 seconds at source/evidence checkpoint

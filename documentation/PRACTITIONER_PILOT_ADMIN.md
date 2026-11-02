@@ -19,8 +19,11 @@ synthetic Microsoft fixture, exact access transitions, in-app Refresh trigger an
 Inactive/revoked cleanup are prepared in the linked report. Nine focused local regressions
 passed again and both public offers remain closed. The owner confirmed the Microsoft
 test session and opened a separate administrator browser. Its Staff access drawer was
-verified Inactive/practitioner-only with all additional permissions unchecked; central
-Admin still needs owner-completed sign-in. No temporary access change has been saved.
+verified Inactive/practitioner-only with all additional permissions unchecked. Central
+Admin sign-in subsequently completed; both pilot entries remain revoked at the observed
+baseline. The Microsoft pilot review and unsaved audit reason are prepared. The owner
+was asked to save only its temporary pilot approval and existing Staff status Active;
+no temporary access save or dashboard revocation result has yet been observed.
 
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive
 with original emails retained and both pilot entries revoked. The Microsoft session was
