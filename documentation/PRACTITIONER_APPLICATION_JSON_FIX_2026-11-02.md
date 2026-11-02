@@ -7,6 +7,45 @@ Continues the owner-authorized controlled rehearsal; no merge or general release
 
 ## Hosted finding and current account state
 
+**Subsequent hosted acceptance, 2 November:** After the owner confirmed the one-file
+patch upload, Admin detail opened successfully. The original synthetic credential/service
+text, punctuation, immutable submission version 1 and terms-confirmation event rendered.
+The owner had added an optional contact phone before personally submitting; that value,
+account addresses, identity subjects and verification codes are excluded from this record.
+The private remote file hash was not independently read; this is behavioral acceptance.
+
+The retained Microsoft session was denied the practitioner workspace while submitted.
+Central Admin then approved the intended synthetic applicant using the independently
+matched code, the existing Virtual Clinic location and the CAD 0 rehearsal plan. Existing
+membership reuse remained unchecked. The review explicitly verified eligibility for this
+owner-authorized synthetic rehearsal only, not any real professional qualification. The
+applicant-facing decision states that publication, patient bookings, charges and messages
+are excluded and the account will be made Inactive afterward. Save succeeded. Retrying
+the practitioner workspace in that same preserved session was still denied after approval;
+the own-application page now reports Application approved and that the trial has not started.
+No bearer bytes were inspected, so this is not byte-identical token replay evidence.
+
+At this checkpoint activation remains held; no Microsoft membership/trial has been created
+by the rehearsal. Google remains Wellnexa Inactive and pilot-revoked; Microsoft pilot access
+is allowed. LivinLively remains closed and mail/SMS remain disabled. Activation, six-calendar-
+month trial creation, normal Microsoft Inactive and final pilot revocation remain pending.
+The failure and pre-upload state below are historical, superseded by this hosted checkpoint.
+
+**Activation handoff:** Under the owner's existing explicit rehearsal authorization, Admin
+subsequently enabled Wellnexa activation, preserving intake, the CAD 0 plan, timezone and
+terms v1. The readiness reason expressly limits the acknowledgement to this controlled
+synthetic test, not real PHI, professional qualification or general release. Save succeeded.
+Anonymous verified-TLS `Invoke-RestMethod` reads of each clinic's
+`/api/v1/public/practitioner-applications` returned Wellnexa intake/activation true and
+LivinLively intake/activation false with no plan/terms. Wellnexa terms SHA-256 remained
+`6097467fc2c0e74a3c6bd215d673a5d66189f6166f9f932a1fa5e371125f2416`.
+Refresh application in the retained Microsoft session now displays activation terms v1,
+an unchecked acceptance box and a disabled Activate my approved account button. The owner
+was asked to personally accept and activate; neither action was performed by the agent.
+Membership/trial creation and Inactive checks remain pending that action. Rollback of this
+temporary setting closes Wellnexa intake/activation through Admin while preserving terms,
+application, consent and audit history. It does not require restoring the database.
+
 The owner submitted the labelled Microsoft application after personally confirming the
 information and accepting terms v1. Its preserved practitioner session reports Application
 submitted; the exact synthetic record appears in Wellnexa's central Admin queue. Opening
@@ -72,7 +111,7 @@ process `OPENSSL_CONF=C:/Program Files/Git/usr/ssl/openssl.cnf`.
 | `./scripts/test-recurring-sql.ps1 -MariaDbDirectory .tmp/recurrence-db-runtime/package/mariadb-11.4.8-winx64 -Port 13343 -IntegrationTest practitioner-applications.php` | **36 + 122 passed**, exit 0; server stopped. |
 | Each `php api/tests/<root-file>.php` with the process OpenSSL setting | All **61 standalone scripts passed**, zero failures; ignored per-file report `.tmp/application-json-php-results.json`. |
 | `git diff --check` | Passed; normal Git line-ending notices only. |
-| Hosted submission / queue / review | Submission and queue passed; detail failed twice before this patch; hosted corrected detail/review still pending. |
+| Hosted submission / queue / review | Owner submission and queue passed; detail failed twice before the patch, then original history/detail and synthetic approval passed after owner upload. Same-session workspace denials passed both before and after approval; activation/trial/Inactive remain pending. |
 
 No frontend source changed. Frontend/website builds, browser suites, clean dependency restores,
 dependency audits, broad SQL suites for unrelated modules, load/accessibility/penetration and
@@ -86,8 +125,9 @@ revision with these qualifications: AUTH-01/02 authorization/realm/clinic bounda
 SEC-04 preserves exact JSON evidence and strict decode; SEC-06/07 retain audit and generic
 errors with private redacted diagnostics; DEV-03 has no dependency change; DEV-04/REL-02 add
 the failing regression, successful HTTP detail and dual-engine results. PRIV-02/REL-03/05
-record the owner's submission but keep review, activation, trial and normal Microsoft
-Inactive acceptance pending. No organizational control is upgraded by these local results.
+record the owner's submission, successful hosted detail/approval and same-session workspace
+denials; activation, trial and normal Microsoft Inactive acceptance remain pending. No
+organizational control is upgraded by these local or narrowly scoped hosted results.
 Named custodian/privacy, security/operations, clinical and release-owner decisions remain
 required before real-data/general release; previous legal applicability is not reverified here.
 
@@ -120,7 +160,8 @@ No .env, logs, dumps, tests, dependencies, frontend files or source maps are inc
 Manifest records exact source/branch/build time, runtime/counts and all three lockfile hashes.
 Upload only the patch contents to `/wellness-api`; retain README/manifest/rollback locally.
 Preserve every other API file, including the previously deployed pilot-response fix.
-Remote private-file hash and corrected hosted review remain unverified pending owner copy.
+The owner confirmed copying the patch and corrected hosted detail/review passed as recorded
+above. Remote private-file hash remains unverified.
 
 Rollback restores only the previous service file; retain the submitted application, consent,
 plan/terms, identity and audit records. It restores the prior review defect and is not a

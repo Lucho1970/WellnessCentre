@@ -1,6 +1,39 @@
 # Wellnexa practitioner live-test rollout and account retirement
 
-## Latest checkpoint: approved rehearsal intake open; activation held
+## Latest checkpoint: Microsoft approved; activation handed to owner
+
+**Activation handoff after approval, 2 November:** Admin successfully enabled Wellnexa's
+separate activation setting under the owner's existing explicit synthetic rehearsal approval.
+The recorded readiness reason limits the acknowledgement to this controlled test and keeps
+real-PHI/general-release/professional-qualification approval excluded. The plan, timezone,
+intake and terms were preserved. Public verified-TLS offers confirm Wellnexa intake/activation
+true with CAD 0 plan and terms v1; LivinLively remains both false without plan/terms. The
+terms SHA-256 is still `6097467fc2c0e74a3c6bd215d673a5d66189f6166f9f932a1fa5e371125f2416`.
+Refresh in the retained Microsoft session displays Joining terms version 1, acceptance
+unchecked and Activate my approved account disabled. The owner was asked to personally
+accept and activate; the agent performed neither action. No new membership/trial is claimed
+until the outcome is observed. Google remains Inactive/pilot-revoked, Microsoft pilot-allowed,
+mail/SMS disabled. Close Wellnexa intake/activation after the final Inactive/revocation tests,
+retaining application/terms/consent/audit history. No SQL or database restore is needed.
+
+**2 November latest — patch verified and Microsoft application approved:** After the owner
+confirmed upload, Admin review rendered the preserved synthetic text and immutable version-1
+history. The optional phone the owner added before submitting is deliberately excluded from
+Git and artifacts. The retained Microsoft session was denied workspace access while pending.
+Normal Admin review then approved the intended account using its independently matched code,
+the existing Virtual Clinic location and the CAD 0 plan; existing-membership reuse was left
+unchecked. Review attestation/reasons apply only to synthetic rehearsal eligibility, not
+professional qualification. The applicant-facing message excludes publication, patient care,
+charges and communications and states that the account will be made Inactive afterward.
+Admin save succeeded. Retrying the workspace in the same preserved session remained denied
+after approval. Its own application now shows approved, activation held and trial not started.
+No Microsoft membership/trial has yet been created by this rehearsal. Google remains
+Inactive/pilot-revoked, Microsoft pilot-allowed; LivinLively closed, mail/SMS disabled.
+Next: enable the already authorized test activation gate, let the owner personally accept
+activation terms, verify six-calendar-month trial and practitioner-only access, then ordinary
+Inactive, final pilot revocation and closure of the rehearsal intake/activation gates.
+The [focused report](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md) records scoped evidence,
+tests and rollback. Earlier blocked-review statements below are historical.
 
 **2 November latest — owner submission confirmed, review blocked:** The owner reported
 submitted, and both the preserved Microsoft session and Wellnexa central Admin queue show

@@ -1,5 +1,22 @@
 # Practitioner pilot access administration
 
+**2 November latest — uploaded JSON patch and synthetic approval passed:** Admin now opens
+the original immutable submission history after the owner's one-file upload. Normal review
+approved the Microsoft rehearsal application at Virtual Clinic on the CAD 0 plan, with
+existing-membership reuse unchecked and explicit synthetic-only review/decision reasons.
+The preserved Microsoft session is denied the workspace both while submitted and after
+approval; its own page shows Application approved and trial not started. Activation remains
+held, Microsoft pilot allowed, Google Inactive/revoked. Activation/trial/normal Microsoft
+Inactive are still pending. See the [dated hosted evidence](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md).
+Earlier failed-review and no-approval statements below describe preceding checkpoints.
+
+**Activation handoff following approval:** The separately authorized Wellnexa rehearsal gate
+is now enabled. Admin save and both clinics' public offers verify Wellnexa intake/activation
+true, LivinLively both false; approved plan and terms hash are unchanged. The Microsoft own
+page displays terms v1 with acceptance unchecked and activation disabled until the owner
+accepts. The owner has been asked to complete this step personally. No trial/membership
+creation is claimed yet. Close the rehearsal gates and retain histories after final checks.
+
 **2 November — application submitted; Admin review read needs a compatibility fix:** The
 owner accepted terms v1 and submitted the Microsoft test application. Submission appears in
 both the applicant session and Wellnexa Admin. Review detail fails twice; the owner's private

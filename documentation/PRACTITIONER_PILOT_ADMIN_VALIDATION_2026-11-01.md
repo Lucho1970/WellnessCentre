@@ -12,6 +12,29 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### 2 November latest: corrected hosted detail and synthetic approval passed
+
+After the owner copied the one-file patch, original immutable submission detail/history
+rendered successfully. Central Admin approved only the owner-authorized synthetic Microsoft
+application at Virtual Clinic on the CAD 0 plan, without existing-membership reuse or claims
+of real credential verification. The preserved applicant session was denied workspace access
+both before and after approval; own status reports approved, activation held and trial not
+started. No reusable token bytes were inspected. Google remains Inactive/pilot-revoked and
+Microsoft pilot-allowed. AUTH-02/REL-03 gain only these scoped hosted checks; the existing
+38-control ledger and organizational gaps remain. Activation/trial/ordinary Microsoft
+Inactive/final revocation still require hosted acceptance. See the [focused report](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md).
+No source, dependency, permission, consent wording, endpoint or external data-flow change
+was made during this hosted verification. Broad local suites were not repeated.
+
+The existing explicit rehearsal authorization then covered enabling Wellnexa's separate
+activation setting. Its audit reason limits readiness to this controlled synthetic test;
+it is not an organizational release/privacy/credential sign-off. Admin save and verified-TLS
+anonymous offers confirm Wellnexa intake/activation true, unchanged plan/terms hash, and
+LivinLively intake/activation false without plan/terms. The applicant page shows unchecked
+activation consent and an initially disabled activation button. Personal acceptance and
+activation have been handed to the owner; membership/trial/Inactive remain pending.
+This changes only the approved clinic setting, not runtime permissions or consent wording.
+
 ### 2 November: owner submission passed; review JSON failure reproduced and corrected locally
 
 The owner accepted the approved terms and submitted the synthetic Microsoft application;
