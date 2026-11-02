@@ -14,6 +14,12 @@ The owner also checked both returned address bars and confirmed neither containe
 drawer dismissal remain unverified. The linked report records evidence sources and exact limits; this
 does not reopen access or establish general-release approval.
 
+The owner requested a controlled mounted-dashboard revocation retest. Its existing
+synthetic Microsoft fixture, exact access transitions, in-app Refresh trigger and final
+Inactive/revoked cleanup are prepared in the linked report. Nine focused local regressions
+passed again and both public offers remain closed; live execution awaits the separate
+administrator session and confirmation of the practitioner tab's test identity.
+
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive
 with original emails retained and both pilot entries revoked. The Microsoft session was
 denied while pilot still allowed, then its application refresh was denied after pilot

@@ -373,6 +373,60 @@ privacy/security/clinical/release decisions remain open. No further package uplo
 needed for the already verified frontend update. Rollback still replaces only the two
 saved previous HTML entries while retaining all old assets and database/history records.
 
+### Mounted-dashboard revocation retest — prepared, not yet executed
+
+The owner explicitly requested this hosted test after confirming both provider returns.
+The prior statement against reactivation was a resting-state safeguard; the new request
+allows preparation of a narrowly scoped rehearsal. Proposed fixture is the existing
+synthetic Microsoft practitioner, using its existing membership and retained CAD 0 trial.
+Do not use Google's older returning profile or grant additional roles, permissions,
+patient relationships, publication or messaging. Intake/activation must remain closed.
+The exact access changes must be reviewed before they are saved; no reactivation is
+claimed by this preparation record.
+
+1. Establish separate current organization-administrator and Microsoft practitioner
+   browser sessions. Verify the test identity, original email, existing practitioner-only
+   membership and synthetic assignment scope. The administrator browser used in the
+   preceding rehearsal is no longer open; a replacement session has been requested.
+   The currently available practitioner tab is blocked, and its provider identity still
+   needs owner confirmation before it is used as this fixture.
+2. Temporarily allow only this existing pilot entry and set only this existing test staff
+   account Active through normal administration. Preserve contacts, role/permission
+   selections, application, membership, billing, trial dates and all history. These are
+   access changes, not another registration, trial activation or subscription change.
+3. Use the practitioner's deliberate Retry to obtain its existing dashboard. Confirm
+   synthetic-only content and the expected deployed build; stop if the fixture or visible
+   records differ. Do not book, publish, open patient records or send communications.
+4. Leave the dashboard mounted. In the separate administrator session set this staff
+   account Inactive, leaving pilot approval temporarily allowed so that membership
+   denial is tested independently of the pilot gate.
+5. Return to the same dashboard and use its in-app Refresh, without browser reload,
+   navigation or sign-out. Expected: the denied protected request triggers access
+   revalidation, removes the practitioner workspace/widgets/navigation and shows the
+   account-denial recovery screen. This is removal on the next observed protected
+   denial, not server push or erasure of previously downloaded information. Do not
+   claim that an untouched idle screen disappears immediately.
+6. Deliberate Retry must stay denied while Inactive. Confirm no dashboard restoration
+   or stale widget reappearance. Finally revoke the test pilot entry again and verify
+   the blocked session. Leave Google Inactive/revoked, both clinics closed and channels
+   disabled. Retain the trial and all application/audit history; no database restore or
+   record deletion is part of cleanup. Record any incomplete cleanup explicitly.
+
+This test is pending the separate administrator session and identity confirmation.
+Preparation makes no hosted access/configuration or database write. Local recheck:
+`npx playwright test tests/portal.spec.ts --grep 'staff status saves|dashboard removes|record-level forbidden|access recheck fails|travel badge account denial|travel badge clears' --reporter=line`
+from Frontend passed **9/9**, exit 0, in 21.2 seconds at source/evidence checkpoint
+`7dee7c7`, using only disposable synthetic browser/API fixtures. The ignored log is
+`.tmp/ui-revocation-retest-local.log`. These overlap the earlier nine focused cases;
+they are not nine additional distinct tests and cannot substitute for the live result.
+Existing Node color-environment warnings were emitted; no assertion or suite was skipped.
+No builds/PHP/SQL/dependency restore were repeated because their inputs did not change.
+At 20:43 UTC, fresh anonymous verified-TLS checks of both public practitioner offers
+passed with intake/activation false (2/2), using the same bounded `Invoke-WebRequest`
+command above; redacted boolean results are in `.tmp/ui-revocation-retest-offers.json`.
+No source, dependency, scope/grant, endpoint, consent wording, schema or package change
+is proposed. The existing 38-control ledger remains applicable with this hosted case open.
+
 ## All 38 controls — scoped reassessment
 
 Evidence applies to this branch's stated changes and the source revision later recorded
