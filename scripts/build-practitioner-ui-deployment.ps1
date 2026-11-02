@@ -73,7 +73,11 @@ try {
             elseif($relative -match '^assets/'){throw "Unexpected build asset type: $relative"}
             else {continue}
             $body=[IO.File]::ReadAllText($file.FullName)
-            if($body -match '(?i)(https?://(localhost|127\.0\.0\.1)|sourceMappingURL|-----BEGIN [A-Z ]*PRIVATE KEY-----|gh[pousr]_[a-zA-Z0-9]{20,}|eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,})'){throw "Artifact requires endpoint/credential review: $relative"}
+            # React Router's reviewed createBrowserURLImpl fallback is used only as a
+            # base for new URL(), never a transport. Exclude that exact structure from
+            # the scan text only; retain the original packaged bytes unchanged.
+            $scanBody=[regex]::Replace($body,'let (?<base>[a-zA-Z_$][\w$]*)="http://localhost";(?<win>[a-zA-Z_$][\w$]*)&&\(\k<base>=\k<win>\.location\.origin!=="null"\?\k<win>\.location\.origin:\k<win>\.location\.href\)','/* reviewed router URL base */')
+            if($scanBody -match '(?i)(https?://(localhost|127\.0\.0\.1)|sourceMappingURL|-----BEGIN [A-Z ]*PRIVATE KEY-----|gh[pousr]_[a-zA-Z0-9]{20,}|eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,})'){throw "Artifact requires endpoint/credential review: $relative"}
             $member=$surface.target+'/'+$relative
             [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$file.FullName,$member,[IO.Compression.CompressionLevel]::Optimal)|Out-Null
             $members.Add(@{archive=$archiveName;path=$member;bytes=$file.Length;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()})

@@ -4,6 +4,10 @@ Branch `bugs/practitioner-ui-reliability`, based on `85ab55d`. Reviewer: Codex f
 specified source, local synthetic tests and artifact checks only. No merge, hosted file
 replacement, account reactivation, grant or general-release approval is inferred.
 
+Frontend implementation revision: `61202e541f5cbe89969cc805de227afeaf5e63c6`.
+Subsequent packaging-only revisions retain that frontend source; the final manifest binds
+the exact committed builder/source revision used for its artifacts.
+
 ## Result and boundaries
 
 This implements the four UI follow-ups from the completed hosted rehearsal:
@@ -94,7 +98,7 @@ Wellnexa React/React DOM 19.3.0, TypeScript 6.0.3, Vite 8.3.4, Playwright 1.64.1
 | `npx playwright test --config playwright.applications.config.ts --reporter=line` (Frontend) | Final 22 passed, exit 0. |
 | `npx playwright test --reporter=line` (Frontend) | Initial full run: 289 passed, 2 existing optional-fixture skips, 1 failure described below. Corrected final full run pending. |
 | `npx playwright test tests/portal.spec.ts --grep 'staff status saves\|dashboard removes\|record-level forbidden\|access recheck fails\|travel badge account denial\|travel badge clears' --reporter=line` (Frontend) | 9 passed, exit 0: includes delayed child response, authority-check outage, explicit restoration and final focus behavior. |
-| `npx playwright test --config playwright.invitations.config.ts --reporter=line` (Frontend) | Pending this task. |
+| `npx playwright test --config playwright.invitations.config.ts --reporter=line` (Frontend) | 7 passed, exit 0. |
 | `npx playwright test --config playwright.build.config.ts --reporter=line` (Frontend) | Pending final committed-source build. |
 | `npm ci`, `npm audit --json`, `npm run lint`, `npm run build`, `npm run test:browser -- --reporter=line` (Wellnexa) | Restore/audit/build passed; zero advisories; lint exit 0 with four pre-existing warnings; 24 browser tests passed. Website source/locks unchanged. |
 | PowerShell parser for the new builder; `git diff --check` | Passed at preparation checkpoint. |
@@ -112,6 +116,18 @@ The first full application run had 19 pass/3 fail: one cold-start readiness fail
 two callback failure tests whose fake provider ignored `redirectFailed`. The latter now
 use the real AuthProvider/client with only the redirect promise delayed/rejected locally.
 Final application/admin results above include the unchanged recovery/privacy assertions.
+
+The committed-source `npm run build` passed lint, content/i18n, strict TypeScript and all
+three surfaces at `61202e5`. The first package scan then correctly stopped with no manifest
+on a localhost literal in `FormValidation-*.js`. Inspection of locked React Router's
+`createBrowserURLImpl` (`react-router/dist/production/chunk-TP6EHSSF.js:376`) and both emitted
+copies establishes that this is a `new URL()` parsing base replaced by the actual window
+origin, not a fetch/transport endpoint. The builder now excludes only that reviewed exact
+assignment/window-origin structure from scan text; other localhost/loopback destinations
+remain blocked and packaged bytes are unchanged. The incomplete first package stays local
+for diagnosis and must not be uploaded. A new versioned output will be used. An initial
+local inspection used Windows' default text decoder on UTF-8 output and failed; the
+inspection was rerun with explicit UTF-8, without modifying output bytes.
 
 The first broad run also exposed the deliberate new account recheck in an old travel-badge
 401 fixture: it denied one badge request but continued reporting an active account from
