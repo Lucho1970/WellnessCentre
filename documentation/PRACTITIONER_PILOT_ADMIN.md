@@ -1,6 +1,18 @@
 # Practitioner pilot access administration
 
-**Latest checkpoint — entry pages verified; private settings pending:** The owner uploaded
+**Latest checkpoint — private settings uploaded; authenticated acceptance pending:** The
+owner reports copying the reviewed private candidate to `/wellness-api/.env`. Both clinic
+public offers now report `available=true`, confirming the application runtime gate changed;
+both still report intake/activation disabled, with no published plan or terms. LivinLively
+remains closed. The candidate preserves pilot mode, two workforce approvals and disabled
+mail/SMS with empty delivery lists; live private-file hashes/channel flags are not independently
+verified by the public response. The owner completed central organization sign-in; the
+Practitioner pilot access tab loads successfully for the explicitly selected Wellnexa clinic,
+showing no entries for the current pending filter. The independent Google rehearsal is at
+the provider picker for owner-completed authentication.
+No practitioner application, membership or pilot approval has been created.
+
+**Earlier checkpoint — entry pages verified; private settings pending:** The owner uploaded
 `02-entry-pages.zip`. All nine HTTPS HTML checks (both clinic roots, staff login, external
 practitioner login and application routes, plus central Admin) match the new package exactly.
 All 140 asset checks passed again. In the guest browser, practitioner sign-in renders both
@@ -148,11 +160,11 @@ Exact source, commands, package/transfer hashes and limitations are recorded in 
 [current 38-control ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
 
 The owner reports the full private API and public asset upload; public hashes and anonymous
-API checks passed. New entry pages are now hash/render verified; private settings remain
-pending the owner's copy. The packages are under
+API checks passed. New entry pages are hash/render verified; the owner reports the private
+settings copied, and the public application runtime gate is available. The packages are under
 `deployments/2026-11-01-practitioner-pilot-admin` and
 `deployments/2026-11-01-practitioner-pilot-admin-transfer`. The current backup and
-owner-applied 058 structure are verified. Complete settings deployment and hosted gate/registration/activation/
+owner-applied 058 structure are verified. Complete authenticated configuration/gate/registration/activation/
 normal departure acceptance and accountable review before opening the flow. An Admin pilot
 approval still cannot supply membership, application approval, payment entitlement or a role.
 

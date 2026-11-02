@@ -6,7 +6,8 @@ adds a separately gated central Admin workflow and migration 058. With
 for the server-resolved clinic; mixed static external approvals are rejected. Workforce/client
 lists and all delivery restrictions below remain applicable. The owner applied 058 and
 copied the API/assets/HTML; public hashes and separate practitioner/workforce rendering
-passed. Private flags and authenticated managed-approval acceptance remain pending;
+passed. The owner reports private settings copied; the application gate is available with
+both clinics' intake/activation closed. Authenticated managed-approval acceptance remains pending;
 see its [current ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md). Historical
 validation below does not verify the new feature.
 

@@ -19,8 +19,11 @@ verified. The owner then copied the new API/assets: 140 HTTPS asset hash checks 
 anonymous API checks passed, while four HTML checks still match the previous release.
 The owner subsequently copied the two new entry pages: nine new HTML and 140 repeated
 asset checks passed, with separate practitioner/workforce rendering verified in a guest
-browser. The reviewed private settings file has been handed to the owner; its upload is
-not yet confirmed. Neither account has
+browser. The owner confirmed the reviewed private settings upload; both clinics now report
+the application feature available while intake/activation remain closed, without plan/terms.
+The owner completed central Admin sign-in; the Practitioner pilot access tab loads for
+Wellnexa with no pending entries. Google reauthentication is at the provider picker in the
+separate Guest window, handed to the owner for password/MFA. Neither account has
 submitted/accepted terms or been approved/activated/retired. The host still has disabled
 mail/SMS and closed application settings. Prior steps below are retained as their dated
 observations; they do not supersede this current checkpoint.

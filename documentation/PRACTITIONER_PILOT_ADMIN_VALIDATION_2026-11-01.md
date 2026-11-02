@@ -11,7 +11,37 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
-### Current checkpoint after the owner's entry-page copy
+### Current checkpoint after the owner's private settings copy
+
+The owner reports **settings uploaded**, confirming the requested private candidate was
+copied to `/wellness-api/.env` outside the public root. Repeat read-only HTTPS checks
+passed **2/2**: both clinics now return 200 with `available=true`, while enabled and
+activation remain false and plan/terms remain absent. LivinLively intake remains closed.
+Ignored report: `.tmp/pilot-admin-hosted-after-settings.json`. This verifies the public
+application feature gate, not every private setting or the private file's remote hash.
+The reviewed candidate's preflight evidence remains two workforce approvals, pilot mode
+on, disabled mail/SMS and empty delivery lists. No credentials/configuration contents were
+printed, committed or added to release archives.
+
+Central `/admin/` renders Application administration; starting its existing Microsoft sign-in
+reaches the organization account picker. Account selection and MFA were handed to the owner,
+per the computer-use authentication boundary. No identity-provider setting, new permission,
+approval, application, membership or financial transaction was changed by the agent.
+The owner subsequently completed sign-in. Central Admin advertises Billing, Practitioner
+applications and Practitioner pilot access; the pilot list loads under the current operator.
+The clinic selector was explicitly changed from its initial clinic to **Wellnexa** and the
+pending filter reports no entries. No decisions or clinic settings were changed. This is
+hosted administrator/list acceptance, not decision, lock or cross-role acceptance. The narrow
+status selector truncates its displayed label at desktop width; readability needs correction
+and retesting before general release (DEV-05). The clinic selector remains readable.
+
+The separate Edge Guest practitioner session navigated from workforce login to external
+practitioner login, then reached the existing External ID provider picker via Continue with
+Google. Both Google and Microsoft account options are present. Password/MFA and choosing the
+approved Google account were handed to the owner; no authentication dialog was automated.
+Managed decisions and both provider registration flows remain pending.
+
+### Earlier checkpoint after the owner's entry-page copy
 
 The owner reports uploading `02-entry-pages.zip`. HTTPS `Invoke-WebRequest` checks using
 Windows trust, no TLS bypass and `Cache-Control: no-cache` passed **9/9 new HTML routes**:
@@ -407,7 +437,8 @@ The prior approved 053–055 updates succeeded after backup verification. The ex
 has two workforce pilot approvals, no static external approvals and no allowlisted delivery
 destinations. Mail/SMS stay disabled; Wellnexa intake/activation settings are still closed
 and no plan/terms have been published. The owner reports the new API/assets copied;
-public asset and new entry hashes passed. Private flags remain pending. Schema 058 is verified.
+public asset and new entry hashes passed. The owner reports private flags uploaded; the
+application runtime gate is available with both clinics' intake/activation closed. Schema 058 is verified.
 
 Excluded/unverified: hosted runtime grants/lock privileges, managed allow/revoke, registration →
 review → activation → ordinary Inactive for both real providers, MFA/idle/absolute/revocation
@@ -461,7 +492,7 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | REL-02 | Partial | Local commands/results and failures recorded; dedicated suites explicitly required. QA: verify final counts and operational omissions. |
 | REL-03 | Partial | New assets: 140 hash/length/MIME matches; nine new HTML matches; separate practitioner/workforce rendering; nine earlier anonymous API checks; 239 local artifact checks. Schema/current backup verified, private hashes/authenticated acceptance/restore rehearsal pending. Operations/release: complete configuration rollout and hosted synthetic acceptance/rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no failed/pending control waived by local tests. Accountable owners: resolve or approve lawful scoped internal exceptions. |
-| REL-05 | Partial | Controlled rollout authorized; owner applied 058 and copied API/assets/HTML, structure/current backup/public hashes verified. Private flags/managed approvals pending. Release/custodian/security/privacy/clinical: complete staged rollout, acceptance and accountable signatures. |
+| REL-05 | Partial | Controlled rollout authorized; owner applied 058 and copied API/assets/HTML/settings, structure/current backup/public hashes verified; public application gate available with intake closed. Private hashes/authenticated managed approvals pending. Release/custodian/security/privacy/clinical: complete acceptance and accountable signatures. |
 | REL-06 | Implemented (report scope) | File purposes, versions/flows, commands, findings, limits, owners and rollback recorded; final checkpoint to bind exact source. Release owner: confirm report. |
 
 ## Private configuration preparation
@@ -469,11 +500,13 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 A separate private candidate at
 `D:/Dev/WellnessCentre-backup/practitioner-pilot-admin-settings/.env` preserves the previously
 reviewed pilot candidate and adds only `PRACTITIONER_PILOT_ACCESS_ENABLED=true`. It has not
-been uploaded. `php api/bin/pilot-preflight.php --env
+been uploaded at the preparation checkpoint; the owner subsequently confirmed its copy as
+recorded above. `php api/bin/pilot-preflight.php --env
 D:/Dev/WellnessCentre-backup/practitioner-pilot-admin-settings/.env` passed with pilot mode
 on, **two workforce approvals, zero email destinations, zero SMS destinations**. This only
 validates settings; it does not verify 058, hosted lock privileges or administrator acceptance.
-The current live file and previous candidate remain unchanged. No private candidate enters Git
+The previous candidate remains unchanged; the owner reports replacing only the live private
+file with the reviewed candidate. No private candidate enters Git
 or the generated archives.
 
 ## Deployment and rollback implications
