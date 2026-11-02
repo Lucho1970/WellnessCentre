@@ -386,10 +386,10 @@ claimed by this preparation record.
 
 1. Establish separate current organization-administrator and Microsoft practitioner
    browser sessions. Verify the test identity, original email, existing practitioner-only
-   membership and synthetic assignment scope. The administrator browser used in the
-   preceding rehearsal is no longer open; a replacement session has been requested.
-   The currently available practitioner tab is blocked, and its provider identity still
-   needs owner confirmation before it is used as this fixture.
+   membership and synthetic assignment scope. The owner subsequently confirmed the
+   blocked practitioner tab uses the Microsoft test account and opened a separate
+   organization-administrator browser. Staff access is authenticated; central Admin
+   currently requires its own sign-in, which was handed to the owner.
 2. Temporarily allow only this existing pilot entry and set only this existing test staff
    account Active through normal administration. Preserve contacts, role/permission
    selections, application, membership, billing, trial dates and all history. These are
@@ -412,7 +412,13 @@ claimed by this preparation record.
    disabled. Retain the trial and all application/audit history; no database restore or
    record deletion is part of cleanup. Record any incomplete cleanup explicitly.
 
-This test is pending the separate administrator session and identity confirmation.
+Before any save, the agent inspected the existing Microsoft test user's drawer:
+original contact values, Inactive status, only practitioner selected, and all additional
+scheduling/invitation/service-area and verified-consent permissions unchecked. The
+drawer was only inspected/scrolled; no status, role, contact or permission change was
+submitted. Central Admin then showed its sign-in screen, so authentication remains
+owner-handled. The live test is pending that sign-in and the reviewed temporary access
+saves. These are prerequisites, not a hosted revocation pass or failure.
 Preparation makes no hosted access/configuration or database write. Local recheck:
 `npx playwright test tests/portal.spec.ts --grep 'staff status saves|dashboard removes|record-level forbidden|access recheck fails|travel badge account denial|travel badge clears' --reporter=line`
 from Frontend passed **9/9**, exit 0, in 21.2 seconds at source/evidence checkpoint
