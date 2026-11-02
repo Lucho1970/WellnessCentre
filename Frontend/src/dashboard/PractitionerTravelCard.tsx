@@ -3,6 +3,7 @@ import { Alert, Box, Button, CircularProgress, Link as MuiLink, Paper, Stack, Ty
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { reportStaffAccessFailure } from '../auth/staffAccessInvalidation';
 import { formatDateTime } from '../i18n/format';
 import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { pagePath } from '../portal/access';
@@ -31,12 +32,12 @@ export function PractitionerTravelCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const load = useCallback(async () => {
-    setLoading(true); setError(''); setEstimate(null);
+    setLoading(true); setError(''); setEstimate(null); setVisit(null);
     try {
       const token = await getAccessToken();
       const response = await fetch(`${apiBaseUrl}/practitioner/next-onsite`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+      if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); throw new Error(apiErrorMessage(body, response.status)); }
       if (!body || !('data' in body)) throw new Error(t('Unable to load the next On-Site visit.'));
       const next = normalizeNumericIds(body.data) as Visit | null;
       setVisit(next?.id ? next : null);
@@ -55,7 +56,7 @@ export function PractitionerTravelCard() {
         body: JSON.stringify({ source, ...coordinates }),
       });
       const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+      if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); throw new Error(apiErrorMessage(body, response.status)); }
       if (!body || !('data' in body)) throw new Error(t('Unable to check travel time.'));
       setEstimate(normalizeNumericIds(body.data) as Estimate);
     } catch (cause) { setError(t(cause instanceof Error ? cause.message : 'Unable to check travel time.')); }

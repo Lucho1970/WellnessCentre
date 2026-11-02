@@ -3,6 +3,7 @@ import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Stack, T
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { reportStaffAccessFailure } from '../auth/staffAccessInvalidation';
 import { formatDateTime } from '../i18n/format';
 import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { pagePath } from '../portal/access';
@@ -30,7 +31,7 @@ export function PractitionerToday() {
     const token = await getAccessToken();
     const response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const body = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+    if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); throw new Error(apiErrorMessage(body, response.status)); }
     if (!body || !('data' in body)) throw new Error(t('Unable to load today’s visits.'));
     return normalizeNumericIds(body.data);
   }, [getAccessToken, t]);

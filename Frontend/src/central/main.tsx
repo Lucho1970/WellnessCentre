@@ -15,6 +15,7 @@ import { PractitionerApplicationAdmin } from '../admin/PractitionerApplicationAd
 import { CommunicationsAdmin } from '../admin/CommunicationsAdmin';
 import { PractitionerPilotAdmin } from '../admin/PractitionerPilotAdmin';
 import { apiRequest } from '../shared/api';
+import { clearStaffRedirectResponse } from '../auth/staffRedirectCleanup';
 import '../i18n';
 
 function Administration() {
@@ -55,7 +56,8 @@ function Administration() {
 async function start() {
   if (window.self !== window.top) return;
   await msalInstance.initialize();
-  const result = await msalInstance.handleRedirectPromise();
+  const callbackUrl = window.location.href;
+  const result = await msalInstance.handleRedirectPromise().finally(() => clearStaffRedirectResponse(callbackUrl));
   msalInstance.setActiveAccount(selectStaffAccount(result?.account ?? msalInstance.getActiveAccount()));
   const router = createBrowserRouter([{ path: '*', element: <UnsavedChangesProvider><Administration/></UnsavedChangesProvider> }]);
   createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider theme={createTheme({ palette: { primary: { main: '#176b62' } } })}><CssBaseline/><StaffAuthProvider><RouterProvider router={router}/></StaffAuthProvider></ThemeProvider></React.StrictMode>);

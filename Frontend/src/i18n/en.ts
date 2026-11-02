@@ -1,4 +1,6 @@
 const en = {
+  "Edit name and email": "Edit name and email",
+  "Cancel name and email changes": "Cancel name and email changes",
   "API error: pilot_access_denied": "This pilot is limited to approved test accounts. Contact the clinic for access.",
   "API error: tax_already_exists": "A tax with this code already exists in this clinic.",
   "API error: service_privacy_review": "This service change needs a privacy review before it can be saved.",

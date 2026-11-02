@@ -3,6 +3,7 @@ import { Alert, Button, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { reportStaffAccessFailure } from '../auth/staffAccessInvalidation';
 import { pagePath } from '../portal/access';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
@@ -18,8 +19,9 @@ export function QualificationReminder() {
       try {
         const token = await getAccessToken();
         const response = await fetch(`${api}/profile/qualifications`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!response.ok) return;
-        const body = await response.json();
+        const body = await response.json().catch(() => null);
+        if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); return; }
+        if (!body) return;
         if (active) setRecords((body.data as ExpiringRecord[]).filter(record => record.renewal_warning));
       } catch { /* Profile displays the actionable error; dashboard remains usable. */ }
     })();

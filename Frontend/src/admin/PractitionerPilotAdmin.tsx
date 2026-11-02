@@ -126,11 +126,11 @@ function PilotAdministration({ onDirtyChange }: { onDirtyChange?: (dirty: boolea
     <Alert severity="info">{t('For ordinary practitioner departure, set Staff access to Inactive and review bookings, publication, billing and communications. Revoking pilot access is an additional sign-in restriction.')}</Alert>
     {error && !draft && <Alert severity="error">{error}</Alert>}
     {saved && <Alert severity="success">{t('Pilot access changes saved.')}</Alert>}
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-      <TextField select label={t('Clinic')} value={clinic} disabled={disabled || !!draft} onChange={event => { setListing(null); setClinic(event.target.value); }}>
+    <Stack direction={{ xs: 'column', md: 'row' }} useFlexGap flexWrap="wrap" spacing={2}>
+      <TextField select sx={{ flex: { md: '1 1 300px' }, minWidth: 0, width: { xs: '100%', md: 'auto' } }} label={t('Clinic')} value={clinic} disabled={disabled || !!draft} onChange={event => { setListing(null); setClinic(event.target.value); }}>
         {clinics.map(item => <MenuItem value={String(item.id)} key={item.id}>{item.name}</MenuItem>)}
       </TextField>
-      <TextField select label={t('Pilot access filter')} value={filter} disabled={disabled || !!draft} onChange={event => { setListing(null); setFilter(event.target.value); }}>
+      <TextField select slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }} sx={{ flex: { md: '1 1 340px' }, minWidth: 0, width: { xs: '100%', md: 'auto' } }} label={t('Pilot access filter')} value={filter} disabled={disabled || !!draft} onChange={event => { setListing(null); setFilter(event.target.value); }}>
         <MenuItem value="">{t('All pilot entries')}</MenuItem>
         {Object.entries(statuses).map(([value, label]) => <MenuItem key={value} value={value}>{t(label)}</MenuItem>)}
       </TextField>

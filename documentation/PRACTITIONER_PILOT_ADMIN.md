@@ -1,5 +1,10 @@
 # Practitioner pilot access administration
 
+**Prepared UI follow-up, not deployed:** [2 November reliability work](PRACTITIONER_UI_RELIABILITY_2026-11-02.md)
+addresses explicit contact editing, dashboard account-denial rechecks, callback URL cleanup
+and readable pilot filters. The completed hosted rehearsal's restrictive resting state
+below remains current; local fixes and a package do not reopen access or establish release.
+
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive
 with original emails retained and both pilot entries revoked. The Microsoft session was
 denied while pilot still allowed, then its application refresh was denied after pilot

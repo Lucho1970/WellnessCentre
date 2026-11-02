@@ -1,5 +1,5 @@
 import { withFormValidation, useFormValidation } from '../shared/FormValidation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import { LogIn, ShieldCheck } from 'lucide-react';
 import { useStaffAuth } from './AuthProvider';
@@ -7,6 +7,7 @@ import { apiRequest } from '../shared/api';
 import { useTranslation } from 'react-i18next';
 import { PractitionerSignInOptions } from './PractitionerSignInOptions';
 import { practitionerIdentityEnabled, type PractitionerProvider } from './practitionerIdentity';
+import { onStaffAccessInvalidated } from './staffAccessInvalidation';
 
 type StaffAccess = { roles: string[]; permissions: string[] };
 
@@ -18,7 +19,13 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
   const { account, configured, isAuthenticated, sessionExpired, signInError, signIn, signOut, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
-  const [access, setAccess] = useState<(StaffAccess & { account: string }) | null>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (error) retryButton.current?.focus(); }, [error]);
+  const [access, setAccess] = useState<(StaffAccess & { account: string; revision: number }) | null>(null);
+  useEffect(() => onStaffAccessInvalidated(() => {
+    setAccess(null);
+    setRetry(value => value + 1);
+  }), []);
   useEffect(() => {
     const controller = new AbortController(); setAccess(null); formValidation.clear(); setError('');
     if (!isAuthenticated || sessionExpired) return () => controller.abort();
@@ -27,7 +34,7 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
       .then(data => {
         if (!Array.isArray(data.roles) || !data.roles.every(role => typeof role === 'string')) throw new Error(t('The service returned invalid staff permissions.'));
         if (data.permissions !== undefined && (!Array.isArray(data.permissions) || !data.permissions.every(permission => typeof permission === 'string'))) throw new Error(t('The service returned invalid staff permissions.'));
-        if (!controller.signal.aborted) setAccess({ account: accountKey, roles: data.roles, permissions: data.permissions ?? [] });
+        if (!controller.signal.aborted) setAccess({ account: accountKey, revision: retry, roles: data.roles, permissions: data.permissions ?? [] });
       }).catch(cause => { formValidation.capture(cause); if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('Staff authorization failed.')); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
@@ -51,11 +58,11 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
     </Stack>
   </Paper>;
   if (sessionExpired) return <Alert severity="warning" action={<Button color="inherit" disabled={busy} onClick={() => void login()}>{t('Sign in again')}</Button>}>{t(externalStaff ? 'Your practitioner session has expired. Sign in again with your original account.' : 'Your staff session has expired. Sign in with Microsoft to continue.')}</Alert>;
-  if (error) return <Stack spacing={2}><Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>{externalStaff && <>
+  if (error) return <Stack spacing={2}><Alert severity="error" action={<Button ref={retryButton} color="inherit" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</Button>}>{error}</Alert>{externalStaff && <>
     {import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && <Button href={`${import.meta.env.BASE_URL}staff/apply`}>{t('Apply or check your practitioner application')}</Button>}
     <Button disabled={busy} onClick={() => { setBusy(true); void signOut().catch(cause => { setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); setBusy(false); }); }}>{t('SignOut')}</Button>
   </>}</Stack>;
-  if (busy || access?.account !== accountKey) return <Stack alignItems="center" py={4}><CircularProgress /><Typography mt={2}>{t('Verifying staff access…')}</Typography></Stack>;
+  if (busy || access?.account !== accountKey || access?.revision !== retry) return <Stack alignItems="center" py={4}><CircularProgress /><Typography mt={2}>{t('Verifying staff access…')}</Typography></Stack>;
   if (!access.roles.length) return <Alert severity="warning">{t('This account has no active staff permissions. Please contact the clinic administrator.')}</Alert>;
   return <div key={accountKey}>{children({ roles: access.roles, permissions: access.permissions })}</div>;
 }

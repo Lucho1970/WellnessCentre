@@ -80,7 +80,7 @@ test('travel badge defers its first request while hidden and ignores stale in-fl
   await page.clock.runFor(600000); expect(calls).toBe(2);
 });
 
-for(const status of [401,403,404])test(`travel badge clears its count after ${status} denial and refreshes when visible again`, async ({ page }) => {
+for(const status of [403,404])test(`travel badge clears its count after ${status} denial and refreshes when visible again`, async ({ page }) => {
   await badgeClock(page); let calls=0;
   await page.route('**/api/v1/travel-enquiries/unread-count', route => {
     calls++; return route.fulfill(calls===2 ? {status,json:{error:{code:'forbidden'}}} : {json:{data:{unread_count:1}}});
@@ -91,6 +91,25 @@ for(const status of [401,403,404])test(`travel badge clears its count after ${st
   await page.clock.runFor(60000); await expect(badge).toHaveCount(0);
   await page.clock.runFor(60000); expect(calls).toBe(2);
   await badgeVisibility(page,true); await badgeVisibility(page,false);
+  await expect(badge).toHaveText('Unread travel enquiries: 1'); expect(calls).toBe(3);
+});
+
+test('travel badge account denial stops polling until current staff access is restored', async ({ page }) => {
+  await badgeClock(page); let calls = 0, revoked = false;
+  await page.route('**/api/v1/auth/me', route => revoked
+    ? route.fulfill({ status: 403, json: { error: { code: 'membership_required' } } })
+    : route.fallback());
+  await page.route('**/api/v1/travel-enquiries/unread-count', route => {
+    calls++; return route.fulfill(revoked ? { status: 401, json: { error: { code: 'unauthorized' } } } : { json: { data: { unread_count: 1 } } });
+  });
+  await page.goto(`${portalHost}/admin/services`);
+  const badge = page.getByRole('button', { name: /Unread travel enquiries:/ });
+  await expect(badge).toHaveText('Unread travel enquiries: 1');
+  revoked = true; await page.clock.runFor(60000);
+  await expect(badge).toHaveCount(0); await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await page.clock.runFor(60000); expect(calls).toBe(2);
+  await badgeVisibility(page, true); await badgeVisibility(page, false); expect(calls).toBe(2);
+  revoked = false; await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(badge).toHaveText('Unread travel enquiries: 1'); expect(calls).toBe(3);
 });
 
@@ -3095,6 +3114,124 @@ test("reception routes support refresh, back, profile menu and restricted deep l
   await expect(
     page.getByText("You do not have permission to access this page."),
   ).toBeVisible();
+});
+
+test('staff status saves preserve contact details despite simulated extension autofill', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const person = { id: 2, display_name: 'Synthetic Practitioner', email: 'practitioner@example.test', status: 'active', roles: ['practitioner'], permissions: [] };
+  const writes: Record<string, unknown>[] = [];
+  await page.route('**/api/v1/admin/staff**', route => {
+    if (route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON(); writes.push(body); Object.assign(person, body);
+      return route.fulfill({ json: { data: { id: person.id } } });
+    }
+    return route.fulfill({ json: { data: [person] } });
+  });
+  await page.goto(`${portalHost}/admin/users`);
+  await page.getByRole('button', { name: /Synthetic Practitioner/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  const email = page.getByRole('textbox', { name: 'Email', exact: true });
+  await expect(email).not.toBeEditable();
+  // Extensions can change even readonly DOM values. They must not change this save.
+  await email.evaluate(input => {
+    if (!(input instanceof HTMLInputElement)) throw new Error('Expected email input');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (!setter) throw new Error('Missing native input setter');
+    setter.call(input, 'unrelated@example.test'); input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.getByRole('combobox', { name: /^Status\b/ }).click();
+  await page.getByRole('option', { name: 'Inactive', exact: true }).click();
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByText('Staff access updated.')).toBeVisible();
+  expect(writes[0]).toMatchObject({ status: 'inactive', display_name: person.display_name, email: 'practitioner@example.test', roles: ['practitioner'] });
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit name and email', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Display name', exact: true })).toBeFocused();
+  await email.fill('reviewed@example.test');
+  await page.getByRole('button', { name: 'Cancel name and email changes', exact: true }).click();
+  await expect(email).toHaveValue('practitioner@example.test'); await expect(email).not.toBeEditable();
+  await page.getByRole('button', { name: 'Edit name and email', exact: true }).click();
+  await email.fill('reviewed@example.test');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect.poll(() => writes.length).toBe(2);
+  expect(writes[1].email).toBe('reviewed@example.test');
+});
+
+for (const denial of [
+  { status: 403, code: 'membership_required' },
+  { status: 403, code: 'pilot_access_denied' },
+  { status: 401, code: '' },
+]) test(`dashboard removes the workspace on account denial ${denial.status} ${denial.code}`, async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let revoked = false, checksAfterRevocation = 0;
+  await page.route('**/api/v1/auth/me', route => {
+    if (revoked) { checksAfterRevocation++; return route.fulfill({ status: 403, json: { error: { code: 'membership_required' } } }); }
+    return route.fulfill({ json: { data: { id: 1, display_name: 'Test Staff', email: 'staff@example.test', roles: ['practitioner'], permissions: [] } } });
+  });
+  await page.route('**/api/v1/dashboard?**', route => revoked
+    ? route.fulfill({ status: denial.status, json: { error: { code: denial.code } } })
+    : route.fallback());
+  await page.goto(`${portalHost}/practitioner`);
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Customize dashboard', exact: true })).toBeVisible();
+  revoked = true;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).first().click();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeFocused();
+  await expect(page.getByRole('list', { name: 'Staff portal navigation' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Book appointment', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toHaveCount(0);
+  expect(checksAfterRevocation).toBe(1); // A denial from /auth/me must not loop.
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect.poll(() => checksAfterRevocation).toBe(2);
+});
+
+test('record-level forbidden and service failure do not revoke the staff workspace', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  let denial = 0;
+  await page.route('**/api/v1/dashboard?**', route => denial
+    ? route.fulfill({ status: denial, json: { error: { code: denial === 403 ? 'forbidden' : 'unavailable' } } })
+    : route.fallback());
+  await page.goto(`${portalHost}/practitioner`);
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Customize dashboard', exact: true })).toBeVisible();
+  for (const status of [403, 503]) {
+    denial = status;
+    await page.getByRole('button', { name: status === 403 ? 'Refresh' : 'Try again', exact: true }).first().click();
+    await expect(page.getByRole('alert').first()).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Staff portal navigation' })).toBeVisible();
+  }
+});
+
+test('access recheck fails closed during an outage and late widget data cannot restore the workspace', async ({ page }) => {
+  await fixtures(page, ['practitioner']);
+  const pending: { authority?: () => Promise<void>; preferences?: () => Promise<void> } = {};
+  let revoked = false, restored = false;
+  await page.route('**/api/v1/auth/me', async route => {
+    if (!revoked || restored) return route.fallback();
+    await new Promise<void>(resolve => { pending.authority = async () => { await route.fulfill({ status: 503, json: { error: { code: 'unavailable' } } }); resolve(); }; });
+  });
+  await page.route('**/api/v1/dashboard/preferences?**', async route => {
+    if (!revoked || restored) return route.fallback();
+    await new Promise<void>(resolve => { pending.preferences = async () => { await route.fulfill({ json: { data: { version: 1, workspace: 'practitioner', widgets: [] } } }); resolve(); }; });
+  });
+  await page.route('**/api/v1/dashboard?**', route => revoked && !restored
+    ? route.fulfill({ status: 403, json: { error: { code: 'membership_required' } } }) : route.fallback());
+  await page.goto(`${portalHost}/practitioner`);
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Customize dashboard', exact: true })).toBeVisible();
+  revoked = true; await page.getByRole('button', { name: 'Refresh', exact: true }).first().click();
+  await expect(page.getByText('Verifying staff access…', { exact: true })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Staff portal navigation' })).toHaveCount(0);
+  await expect.poll(() => Boolean(pending.preferences && pending.authority)).toBe(true);
+  if (!pending.preferences || !pending.authority) throw new Error('Expected the delayed synthetic requests');
+  await pending.preferences();
+  await expect(page.getByRole('button', { name: 'Book appointment', exact: true })).toHaveCount(0);
+  await pending.authority();
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeFocused();
+  await expect(page.getByRole('list', { name: 'Staff portal navigation' })).toHaveCount(0);
+  restored = true; await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Customize dashboard', exact: true })).toBeVisible();
 });
 
 test("staff access uses a selected-list ribbon and shared details, edit, and new panel", async ({ page }) => {

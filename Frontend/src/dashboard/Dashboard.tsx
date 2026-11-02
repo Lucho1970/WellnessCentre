@@ -4,6 +4,7 @@ import { CalendarCheck, Clock3, MailCheck, MapPin, MoveDown, MoveUp, Pencil, Ref
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { reportStaffAccessFailure } from '../auth/staffAccessInvalidation';
 import { formatDateTime } from '../i18n/format';
 import { pagePath, type Workspace } from '../portal/access';
 import { apiErrorMessage, normalizeNumericIds } from '../shared/api';
@@ -37,11 +38,11 @@ export function Dashboard({ workspace }: { workspace: Workspace }) {
   const [error,setError]=useState('');
   const request=useCallback(async(path:string,init:RequestInit={})=>{
     const token=await getAccessToken();const response=await fetch(`${api}${path}`,{...init,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',...init.headers}});const text=await response.text();let body;
-    try{body=JSON.parse(text);}catch{throw new Error(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.',{status:response.status}));}
-    if(!response.ok)throw new Error(apiErrorMessage(body,response.status,t('Request failed (HTTP {{status}}).',{status:response.status})));return normalizeNumericIds(body.data);
+    try{body=JSON.parse(text);}catch{reportStaffAccessFailure(response.status,undefined);throw new Error(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.',{status:response.status}));}
+    if(!response.ok){reportStaffAccessFailure(response.status,body?.error?.code);throw new Error(apiErrorMessage(body,response.status,t('Request failed (HTTP {{status}}).',{status:response.status})));}return normalizeNumericIds(body.data);
   },[getAccessToken,t]);
   const load=useCallback(async()=>{
-    setBusy(true);setError('');try{const [summaryData,preferenceData]=await Promise.all([request(`/dashboard?workspace=${workspace}`),request(`/dashboard/preferences?workspace=${workspace}`)]);setSummary(summaryData);setPreferences(preferenceData.widgets);setDraft(preferenceData.widgets);}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to load dashboard.'));}finally{setBusy(false);}
+    setBusy(true);setError('');setSummary(null);setPreferences([]);setDraft([]);setEditing(false);try{const [summaryData,preferenceData]=await Promise.all([request(`/dashboard?workspace=${workspace}`),request(`/dashboard/preferences?workspace=${workspace}`)]);setSummary(summaryData);setPreferences(preferenceData.widgets);setDraft(preferenceData.widgets);}catch(cause){setError(cause instanceof Error?cause.message:t('Unable to load dashboard.'));}finally{setBusy(false);}
   },[request,t,workspace]);
   useEffect(()=>{void load();},[load]);
   const ordered=useMemo(()=>[...(editing?draft:preferences)].sort((a,b)=>a.order-b.order),[draft,editing,preferences]);

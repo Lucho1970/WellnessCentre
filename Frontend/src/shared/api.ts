@@ -1,4 +1,5 @@
 import i18n from '../i18n';
+import { reportStaffAccessFailure } from '../auth/staffAccessInvalidation';
 
 export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1').replace(/\/$/, '');
 
@@ -74,6 +75,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   let body;
   try { body = text ? JSON.parse(text) : null; } catch { /* Infrastructure failures may be HTML. */ }
   if (!response.ok || !body || typeof body !== 'object' || !('data' in body)) {
+    // /auth/me is the recheck itself; reporting its denial would create a retry loop.
+    if (path.split('?')[0] !== '/auth/me' && new Headers(init?.headers).has('Authorization')) {
+      reportStaffAccessFailure(response.status, body?.error?.code);
+    }
     throw new ApiError(body, response.status);
   }
   return normalizeNumericIds(body.data as T);

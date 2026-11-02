@@ -1,6 +1,6 @@
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Box, Button, Checkbox, Chip, Divider, Drawer, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Typography } from '@mui/material';
 import { Eye, Pencil, Plus, Save, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +27,10 @@ function StaffAdminForm() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>(null);
   const [editing, setEditing] = useState<Staff | null>(null);
+  const [contactEditing, setContactEditing] = useState(false);
+  const [originalContact, setOriginalContact] = useState({ display_name: '', email: '' });
+  const contactName = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (contactEditing) contactName.current?.focus(); }, [contactEditing]);
   const [newStaff, setNewStaff] = useState<NewStaff>(blank);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,6 +69,8 @@ function StaffAdminForm() {
     if (!member || isSelf(member)) return;
     formGuard.markClean(); setSelectedId(member.id);
     setEditing({ ...member, roles: [...member.roles], permissions: [...member.permissions] });
+    setOriginalContact({ display_name: member.display_name, email: member.email });
+    setContactEditing(false);
     formValidation.clear(); setPanelError(''); setPanelMode('edit');
   };
   const closePanel = () => {
@@ -93,7 +99,8 @@ function StaffAdminForm() {
       const response = await fetch(creating ? `${api}/admin/staff` : `${api}/admin/staff/${editing!.id}`, {
         method: creating ? 'POST' : 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(creating ? newStaff : editing),
+        // A status/role change must not silently save browser/extension autofill.
+        body: JSON.stringify(creating ? newStaff : contactEditing ? editing : { ...editing, ...originalContact }),
       });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save staff member.'));
@@ -128,7 +135,7 @@ function StaffAdminForm() {
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'new' ? 'New staff member' : panelMode === 'details' ? 'Staff details' : 'Edit staff access')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Add staff access') : selected?.display_name}</Typography></Box><IconButton aria-label={t('Close panel')} onClick={closePanel}><X/></IconButton></Stack>
       {panelError && <Alert severity="error" sx={{mx:3}}>{panelError}</Alert>}
       {panelMode === 'details' && selected && <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}><Stack divider={<Divider flexItem/>}>{[[t('Email'), selected.email], [t('Status'), t(selected.status === 'active' ? 'Active' : selected.status === 'inactive' ? 'Inactive' : 'Locked')], [t('Local roles'), selected.roles.join(', ') || t('No role')], [t('Additional permissions'), selected.permissions.join(', ') || t('None')]].map(([label, value]) => <Box key={label} sx={{ py: 1.5 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={600}>{value}</Typography></Box>)}</Stack>{(selected.permissions.includes('review_privacy_audit') || (!isSelf(selected) && selected.status === 'active' && selected.roles.some(role => ['super_admin','clinic_admin'].includes(role)))) && <Button disabled={busy} onClick={() => void changePrivacyPermission(selected)}>{t(selected.permissions.includes('review_privacy_audit') ? 'Revoke privacy-review permission' : 'Grant privacy-review permission')}</Button>}<Button variant="contained" startIcon={<Pencil size={17}/>} disabled={isSelf(selected)} onClick={() => startEdit(selected)}>{t('Edit')}</Button></Stack>}
-      {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={event => void save(event)} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+      {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" autoComplete="off" onSubmit={event => void save(event)} onChange={formGuard.markDirty} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}><Stack spacing={2}>
           {panelMode === 'new' && <>
             <Alert severity="info">{t('Configure the Microsoft Entra account and app role first. Enter the tenant ID and user object ID from that account.')}</Alert>
@@ -139,8 +146,12 @@ function StaffAdminForm() {
             <TextField name="role" select required label={t('Initial local role')} value={newStaff.role} onChange={event => setNew('role', event.target.value)}>{roleOptions.map(role => <MenuItem key={role} value={role}>{role.replaceAll('_', ' ')}</MenuItem>)}</TextField>
           </>}
           {panelMode === 'edit' && editing && <>
-            <TextField name="display_name" required label={t('Display name')} value={editing.display_name} onChange={event => setEdit('display_name', event.target.value)}/>
-            <TextField name="email" required type="email" label={t('Email')} value={editing.email} onChange={event => setEdit('email', event.target.value)}/>
+            <TextField name="display_name" inputRef={contactName} autoComplete="off" required label={t('Display name')} value={contactEditing ? editing.display_name : originalContact.display_name} slotProps={{ input: { readOnly: !contactEditing } }} onChange={event => { if (contactEditing) setEdit('display_name', event.target.value); }}/>
+            <TextField name="email" autoComplete="off" required type="email" label={t('Email')} value={contactEditing ? editing.email : originalContact.email} slotProps={{ input: { readOnly: !contactEditing } }} onChange={event => { if (contactEditing) setEdit('email', event.target.value); }}/>
+            <Button aria-pressed={contactEditing} onClick={() => {
+              setEditing({ ...editing, ...originalContact });
+              setContactEditing(value => !value);
+            }}>{t(contactEditing ? 'Cancel name and email changes' : 'Edit name and email')}</Button>
             <TextField name="status" select label={t('Status')} value={editing.status} onChange={event => setEdit('status', event.target.value)}><MenuItem value="active">{t('Active')}</MenuItem><MenuItem value="inactive">{t('Inactive')}</MenuItem><MenuItem value="locked">{t('Locked')}</MenuItem></TextField>
             <Typography fontWeight={700}>{t('Local roles')}</Typography>
             {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => {

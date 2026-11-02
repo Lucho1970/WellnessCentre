@@ -3,6 +3,7 @@ import { Alert, Box, Button, Card, CardContent, CircularProgress, Stack, Typogra
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStaffAuth } from '../auth/AuthProvider';
+import { reportStaffAccessFailure } from '../auth/staffAccessInvalidation';
 import { apiBaseUrl, apiErrorMessage, normalizeNumericIds } from '../shared/api';
 import { pagePath } from '../portal/access';
 
@@ -21,7 +22,7 @@ export function PractitionerVisitSummary() {
       const token = await getAccessToken();
       const response = await fetch(`${apiBaseUrl}/practitioner/visit-summary?refresh=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
+      if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); throw new Error(apiErrorMessage(body, response.status)); }
       const data = normalizeNumericIds(body?.data);
       if (!data || typeof data !== 'object' || !('counts' in data) || !data.counts) throw new Error(t('Unable to load visit activity.'));
       setSummary(data as Summary);

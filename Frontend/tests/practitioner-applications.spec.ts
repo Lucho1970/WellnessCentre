@@ -45,6 +45,7 @@ function approved() { return { ...profile, id: 7, version: 2, status: 'approved'
 test('anonymous mobile application entry chooses practitioner identity and retains language', async ({ page }) => {
   const state = await fixture(page, false); await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${host}/staff/apply`);
+  await expect(page.getByRole('heading', { name: 'Apply to join the clinic', exact: true })).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBe('external');
   await page.getByRole('button', { name: 'Continue with Google', exact: true }).click();
@@ -196,6 +197,43 @@ test('an unapproved practitioner can reach their application after portal access
   await expect(page.getByRole('heading', { name: 'Apply to join the clinic' })).toBeVisible();
   expect(state.privateRequests).toContain('/api/v1/auth/me');
   expect(state.privateRequests).not.toContain('/api/v1/clients');
+});
+
+for (const transport of ['hash', 'query']) for (const failed of [false, true]) {
+  test(`staff callback cleans ${transport} only after MSAL settles (${failed ? 'failure' : 'success'})`, async ({ page }) => {
+    await fixture(page, false);
+    await page.route('**/src/auth/AuthProvider.tsx', async route => {
+      const response = await route.fetch();
+      await route.fulfill({ response, body: await response.text() + `\nmsalInstance.handleRedirectPromise=()=>new Promise((resolve,reject)=>{window.finishRedirect=()=>${failed ? 'reject(new Error("Synthetic private callback diagnostic"))' : 'resolve(null)'};});` });
+    });
+    const response = failed ? 'error=access_denied&error_description=synthetic-private-error&state=synthetic-state' : 'code=synthetic-code&state=synthetic-state&client_info=synthetic-info';
+    const url = transport === 'hash' ? `${host}/staff/external?return=application#${response}&keep=anchor` : `${host}/staff/external?return=application&${response}#keep=anchor`;
+    await page.goto(url);
+    await expect.poll(() => page.evaluate(() => typeof (window as Window & { finishRedirect?: () => void }).finishRedirect)).toBe('function');
+    expect(page.url()).toContain(failed ? 'error_description=' : 'code=synthetic-code');
+    await page.evaluate(() => (window as Window & { finishRedirect?: () => void }).finishRedirect?.());
+    await expect(page.getByRole('heading', { name: 'Practitioner sign-in', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(`${host}/staff/external?return=application#keep=anchor`);
+    if (failed) await expect(page.getByText('Sign-in could not be completed. Try again or choose another sign-in method.')).toBeVisible();
+    await expect(page.getByText('Synthetic private callback diagnostic')).toHaveCount(0);
+    expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBe('external');
+  });
+}
+
+test('callback cleanup preserves unrelated navigation and never overwrites navigation during processing', async ({ page }) => {
+  await fixture(page, false); await page.goto(`${host}/staff/login?portal=admin#section`);
+  await expect(page.getByRole('heading', { name: 'Staff portal', exact: true })).toBeVisible();
+  const result = await page.evaluate(async () => {
+    const { clearStaffRedirectResponse } = await import('/src/auth/staffRedirectCleanup.ts');
+    const original = location.href; clearStaffRedirectResponse(original);
+    const unchanged = location.href === original;
+    const callback = `${location.origin}/staff/login?code=synthetic&state=synthetic`;
+    history.replaceState({ synthetic: true }, '', callback);
+    history.replaceState({ synthetic: true }, '', '/staff/login#new-navigation');
+    clearStaffRedirectResponse(callback);
+    return { unchanged, path: location.pathname + location.hash, retainedHistory: history.state.synthetic };
+  });
+  expect(result).toEqual({ unchanged: true, path: '/staff/login#new-navigation', retainedHistory: true });
 });
 
 test('a rejected identity callback renders recovery without exposing provider diagnostics', async ({ page }) => {

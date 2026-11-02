@@ -1070,6 +1070,27 @@ test('revoked administrator access clears pilot identity details on refresh', as
   const state = await pilotFixture(page); state.denied = true; await page.getByRole('button', { name: 'Refresh pilot access' }).click();
   await expect(page.getByText('You do not have permission to perform this action.', { exact: true })).toBeVisible(); await expect(page.getByText('Synthetic Practitioner', { exact: true })).toHaveCount(0);
 });
+test('pilot filters remain readable at desktop, zoom-equivalent and mobile widths in both languages', async ({ page }) => {
+  await pilotFixture(page);
+  for (const language of ['en', 'fr']) {
+    if (language === 'fr') await page.getByRole('button', { name: 'FR', exact: true }).click();
+    const label = language === 'fr' ? 'Filtre d’accès au projet pilote' : 'Pilot access filter';
+    const control = page.getByRole('combobox', { name: label });
+    await expect(control).toContainText(language === 'fr' ? 'Toutes les inscriptions au projet pilote' : 'All pilot entries');
+    for (const width of [1630, 815, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(control).toBeVisible();
+      const box = await control.boundingBox(); expect(box?.width).toBeGreaterThan(250);
+      expect(await control.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await control.focus(); await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('option').first()).toBeVisible(); await page.keyboard.press('Escape');
+    await expect(control).toBeFocused();
+    await page.screenshot({ path: `test-results/pilot-filter-${language}.png`, fullPage: true });
+  }
+});
+
 test('French mobile pilot review preserves drafts and restores keyboard focus', async ({ page }) => {
   await pilotFixture(page); await page.setViewportSize({ width: 390, height: 844 }); await pilotRecord(page);
   await page.getByRole('button', { name: 'FR', exact: true }).click();
