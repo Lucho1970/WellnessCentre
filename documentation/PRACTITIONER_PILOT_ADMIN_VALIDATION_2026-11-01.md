@@ -11,7 +11,37 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
-### Current checkpoint after the owner's API and asset copies
+### Current checkpoint after the owner's entry-page copy
+
+The owner reports uploading `02-entry-pages.zip`. HTTPS `Invoke-WebRequest` checks using
+Windows trust, no TLS bypass and `Cache-Control: no-cache` passed **9/9 new HTML routes**:
+both clinic roots and each clinic's `/staff/login`, `/staff/external` and `/staff/apply`,
+plus central `/admin/`. Exact package SHA-256, lengths and HTML MIME matched. All **140/140
+asset hash/length/MIME checks passed again**. Ignored evidence:
+`.tmp/pilot-admin-hosted-new-entry-results.json` and
+`.tmp/pilot-admin-hosted-post-entry-asset-results.json`.
+
+Fresh guest-browser rendering confirms two independent practitioner choices (Google and
+personal Microsoft) on `/staff/external`; the separate `/staff/login` offers organization
+Microsoft only. Existing workforce and guest-client tabs were preserved. No provider
+credentials, account creation, joining terms or account approval was automated. One click
+was rejected because of user input; observation was refreshed before the successful retry.
+
+Repeat public API checks returned 200 for both clinics with available/enabled/activation
+false and no plan/terms. The prepared private candidate passed
+`php api/bin/pilot-preflight.php --env D:/Dev/WellnessCentre-backup/practitioner-pilot-admin-settings/.env`
+with pilot mode on, two workforce approvals and zero email/SMS destinations. The owner was
+given that private file's exact source and `/wellness-api/.env` target to complete the five
+reviewed flags after static verification. **That settings upload remains unconfirmed**;
+the real-provider approval/registration/activation/retirement flow is still pending.
+
+No source, dependency/version, permission/consent, endpoint or external data flow changed.
+This checkpoint supersedes earlier held-HTML notes. Preserve matching code/configuration
+backups and all records; hosted private hashes, runtime grant/locking acceptance and rollback
+restoration remain unverified. The 38-control limitations and accountable sign-offs below
+remain open.
+
+### Earlier checkpoint after the owner's API and asset copies
 
 The owner reports completing the requested first two transfers, `00-api-private.zip` into
 `/wellness-api` and `01-assets.zip` into `/public_html`. No new private setting, approval,
@@ -341,7 +371,7 @@ public identifiers are present in the final portal. Three `http://localhost` bun
 were inspected: React Router's non-browser base fallback, superseded by the actual window
 origin; they are not configured API/callback/delivery endpoints. No TLS check was disabled.
 
-Prepared transfer set (owner reports API/assets copied; entry pages still held):
+Prepared transfer set (owner reports all three copied; public assets/entry pages verified):
 `D:/Dev/WelnessCentre/deployments/2026-11-01-practitioner-pilot-admin-transfer`.
 
 | File | Target / verified contents | SHA-256 |
@@ -377,7 +407,7 @@ The prior approved 053–055 updates succeeded after backup verification. The ex
 has two workforce pilot approvals, no static external approvals and no allowlisted delivery
 destinations. Mail/SMS stay disabled; Wellnexa intake/activation settings are still closed
 and no plan/terms have been published. The owner reports the new API/assets copied;
-public hashes passed, but entry pages/private flags remain held. Schema 058 is verified.
+public asset and new entry hashes passed. Private flags remain pending. Schema 058 is verified.
 
 Excluded/unverified: hosted runtime grants/lock privileges, managed allow/revoke, registration →
 review → activation → ordinary Inactive for both real providers, MFA/idle/absolute/revocation
@@ -429,9 +459,9 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | DEV-06 | Partial | No polling/dependencies; bounded indexed queries and identity-scoped locks. Build/performance: assess existing chunks, clinic-lock contention and representative scale. |
 | REL-01 | Partial | This dated 38-control ledger/file/test matrix; named human owners/decisions absent. Release owner: assign and retain evidence. |
 | REL-02 | Partial | Local commands/results and failures recorded; dedicated suites explicitly required. QA: verify final counts and operational omissions. |
-| REL-03 | Partial | New assets: 140 hash/length/MIME matches; four old HTML matches; nine anonymous API checks; 239 local artifact checks. Schema/current backup verified, private hashes/authenticated acceptance/restore rehearsal pending. Operations/release: complete entry/configuration rollout and hosted synthetic acceptance/rollback. |
+| REL-03 | Partial | New assets: 140 hash/length/MIME matches; nine new HTML matches; separate practitioner/workforce rendering; nine earlier anonymous API checks; 239 local artifact checks. Schema/current backup verified, private hashes/authenticated acceptance/restore rehearsal pending. Operations/release: complete configuration rollout and hosted synthetic acceptance/rollback. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no failed/pending control waived by local tests. Accountable owners: resolve or approve lawful scoped internal exceptions. |
-| REL-05 | Partial | Controlled rollout authorized; owner applied 058 and copied API/assets, structure/current backup verified. Entry pages/flags/managed approvals still held. Release/custodian/security/privacy/clinical: complete staged rollout, acceptance and accountable signatures. |
+| REL-05 | Partial | Controlled rollout authorized; owner applied 058 and copied API/assets/HTML, structure/current backup/public hashes verified. Private flags/managed approvals pending. Release/custodian/security/privacy/clinical: complete staged rollout, acceptance and accountable signatures. |
 | REL-06 | Implemented (report scope) | File purposes, versions/flows, commands, findings, limits, owners and rollback recorded; final checkpoint to bind exact source. Release owner: confirm report. |
 
 ## Private configuration preparation

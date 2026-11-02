@@ -1,6 +1,15 @@
 # Practitioner pilot access administration
 
-**Latest checkpoint — API/assets copied; entry pages held:** The owner reports copying
+**Latest checkpoint — entry pages verified; private settings pending:** The owner uploaded
+`02-entry-pages.zip`. All nine HTTPS HTML checks (both clinic roots, staff login, external
+practitioner login and application routes, plus central Admin) match the new package exactly.
+All 140 asset checks passed again. In the guest browser, practitioner sign-in renders both
+independent providers and the separate workforce page renders organization Microsoft only.
+Both public application offers remain closed. The prepared private settings passed preflight
+again and were handed to the owner for copying to `/wellness-api/.env`; that copy is not
+yet confirmed. No practitioner was approved, activated, registered or retired in this check.
+
+**Earlier checkpoint — API/assets copied; entry pages held:** The owner reports copying
 `00-api-private.zip` and `01-assets.zip`. All **140 HTTPS asset checks** passed exact
 SHA-256, length and MIME checks across 72 distinct files. Four HTML entry checks still
 match the preceding release, confirming that the entry pages remain held. All **nine API
@@ -139,10 +148,11 @@ Exact source, commands, package/transfer hashes and limitations are recorded in 
 [current 38-control ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).
 
 The owner reports the full private API and public asset upload; public hashes and anonymous
-API checks passed. The new entry pages and private settings are still held. The packages are under
+API checks passed. New entry pages are now hash/render verified; private settings remain
+pending the owner's copy. The packages are under
 `deployments/2026-11-01-practitioner-pilot-admin` and
 `deployments/2026-11-01-practitioner-pilot-admin-transfer`. The current backup and
-owner-applied 058 structure are verified. Complete entry/settings deployment and hosted gate/registration/activation/
+owner-applied 058 structure are verified. Complete settings deployment and hosted gate/registration/activation/
 normal departure acceptance and accountable review before opening the flow. An Admin pilot
 approval still cannot supply membership, application approval, payment entitlement or a role.
 

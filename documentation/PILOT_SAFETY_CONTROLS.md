@@ -5,8 +5,8 @@ adds a separately gated central Admin workflow and migration 058. With
 `PRACTITIONER_PILOT_ACCESS_ENABLED=true`, external practitioner approvals use the database
 for the server-resolved clinic; mixed static external approvals are rejected. Workforce/client
 lists and all delivery restrictions below remain applicable. The owner applied 058 and
-copied the API/assets; public hashes passed. New HTML/private flags and authenticated
-managed-approval acceptance remain pending;
+copied the API/assets/HTML; public hashes and separate practitioner/workforce rendering
+passed. Private flags and authenticated managed-approval acceptance remain pending;
 see its [current ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md). Historical
 validation below does not verify the new feature.
 

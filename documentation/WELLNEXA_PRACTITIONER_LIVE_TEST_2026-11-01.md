@@ -17,7 +17,10 @@ The owner then requested allowed-practitioner management in central Admin. Work 
 058 was applied by the owner; resulting structure/keys and a current private backup are
 verified. The owner then copied the new API/assets: 140 HTTPS asset hash checks and nine
 anonymous API checks passed, while four HTML checks still match the previous release.
-The two new entry pages and private flags remain held. Neither account has
+The owner subsequently copied the two new entry pages: nine new HTML and 140 repeated
+asset checks passed, with separate practitioner/workforce rendering verified in a guest
+browser. The reviewed private settings file has been handed to the owner; its upload is
+not yet confirmed. Neither account has
 submitted/accepted terms or been approved/activated/retired. The host still has disabled
 mail/SMS and closed application settings. Prior steps below are retained as their dated
 observations; they do not supersede this current checkpoint.
