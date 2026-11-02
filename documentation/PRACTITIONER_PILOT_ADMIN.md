@@ -10,8 +10,8 @@ Central EN/FR filter rendering and unsaved contact edit/cancel passed scoped smo
 The owner subsequently reported fresh Google and personal Microsoft sign-ins both
 returning to the expected pilot denial, with a screenshot of the denial screen.
 The owner also checked both returned address bars and confirmed neither contained
-`code=` or `error=`. Hosted error-return cleanup, mounted revocation and the final
-drawer dismissal remain unverified. The linked report records evidence sources and exact limits; this
+`code=` or `error=`. The subsequent mounted-workspace retest and final cleanup are
+verified below; hosted error-return cleanup remains unverified. The linked report records evidence sources and exact limits; this
 does not reopen access or establish general-release approval.
 
 The owner requested a controlled mounted-dashboard revocation retest. Its existing
@@ -34,9 +34,12 @@ saved Inactive, independently verified in Staff access. The retained practitione
 already showed denial with dashboard/widgets gone before agent Refresh/reload/navigation;
 deliberate Retry verified access again and remained denied. The exact initial background
 or visibility trigger was not traced. The scoped live removal/Retry check passed.
-Final pilot revocation is prepared in central Admin and awaits the owner's final save;
-latest observed Microsoft state is Inactive, denied, temporarily pilot-allowed. No code,
-dependency, billing/trial, clinical-record or messaging change is part of this retest.
+The owner then saved final pilot revocation, verified in the queue and retained Microsoft
+decision history at 22:05:30 UTC. Both pilot entries are revoked. Microsoft Retry after
+revocation remains pilot-denied without dashboard/widgets. Both staff accounts are
+verified Inactive with original emails and no open staff drawer; final cleanup is complete.
+Both clinics' public intake/activation offers were rechecked closed at 22:08 UTC. No code,
+dependency, billing/trial, clinical-record or messaging change was part of this retest.
 
 **2 November final — authorized rehearsal complete:** Both test staff users are Inactive
 with original emails retained and both pilot entries revoked. The Microsoft session was

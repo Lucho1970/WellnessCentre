@@ -5,6 +5,13 @@ specified source, synthetic checks and scoped hosted observations only. The owne
 the controlled frontend pilot update; new assets and entry pages passed the hosted gates below.
 No merge, account reactivation, grant or general-release approval is inferred.
 
+**Latest scoped result:** The separately owner-authorized mounted-dashboard retest and
+cleanup are complete. Both test staff users are verified Inactive with original contact
+emails; both pilot entries are verified revoked. The Microsoft dashboard disappeared
+after Inactive and Retry stayed denied, then returned pilot denial after final revocation.
+Both clinics' public intake/activation remain closed. This closes this controlled access
+retest, not the broader release gates below; the exact first removal trigger was untraced.
+
 Frontend implementation revision: `61202e541f5cbe89969cc805de227afeaf5e63c6`.
 The final public-surface isolation correction and package source are
 `f35e2b4c203436133257361652010d9c4ab51d69`. The manifest binds that exact committed source
@@ -363,17 +370,18 @@ was made for this evidence update. The documentation-only follow-up passed
 `git diff --check`; source/dependencies are unchanged and builds/browser/PHP/SQL suites
 were not repeated.
 
-Remaining acceptance is explicit: manually confirm the drawer is closed without saving;
-verify hosted error-return cleanup separately from the owner-checked successful returns;
-and test live mounted-workspace removal after authority revocation in a separately
-approved synthetic scenario. Do not reactivate the departed test accounts or reopen
-intake to force those checks. Actual autofill/status-save protection, hosted keyboard
+At that checkpoint, remaining acceptance included drawer dismissal, hosted error-return
+cleanup and a separately approved mounted-workspace revocation test. The later retest
+and verified final Staff access list below close the scoped workspace/cleanup checks;
+hosted error-return cleanup remains separate from owner-checked successful returns.
+Do not reactivate the departed test accounts or reopen intake to force other checks.
+Actual autofill/status-save protection, hosted keyboard
 focus, broader role/clinic negatives, headers, restore rehearsal and accountable
 privacy/security/clinical/release decisions remain open. No further package upload is
 needed for the already verified frontend update. Rollback still replaces only the two
 saved previous HTML entries while retaining all old assets and database/history records.
 
-### Mounted-dashboard revocation retest — observed result; pilot cleanup pending
+### Mounted-dashboard revocation retest — scoped test and cleanup complete
 
 The owner explicitly requested this hosted test after confirming both provider returns.
 The prior statement against reactivation was a resting-state safeguard; the new request
@@ -511,15 +519,48 @@ erasure of downloaded data or the isolated manual-Refresh scenario. No reactivat
 needed merely to repeat an already successful workspace-removal observation. Local
 tests above separately cover controlled request triggers and late-widget races.
 
-**Pilot cleanup handoff:** The owner requested revoking the temporary Microsoft pilot
+**Pilot cleanup handoff (historical):** The owner requested revoking the temporary Microsoft pilot
 allowance. The agent opened its existing central Admin review and observed Allowed for
 pilot with Revoke pilot access selected; Google was shown revoked behind the dialog.
 Only the unsaved audit reason was prepared, recording Inactive, workspace disappearance,
 denied Retry and the untraced automatic trigger. The owner was asked to make the final
 Save pilot access decision under the computer-use access-setting restriction. At this
-checkpoint the Microsoft staff account is verified Inactive, its session is denied, and
-the pilot revocation save is still pending. No final pilot-revoked state is claimed until
-the saved queue/history and blocked session are checked.
+checkpoint the Microsoft staff account was verified Inactive, its session was denied,
+and the pilot revocation save was pending. The following verification supersedes that
+pending cleanup state.
+
+**Final cleanup verified:** The owner confirmed pilot revoked. Central Admin showed
+Pilot access changes saved, with both Microsoft and Google entries Pilot access revoked.
+Opening the existing Microsoft review verified its saved Revoke pilot access decision
+at `2026-11-02 22:05:30 UTC` and the prepared cleanup reason; this was a retained audit
+event, not just an unsaved dropdown selection. No further decision was saved by the agent.
+
+The Microsoft session remained at `/practitioner` with pilot denial and no dashboard.
+The agent used its Retry once more; the settled result at 22:07:17 UTC still showed pilot
+denial, Retry available, and no dashboard/day summary/travel or visit widgets. In the
+separate clinic Staff access tab at 22:07:55 UTC, both designated test staff users were
+listed Inactive with their original emails and practitioner role, and no staff drawer
+was open. The earlier unknown drawer-dismissal outcome is superseded by that verified
+closed drawer/current saved contact and status state. Final resting state is restored:
+both test users Inactive, both pilot entries revoked, Microsoft retained session blocked.
+
+Fresh anonymous verified-TLS public offers at 22:08 UTC passed **2/2** with intake and
+activation false for Wellnexa and LivinLively. The same bounded `Invoke-WebRequest`
+command and explicit response-envelope/false-boolean checks above were used. Local
+redacted results: `.tmp/ui-revocation-final-offers.json`, SHA-256
+`660697c6d3f54c4044e3dd8f67edcae4cfdc824f9e3279fd6785714d0be32544`.
+The nine focused local cases had already passed at preparation; they were not rerun
+again for this evidence-only cleanup. `git diff --check`, evidence-hash comparison
+and the 38-row control-ledger check validate this final documentation update.
+
+No additional upload, account/trial activation, role grant, patient operation, message,
+charge, dependency/version, source code, schema, provider grant or endpoint change was
+needed. Owner-performed access transitions and their decision history are retained.
+Mail/SMS and billing/database counts were not freshly inspected; this test requested no
+changes to them. All existing application, membership, consent, trial and audit history
+remain retained; no record deletion or database restore was performed. General-release
+acceptance remains incomplete for the separately recorded privacy/security/operational
+controls, error-return handling, isolated manual-Refresh trigger and broader boundaries.
 
 Only the owner performed access saves; the agent opened/scrolled forms, prepared audit
 text, observed the test and used Retry. No patient record, appointment, publication,
@@ -582,9 +623,9 @@ Historical audits remain intact. This is a follow-up to the
 | DEV-06 | Partial | No runtime dependency or polling; source bounds unchanged. Build/performance: compare final chunks and representative access-recheck concurrency. |
 | REL-01 | Partial | This dated ledger and file matrix; named owner decisions absent. Release owner: assign and retain approvals. |
 | REL-02 | Implemented (local changed scope) | Exact frontend/website builds and dedicated/default browser configs pass; unchanged API/SQL exclusions explicit. QA: local success is not hosted acceptance. |
-| REL-03 | Partial | Final v3 provenance/static integrity, scoped central/staff checks, owner provider/URL checks, retained Microsoft workspace removal and denied Retry recorded. Operations/release: final pilot cleanup, isolated request/error-return checks, broader boundaries and actual restore remain. |
+| REL-03 | Partial | Final v3 provenance/static integrity, scoped central/staff/provider checks and retained Microsoft workspace removal/denied Retry recorded; final Inactive/pilot-revoked cleanup, saved history and closed offers verified. Operations/release: isolated request/error-return checks, broader boundaries and actual restore remain. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no local result waives open gates. Accountable owners: resolve/sign scoped decisions. |
-| REL-05 | Partial | Owner proceeded with reviewed controlled frontend copy; assets verified before entry handoff, both public offers closed. No permission/settings expansion. Release/privacy/security/clinical owners: remaining scoped operational and general-release decisions. |
+| REL-05 | Partial | Owner authorized controlled frontend copy and synthetic access retest; owner saved temporary pilot/staff changes through normal administration, then final Inactive/revoked state verified. No persistent role/provider-grant expansion; public offers closed. Accountable owners: remaining operational/general-release decisions. |
 | REL-06 | Implemented (report scope) | Files/commands/flows/limits/rollback and final source/hash binding recorded. Release owner: confirm report and accountable decisions. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
