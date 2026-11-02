@@ -5,8 +5,9 @@ specified source, local synthetic tests and artifact checks only. No merge, host
 replacement, account reactivation, grant or general-release approval is inferred.
 
 Frontend implementation revision: `61202e541f5cbe89969cc805de227afeaf5e63c6`.
-Subsequent packaging-only revisions retain that frontend source; the final manifest binds
-the exact committed builder/source revision used for its artifacts.
+The final public-surface isolation correction and package source are
+`f35e2b4c203436133257361652010d9c4ab51d69`. The manifest binds that exact committed source
+and the reviewed baseline; later evidence/documentation does not change its payload.
 
 ## Result and boundaries
 
@@ -93,15 +94,26 @@ Wellnexa React/React DOM 19.3.0, TypeScript 6.0.3, Vite 8.3.4, Playwright 1.64.1
 | `npm ci` (Frontend) | Passed, exit 0; 350-package locked baseline. |
 | `npm audit --json` (Frontend) | Exit 1: 11 moderate build/development advisories, zero high/critical; existing exposure/remediation decision remains open. |
 | `npm audit --omit=dev --json` (Frontend) | Passed, zero runtime advisories. |
-| `npm run lint`, `npm run validate:content`, `npm run validate:i18n`, `npx tsc --noEmit` (Frontend) | Passed at focused checkpoint; 4 bilingual entries / 2,568 UI translations. Final canonical build below still required. |
+| `npm run lint`, `npm run validate:content`, `npm run validate:i18n`, `npx tsc --noEmit` (Frontend) | Passed individually and in the final canonical production build; 4 bilingual entries / 2,568 UI translations. Zero frontend lint warnings. |
 | `npx playwright test --config playwright.application-admin.config.ts --reporter=line` (Frontend) | 46 passed, exit 0. |
 | `npx playwright test --config playwright.applications.config.ts --reporter=line` (Frontend) | Final 22 passed, exit 0. |
-| `npx playwright test --reporter=line` (Frontend) | Initial full run: 289 passed, 2 existing optional-fixture skips, 1 failure described below. Corrected final full run pending. |
+| `npx playwright test --reporter=line` (Frontend) | Corrected full run: **291 passed, 2 existing optional-fixture skips**, exit 0. Initial 289/2/1 result is retained below. |
 | `npx playwright test tests/portal.spec.ts --grep 'staff status saves\|dashboard removes\|record-level forbidden\|access recheck fails\|travel badge account denial\|travel badge clears' --reporter=line` (Frontend) | 9 passed, exit 0: includes delayed child response, authority-check outage, explicit restoration and final focus behavior. |
 | `npx playwright test --config playwright.invitations.config.ts --reporter=line` (Frontend) | 7 passed, exit 0. |
-| `npx playwright test --config playwright.build.config.ts --reporter=line` (Frontend) | Pending final committed-source build. |
+| `BUILD_PRACTITIONER_SIGN_IN=1` in this test process, then `npx playwright test --config playwright.build.config.ts --reporter=line` (Frontend) | **15 passed**, exit 0, against the final built public/portal output; test flag restored afterward. Real MSAL code-flow/broker boundary uses intercepted synthetic responses. |
 | `npm ci`, `npm audit --json`, `npm run lint`, `npm run build`, `npm run test:browser -- --reporter=line` (Wellnexa) | Restore/audit/build passed; zero advisories; lint exit 0 with four pre-existing warnings; 24 browser tests passed. Website source/locks unchanged. |
 | PowerShell parser for the new builder; `git diff --check` | Passed at preparation checkpoint. |
+| `npx playwright test --config playwright.applications.config.ts --reporter=line` (Wellnexa) | Dedicated opt-in joining-entry suite: **1 passed**, exit 0; omitted by its default browser configuration. |
+| `./scripts/build-practitioner-ui-deployment.ps1 -ReleaseName 2026-11-02-practitioner-ui-reliability-v3 -BaselineManifest deployments/2026-11-01-practitioner-pilot-admin/manifest.json` (repository) | Passed, exit 0, from committed `f35e2b4`; preserves reviewed build flags/IDs, runs canonical lint/types/content/i18n and all three frontend production builds, packages only clinic/central portals. |
+
+Final browser coverage is **406 distinct passed / 2 existing optional-fixture skips**:
+291 default + 46 central Admin + 22 practitioner applications + 7 invitations + 15 built
+artifact + 24 Wellnexa browser + 1 Wellnexa application-entry. The nine focused portal cases
+were rerun after the final public-surface guard and passed again; they overlap this total.
+The full default run preceded that narrow compile-time public guard; the final artifact
+suite verifies public isolation and the final focused run verifies the active portal branch.
+No unrelated broad suite was repeated after that targeted correction. The two skipped
+cases require optional private CSV/workbook fixtures; they are not new skips or acceptance.
 
 Initial evidence is retained rather than hidden: the first new portal run had four failures
 and one pass. The status control's accessible name includes its selected value; its selector
@@ -125,7 +137,7 @@ copies establishes that this is a `new URL()` parsing base replaced by the actua
 origin, not a fetch/transport endpoint. The builder now excludes only that reviewed exact
 assignment/window-origin structure from scan text; other localhost/loopback destinations
 remain blocked and packaged bytes are unchanged. The incomplete first package stays local
-for diagnosis and must not be uploaded. A new versioned output will be used. An initial
+for diagnosis and must not be uploaded; it was superseded by the final v3 output. An initial
 local inspection used Windows' default text decoder on UTF-8 output and failed; the
 inspection was rerun with explicit UTF-8, without modifying output bytes.
 
@@ -149,8 +161,9 @@ for its existing boundary test. The other caught a real public-build isolation r
 the new shared helper's `/auth/me` exclusion literal was included in marketing output.
 The signal is now explicitly gated to the portal surface so public builds tree-shake that
 staff branch. The existing no-staff-authentication/private-module assertion is retained,
-not relaxed. A new committed artifact will replace the otherwise verified v2 package;
-final production-artifact retest remains pending at this checkpoint.
+not relaxed. A new committed artifact replaced the otherwise verified v2 package;
+final production-artifact retest passed all 15 cases. These initial failures are historical;
+the final v3 package and current validation table supersede their pending state.
 
 ## Package, approval and rollback
 
@@ -164,8 +177,35 @@ Only built JS/CSS/HTML are packaged; private API/configuration, SQL, tests and d
 are excluded. Credential/development-endpoint/source-map signatures block packaging pending
 review. This bounded scan is not an exhaustive credential/PHI or vulnerability assessment.
 
-Prepared output and final hashes are pending the committed-source build. The expected
-transfer layout is `/public_html`, existing directories:
+The final review package is
+`D:/Dev/WelnessCentre/deployments/2026-11-02-practitioner-ui-reliability-v3`.
+Do not upload the incomplete first directory or superseded v2 output. Final source is
+`f35e2b4c203436133257361652010d9c4ab51d69`, branch as above. The manifest records UTC build
+time, Node/npm versions, all three lockfile hashes, public build settings and baseline
+manifest hash, member hashes/lengths and rollback URLs/hashes. No private settings file is
+included. The transfer layout is `/public_html`, existing directories:
+
+| Archive | Entries | Bytes | SHA-256 |
+| --- | --- | --- | --- |
+| `01-assets.zip` | 70 | 1,249,885 | `895ecd0633063057000f548d2918cdd5fad1c357d05109de77ef6f4541e81492` |
+| `02-entry-pages.zip` | 2 | 843 | `815157df49108961d81ca6ec16517b52452116fedd653cea44a4b9074d7aadd9` |
+| `ROLLBACK-entry-pages.zip` | 2 | 848 | `92ec6f60c8894f79c2e2ad5aab602e6b2875a75e332cefaa40aaf254b10afab5` |
+
+Independent Python standard-library ZIP/JSON/SHA-256 inspection passed for all three
+archives: CRC/readback, unique safe paths, only JS/CSS/HTML, archive and member hashes,
+all **72 payload members** byte-identical to final build output, all rollback bytes matching
+fresh baseline hashes, and every entry-page module/stylesheet reference present in the
+asset archive. Public output's existing no-workforce/no-`/auth/me`/no-CIAM assertions pass.
+New portal assets total 2,612,824 bytes versus baseline 2,610,228 (+2,596); central assets
+1,550,157 versus 1,549,100 (+1,057). Existing >500-kB chunk warnings remain; limits were
+not raised. The small increase does not establish representative-volume performance.
+
+Both rollback HTML files also matched their earlier verified archive entries. Five fresh
+anonymous verified-TLS checks confirmed their four primary JS/CSS assets have exact prior
+hashes/lengths and LivinLively's portal HTML matches the shared Wellnexa baseline. These
+are static rollback checks, not a restore rehearsal or all transitive-asset verification.
+Read-only public application offers still report intake/activation false for both clinics.
+No hosted file, setting, account, database, grant, worker or provider change was made.
 
 1. Merge `01-assets.zip` contents into existing directories; preserve every old asset.
 2. Verify actual hosted bytes before replacing only the two `02-entry-pages.zip` files:
@@ -181,6 +221,11 @@ checks are ready; this development request does not authorize it. Before real te
 finish restricted hosted smoke checks (including actual autofill and both provider returns),
 headers/current boundaries/rollback and accountable privacy/security/clinical/release-owner
 decisions. Do not enable mail/SMS, intake, activation or test users to force a pass.
+The existing staff PATCH still submits its required contact fields and has no new server
+version/concurrent-edit guard; resolving concurrent administrator edits is a separate
+backend review. Actual extension behavior, hosted revocation and both provider returns
+must be retested on the reviewed artifact. Keep the source branches for human review;
+implementation authorization does not authorize merging or deploying them.
 
 ## All 38 controls — scoped reassessment
 
@@ -218,17 +263,17 @@ Historical audits remain intact. This is a follow-up to the
 | SEC-07 | Partial | Generic provider recovery retained; raw OAuth error fields cleaned after processing. Operations: web/proxy/provider-log redaction review. |
 | SEC-08 | Partial | No new endpoint/vendor/data flow. Privacy/vendor owner: existing support/retention/incident approvals. |
 | SEC-09 | Partial | No messages/channel activation. Privacy/operations: actual sender/recipient/CASL and delivery evidence before enabling. |
-| DEV-01 | Partial | Dedicated bugs branch, instructions/config/locks/migrations/docs reviewed; PDF preserved. Maintainer: validated commit/push and review. |
-| DEV-02 | Partial | No new any/ts-ignore/skips, narrow changes, initial failures retained. Maintainer/security: independent final diff review. |
+| DEV-01 | Implemented (task scope) | Dedicated bugs branch, instructions/config/locks/migrations/docs reviewed; source/artifact committed and final branch pushed; PDF preserved. Maintainer: human review, no merge inferred. |
+| DEV-02 | Partial | No new any/ts-ignore/skips, narrow changes, initial failures retained; local diff reviewed. Maintainer/security: independent review remains. |
 | DEV-03 | Partial | Exact restores/unchanged locks; zero runtime/11 moderate frontend build findings. Build/security: outstanding build advisory exposure decision. |
-| DEV-04 | Partial | Real lint/types/content/i18n and local browser checks; full final counts below pending. QA: finish required suites and hosted checks. |
+| DEV-04 | Partial | Real lint/types/content/i18n/builds and 406 passing distinct browser cases; 2 existing optional-fixture skips documented. QA: hosted checks and broader omitted scenarios remain. |
 | DEV-05 | Partial | Bilingual controls, explicit focus, filter keyboard/mobile/zoom-equivalent checks. Accessibility/product: real AT/contrast/themes/full zoom and actual extension handling. |
 | DEV-06 | Partial | No runtime dependency or polling; source bounds unchanged. Build/performance: compare final chunks and representative access-recheck concurrency. |
 | REL-01 | Partial | This dated ledger and file matrix; named owner decisions absent. Release owner: assign and retain approvals. |
-| REL-02 | Partial | Commands/failures scoped above; remaining broad gates pending. QA: complete counts/build artifact checks. |
-| REL-03 | Partial | Review package and rollback planned; no hosted replacement/acceptance. Operations/release: artifact provenance/integrity, restricted hosting and restore. |
+| REL-02 | Implemented (local changed scope) | Exact frontend/website builds and dedicated/default browser configs pass; unchanged API/SQL exclusions explicit. QA: local success is not hosted acceptance. |
+| REL-03 | Partial | Final v3 source/lock/runtime/member hashes, 74 ZIP entries, independent readback and static rollback checks recorded; no hosted replacement. Operations/release: restricted hosted acceptance and actual restore. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no local result waives open gates. Accountable owners: resolve/sign scoped decisions. |
 | REL-05 | Partial | Development authorized; current hosted restrictions preserved. Release/privacy/security/clinical owners: review actual package before production authorization. |
-| REL-06 | Partial | Files/commands/flows/limits/rollback recorded; final result/source/hash binding pending. Release owner: confirm final evidence. |
+| REL-06 | Implemented (report scope) | Files/commands/flows/limits/rollback and final source/hash binding recorded. Release owner: confirm report and accountable decisions. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
