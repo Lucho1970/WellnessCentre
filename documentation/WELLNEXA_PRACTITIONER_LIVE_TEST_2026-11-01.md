@@ -2,6 +2,21 @@
 
 ## Latest checkpoint: entry pages live, both provider returns at pilot gate
 
+The subsequent metadata check confirmed the Google identity already has an active Wellnexa
+practitioner membership from October 14, predating this rollout. Backup metadata independently
+matches the reviewed identity and approved Google email. Pilot approval did not create the
+older membership. Google remains revoked while the owner chooses returning/Inactive testing
+on that profile or another Google identity for a new-registration test.
+
+After the owner uploaded the numeric response patch, fresh Google pilot approval saved.
+The preserved session unexpectedly reached a practitioner workspace before the application
+rehearsal. The owner confirms this should be a new practitioner. Admin pilot revocation
+saved, and the same session now denies access after reload. No client record was manually
+opened. Keep Google revoked and Microsoft unapproved pending the
+[identity/membership investigation](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md).
+This supersedes the older pending/failed-decision state below; no application was submitted
+or activated, and ordinary Staff Inactive acceptance has not been completed.
+
 The latest rehearsal recorded the Google reference as **Wellnexa Test Google**, pending in
 Admin; retry while pending still denies access. Its approval attempt failed validation on
 the version field and granted no access. The separately reauthenticated personal Microsoft

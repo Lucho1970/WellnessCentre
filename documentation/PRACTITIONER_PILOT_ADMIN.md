@@ -1,6 +1,21 @@
 # Practitioner pilot access administration
 
-**Latest checkpoint — both providers returned; Google approval needs a response fix:**
+**Latest checkpoint — patch decision path passed; Google access revoked for investigation:**
+The read-only live check subsequently confirmed an active Wellnexa practitioner membership
+from October 14 for the same Google identity; private backup metadata independently confirms
+the older mapping and approved account email. This explains the workspace outcome; pilot
+approval did not create that membership. Google remains revoked pending the owner's choice
+of existing-profile testing versus a different Google account for fresh registration.
+
+After the owner's patch upload, the reopened Google entry approved successfully. Retrying
+that session unexpectedly reached a practitioner dashboard before the rehearsal's application
+or activation. The owner confirms this should be a new practitioner. Pilot access was
+immediately revoked through Admin and the reloaded session is denied again. No client records
+were manually opened, and no membership/role was changed. Microsoft remains unrecorded and
+unapproved; further approvals/registration wait for the identity/membership investigation.
+See the [hosted retest and containment record](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md).
+
+**Earlier checkpoint — both providers returned; Google approval needs a response fix:**
 Google returned an own-account reference, and **Wellnexa Test Google** was recorded as
 pending in Admin. Retrying that session still denies access. Approval failed safely on the
 version field; no pilot approval or membership was granted. The numeric response fix passes

@@ -11,6 +11,34 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### Current checkpoint: patch decision path passed; unexpected workspace contained
+
+**Subsequent read-only result:** phpMyAdmin recovered and the clinic-scoped aggregate
+completed: Google pilot status revoked, identity created October 8, one active Wellnexa
+membership created October 14, practitioner-role flag true. The private pre-rollout backup
+independently matches that reviewed subject and owner-approved Google email on older active
+staff rows. Only aggregate fields/date/counts and email-match booleans were reported; no
+clinical records, account identifiers or actual emails enter this ledger. The older membership
+explains the workspace outcome; automatic creation by pilot approval is not established.
+Keep Google revoked while the owner chooses existing-profile/Inactive testing or a separate
+Google identity for new registration. Microsoft is checked separately before approval.
+
+Owner-reported patch upload was followed by a fresh Google review and successful approval;
+Admin showed Allowed for pilot and its decision history. Retry unexpectedly reached a
+practitioner workspace before this rehearsal's application/activation. The owner confirms
+the account should be new. The agent revoked that pilot entry immediately; Admin showed
+Pilot access revoked, and reload of the same Google session denied access again. No client
+record was manually opened. Microsoft remains unrecorded/unapproved. See the
+[full hosted finding and containment](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md).
+
+The 38-control ledger below is qualified by an open high-impact AUTH-02/REL-03 finding:
+no further approvals or registration until the actual identity/membership mapping and audit
+evidence are established. The local exact-membership resolver is not hosted causal proof.
+A minimized aggregate metadata query was initially blocked by hosting/session/HTTP 500 issues
+and subsequently executed as recorded above. No direct SQL write, schema change, role grant,
+payment or application activation occurred. The source patch, dependencies and external
+flows remain unchanged; this follow-up records operational evidence only.
+
 ### Current checkpoint: both provider returns and blocked Google approval
 
 On continuation branch `bugs/practitioner-pilot-response-types`, Google returned its

@@ -5,6 +5,63 @@ Implementation/package source: `18e9b595ebb88bab55c25fdbd524ef9a1db5106d`.
 Reviewer: Codex for the stated code, synthetic-test and hosted-observation scope.
 This continues the authorized controlled pilot, not a general release or merge approval.
 
+## Latest hosted retest and containment
+
+**Subsequent mapping result:** The minimized live aggregate executed successfully in
+phpMyAdmin after hosting/session recovery. The Google pilot entry is revoked; its exact
+identity was created October 8 and has **one active Wellnexa staff membership**, created
+October 14, with the practitioner role. Independently, the pre-rollout private backup
+contains that same visually reviewed subject and two active memberships across clinics;
+both linked staff rows' email matches the owner-approved Google account. Only those staff
+metadata rows were inspected; unrelated users/patient records were not parsed or displayed.
+Ignored local aggregate report: `.tmp/pilot-backup-membership-counts.json`.
+
+This establishes that the relevant membership **predates the pilot**, explaining the
+workspace outcome consistently with the exact-membership resolver. It does not establish
+who originally authorized the older mappings, which still need owner/identity review.
+No automatic membership creation by this pilot approval was observed. The earlier open
+cause statement below is superseded by this dated result; general AUTH-02/REL-03 acceptance
+remains Partial. The owner was asked to choose whether to use the existing Google profile
+for returning/Inactive tests or provide another Google identity for genuinely new registration.
+Google stays revoked pending that choice. Microsoft can be checked separately before any
+approval; no Microsoft entry or membership has yet been created.
+
+The owner confirmed the one-file patch upload and dismissed the failed form's unsaved-change
+dialog after computer control stopped on URL-policy detection. On the next authorized turn,
+the existing Google entry was reopened and its current review loaded. Approval **saved
+successfully**, and Admin displayed **Allowed for pilot**; reopening review displayed the
+record and approval events. This verifies the previously failing hosted decision path;
+the remote private-file SHA-256 itself has not been independently read.
+
+Retrying the preserved Google session then unexpectedly navigated to a practitioner dashboard
+before any application/activation in this rehearsal. No client record or clinical menu was
+manually opened. Dashboard counters/empty appointment messages rendered automatically; this
+does not prove that the database or all responses are synthetic, or that no disclosure occurred.
+The owner explicitly confirmed the account should be a **new practitioner**, with no prior
+profile/invitation/link known to them.
+
+The agent immediately used the same Admin entry to **revoke pilot access**, recording the
+containment reason. Save succeeded and the entry displayed **Pilot access revoked**. Reloading
+the same signed-in Google tab then returned the pilot denial and removed the workspace view.
+No membership, record, role, application or identity was deleted/changed for containment.
+Google remains revoked; Microsoft remains unrecorded and unapproved. Further approvals and
+registration are held while the unexpected identity/membership boundary is investigated.
+
+Local source review shows `StaffMembershipResolver` requires the exact adapter/issuer/subject,
+active identity, clinic, membership and staff user plus an allowed role; the pilot service
+does not insert memberships. This is code evidence, **not proof of the hosted cause**.
+A read-only clinic-scoped aggregate query was prepared at ignored
+`.tmp/pilot-google-membership-review.sql`; it selects only access status, creation dates,
+membership counts and a practitioner-role flag, with no patient/name/email/subject data.
+It had not executed at that checkpoint. Netfirms MySQL Management initially stalled and
+phpMyAdmin returned HTTP 500; after session/window recovery the aggregate completed as
+recorded above. No direct SQL write or hosted test suite was run.
+
+AUTH-02 and REL-03 remain **Partial with an open high-impact hosted finding**. Operations,
+identity/security and the accountable custodian must establish the actual mapping, scope and
+audit evidence before another approval; assess incident handling on verified facts. Do not
+work around this result by accepting a dashboard as successful new-practitioner registration.
+
 ## Hosted trigger and result
 
 The owner completed the requested Google sign-in. Wellnexa returned the expected pilot
@@ -94,7 +151,8 @@ are verified independently; complete practitioner registration is not yet accept
 
 The one-file private patch is prepared at
 `D:/Dev/WelnessCentre/deployments/2026-11-01-practitioner-pilot-response-fix` and handed to the
-owner for copying; upload is **not confirmed yet**. There is no additional migration,
+owner for copying; the owner subsequently confirmed upload and the decision-path retest
+above passed. There is no additional migration,
 frontend upload or private configuration change. Both generated archives were reopened,
 verified as exactly one expected member, CRC-checked and byte-compared with their sources.
 The new payload comes from `git show` at the exact source above, not uncommitted content.
