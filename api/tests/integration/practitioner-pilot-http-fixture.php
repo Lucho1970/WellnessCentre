@@ -7,7 +7,9 @@ if(!preg_match('/^wellness_subscription_test_[a-f0-9]{12}$/D',$f['database']))th
 $config=new Wellness\Config('test',false,'test',[],'127.0.0.1',$f['port'],$f['database'],'root','','11111111-1111-1111-1111-111111111111','33333333-3333-3333-3333-333333333333','access_as_user',300,
  staffExternalTenantId:'44444444-4444-4444-4444-444444444444',staffExternalSubdomain:'teststaff',staffExternalApiClientId:'88888888-8888-8888-8888-888888888888',staffExternalSpaClientId:'77777777-7777-7777-7777-777777777777',
  clinicManagementEnabled:true,applicationAdminEnabled:true,applicationAdminHost:'portal.test',externalStaffAuthEnabled:true,practitionerPilotAccessEnabled:true);
-$db=new Wellness\Database($config);$api=new Wellness\Api($config,$db);$loader=fn()=>['keys'=>[$f['jwk']]];
+$db=new Wellness\Database($config);
+$db->connection()->setAttribute(PDO::ATTR_STRINGIFY_FETCHES,true);
+$api=new Wellness\Api($config,$db);$loader=fn()=>['keys'=>[$f['jwk']]];
 (new ReflectionProperty(Wellness\Api::class,'auth'))->setValue($api,new Wellness\Auth\EntraAuthenticator($config,$db,$loader));
 $pilot=new Wellness\Service\PractitionerPilotAccessService($db,$config);
 (new ReflectionProperty(Wellness\Api::class,'practitionerPilotAccess'))->setValue($api,$pilot);

@@ -2,6 +2,14 @@
 
 ## Latest checkpoint: entry pages live, both provider returns at pilot gate
 
+The latest rehearsal recorded the Google reference as **Wellnexa Test Google**, pending in
+Admin; retry while pending still denies access. Its approval attempt failed validation on
+the version field and granted no access. The separately reauthenticated personal Microsoft
+account also returned with its own pilot reference, not yet recorded. The
+[numeric response fix](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md) passes dual-engine
+regression and is being prepared for the private one-file update. This supersedes older
+statements below that no pilot entry exists; neither practitioner has a clinic membership.
+
 The owner uploaded the prepared assets and three entry pages using Beyond Compare.
 140 HTTPS asset checks matched 72 distinct files; nine entry/body checks matched after
 separately diagnosing stale website-root cache and rechecking the normal canonical root.

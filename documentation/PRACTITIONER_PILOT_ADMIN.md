@@ -1,6 +1,15 @@
 # Practitioner pilot access administration
 
-**Latest checkpoint — private settings uploaded; authenticated acceptance pending:** The
+**Latest checkpoint — both providers returned; Google approval needs a response fix:**
+Google returned an own-account reference, and **Wellnexa Test Google** was recorded as
+pending in Admin. Retrying that session still denies access. Approval failed safely on the
+version field; no pilot approval or membership was granted. The numeric response fix passes
+68 pilot checks on each disposable engine and all 61 standalone PHP scripts. The personal
+Microsoft account also returned to its own pilot denial/reference in a separate tab; it
+has not been recorded or approved. See the
+[response compatibility follow-up](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md).
+
+**Earlier checkpoint — private settings uploaded; authenticated acceptance pending:** The
 owner reports copying the reviewed private candidate to `/wellness-api/.env`. Both clinic
 public offers now report `available=true`, confirming the application runtime gate changed;
 both still report intake/activation disabled, with no published plan or terms. LivinLively
@@ -8,7 +17,7 @@ remains closed. The candidate preserves pilot mode, two workforce approvals and 
 mail/SMS with empty delivery lists; live private-file hashes/channel flags are not independently
 verified by the public response. The owner completed central organization sign-in; the
 Practitioner pilot access tab loads successfully for the explicitly selected Wellnexa clinic,
-showing no entries for the current pending filter. The independent Google rehearsal is at
+showing no entries for the current filter. The independent Google rehearsal is at
 the provider picker for owner-completed authentication.
 No practitioner application, membership or pilot approval has been created.
 

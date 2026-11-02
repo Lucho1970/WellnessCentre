@@ -11,6 +11,25 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### Current checkpoint: both provider returns and blocked Google approval
+
+On continuation branch `bugs/practitioner-pilot-response-types`, Google returned its
+verified own-account reference. The exact UI reference was copied to central Admin and
+recorded as **Wellnexa Test Google**, pending for Wellnexa. Its history loads; the same
+practitioner session remains denied while pending. The attempted approval was rejected
+with validation on `version`; no successful decision/membership/application/trial resulted.
+Personal Microsoft also returned to Wellnexa with its own distinct pilot-denial reference
+in a separate tab; no Microsoft entry/approval was created. Private values remain out of Git.
+
+The [dated response fix](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md) records the failing
+PDO-string regression, numeric serialization correction, initial OpenSSL environment failures,
+final 36 + 68 checks on each disposable engine and 61 standalone PHP passes. The 38 statuses
+below are reassessed for this continuation with that narrow qualification: numeric response
+types are corrected locally, while hosted decisions/full registration and all organizational
+gates remain pending. No permission, dependency, identity architecture, schema or external
+flow changes are introduced by the fix. The pre-fix private service remains hosted pending
+the small patch handoff. Existing source/package bindings below describe the preceding release.
+
 ### Current checkpoint after the owner's private settings copy
 
 The owner reports **settings uploaded**, confirming the requested private candidate was
@@ -30,7 +49,7 @@ approval, application, membership or financial transaction was changed by the ag
 The owner subsequently completed sign-in. Central Admin advertises Billing, Practitioner
 applications and Practitioner pilot access; the pilot list loads under the current operator.
 The clinic selector was explicitly changed from its initial clinic to **Wellnexa** and the
-pending filter reports no entries. No decisions or clinic settings were changed. This is
+current filter reports no entries. No decisions or clinic settings were changed. This is
 hosted administrator/list acceptance, not decision, lock or cross-role acceptance. The narrow
 status selector truncates its displayed label at desktop width; readability needs correction
 and retesting before general release (DEV-05). The clinic selector remains readable.

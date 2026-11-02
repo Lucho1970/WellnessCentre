@@ -116,6 +116,15 @@ final class PractitionerPilotAccessService
     {
         $row = $this->query('SELECT '.self::COLUMNS.' FROM practitioner_pilot_access p JOIN product_identities i ON i.id=p.identity_id WHERE p.clinic_id=? AND p.id=?'.($lock?' FOR UPDATE':''),[$clinic,$id])->fetch();
         if (!$row) throw new ApiException(404,'pilot_access_not_found','Pilot access entry not found.');
+        return self::numericFields($row);
+    }
+
+    /** Keep the JSON contract stable when PDO returns numeric columns as strings. */
+    private static function numericFields(array $row): array
+    {
+        foreach (['id','clinic_id','version'] as $field) {
+            if (array_key_exists($field,$row)) $row[$field]=(int)$row[$field];
+        }
         return $row;
     }
 
@@ -134,12 +143,12 @@ final class PractitionerPilotAccessService
             }
             $items=$this->query('SELECT '.self::LIST_COLUMNS.' FROM practitioner_pilot_access p JOIN product_identities i ON i.id=p.identity_id WHERE p.clinic_id=?'.$filter.' ORDER BY p.id DESC LIMIT 51',$values)->fetchAll();
             $more=count($items)>50;if($more)array_pop($items);
-            return ['items'=>$items,'next_before_id'=>$more?(int)$items[count($items)-1]['id']:null];
+            return ['items'=>array_map(self::numericFields(...),$items),'next_before_id'=>$more?(int)$items[count($items)-1]['id']:null];
         });
         if ($method==='GET' && preg_match('#^/([1-9][0-9]{0,17})$#D',$tail,$match)) {
             return $this->transaction($actor,$clinic,fn():array=>[
                 'entry'=>$this->row($clinic,(int)$match[1]),
-                'events'=>$this->query('SELECT e.id,e.action,e.reason,e.version,e.created_at,a.display_name operator_name FROM practitioner_pilot_events e JOIN application_administrators a ON a.id=e.application_administrator_id WHERE e.clinic_id=? AND e.access_id=? ORDER BY e.id DESC LIMIT 50',[$clinic,(int)$match[1]])->fetchAll(),
+                'events'=>array_map(self::numericFields(...),$this->query('SELECT e.id,e.action,e.reason,e.version,e.created_at,a.display_name operator_name FROM practitioner_pilot_events e JOIN application_administrators a ON a.id=e.application_administrator_id WHERE e.clinic_id=? AND e.access_id=? ORDER BY e.id DESC LIMIT 50',[$clinic,(int)$match[1]])->fetchAll()),
             ]);
         }
         if ($method==='POST' && $tail==='') {

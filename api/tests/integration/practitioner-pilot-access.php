@@ -37,6 +37,8 @@ $pdo->exec("INSERT INTO clinic_hosts(host,clinic_id) VALUES('wellnexa.test',1),(
 putenv('PILOT_MODE=true');putenv('PILOT_ALLOWED_EMAILS=[]');putenv('PILOT_ALLOWED_SMS=[]');
 putenv('PILOT_ALLOWED_IDENTITIES='.json_encode([['adapter'=>'entra-workforce','issuer'=>pilotActor()->identity->issuer,'subject'=>'operator']]));
 $config=pilotConfig($port,$name);$service=new PractitionerPilotAccessService($database,$config);$actor=pilotActor();
+// Some deployed PDO drivers return numeric columns as strings. The public contract must not.
+$pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES,true);
 $checks=0;
 $check=function(bool $ok,string $why)use(&$checks):void{if(!$ok)throw new RuntimeException($why);$checks++;};
 $deny=function(callable $call,int $status,string $why)use($check):void{try{$call();}catch(ApiException $e){$check($e->status===$status,$why.': '.$e->errorCode);return;}throw new RuntimeException($why.' accepted');};
@@ -53,6 +55,12 @@ putenv('PILOT_ALLOWED_IDENTITIES='.json_encode([['adapter'=>'entra-workforce','i
 $deny(fn()=>$service->assertAllowed(pilotIdentity('alice'),1),403,'Unknown practitioner denied');
 $body=$key(['reference'=>$ref('alice'),'label'=>'Synthetic Alice']);$entry=$admin('POST','',$body);$id=$entry['id'];
 $check($entry['status']==='pending' && $entry['version']===1,'Recording does not approve');
+$check(is_string($pdo->query('SELECT version FROM practitioner_pilot_access WHERE id='.(int)$id)->fetchColumn()),'Regression exercises string-returning PDO driver');
+$detail=$admin('GET',"/$id");
+$check(is_int($detail['entry']['id']) && is_int($detail['entry']['clinic_id']) && is_int($detail['entry']['version']),'Review response preserves numeric entry contract');
+$check(is_int($detail['events'][0]['id']) && is_int($detail['events'][0]['version']),'Review history preserves numeric event contract');
+$listed=$admin('GET')['items'][0];
+$check(is_int($listed['id']) && is_int($listed['clinic_id']) && is_int($listed['version']),'List response preserves numeric entry contract');
 $check($admin('POST','',$body)==$entry,'Identical record retry stable');
 $check((int)$pdo->query('SELECT COUNT(*) FROM staff_memberships')->fetchColumn()===14,'No membership granted');
 $deny(fn()=>$service->assertAllowed(pilotIdentity('alice'),1),403,'Pending identity denied');
@@ -67,7 +75,7 @@ $deny(fn()=>$admin('GET',"/$id",[],[],2),404,'Other clinic cannot read entry');
 $deny(fn()=>$admin('GET','',[],['status'=>'invalid']),422,'Invalid status denied');
 $deny(fn()=>$admin('GET','',[],['before_id'=>['1']]),422,'Malformed cursor denied');
 $deny(fn()=>$admin('GET','',[],['limit'=>'5000']),422,'Unbounded limit rejected');
-$approve=$key(['version'=>1,'identity_verified'=>true]);$approved=$admin('POST',"/$id/approve",$approve);
+$approve=$key(['version'=>$detail['entry']['version'],'identity_verified'=>true]);$approved=$admin('POST',"/$id/approve",$approve);
 $check($admin('POST',"/$id/approve",$approve)==$approved,'Identical approval retry stable');
 $service->assertAllowed(pilotIdentity('alice'),1);$service->release();$check(true,'Exact approved identity allowed');
 $deny(fn()=>$service->assertAllowed(pilotIdentity('Alice'),1),403,'Subject is case sensitive');
@@ -141,6 +149,9 @@ try{
  $list=$http('portal.test','application/clinics/1/pilot-practitioners',$workforce);
  $check($list[0]===200 && count($list[1]['data']['items'])===50,'HTTP operator listing uses live grant');
  $check(in_array('Cache-Control: no-store',$list[2],true),'HTTP admin response no-store');
+ $check(is_int($list[1]['data']['items'][0]['version']),'HTTP JSON list emits numeric versions with string-returning PDO');
+ $review=$http('portal.test','application/clinics/1/pilot-practitioners/'.$id,$workforce);
+ $check($review[0]===200 && is_int($review[1]['data']['entry']['version']) && is_int($review[1]['data']['events'][0]['version']),'HTTP JSON review and history emit numeric versions');
  $check($http('portal.test','application/me',$workforce)[1]['data']['features']['practitioner_pilot_access']===true,'HTTP feature flag exposed only after admin authentication');
  $denial=$http('wellnexa.test','auth/me',$sign(array_replace($claims,['sub'=>'unapproved'])));
  $check($denial[0]===403 && str_starts_with($denial[1]['error']['fields']['ID'],'WPI1 '),'HTTP verified denied account gets own reference');
@@ -156,7 +167,8 @@ try{
  $pdo->exec("UPDATE users SET status='active' WHERE id=1");
  $check($http('wellnexa.test','auth/me',$memberToken)[0]===200,'Explicit ordinary access restoration retains separate pilot decision');
  $check($http('other.test','auth/me',$memberToken)[0]===403,'HTTP same bearer denied for other clinic');
- $rev=$http('portal.test','application/clinics/1/pilot-practitioners/'.$member['id'].'/revoke',$workforce,$key(['version'=>2]));
+ $memberReview=$http('portal.test','application/clinics/1/pilot-practitioners/'.$member['id'],$workforce);
+ $rev=$http('portal.test','application/clinics/1/pilot-practitioners/'.$member['id'].'/revoke',$workforce,$key(['version'=>$memberReview[1]['data']['entry']['version']]));
  $check($rev[0]===200 && $rev[1]['data']['status']==='revoked','HTTP explicit admin revoke succeeds');
  $check($http('wellnexa.test','auth/me',$memberToken)[0]===403,'HTTP same valid bearer denied after revoke');
  $pdo->exec("UPDATE application_administrators SET status='revoked' WHERE id=1");
