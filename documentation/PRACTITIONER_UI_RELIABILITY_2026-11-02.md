@@ -351,7 +351,12 @@ inspection. Pilot denial does not independently prove the Inactive membership ch
 because the pilot gate can reject access first. The previously observed Inactive states
 remain the evidence for membership status.
 
-The screenshot has no address bar, so OAuth query/fragment cleanup remains unverified.
+The screenshot has no address bar. In a subsequent explicit check of both returned
+Wellnexa tabs, the owner confirmed neither address bar contained `code=` or `error=`.
+This completes the owner-observed successful-return URL check for both providers on
+this build. It does not establish the hosted error-return path, every other callback
+parameter, or an independent browser/network inspection. No parameter values were
+requested or recorded.
 No identifying pilot-reference payload or screenshot was copied into the repository.
 No access was reapproved and no account, setting, billing, consent or messaging change
 was made for this evidence update. The documentation-only follow-up passed
@@ -359,7 +364,7 @@ was made for this evidence update. The documentation-only follow-up passed
 were not repeated.
 
 Remaining acceptance is explicit: manually confirm the drawer is closed without saving;
-verify post-return URL cleanup on this build without sharing authentication parameters;
+verify hosted error-return cleanup separately from the owner-checked successful returns;
 and test live mounted-workspace removal after authority revocation in a separately
 approved synthetic scenario. Do not reactivate the departed test accounts or reopen
 intake to force those checks. Actual autofill/status-save protection, hosted keyboard
@@ -390,7 +395,7 @@ Historical audits remain intact. This is a follow-up to the
 | PRIV-05 | Unverified | No patient-rights workflow changes. Privacy operations: evidence access/correction process. |
 | PRIV-06 | Unverified | No deletion/retention change. Records/privacy: approve holds/backup/disposal and restore. |
 | PRIV-07 | Unverified | No incident exercise. Incident/privacy lead: rehearse runbook. |
-| AUTH-01 | Partial | Supported locked MSAL/JWT flow retained; owner reports both real provider returns followed by pilot denial on deployed build. Identity/security: hosted URL cleanup and independent provider/security acceptance remain. |
+| AUTH-01 | Partial | Supported locked MSAL/JWT flow retained; owner reports both real provider returns followed by pilot denial and neither returned URL contains code=/error=. Identity/security: hosted error-return cleanup and independent provider/security acceptance remain. |
 | AUTH-02 | Partial | Revision-bound UI access and account-vs-resource denial tests; API role/clinic rules unchanged. Security/custodian: hosted cross-clinic/record negatives. |
 | AUTH-03 | Partial | Workspace clears on observed account denial; deliberate Retry/focus. Identity/security: idle/absolute/MFA/logout/lost-device and broader raw-fetch coverage. |
 | AUTH-04 | Partial | Signal/drafts in memory, no new token persistence. Security: resolve existing MSAL sessionStorage exception/design before real-data release. |
@@ -412,7 +417,7 @@ Historical audits remain intact. This is a follow-up to the
 | DEV-06 | Partial | No runtime dependency or polling; source bounds unchanged. Build/performance: compare final chunks and representative access-recheck concurrency. |
 | REL-01 | Partial | This dated ledger and file matrix; named owner decisions absent. Release owner: assign and retain approvals. |
 | REL-02 | Implemented (local changed scope) | Exact frontend/website builds and dedicated/default browser configs pass; unchanged API/SQL exclusions explicit. QA: local success is not hosted acceptance. |
-| REL-03 | Partial | Final v3 provenance/74 ZIP entries/static rollback; 138 hosted assets/3 new entries match, both public offers closed; central EN/FR/staff edit/cancel observed and both fresh provider returns/pilot denial owner-reported. Operations/release: URL cleanup, mounted revocation, unknown final drawer dismissal and actual restore remain. |
+| REL-03 | Partial | Final v3 provenance/74 ZIP entries/static rollback; 138 hosted assets/3 new entries match, both public offers closed; central EN/FR/staff edit/cancel observed; both provider returns/pilot denial and successful-return URL cleanup owner-reported. Operations/release: error-return cleanup, mounted revocation, unknown final drawer dismissal and actual restore remain. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no local result waives open gates. Accountable owners: resolve/sign scoped decisions. |
 | REL-05 | Partial | Owner proceeded with reviewed controlled frontend copy; assets verified before entry handoff, both public offers closed. No permission/settings expansion. Release/privacy/security/clinical owners: remaining scoped operational and general-release decisions. |
 | REL-06 | Implemented (report scope) | Files/commands/flows/limits/rollback and final source/hash binding recorded. Release owner: confirm report and accountable decisions. |
