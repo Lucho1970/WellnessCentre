@@ -1,6 +1,37 @@
 # Wellnexa practitioner live-test rollout and account retirement
 
-## Latest checkpoint: Microsoft activation passed; Inactive verification pending
+## Latest checkpoint: rehearsal completed; test access disabled and intake closed
+
+**Final 2 November checkpoint, documentation baseline `c89362e`:** The owner restored the
+original Microsoft email and saved normal Staff Inactive. Staff access verifies it, and
+the preserved Microsoft session received HTTP 403 on dashboard Refresh while pilot access
+was still allowed. The shell remained until full reload; reload then denied the workspace.
+Own application history warns that refreshing cannot restore revoked access, with no
+activation/workspace button. Read-only clinic/test-label-scoped phpMyAdmin checks confirm
+one retained membership and one Inactive user for each test identity, zero effective active
+staff memberships, and Microsoft one billing account/subscription/activation event with
+zero published profiles. The CAD 0 subscription is trialing, from `2026-11-02 15:56:42` UTC
+to `2027-05-02 14:56:42` UTC, stored timezone America/Toronto: exactly six calendar months,
+10:56:42 local on each date. Local timezone conversion/AddMonths equality passed.
+
+Central Admin then closed Wellnexa intake and activation, preserving plan/terms/history.
+Save succeeded, the activated application remains listed, and anonymous verified-TLS offers
+confirm both clinics' intake/activation false. Closed offers conceal stored plan/terms.
+Microsoft pilot revocation saved successfully; its next own-application Refresh was denied
+and cleared the prior status/trial card. Google remains Inactive/pilot-revoked. Mail/SMS
+remain disabled; no profile publication, patient bookings, charges, messages or deletion.
+The trial/history are retained; this is access offboarding rather than billing cancellation.
+
+The approved Microsoft new-registration rehearsal and Google's selected returning-profile
+case are complete in this scope. Full commercial offboarding, fresh sign-in after final
+Inactive, direct hosted replay/concurrency/privileged-API tests, full clinical boundaries,
+restore and accountable release decisions remain separate. Autofill changing the unsaved
+email and stale dashboard shell until reload are recorded UI/session follow-ups. Exact
+evidence/limits and file purposes are in the [JSON-fix report](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md).
+Earlier pending statements below describe their historical checkpoints and are superseded.
+No new source/schema/dependency/grant/terms text/endpoint/external-flow change in this
+continuation. The restrictive closure is intentional; do not restore an old database or
+delete application/consent/audit/billing records to clean up this test.
 
 **Owner activation observed, 2 November:** The owner personally completed acceptance and
 activation. The Microsoft session reached the practitioner dashboard. Its own application

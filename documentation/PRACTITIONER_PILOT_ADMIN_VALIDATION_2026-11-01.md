@@ -12,6 +12,31 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### 2 November final: scoped registration rehearsal and access offboarding complete
+
+Against baseline `c89362e` and deployed JSON source `d61a94c`, the owner-saved Microsoft
+Inactive/original email is verified. Dashboard Refresh received HTTP 403 while pilot access
+was still allowed; full reload denied the workspace. Own history could not restore access.
+Minimized read-only SQL found one membership/Inactive user for each test identity and zero
+effective active staff memberships. Microsoft has one billing account/subscription/activation
+event, zero published profiles, and the CAD 0 trial from `2026-11-02 15:56:42` to
+`2027-05-02 14:56:42` UTC in America/Toronto. Local conversion/AddMonths verifies six calendar
+months at 10:56:42 local. Admin then closed Wellnexa intake/activation and revoked Microsoft
+pilot access; save and subsequent own-request pilot denial/card clearing passed. Google
+remains Inactive/revoked; both public offers report intake/activation false. Histories and
+trialing subscription are retained. See the [exact scoped evidence](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md).
+
+PRIV-02, AUTH-02/03 and REL-03/05 gain this owner-consent, normal Inactive, single-trial and
+closure evidence. The 38-control statuses remain qualified below; accountable organizational
+decisions, remote private hashes, restore, real-PHI gate, storage/session design, full
+clinical isolation and broader hosted negatives/concurrency are still open. The old shell
+persisted after widget 403 until full reload, and browser autofill altered an unsaved email
+before owner correction; these UI/session findings require follow-up. Fresh provider login
+after final Inactive and Google fresh-registration were not performed (owner selected an
+existing Google profile). No new code/dependency/grant/schema/terms-text/endpoint/external
+flow in this continuation; broad suites not rerun for hosted observation and documentation.
+This final checkpoint supersedes historical pending/open-intake statements below.
+
 ### 2 November current: owner activation and practitioner UI boundary passed
 
 The owner completed activation personally. The retained Microsoft session reaches the
@@ -618,15 +643,15 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | GOV-04 | Partial | New function is identity administration; no clinical inference. Product/clinical/legal: approve intended use. |
 | GOV-05 | Partial | Synthetic fixtures, minimized reference and documented flow; complete signed PIA/TRA absent. Privacy/security: assess database identity-administration flow and residual risk. |
 | PRIV-01 | Unverified | This feature does not establish custodian-specific bilingual notices/contacts. Custodian/privacy: verify published practices. |
-| PRIV-02 | Partial | Independent operator attestation/reason, no registration consent auto-accepted. Privacy/clinical: approve actual joining terms and collection authority. |
+| PRIV-02 | Partial | Owner approved synthetic-only terms and personally accepted submission/activation; consent/history retained. Privacy/clinical: approve commercial terms, collection authority and real-data scope. |
 | PRIV-03 | Partial | Current grant/clinic/identity checks and serialized pilot revocation; no consent/clinical bypass. Security/custodian: finish hosted restriction/worker acceptance. |
 | PRIV-04 | Unverified | No minor/representative authority added. Clinical/custodian: approve supported populations and safe assisted process. |
 | PRIV-05 | Unverified | Pilot history is not patient access/correction service. Privacy operations: verify intake/deadline/protected delivery process. |
 | PRIV-06 | Unverified | No deletion; new identity/events/retry records retained. Records/privacy: approve retention, holds, backup/disposal schedule and restoration. |
 | PRIV-07 | Unverified | No breach exercise or external notice action. Incident/privacy lead: approve/rehearse runbook. |
 | AUTH-01 | Implemented (local changed scope) | Full signed JWT checks before callback/reference; missing authority denies, callback cannot accept raw provider tokens. Identity/security: verify final hosted configuration/MFA. |
-| AUTH-02 | Partial | Exact clinic/identity/active grant, case sensitivity, no membership grant, stale replay/Inactive/current bearer tests. Security/custodian: complete hosted application and clinical boundaries. |
-| AUTH-03 | Partial | Principal-bound UI cleanup; pilot revocation only additional gate. Identity/security: approve idle/absolute/MFA/lost-device and normal departure procedures. |
+| AUTH-02 | Partial | Exact clinic/identity/active grant and local negative/replay tests; hosted Microsoft registration/activation/practitioner-only UI, normal Inactive and final pilot revoke passed. Pilot approval alone grants no membership. Security/custodian: full hosted clinical/privileged-API boundaries and direct replay/concurrency. |
+| AUTH-03 | Partial | Normal Inactive denied retained-session requests before pilot revoke; application card cleared on final pilot denial. Dashboard shell remained after widget 403 until reload. Identity/security: resolve stale UI and approve idle/absolute/MFA/lost-device/departure policies. |
 | AUTH-04 | Partial | New draft/reference stays in memory; no new token storage. Existing MSAL sessionStorage exception unresolved. Security: approve time-bounded exception or separate architecture remediation. |
 | AUTH-05 | Partial | Same existing central admin grant/scope, no Graph/provider permission changes. Identity/operations: inventory actual deployed grants and DB lock/runtime privileges. |
 | SEC-01 | Partial | Synthetic tests, private files/PDF/builds excluded; 239 package checks/signature scan passed. Build/security: complete indicated history/PHI review and accountable artifact acceptance. |
@@ -641,14 +666,14 @@ below are roles awaiting named appointments; no human approval is inferred. Hist
 | DEV-01 | Implemented (task scope) | Dedicated feature branch, existing work/PDF preserved, instructions/config/locks/migrations/docs reviewed. Maintainer: review/push/merge only within authority. |
 | DEV-02 | Implemented (local scope) | Focused changes, no new any/ts-ignore/skips/dependency or suppressed failure; initial defects recorded. Maintainer/security: independent review. |
 | DEV-03 | Partial | Locks unchanged; exact versions/audits above; 11 moderate build findings unresolved. Build/security: exposure decision/remediation; exact frontend/website/private-Composer restores now passed. |
-| DEV-04 | Partial | Real lint/types/build/browser/PHP/dual-engine checks recorded; hosted acceptance still separate. QA/release: finish final checkpoint and provider flows. |
+| DEV-04 | Partial | Real lint/types/build/browser/PHP/dual-engine checks recorded; both provider returns and scoped Google returning/Microsoft new-registration rehearsal passed. QA/release: complete documented broader hosted and accessibility omissions. |
 | DEV-05 | Partial | EN/FR modal, labels, keyboard/unsaved guards, focus restoration and mobile checks. Accessibility/legal/product: full AT/contrast/zoom and applicability review. |
 | DEV-06 | Partial | No polling/dependencies; bounded indexed queries and identity-scoped locks. Build/performance: assess existing chunks, clinic-lock contention and representative scale. |
 | REL-01 | Partial | This dated 38-control ledger/file/test matrix; named human owners/decisions absent. Release owner: assign and retain evidence. |
 | REL-02 | Partial | Local commands/results and failures recorded; dedicated suites explicitly required. QA: verify final counts and operational omissions. |
-| REL-03 | Partial | New assets: 140 hash/length/MIME matches; nine new HTML matches; separate practitioner/workforce rendering; nine earlier anonymous API checks; 239 local artifact checks. Schema/current backup verified, private hashes/authenticated acceptance/restore rehearsal pending. Operations/release: complete configuration rollout and hosted synthetic acceptance/rollback. |
+| REL-03 | Partial | Public artifact hashes, schema/backup and final scoped provider/registration/trial/Inactive/revoke/gate closure checks recorded above. Operations/release: remote private hashes, broader hosted boundaries/concurrency and actual restore rehearsal remain open. |
 | REL-04 | Implemented (decision only) | NOT READY FOR RELEASE; no failed/pending control waived by local tests. Accountable owners: resolve or approve lawful scoped internal exceptions. |
-| REL-05 | Partial | Controlled rollout authorized; owner applied 058 and copied API/assets/HTML/settings, structure/current backup/public hashes verified; public application gate available with intake closed. Private hashes/authenticated managed approvals pending. Release/custodian/security/privacy/clinical: complete acceptance and accountable signatures. |
+| REL-05 | Partial | Controlled deployment/schema/settings/plan/terms/rehearsal authorized; final test users Inactive/revoked and intake/activation closed, histories retained. Private hashes, recovery and accountable release/custodian/security/privacy/clinical decisions remain open. |
 | REL-06 | Implemented (report scope) | File purposes, versions/flows, commands, findings, limits, owners and rollback recorded; final checkpoint to bind exact source. Release owner: confirm report. |
 
 ## Private configuration preparation

@@ -1,5 +1,16 @@
 # Practitioner pilot access administration
 
+**2 November final — authorized rehearsal complete:** Both test staff users are Inactive
+with original emails retained and both pilot entries revoked. The Microsoft session was
+denied while pilot still allowed, then its application refresh was denied after pilot
+revocation and cleared prior status. Wellnexa intake/activation are closed; LivinLively
+remains closed. One Microsoft membership, billing account, CAD 0 six-calendar-month trial
+and activation event were verified by minimized read-only SQL; no published profile.
+Histories and the trialing subscription remain retained. The [final hosted record](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md)
+qualifies UI-shell/autofill and untested release boundaries. No messages, charges or patient
+bookings. Earlier pending/open-intake states below are historical. Reopening, reactivation
+and commercial billing/offboarding are separate owner decisions; do not delete evidence.
+
 **2 November current — owner activation passed:** The Microsoft session now reaches the
 practitioner dashboard; own status shows activated with trial ending 2 May 2027, all setup
 and publication checklist items Pending. Clinic Staff access shows practitioner only and

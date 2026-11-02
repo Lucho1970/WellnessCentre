@@ -7,6 +7,80 @@ Continues the owner-authorized controlled rehearsal; no merge or general release
 
 ## Hosted finding and current account state
 
+### Final rehearsal checkpoint — 2 November 2026
+
+Observed against documentation baseline `c89362e` and deployed application JSON patch source
+`d61a94cc628c485164db5483c3f292909d6dadbe`. This checkpoint supersedes the pending statements
+in the historical observations below. The owner reported both hosting ready and Inactive
+saved. Clinic Staff access shows the original approved Microsoft email, practitioner role
+and Inactive status. Google is also Inactive with its original email preserved.
+
+Before changing pilot approval, Refresh in the retained Microsoft dashboard returned HTTP
+403 and permission-denied messages. The old workspace shell/buttons remained until a full
+page reload; full reload then showed only permission denial, Retry, application and sign-out
+links. This proves ordinary Inactive independently denies the next protected request while
+pilot access is allowed. It does not prove push revocation or immediate removal of already
+rendered data. Its own application retained activated history/trial date with the explicit
+warning that refreshing cannot restore revoked access; no activation/workspace button was
+offered. No bearer/token bytes were inspected or replayed directly.
+
+Three read-only phpMyAdmin SELECT statements, scoped to the approved synthetic pilot labels
+and `wellnexa.copihue.ca`, verified:
+
+| Check | Result |
+| --- | --- |
+| Google / Microsoft memberships | One retained membership each; one Inactive local staff user each; zero effective active staff memberships each. Pilot state at this query: Google revoked, Microsoft still approved, deliberately proving ordinary Inactive separately. |
+| Microsoft application / subscription | `activated` / `trialing`; CAD 0 plan. |
+| Trial start / end, UTC | `2026-11-02 15:56:42` / `2027-05-02 14:56:42`; stored timezone `America/Toronto`. |
+| Toronto local interval | `2026-11-02 10:56:42` to `2027-05-02 10:56:42`, exactly six calendar months despite the offset change. PowerShell `TimeZoneInfo.ConvertTimeFromUtc` and local `AddMonths(6)` equality returned true, exit 0. |
+| Microsoft account / subscription / activation-event counts | 1 / 1 / 1. No duplicate enrollment observed after normal own-status revisits; no forged activation request was sent. |
+| Published Microsoft profiles | 0. |
+
+The owner opened a new Chrome/phpMyAdmin window; one activation attempt against the old
+window reported no foreground process ID. Fresh window selection recovered successfully.
+One SQL editor focus inspection returned a stale address-bar accessibility focus; no text
+was typed until a first-line caret was visibly confirmed. No SQL write, dump, credentials,
+identity subject, email, phone, application body or patient record was retrieved for these
+checks. Read-only administrative SQL remains outside the API's disclosure-audit boundary.
+
+Central Admin subsequently closed **both Wellnexa intake and activation**, preserving plan,
+terms, consent, application, membership, trial and decision history. Save succeeded and the
+activated application remains listed. Verified-TLS anonymous `Invoke-RestMethod -Uri
+https://wellnexa.copihue.ca/api/v1/public/practitioner-applications -TimeoutSec 25` and the
+equivalent LivinLively URL both returned `data.enabled=false` and
+`data.activation_available=false`. Closed offers hide plan/terms; null public fields do not
+mean stored evidence was deleted. No LivinLively setting or account was changed.
+
+The Microsoft pilot entry was then revoked through normal central Admin with an explicit
+completion reason; the successful save and Pilot access revoked state were observed.
+Refresh application in the preserved Microsoft session returned the pilot denial and
+cleared the prior account/trial card. Google remains pilot-revoked. Mail/SMS stay disabled;
+no patient bookings, publication, charges or messages were made by this rehearsal.
+
+The completed hosted scope is Microsoft new registration, owner consent, synthetic review,
+activation, single six-calendar-month CAD 0 trial, practitioner access, clinic-admin UI
+denial, normal Inactive and final pilot revocation. Google covers the owner-selected existing
+profile/Inactive case rather than fresh registration. A fresh provider sign-in after final
+Inactive, direct hosted activation replay/concurrency, privileged-API negatives, full
+clinical isolation, load/accessibility and restore are not established by these UI checks.
+Prior disposable tests remain separately scoped. Browser autofill can change an unsaved
+administrative email; the owner corrected it before saving. Record this and the stale
+workspace-shell behavior as UI/session follow-ups, alongside the existing callback-fragment,
+sessionStorage, narrow filter layout and infrastructure/accountable-owner release gaps.
+
+This final follow-up changes only four maintained documents: this report (results/limits),
+the pilot guide (operator state), live-test runbook (closure/offboarding), and 38-control
+ledger (scoped evidence/next actions). No new runtime code, dependency/version, schema,
+grant, consent wording, endpoint or external flow. `git diff --check` passes; broad local
+build/test/audit suites were not rerun for hosted observation/documentation. The existing
+CAD 0 subscription remains recorded as trialing; ordinary Inactive and pilot revocation
+restrict access without canceling billing history. Commercial departures require separate
+booking, publication, billing, communications and number reviews. Do not delete retained
+records or restore the pre-registration database as test cleanup. Current restrictive
+closure is the intended resting state; reopening/reactivating is a separate owner decision.
+
+### Historical observations
+
 **Owner activation observed, 2 November:** The owner personally accepted activation terms
 and reported activated. The retained Microsoft session reached the practitioner dashboard.
 Its own application page reports Account activated and a trial end displayed as 2 May 2027,
@@ -134,7 +208,7 @@ process `OPENSSL_CONF=C:/Program Files/Git/usr/ssl/openssl.cnf`.
 | `./scripts/test-recurring-sql.ps1 -MariaDbDirectory .tmp/recurrence-db-runtime/package/mariadb-11.4.8-winx64 -Port 13343 -IntegrationTest practitioner-applications.php` | **36 + 122 passed**, exit 0; server stopped. |
 | Each `php api/tests/<root-file>.php` with the process OpenSSL setting | All **61 standalone scripts passed**, zero failures; ignored per-file report `.tmp/application-json-php-results.json`. |
 | `git diff --check` | Passed; normal Git line-ending notices only. |
-| Hosted submission / queue / review | Owner submission and queue passed; detail failed twice before the patch, then original history/detail and synthetic approval passed after owner upload. Same-session workspace denials passed both before and after approval; activation/trial/Inactive remain pending. |
+| Hosted rehearsal | Owner submission/consent, corrected detail/history, synthetic approval, activation, single six-calendar-month CAD 0 trial, practitioner access, clinic-admin UI denial, ordinary Inactive, final pilot revocation and both-clinic gate closure passed in the scoped final checkpoint above. |
 
 No frontend source changed. Frontend/website builds, browser suites, clean dependency restores,
 dependency audits, broad SQL suites for unrelated modules, load/accessibility/penetration and
@@ -149,7 +223,7 @@ SEC-04 preserves exact JSON evidence and strict decode; SEC-06/07 retain audit a
 errors with private redacted diagnostics; DEV-03 has no dependency change; DEV-04/REL-02 add
 the failing regression, successful HTTP detail and dual-engine results. PRIV-02/REL-03/05
 record the owner's submission, successful hosted detail/approval and same-session workspace
-denials; activation, trial and normal Microsoft Inactive acceptance remain pending. No
+denials, owner activation, recorded trial, normal Microsoft Inactive and final revocation. No
 organizational control is upgraded by these local or narrowly scoped hosted results.
 Named custodian/privacy, security/operations, clinical and release-owner decisions remain
 required before real-data/general release; previous legal applicability is not reverified here.
