@@ -12,6 +12,10 @@ npm run lint
 npm run test:session-prototype
 ```
 
+The recorded full run exits 1: Edge passes all 44 cases; WebKit passes 39 with four
+strict SameSite mismatches and one cancellation-recovery failure. The failing checks
+are retained. See the dated report before interpreting results as browser acceptance.
+
 The dedicated Playwright configuration starts Vite and PHP on loopback ports 5196
 and 5197. It generates disposable signing/control secrets in ignored
 `.tmp/session-security-prototype`; normal teardown removes the two private files.
@@ -41,8 +45,10 @@ does not provide a persistent refresh-token fallback, provider logout, privilege
 recent-authentication flows or real MFA. Existing application auth is unchanged.
 
 Reports and traces are kept out of Git. The prototype disables Playwright traces;
-its retained diagnostics contain classifications and key names, never token or
-cookie values. Its UI and fixtures must never be pointed at real identities.
+its current diagnostics use classifications and key names. Initial development
+route errors included generated synthetic request headers in ignored private logs;
+do not share those logs as sanitized output. Its UI and fixtures must never be
+pointed at real identities.
 
 See [the dated results and remaining gates](../../documentation/SESSION_SECURITY_PROTOTYPE_2026-11-02.md)
 and [the implementation plan](../../documentation/SESSION_SECURITY_REVIEW_2026-11-02.md).

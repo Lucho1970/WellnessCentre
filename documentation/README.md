@@ -1,6 +1,7 @@
 # Wellness Centre Documentation
 
-- [Session security review and implementation plan — 2 November 2026](SESSION_SECURITY_REVIEW_2026-11-02.md): current staff/client/central storage and expiry findings, proposed memory-token/server-session design, decisions, work packages, tests and rollout/rollback. Review only; no authentication changes authorized or made.
+- [Session security feasibility prototype — 2 November 2026](SESSION_SECURITY_PROTOTYPE_2026-11-02.md): isolated MSAL memory/popup and PHP bearer-plus-cookie experiment, local browser/HTTP results, temporary-storage inventory, limitations and remaining production decisions. Production unchanged.
+- [Session security review and implementation plan — 2 November 2026](SESSION_SECURITY_REVIEW_2026-11-02.md): staff/client/central storage and expiry findings, proposed session design, decisions, work packages and rollout/rollback. Later authorization covers the separate local WP0 prototype only.
 - [Practitioner UI reliability — 2 November 2026](PRACTITIONER_UI_RELIABILITY_2026-11-02.md): post-rehearsal contact-edit, access-denial, callback and filter fixes; validation, control ledger and frontend-only package/rollback. Prepared work does not reopen hosted access.
 - [Practitioner application review JSON fix](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md): submitted application, hosted UTF-8 decode failure, evidence-preserving JSON retrieval, dual-engine regression and one-file rollback.
 - [Practitioner pilot approval response fix](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md): hosted pending/approval failure, PDO numeric-string regression, dual-engine checks and private one-file rollout.

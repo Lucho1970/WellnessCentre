@@ -2,6 +2,12 @@
 
 **Review and proposal only. No authentication behavior has been changed.**
 
+**Follow-up:** the owner subsequently authorized WP0 as an isolated local synthetic
+prototype, keeping production unchanged. See the [prototype results](SESSION_SECURITY_PROTOTYPE_2026-11-02.md).
+The original source review below remains historical evidence. Local feasibility
+work does not approve production integration, transient-storage exceptions, actual
+provider controls, migrations, deployment or merging.
+
 Source reviewed: `4b7ed03` (completed practitioner UI/revocation checkpoint).
 Branch: `feature/session-security-review`, created from that revision, not merged into
 main. Reviewer: Codex, source/local synthetic checks and bounded anonymous HTTP evidence.
@@ -48,9 +54,13 @@ silently disable a session guard to make a provider work.
 | D5 — revocation authority | Approve self-session revocation, clinic-scoped staff-session administration and a separately privileged central emergency process. Central billing/support does not imply clinical access. | Custodian + security |
 | D6 — release | Approve exact migrations, configuration, identity-registration edits if needed, hosted synthetic scope, backups and rollback after the implementation artifact exists. | Operations + release owner |
 
-The owner requested a review/plan before authentication changes. That authorizes this
+At the time of this review, the owner requested a review/plan before authentication changes. That authorized this
 document and read-only assessment, not D1–D6 implementation, tenant changes, schema
 application, new grants, account reactivation, deployment or merging.
+
+The later WP0 authorization covers the separate synthetic harness only. D1–D6
+production decisions and WP1 onward remain outstanding; the follow-up report
+distinguishes local passes from unverified hosted/provider/browser acceptance.
 
 ## Verified current design
 
