@@ -1,6 +1,39 @@
 # Wellnexa practitioner live-test rollout and account retirement
 
-## Latest checkpoint: both provider pilot tests passed; registration still closed
+## Latest checkpoint: approved rehearsal intake open; activation held
+
+**2 November subsequent checkpoint — approved rehearsal configured:** The owner approved
+the exact test-only plan and wording, completed hosting sign-in and manually saved the fresh
+backup after computer control stopped on browser URL detection. The private file
+`D:/Dev/WellnessCentre-backup/database/wellness_centre-2026-11-02-before-registration.sql`
+is 2,039,776 bytes; SHA-256
+`7a91aa3ca77a5c289d2411450abdfcbb0ab60f8f79b5766d57dcd095de2130b4`.
+Metadata/structural verification found 152 CREATE TABLE statements, 103 INSERT statements,
+COMMIT and the pilot table; no records were displayed. Restoration remains untested.
+
+Through central Admin the agent saved `wellnexa-registration-rehearsal` version 1,
+practitioner scope, CAD 0 with only booking/calendar/client-management enabled. No subscription
+was manually created. Wellnexa intake was then opened with that plan, America/Toronto and
+the approved bilingual terms; activation stays disabled. The readiness reason explicitly
+limits the acknowledgement to the controlled synthetic rehearsal, not real PHI, professional
+credential verification or general release. Two successful saves were observed. Read-only
+HTTPS offer checks confirmed Wellnexa enabled / activation false / plan 0 cents / terms v1,
+and LivinLively disabled / activation false / no plan or terms. The API uses a `data` envelope;
+an initial unwrapped inspection produced blank fields and was corrected before verification.
+Exact ordinal comparison with the runbook's unwrapped bilingual paragraphs passed (1,719
+characters); hosted terms SHA-256
+`6097467fc2c0e74a3c6bd215d673a5d66189f6166f9f932a1fa5e371125f2416`.
+Microsoft pilot access was subsequently restored through its retained Admin entry with an
+owner-approval reason. Save succeeded and Admin showed Allowed for pilot. Refresh application
+in the preserved Microsoft tab loaded a blank new-application form, the CAD 0 test plan and
+terms v1. The agent filled the synthetic name/profile fields and only the owner-approved
+contact email; optional phone/enquiry reference remain empty. No professional qualification
+is claimed. Both applicant confirmation boxes remain unchecked and submission was handed to
+the owner. At this checkpoint no application, activation or trial has been created. Google
+remains Inactive/pilot-revoked. Earlier closed-intake/both-revoked statements below are historical.
+Rollback closes Wellnexa intake/activation and restores no plan/terms selection through Admin,
+while preserving the newly created plan version, terms and audit history. No deployment,
+schema, dependency, permission, endpoint or external data-flow changes accompany these settings.
 
 **2 November:** The owner authorized using the older Google profile and disabling it
 afterward. The original email and saved Wellnexa Inactive status were verified. Its preserved
@@ -37,7 +70,7 @@ America/Toronto timezone and no submitted applications; the shared plan catalogu
 The unchanged settings form was closed without saving. No plan, application, trial, pilot
 reapproval or other hosted mutation has occurred in this continuation yet.
 
-This proposal is **not saved or enabled on the host** and is not the commercial beta offer.
+This approved proposal is now configured as recorded above; it is not the commercial beta offer.
 It prepares the remaining approved Microsoft account's new-registration test without choosing
 unconfirmed commercial pricing. The earlier CAD 10 per practitioner / CAD 100 clinic cap is
 an SMS spending allowance, not an agreed subscription price. Commercial cost estimates remain
@@ -78,7 +111,7 @@ Proposed exact single terms field (both languages in one versioned record):
 > l’historique de la demande et des décisions sera conservé. Ce test ne constitue pas une
 > vérification des titres professionnels et ne remplace pas de futures conditions commerciales.
 
-Before saving, the release owner must approve this exact test-only scope/wording and confirm
+The original preparation gate required the release owner to approve this exact scope/wording and confirm
 that the permitted operator is authorized to record synthetic review attestations without
 claiming real credential verification. Record current settings/revision and fresh backup,
 save through Admin with a test reason, and verify the displayed plan/terms before asking the

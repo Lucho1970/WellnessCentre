@@ -12,6 +12,23 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### 2 November subsequent checkpoint: approved synthetic plan and intake configuration
+
+The owner explicitly approved the reviewed rehearsal plan and bilingual terms. Fresh private
+backup structural/hash verification and two hosted Admin saves passed as detailed in the
+[live-test record](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md). Plan v1 is practitioner/CAD 0,
+booking/calendar/client-management only. Wellnexa intake is open, activation held; LivinLively
+remains closed with no plan/terms. Exact approved wording comparison passed. No subscription,
+application, activation, membership or trial was created in this setup. Microsoft's pilot
+approval was then restored with its owner-verification attestation and explicit test reason;
+its preserved session now renders the new-application form with plan/terms v1. Synthetic
+details are filled, acceptance/submission handed to the owner; Google remains Inactive and
+revoked. Settings rollback preserves versioned plan/terms/audit
+records; actual database restore remains untested. Source patch/locks/dependencies, grants,
+endpoints and external data flows are unchanged. All 38 statuses remain qualified as below;
+PRIV-02/REL-05 now include this exact owner-approved synthetic-only configuration, without
+claiming real-data, clinical credential or general release acceptance.
+
 ### 2 November: Google returning-profile, ordinary Inactive and final revoke passed
 
 The owner chose existing-profile testing and completed the normal Staff access edit after

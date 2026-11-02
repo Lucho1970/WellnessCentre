@@ -1,5 +1,17 @@
 # Practitioner pilot access administration
 
+**2 November subsequent rehearsal setup:** After explicit owner approval and fresh private
+backup verification, the CAD 0 synthetic practitioner plan v1 and bilingual joining terms v1
+were saved through Admin. Wellnexa intake is now open under the existing pilot restriction;
+activation remains held. Read-only offers verify LivinLively remains closed without plan/terms,
+and Wellnexa's displayed wording exactly matches the approved 1,719-character text. Microsoft's
+retained pilot entry was then allowed with an explicit rehearsal reason. Its preserved session
+now shows the new-application form; synthetic details are filled but both applicant acceptance
+boxes remain unchecked, pending owner submission. Google stays revoked and Inactive. No
+application/activation/trial has been created at this checkpoint. See the
+[current rehearsal record](WELLNEXA_PRACTITIONER_LIVE_TEST_2026-11-01.md).
+The older final checkpoints below describe the preceding closed-intake state.
+
 **2 November checkpoint — Google existing-profile test complete:** With the owner's choice
 to use the older Google profile, normal Wellnexa Staff access was saved as Inactive and
 the original email verified. Temporarily allowing its pilot entry still produced permission
