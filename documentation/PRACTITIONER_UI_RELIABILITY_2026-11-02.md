@@ -143,6 +143,15 @@ AT/contrast/theme/zoom audit, load/penetration and backup restore were not repea
 Mocked browser success is not hosted acceptance. Test logs and screenshots remain ignored
 under `.tmp/` and browser test-results directories. The unrelated PDF is preserved.
 
+The initial production-artifact browser command passed 13/15. One failure was invocation
+configuration: the explicitly enabled pilot artifact requires `BUILD_PRACTITIONER_SIGN_IN=1`
+for its existing boundary test. The other caught a real public-build isolation regression:
+the new shared helper's `/auth/me` exclusion literal was included in marketing output.
+The signal is now explicitly gated to the portal surface so public builds tree-shake that
+staff branch. The existing no-staff-authentication/private-module assertion is retained,
+not relaxed. A new committed artifact will replace the otherwise verified v2 package;
+final production-artifact retest remains pending at this checkpoint.
+
 ## Package, approval and rollback
 
 The versioned builder accepts a release name and the reviewed previous private/local
