@@ -26,6 +26,17 @@ will not accept joining terms on the applicant's behalf.
 
 ### Proposed Microsoft registration rehearsal — awaiting owner review
 
+**2 November approval received:** The owner explicitly selected **Approve the test-only plan
+and wording** for the exact proposal below. Its existing heading/anchor is retained for
+earlier review links. This authorizes the described rehearsal settings and synthetic review,
+not real commercial terms, clinical credential verification or general release. Before any
+save, fresh backup verification is pending: the former phpMyAdmin session expired and the
+hosting browser redirected to Netfirms Login. Authentication was handed to the owner. Admin
+inspection confirms Wellnexa has intake and activation closed, no selected plan, empty terms,
+America/Toronto timezone and no submitted applications; the shared plan catalogue is empty.
+The unchanged settings form was closed without saving. No plan, application, trial, pilot
+reapproval or other hosted mutation has occurred in this continuation yet.
+
 This proposal is **not saved or enabled on the host** and is not the commercial beta offer.
 It prepares the remaining approved Microsoft account's new-registration test without choosing
 unconfirmed commercial pricing. The earlier CAD 10 per practitioner / CAD 100 clinic cap is
