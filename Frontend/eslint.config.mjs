@@ -13,6 +13,7 @@ export default tseslint.config(
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
   },
   { files: ['src/**/*.{ts,tsx}'], languageOptions: { globals: globals.browser } },
+  { files: ['prototypes/session-security/**/*.ts'], languageOptions: { globals: globals.browser } },
   { files: ['scripts/**/*.mjs', '*.mjs', '*.config.ts'], languageOptions: { globals: globals.node } },
   { files: ['tests/**/*.{ts,mjs}'], languageOptions: { globals: { ...globals.browser, ...globals.node } } },
   {

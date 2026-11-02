@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node", "vite/client"] },
+  "include": ["prototypes/session-security/**/*.ts", "tests/session-security-prototype.spec.ts", "tests/helpers/sessionPrototype.ts", "tests/helpers/sessionPrototypeSetup.ts", "tests/helpers/sessionPrototypeTeardown.ts", "playwright.session-prototype.config.ts", "vite.session-prototype.config.ts"],
+  "references": []
+}

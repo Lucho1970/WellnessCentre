@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Local session feasibility prototype</title><style>pre { white-space: pre-wrap; overflow-wrap: anywhere; } button { margin: .25rem; } :focus-visible { outline: 3px solid #164b72; outline-offset: 2px; }</style></head>
+<body>
+  <main>
+    <h1 id="heading">Local session feasibility prototype</h1>
+    <p id="notice">Synthetic identities only. This harness is not part of the deployed application.</p>
+    <p id="realm"></p>
+    <button id="login" type="button">Sign in</button>
+    <button id="check" type="button">Check session</button>
+    <button id="activity" type="button">Record activity</button>
+    <button id="renew" type="button">Renew token and check session</button>
+    <button id="logout" type="button">Sign out locally</button>
+    <p id="status" role="status" tabindex="-1">Starting</p>
+    <section id="workspace" hidden><h2 id="dashboard-heading">Synthetic dashboard</h2><p id="no-patients">No patient data.</p><p id="account"></p></section>
+    <h2 id="storage-heading">Storage key metadata (values omitted)</h2><pre id="diagnostics"></pre>
+  </main>
+  <script type="module" src="/prototypes/session-security/main.ts"></script>
+</body></html>
