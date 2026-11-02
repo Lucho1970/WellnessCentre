@@ -95,7 +95,9 @@ final class PractitionerApplicationService
         });
         if($method==='GET' && preg_match('#^/([1-9][0-9]*)$#D',$tail,$m))return $this->read($clinic,$actor,function()use($clinic,$m):array{
             $app=$this->q('SELECT * FROM practitioner_applications WHERE id=? AND clinic_id=?',[(int)$m[1],$clinic])->fetch();if(!$app)throw new ApiException(404,'application_not_found','Application not found.');unset($app['identity_id']);
-            $submissions=$this->q('SELECT version,terms_id,details,submitted_at FROM practitioner_application_submissions WHERE application_id=? ORDER BY version DESC',[$app['id']])->fetchAll();
+            // JSON is stored as UTF-8. Retrieve its bytes without a legacy result-
+            // charset conversion; never guess an encoding or replace evidence.
+            $submissions=$this->q('SELECT version,terms_id,CAST(details AS BINARY) AS details,submitted_at FROM practitioner_application_submissions WHERE application_id=? ORDER BY version DESC',[$app['id']])->fetchAll();
             foreach($submissions as &$submission)$submission['details']=json_decode($submission['details'],true,512,JSON_THROW_ON_ERROR);
             return ['application'=>$app,'submissions'=>$submissions,'events'=>$this->q('SELECT action,reason,created_at FROM practitioner_application_events WHERE application_id=? AND clinic_id=? ORDER BY id DESC LIMIT 50',[$app['id'],$clinic])->fetchAll()];
         });

@@ -1,5 +1,14 @@
 # Practitioner pilot access administration
 
+**2 November — application submitted; Admin review read needs a compatibility fix:** The
+owner accepted terms v1 and submitted the Microsoft test application. Submission appears in
+both the applicant session and Wellnexa Admin. Review detail fails twice; the owner's private
+log classifies invalid UTF-8 when decoding submission history. No approval was attempted;
+activation stays held, Microsoft pilot-allowed, Google Inactive/revoked. The
+[focused JSON fix](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md) preserves stored evidence
+bytes and passes 36 + 122 checks on each disposable engine plus 61 standalone PHP scripts.
+Hosted correction/review/activation remain pending; do not resubmit or delete the application.
+
 **2 November subsequent rehearsal setup:** After explicit owner approval and fresh private
 backup verification, the CAD 0 synthetic practitioner plan v1 and bilingual joining terms v1
 were saved through Admin. Wellnexa intake is now open under the existing pilot restriction;

@@ -12,6 +12,21 @@ untouched and excluded. Implementation authorization does not establish organiza
 
 ## Hosted follow-up after the owner's database update
 
+### 2 November: owner submission passed; review JSON failure reproduced and corrected locally
+
+The owner accepted the approved terms and submitted the synthetic Microsoft application;
+both own status and clinic-scoped Admin queue verify submission. Two review-detail reads
+failed before any approval. The private log reports JsonException/code 5 at the submission
+decode line; it is excluded from Git. On continuation branch
+`bugs/practitioner-application-json-encoding`, a native-driver lossy-result regression fails
+before the narrow binary JSON projection and passes after it. Both engines pass 36 ledger +
+122 application SQL/HTTP/concurrency checks; all 61 standalone PHP scripts pass. The
+[dated finding](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md) records exact commands,
+initial defaults-only pass, limits, files and rollback. Actual host session charset remains
+unverified. The 38 statuses below apply with its stated scope qualifications; none grants
+general hosted/organizational acceptance. Activation remains held, Microsoft pilot allowed,
+Google Inactive/revoked; approval/trial/ordinary Microsoft Inactive are not yet tested live.
+
 ### 2 November subsequent checkpoint: approved synthetic plan and intake configuration
 
 The owner explicitly approved the reviewed rehearsal plan and bilingual terms. Fresh private

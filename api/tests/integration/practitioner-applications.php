@@ -23,6 +23,9 @@ require __DIR__.'/subscription-foundation.php';
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/042_global_practitioners.sql'));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/047_practitioner_enquiries.sql'));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/049_access_audit_events.sql'));
+// Match the hosted legacy database default while retaining the UTF-8 connection.
+// Native MySQL JSON retrieval must preserve non-ASCII submitted evidence too.
+$pdo->exec("ALTER DATABASE `$name` CHARACTER SET latin1 COLLATE latin1_swedish_ci");
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/055_practitioner_applications.sql'));
 $pdo->exec("INSERT INTO locations(id,clinic_id,name,timezone) VALUES(1,1,'Virtual','America/Toronto'),(2,2,'Foreign','America/Toronto');
  INSERT INTO clinic_hosts(host,clinic_id) VALUES('wellnexa.test',1),('other.test',2);
@@ -50,7 +53,7 @@ $noDurable=new PractitionerApplicationService($database,applicationConfig($port,
 $denied(fn()=>$noDurable->admin($actor,1,'POST','/settings',$key($settings),'test'),409,'Durable sign-in required before enabling activation');
 $configured=$admin('POST','/settings',$key($settings));$offer=$service->publicInfo(1);
 $check($offer['enabled'] && $offer['terms']['version']===1 && $offer['plan']['base_monthly_cents']===null,'Only operator-published terms and unpriced beta offer are exposed');
-$profile=['version'=>0,'given_name'=>'Alice','family_name'=>'Applicant','email'=>'alice@example.test','phone'=>'','discipline'=>'Synthetic practice','credentials'=>'Declared synthetic credential','service_area'=>'Toronto, Ontario','services'=>'Synthetic services for local testing only.','enquiry_reference'=>'','terms_id'=>$offer['terms']['id'],'accept_terms'=>true,'information_confirmed'=>true];
+$profile=['version'=>0,'given_name'=>'Alice','family_name'=>'Applicant','email'=>'alice@example.test','phone'=>'','discipline'=>'Synthetic practice','credentials'=>'Déclaration synthétique — essai contrôlé, aucune qualification réelle.','service_area'=>'Toronto, Ontario','services'=>'Services synthétiques pour l’essai seulement.','enquiry_reference'=>'','terms_id'=>$offer['terms']['id'],'accept_terms'=>true,'information_confirmed'=>true];
 $denied(fn()=>$service->submit(1,new VerifiedIdentity('customer','customer','alice','test'),$key($profile),'test'),403,'Customer identity cannot apply as staff');
 $denied(fn()=>$service->submit(1,$alice,$key($profile+['role'=>'super_admin']),'test'),422,'Application cannot inject a role');
 $denied(fn()=>$service->submit(1,$alice,$key(array_replace($profile,['accept_terms'=>false])),'test'),422,'Explicit terms acceptance required');
@@ -69,6 +72,16 @@ $admin('POST',"/$id/review",$key(['version'=>1,'decision'=>'changes_requested','
 $denied(fn()=>$service->submit(1,$alice,$key(array_replace($profile,['version'=>1])),'test'),409,'Stale applicant revision denied');
 $service->submit(1,$alice,$key(array_replace($profile,['version'=>2,'services'=>'Clarified synthetic services.'])),'test');
 $detail=$admin('GET',"/$id");$check(count($detail['submissions'])===2,'Revised applications retain immutable submitted history');
+$check($detail['submissions'][0]['details']['credentials']===$profile['credentials'] && $detail['submissions'][1]['details']['services']===$profile['services'],'Legacy-default JSON submission history preserves exact non-ASCII evidence');
+// Reproduce a lossy JSON result conversion with the real driver, without using
+// hosted records. The service must retrieve the original UTF-8 evidence bytes.
+$pdo->exec('SET character_set_results=latin1');
+try {
+    $legacyDetail=$admin('GET',"/$id");
+    $check($legacyDetail['submissions'][0]['details']['credentials']===$profile['credentials'] && $legacyDetail['submissions'][1]['details']['services']===$profile['services'],'Submission history survives legacy result encoding without replacing characters');
+} finally {
+    $pdo->exec('SET character_set_results=utf8mb4');
+}
 $admin('POST',"/$id/review",$key(array_replace($review,['version'=>3])));
 $denied(fn()=>$notReady->activate(1,$alice,$key(['version'=>4,'accept_terms'=>true,'terms_id'=>$offer['terms']['id']]),'test'),503,'Approval alone does not bypass activation rollout');
 // Preserve this identity's existing global profile and another clinic's independent records.
@@ -184,6 +197,8 @@ try {
     $check($http('wellnexa.test','/api/v1/auth/me',$pendingToken)[0]===403,'Submission does not grant staff access');
     $check($http('wellnexa.test','/api/v1/clients',$pendingToken)[0]===403,'Unapproved applicant cannot read patient records');
     $check($http('portal.test','/api/v1/application/clinics/1/practitioner-applications',$adminToken)[0]===200,'Central grant can read applications');
+    $httpDetail=$http('portal.test','/api/v1/application/clinics/1/practitioner-applications/'.$created[1]['data']['id'],$adminToken);
+    $check($httpDetail[0]===200 && $httpDetail[1]['data']['submissions'][0]['details']['credentials']===$profile['credentials'],'Authorized HTTP review preserves non-ASCII submitted evidence');
     $check($http('portal.test','/api/v1/application/clinics/2/practitioner-applications/'.$id,$adminToken)[0]===404,'Central detail is clinic scoped');
     $check($http('wellnexa.test','/api/v1/application/clinics/1/practitioner-applications',$adminToken)[0]===404,'Clinic host cannot perform central review');
     $check($http('portal.test','/api/v1/application/clinics/1/practitioner-applications',$appToken)[0]===401,'External practitioner cannot obtain central privileges');

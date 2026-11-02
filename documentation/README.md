@@ -1,5 +1,6 @@
 # Wellness Centre Documentation
 
+- [Practitioner application review JSON fix](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md): submitted application, hosted UTF-8 decode failure, evidence-preserving JSON retrieval, dual-engine regression and one-file rollback.
 - [Practitioner pilot approval response fix](PRACTITIONER_PILOT_RESPONSE_FIX_2026-11-01.md): hosted pending/approval failure, PDO numeric-string regression, dual-engine checks and private one-file rollout.
 
 - [Practitioner pilot access in Admin](PRACTITIONER_PILOT_ADMIN.md): clinic-scoped pending/approve/revoke/history, independent ownership checks, default-off database gate and proposed migration 058; [current validation and 38-control ledger](PRACTITIONER_PILOT_ADMIN_VALIDATION_2026-11-01.md).

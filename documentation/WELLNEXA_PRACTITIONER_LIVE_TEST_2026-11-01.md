@@ -2,6 +2,17 @@
 
 ## Latest checkpoint: approved rehearsal intake open; activation held
 
+**2 November latest — owner submission confirmed, review blocked:** The owner reported
+submitted, and both the preserved Microsoft session and Wellnexa central Admin queue show
+Application submitted with the exact synthetic profile. Admin detail failed twice before
+any approval mutation. The owner's private log identifies invalid UTF-8 decoding at the
+submission-history line. A [local correction and regression](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md)
+now pass dual-engine 36 + 122 checks and 61 standalone scripts; hosted patch acceptance is
+pending. Keep activation held and retain the submitted consent/evidence. Microsoft is pilot
+allowed with no membership/trial created by this rehearsal; Google stays Inactive/revoked.
+No verification code/account identifiers/log payload are committed. Earlier draft/no-submission
+statements describe their preceding checkpoint and do not supersede this result.
+
 **2 November subsequent checkpoint — approved rehearsal configured:** The owner approved
 the exact test-only plan and wording, completed hosting sign-in and manually saved the fresh
 backup after computer control stopped on browser URL detection. The private file
