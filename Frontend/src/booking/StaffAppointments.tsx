@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { RecurringBooking } from './RecurringBooking';
 import { ManageRecurringSeries } from './ManageRecurringSeries';
@@ -92,7 +93,7 @@ function StaffAppointmentsForm({ canBook, practitionerMode = false, canScheduleO
   useEffect(() => { if (detailsOpen && !selected) setDetailsOpen(false); }, [detailsOpen, selected]);
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
-    const response = await fetch(`${api}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
+    const response = await sessionFetch(`${api}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const text = await response.text();
     let body;
     try { body = JSON.parse(text); } catch { throw new RequestError(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.', { status: response.status }), response.status, 'invalid_response'); }

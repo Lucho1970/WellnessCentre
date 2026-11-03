@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, withFormValidation, useFormValidation, ValidationField } from '../shared/FormValidation';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -28,7 +29,7 @@ function PractitionerWorkLocationForm() {
   };
   const request = async (body?: Settings): Promise<Settings> => {
     const token = await getAccessToken();
-    const response = await fetch(`${api}/profile/work-location`, {
+    const response = await sessionFetch(`${api}/profile/work-location`, {
       method: body ? 'PUT' : 'GET', headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });

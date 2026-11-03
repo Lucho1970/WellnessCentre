@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Card, CardActionArea, CardContent, Chip, CircularProgress, FormControl, IconButton, InputLabel, MenuItem, Select, Stack, Typography } from '@mui/material';
 import { CalendarCheck, Clock3, MailCheck, MapPin, MoveDown, MoveUp, Pencil, RefreshCw, RotateCcw, Save, SlidersHorizontal, X } from 'lucide-react';
@@ -37,7 +38,7 @@ export function Dashboard({ workspace }: { workspace: Workspace }) {
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
   const request=useCallback(async(path:string,init:RequestInit={})=>{
-    const token=await getAccessToken();const response=await fetch(`${api}${path}`,{...init,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',...init.headers}});const text=await response.text();let body;
+    const token=await getAccessToken();const response=await sessionFetch(`${api}${path}`,{...init,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',...init.headers}});const text=await response.text();let body;
     try{body=JSON.parse(text);}catch{reportStaffAccessFailure(response.status,undefined);throw new Error(t('The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.',{status:response.status}));}
     if(!response.ok){reportStaffAccessFailure(response.status,body?.error?.code);throw new Error(apiErrorMessage(body,response.status,t('Request failed (HTTP {{status}}).',{status:response.status})));}return normalizeNumericIds(body.data);
   },[getAccessToken,t]);

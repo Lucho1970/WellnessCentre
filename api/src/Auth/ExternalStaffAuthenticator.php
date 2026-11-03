@@ -104,6 +104,9 @@ final class ExternalStaffAuthenticator implements IdentityAdapter
         catch (Throwable) { throw new ApiException(401, 'invalid_staff_token', 'Invited staff authorization is invalid or expired. Please sign in again.'); }
     }
 
+    /** Existing realm transport for the cookie-session verifier; no client-selected URL. */
+    public function sessionKeys(bool $refresh): array { return $this->keys($refresh); }
+
     private function keys(bool $refresh): array
     {
         if ($this->keyLoader) return ($this->keyLoader)($refresh);

@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useRef, useState } from 'react';
@@ -44,7 +45,7 @@ function CatalogueSettingsForm() {
 
   const request = async (path: string, method = 'GET', body?: unknown) => {
     const token = await getAccessToken();
-    const response = await fetch(`${api}${path}`, {
+    const response = await sessionFetch(`${api}${path}`, {
       method,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,

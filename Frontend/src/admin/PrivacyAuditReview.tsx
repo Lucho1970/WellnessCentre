@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Alert, Box, Button, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +21,7 @@ export function PrivacyAuditReview() {
     try {
       const token = await getAccessToken(); if(controller.signal.aborted)return;
       const query = new URLSearchParams(Object.entries(filters).filter(([,v]) => v !== '')); if(before)query.set('before',String(before));
-      const response = await fetch(`${apiBaseUrl}/admin/privacy-audit?${query}`, {headers:{Authorization:`Bearer ${token}`},cache:'no-store',signal:controller.signal});
+      const response = await sessionFetch(`${apiBaseUrl}/admin/privacy-audit?${query}`, {headers:{Authorization:`Bearer ${token}`},cache:'no-store',signal:controller.signal});
       const body = await response.json(); if(!response.ok)throw new ApiError(body,response.status,t('Unable to load privacy audit history.'));
       if(!controller.signal.aborted)setData(body.data);
     } catch(cause) { if(!controller.signal.aborted)setError(cause instanceof Error ? cause.message : t('Unable to load privacy audit history.')); }

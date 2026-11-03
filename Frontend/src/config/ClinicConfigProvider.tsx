@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { apiErrorMessage } from '../shared/api';
 
@@ -34,7 +35,7 @@ export function ClinicConfigProvider({ children }: PropsWithChildren) {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/site-config`);
+      const response = await sessionFetch(`${apiBaseUrl}/site-config`);
       const body = await response.json();
       if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
       setConfig(body.data);

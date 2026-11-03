@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -43,7 +44,7 @@ function PractitionerClientsForm() {
         const token = await getAccessToken();
         const params = new URLSearchParams({ page: String(page) });
         if (query) params.set('q', query);
-        const response = await fetch(`${apiBaseUrl}/practitioner/clients?${params}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+        const response = await sessionFetch(`${apiBaseUrl}/practitioner/clients?${params}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
         const body = await response.json();
         if (!response.ok) throw new ApiError(body, response.status);
         if (!controller.signal.aborted) setData(normalizeNumericIds(body.data));

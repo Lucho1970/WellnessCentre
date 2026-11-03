@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState } from 'react';
@@ -33,7 +34,7 @@ function StaffNotificationSettingsForm() {
 
   const request = async (path: string, method = 'GET', body?: unknown) => {
     const token = await getAccessToken();
-    const response = await fetch(`${api}/profile/notifications${path}`, {
+    const response = await sessionFetch(`${api}/profile/notifications${path}`, {
       method,
       headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),

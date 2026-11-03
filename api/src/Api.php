@@ -42,6 +42,8 @@ final class Api
     private ?\Wellness\Service\AccessAudit $accessAudit = null;
     private ?\Wellness\Service\PractitionerPilotAccessService $practitionerPilotAccess = null;
     private ?ClinicContext $clinicContext = null;
+    private ?\Wellness\Service\BrowserSessionGateway $browserSession = null;
+    private ?Request $sessionRequest = null;
     private CatalogService $catalog;
     private AvailabilityService $availability;
     private BookingService $bookings;
@@ -63,9 +65,9 @@ final class Api
     private ReminderScheduleService $reminderSchedules;
     private StaffNotificationPreferences $staffNotifications;
 
-    public function __construct(private readonly Config $config,private readonly Database $database)
+    public function __construct(private readonly Config $config,private readonly Database $database,private readonly ?\Closure $sessionKeyLoader=null,private readonly ?\Closure $sessionClock=null)
     {
-        $audit=new AuditLogger($database);$this->workLocations=new PractitionerWorkLocationService($database,$audit);$this->auth=new EntraAuthenticator($config,$database);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit,$config->applicationAdminEnabled && $config->clinicManagementEnabled);$this->admin=new AdminService($database,$audit,$config->applicationAdminEnabled && $config->clinicManagementEnabled);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
+        $audit=new AuditLogger($database);$this->workLocations=new PractitionerWorkLocationService($database,$audit);$this->auth=new EntraAuthenticator($config,$database,$this->sessionKeyLoader ? fn()=>($this->sessionKeyLoader)('workforce',false) : null);$this->availability=new AvailabilityService($database);$this->addressCoverage=new AddressCoverageService($database,$config);$this->bookings=new BookingService($database,$audit,$this->addressCoverage);$this->appointmentLogisticsNotes=new AppointmentLogisticsNotesService($database,$audit);$this->practitionerTravel=new PractitionerTravelService($database,$config,$audit);$this->practitionerVisits=new PractitionerVisitService($database,$audit);$this->practitionerQualifications=new PractitionerQualificationService($database,$audit,$config->applicationAdminEnabled && $config->clinicManagementEnabled);$this->admin=new AdminService($database,$audit,$config->applicationAdminEnabled && $config->clinicManagementEnabled);$this->profiles=new ProfileService($database,$audit);$this->publicProfiles=new PractitionerPublicProfileService($database,$audit);$this->clients=new ClientService($database,$audit);$this->dashboard=new DashboardService($database,$audit);$this->notificationStatus=new NotificationStatusService($database);$this->notificationReviews=new NotificationReviewService($database,$audit);$this->reminderSchedules=new ReminderScheduleService($database,$audit);$this->staffNotifications=new StaffNotificationPreferences($database,$audit);
     }
 
     public function handle(): never
@@ -73,7 +75,11 @@ final class Api
         $request=null;
         $this->accessAudit=new \Wellness\Service\AccessAudit($this->database);
         Response::beforeJson(function(array $payload,int $status)use(&$request):void{
-            try { $this->accessAudit->response($request,$payload,$status,$this->clinicContext?->clinicId); }
+            try {
+                $this->browserSession?->beforeAudit($status);
+                $this->accessAudit->response($request,$payload,$status,$this->clinicContext?->clinicId);
+                $this->browserSession?->finish($status);
+            } catch(Throwable $error){$this->browserSession?->abort();throw $error;}
             finally { $this->practitionerPilotAccess?->release(); }
         });
         try{
@@ -81,8 +87,13 @@ final class Api
             if($request->method==='OPTIONS')Response::json([],204,$request->correlationId);
             $host=ClinicContext::normalizeHost((string)($request->headers['host']??''));
             $centralHost=ClinicContext::normalizeHost($this->config->applicationAdminHost);
+            if($request->method==='GET' && $request->path==='/api/v1/auth/session/options'){
+                if($host!==$centralHost)$this->clinicContext=$this->config->clinicManagementEnabled?ClinicContext::resolve($this->config,$this->database,$request):ClinicContext::forHost($this->config,$host);
+                Response::json(['data'=>['enabled'=>\Wellness\Service\BrowserSessionGateway::enabled($this->config,$this->clinicContext,$host===$centralHost)]],200,$request->correlationId);
+            }
             if (str_starts_with($request->path, '/api/v1/application/')) {
                 if ($host!==$centralHost) throw new ApiException(404,'not_found','Route not found.');
+                $this->sessionEndpoint($request,'central');$this->guardSession($request,'central');
                 Response::json(['data'=>$this->applicationRoute($request)],200,$request->correlationId);
             }
             if ($host===$centralHost && !in_array($request->path,['/api/v1/health','/api/v1/health/database'],true)) throw new ApiException(404,'not_found','Route not found.');
@@ -96,13 +107,16 @@ final class Api
             if ($request->method === 'POST' && $request->path === '/api/v1/public/practitioner-enquiries' && PilotPolicy::fromEnvironment()->enabled) {
                 throw new \Wellness\Http\ApiException(403, 'pilot_access_denied', 'Public enquiries are paused during this pilot.');
             }
+            $this->sessionEndpoint($request);
             if (str_starts_with($request->path, '/api/v1/customer/') && $request->path !== '/api/v1/customer/auth/me') {
+                if($request->path!=='/api/v1/customer/auth/options')$this->guardSession($request,'client');
                 Response::json(['data' => $this->customerRoute($request)], 200, $request->correlationId);
             }
             if($request->path==='/api/v1/public/practitioner-applications' || str_starts_with($request->path,'/api/v1/practitioner-applications/')) {
                 header('Cache-Control: no-store');
                 $service=new \Wellness\Service\PractitionerApplicationService($this->database,$this->config);
                 if($request->path==='/api/v1/public/practitioner-applications' && $request->method==='GET')Response::json(['data'=>$service->publicInfo($this->clinicContext->clinicId)],200,$request->correlationId);
+                $this->guardSession($request,'practitioner');
                 $identity=$this->externalStaff()->verify($request->bearerToken());
                 $this->accessAudit?->practitionerApplicant($identity,$this->clinicContext->clinicId);
                 $result=match($request->method.' '.$request->path) {
@@ -119,6 +133,7 @@ final class Api
                 $discovery=$this->discovery($request->correlationId);
                 if($request->path==='/api/v1/public/discovery/options'&&$request->method==='GET')Response::json(['data'=>$discovery->options()],200,$request->correlationId);
                 if($request->path==='/api/v1/public/discovery/search'&&$request->method==='POST')Response::json(['data'=>$discovery->search($this->clinicContext->clinicId,$request->body,(string)($_SERVER['REMOTE_ADDR']??'unknown'))],200,$request->correlationId);
+                $this->guardSession($request);
                 if($request->path==='/api/v1/profile/discovery-preferences'&&in_array($request->method,['GET','PUT'],true))Response::json(['data'=>$discovery->preferences($this->user($request),$request->method==='PUT'?$request->body:null,$request->correlationId)],200,$request->correlationId);
                 if(str_starts_with($request->path,'/api/v1/travel-enquiries'))Response::json(['data'=>$this->travelRoute($this->user($request),$request,substr($request->path,strlen('/api/v1/')))],200,$request->correlationId);
                 throw new ApiException(404,'not_found','Route not found.');
@@ -330,6 +345,7 @@ final class Api
                 $this->clinicContext->assertActive($this->database);
             }
             $this->consentRoute=$route[1];
+            if(!in_array($route[1],['health','databaseHealth','siteConfig','brandAsset','locations','services','publicServices','publicService','publicPractitioners','publicPractitioner','practitioners','team','teamImage','availability','submitPractitionerEnquiry'],true))$this->guardSession($request,$route[1]==='customerMe'?'client':null);
             $data=match($route[1]){
                 'submitPractitionerEnquiry'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->submit($this->clinicContext->clinicId,$request->body,$_SERVER['REMOTE_ADDR']??'unknown'),
                 'practitionerEnquiries'=>(new \Wellness\Service\PractitionerEnquiryService($this->database))->list($this->user($request),$this->clinicContext->clinicId,$request->query),
@@ -557,12 +573,89 @@ final class Api
         $this->clinicContext->assertActive($this->database);
         if ($this->config->customerOnboardingEnabled) {
             $service = $this->onboarding();
-            $session = $service->session(($this->customerAuth ??= new CustomerAuthenticator($this->config))->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
+            $session = $this->browserSession ? $this->browserSession->clientSession() : $service->session($this->customerAuthenticator()->claims($request->bearerToken()), $request->headers['x-customer-session'] ?? null);
             $identity = $session['identity_id']; unset($session['identity_id']);
             $this->accessAudit?->customerIdentity((int)$identity,$this->clinicContext->clinicId);
             return $service->status($identity) + ['session' => $session];
         }
-        return ($this->customerAuth ??= new CustomerAuthenticator($this->config))->authenticate($request->bearerToken());
+        return $this->customerAuthenticator()->authenticate($request->bearerToken());
+    }
+
+    private function customerAuthenticator():CustomerAuthenticator
+    {return $this->customerAuth ??= new CustomerAuthenticator($this->config,$this->sessionKeyLoader ? fn(bool $refresh)=>($this->sessionKeyLoader)('client',$refresh) : null);}
+
+    private function sessionGateway(Request $r,?string $realm=null):?\Wellness\Service\BrowserSessionGateway
+    {
+        $central=$realm==='central';
+        if(!\Wellness\Service\BrowserSessionGateway::enabled($this->config,$this->clinicContext,$central))return null;
+        if($this->browserSession!==null)return $this->browserSession;
+        $realm ??= $this->externalStaff()->isCandidate($r->bearerToken()) ? 'practitioner' : 'workforce';
+        $host=ClinicContext::normalizeHost((string)($r->headers['host']??''));
+        $policy=\Wellness\Service\BrowserSessionGateway::policy($this->config,$realm,$host,$central?null:$this->clinicContext->clinicId);
+        $this->sessionRequest=$r;
+        $keys=$this->sessionKeyLoader ? fn(bool $refresh)=>($this->sessionKeyLoader)($realm,$refresh) : match($realm){
+            'client'=>fn(bool $refresh)=>$this->customerAuthenticator()->sessionKeys($refresh),
+            'practitioner'=>fn(bool $refresh)=>$this->externalStaff()->sessionKeys($refresh),
+            default=>fn(bool $refresh)=>$this->auth->sessionKeys($refresh),
+        };
+        return $this->browserSession=new \Wellness\Service\BrowserSessionGateway($policy,$this->database,$r,$keys,
+            fn(string $realm,array $claims)=>$this->sessionAuthority($realm,$claims),$this->sessionClock,function()use($realm,$r):void{
+                // Existing advisory locks precede the new shared authority barrier.
+                // Pending pilot records remain durable when admission is denied.
+                if($realm==='practitioner')$this->externalStaff()->verify($r->bearerToken());
+                if($this->clinicContext!==null)($this->consentLock ??= new \Wellness\Service\ConsentLock($this->database->connection()))->acquire($this->clinicContext->clinicId);
+            });
+    }
+    private function guardSession(Request $r,?string $realm=null):void
+    {
+        $gateway=$this->sessionGateway($r,$realm);if($gateway===null)return;
+        try{$gateway->guard();Response::privateSession();}
+        catch(ApiException $error){if(in_array($error->status,[401,403],true))$gateway->reject();throw $error;}
+    }
+    private function sessionEndpoint(Request $r,?string $realm=null):void
+    {
+        if(preg_match('#^/api/v1/(staff|practitioner|application)/session/(challenge|start|me|activity|logout|action-challenge|action-proof|revoke-all)$#D',$r->path,$match)){
+            $realm=match($match[1]){'staff'=>'workforce','application'=>'central',default=>'practitioner'};
+        }elseif(preg_match('#^/api/v1/customer/auth/(challenge|session|activity|logout|action-challenge|action-proof|revoke-all)$#D',$r->path))$realm='client';
+        else return;
+        $gateway=$this->sessionGateway($r,$realm);if($gateway===null)return;
+        try{$reply=$gateway->endpoint();$gateway->queueHeaders($reply->headers());Response::json(['data'=>$reply->body],200,$r->correlationId);}
+        catch(ApiException $error){if(in_array($error->status,[401,403],true))$gateway->reject();throw $error;}
+    }
+    private function sessionAuthority(string $realm,array $claims):\Wellness\Service\BrowserSessionAuthority
+    {
+        $r=$this->sessionRequest;$db=$this->database->connection();
+        if($realm==='central'){
+            $actor=(new \Wellness\Auth\ApplicationAdminAuthenticator($this->database,$this->auth))->authenticate($r->bearerToken());
+            $this->accessAudit?->applicationActor($actor);
+            return new \Wellness\Service\BrowserSessionAuthority($actor->id,applicationAdministratorId:$actor->id);
+        }
+        $resolved=$this->config->clinicManagementEnabled?ClinicContext::resolve($this->config,$this->database,$r):ClinicContext::forHost($this->config,(string)$r->headers['host']);
+        if($resolved->clinicId!==$this->clinicContext->clinicId)throw new ApiException(401,'session_required','Please sign in again.');
+        $resolved->assertActive($this->database);
+        if($realm==='client'){
+            if(!$this->config->customerOnboardingEnabled)throw new ApiException(503,'onboarding_unavailable','Client onboarding is not enabled.');
+            $this->customerAuthenticator()->claims($r->bearerToken());
+            $q=$db->prepare('SELECT id FROM customer_identities WHERE identity_hash=?');$q->execute([CustomerOnboarding::identityHash($claims)]);$id=$q->fetchColumn();
+            if($id){$this->onboarding()->status((int)$id);$this->accessAudit?->customerIdentity((int)$id,$resolved->clinicId);}
+            return new \Wellness\Service\BrowserSessionAuthority($id?(int)$id:null);
+        }
+        if($realm==='workforce'){
+            $actor=$this->auth->authenticateForClinic($r->bearerToken(),$resolved);$this->accessAudit?->actor($actor);
+            return new \Wellness\Service\BrowserSessionAuthority($actor->userId,localUserId:$actor->userId);
+        }
+        $identity=$this->externalStaff()->verify($r->bearerToken());
+        $q=$db->prepare('INSERT INTO product_identities(adapter,issuer,subject) VALUES(?,?,?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)');$q->execute([$identity->adapter,$identity->issuer,$identity->subject]);
+        $q=$db->prepare('SELECT id,status FROM product_identities WHERE adapter=? AND issuer=? AND subject=?');$q->execute([$identity->adapter,$identity->issuer,$identity->subject]);$product=$q->fetch();
+        if(!$product || $product['status']!=='active')throw new ApiException(403,'membership_required','An active staff membership is required.');
+        $q=$db->prepare('SELECT id FROM staff_memberships WHERE identity_id=? AND clinic_id=?');$q->execute([$product['id'],$resolved->clinicId]);
+        if($q->fetchColumn()){
+            $actor=(new \Wellness\Auth\StaffMembershipResolver($this->database))->resolve($identity,$resolved);$this->accessAudit?->actor($actor);
+            return new \Wellness\Service\BrowserSessionAuthority($actor->userId,$actor->userId,(int)$product['id']);
+        }
+        if(!str_starts_with($r->path,'/api/v1/practitioner/session/') && !str_starts_with($r->path,'/api/v1/practitioner-applications/') && !str_contains($r->path,'/staff-invitations/'))throw new ApiException(403,'membership_required','An active staff membership is required.');
+        $this->accessAudit?->practitionerApplicant($identity,$resolved->clinicId);
+        return new \Wellness\Service\BrowserSessionAuthority(null,productIdentityId:(int)$product['id']);
     }
 
     private function onboarding(): CustomerOnboarding
@@ -640,13 +733,13 @@ final class Api
         if ($route === 'POST auth/challenge') return $service->challenge($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         $token = $r->headers['x-customer-session'] ?? null;
         if ($route === 'POST auth/logout') return $service->logout($token, $r->correlationId);
-        $auth = $this->customerAuth ??= new CustomerAuthenticator($this->config);
+        $auth = $this->customerAuthenticator();
         $claims = $auth->claims($r->bearerToken());
         if ($route === 'POST auth/session') {
             if (!is_string($r->body['id_token'] ?? null)) throw new ApiException(422, 'invalid_proof', 'A fresh sign-in proof is required.');
             return $service->startSession($claims, $auth->claims($r->body['id_token'], true), $r->correlationId);
         }
-        $session = $service->session($claims, $token, $route === 'POST auth/activity');
+        $session = $this->browserSession ? $this->browserSession->clientSession() : $service->session($claims, $token, $route === 'POST auth/activity');
         $identity = $session['identity_id'];
         $this->accessAudit?->customerIdentity((int)$identity,$this->clinicContext->clinicId);
         unset($session['identity_id']);
@@ -760,7 +853,7 @@ final class Api
     }
     private function externalStaff(): \Wellness\Auth\ExternalStaffAuthenticator
     {
-        return $this->externalStaffAuth ??= new \Wellness\Auth\ExternalStaffAuthenticator($this->config,null,function(\Wellness\Auth\VerifiedIdentity $identity):void{
+        return $this->externalStaffAuth ??= new \Wellness\Auth\ExternalStaffAuthenticator($this->config,$this->sessionKeyLoader ? fn(bool $refresh)=>($this->sessionKeyLoader)('practitioner',$refresh) : null,function(\Wellness\Auth\VerifiedIdentity $identity):void{
             if($this->clinicContext===null)throw new ApiException(503,'pilot_administration_unavailable','Practitioner pilot administration is not available.');
             $this->practitionerPilotAccess ??= new \Wellness\Service\PractitionerPilotAccessService($this->database,$this->config);
             $this->practitionerPilotAccess->assertAllowed($identity,$this->clinicContext->clinicId);

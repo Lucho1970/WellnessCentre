@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -47,7 +48,7 @@ function RoomAdminForm() {
     const scope = ++generation.current; setLoaded(false); setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken(); const headers = { Authorization: `Bearer ${token}` };
-      const [locationResponse, roomResponse] = await Promise.all([fetch(`${api}/admin/locations`, { headers }), fetch(`${api}/admin/rooms`, { headers })]);
+      const [locationResponse, roomResponse] = await Promise.all([sessionFetch(`${api}/admin/locations`, { headers }), sessionFetch(`${api}/admin/rooms`, { headers })]);
       const [locationBody, roomBody] = await Promise.all([locationResponse.json(), roomResponse.json()]);
       if (!locationResponse.ok) throw new ApiError(locationBody, locationResponse.status, t('Unable to load locations.'));
       if (!roomResponse.ok) throw new ApiError(roomBody, roomResponse.status, t('Unable to load rooms.'));
@@ -71,7 +72,7 @@ function RoomAdminForm() {
     event.preventDefault(); const scope = ++generation.current; setBusy(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken(); const payload = { ...form, location_id: Number(form.location_id), turnover_minutes: Number(form.turnover_minutes) };
-      const response = await fetch(editingId ? `${api}/admin/rooms/${editingId}` : `${api}/admin/rooms`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await sessionFetch(editingId ? `${api}/admin/rooms/${editingId}` : `${api}/admin/rooms`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
       if (scope !== generation.current) return;
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save room.'));

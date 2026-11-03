@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -49,7 +50,7 @@ function StaffAdminForm() {
     setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await sessionFetch(`${api}/admin/staff`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to load staff.'));
       const loaded = normalizeNumericIds<Staff[]>(body.data).map(member => ({ ...member, permissions: member.permissions ?? [] }));
@@ -83,7 +84,7 @@ function StaffAdminForm() {
     setBusy(true); setPanelError('');
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${api}/admin/privacy-audit/reviewers/${member.id}`, {method:member.permissions.includes('review_privacy_audit') ? 'DELETE' : 'PUT',headers:{Authorization:`Bearer ${token}`}});
+      const response = await sessionFetch(`${api}/admin/privacy-audit/reviewers/${member.id}`, {method:member.permissions.includes('review_privacy_audit') ? 'DELETE' : 'PUT',headers:{Authorization:`Bearer ${token}`}});
       const body = await response.json(); if(!response.ok)throw new ApiError(body,response.status,t('Unable to save staff member.'));
       setPanelMode(null); await load(member.id); setSaved(t('Privacy-review permission updated.'));
     } catch(cause) {setPanelError(cause instanceof Error ? cause.message : t('Unable to save staff member.'));}
@@ -96,7 +97,7 @@ function StaffAdminForm() {
     try {
       const token = await getAccessToken();
       const creating = panelMode === 'new';
-      const response = await fetch(creating ? `${api}/admin/staff` : `${api}/admin/staff/${editing!.id}`, {
+      const response = await sessionFetch(creating ? `${api}/admin/staff` : `${api}/admin/staff/${editing!.id}`, {
         method: creating ? 'POST' : 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         // A status/role change must not silently save browser/extension autofill.

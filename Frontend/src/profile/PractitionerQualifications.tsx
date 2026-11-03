@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
@@ -39,7 +40,7 @@ function PractitionerQualificationsForm({ practitionerId, admin = false, globalR
   const load = useCallback(async () => {
     const token = await getAccessToken();
     const headers = { Authorization: `Bearer ${token}` };
-    const [typeResponse, recordResponse] = await Promise.all([fetch(`${api}/qualifications/types`, { headers }), fetch(base, { headers })]);
+    const [typeResponse, recordResponse] = await Promise.all([sessionFetch(`${api}/qualifications/types`, { headers }), sessionFetch(base, { headers })]);
     clearDenied(typeResponse.status); clearDenied(recordResponse.status);
     const [typeBody, recordBody] = await Promise.all([typeResponse.json(), recordResponse.json()]);
     if (!typeResponse.ok) throw new ApiError(typeBody, typeResponse.status, t('Unable to load qualifications.'));
@@ -52,7 +53,7 @@ function PractitionerQualificationsForm({ practitionerId, admin = false, globalR
 
   const request = async (url: string, method: string, body: object) => {
     const token = await getAccessToken();
-    const response = await fetch(url, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const response = await sessionFetch(url, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     clearDenied(response.status);
     const payload = await response.json();
     if (!response.ok) throw new ApiError(payload, response.status, t('Unable to save qualification.'));

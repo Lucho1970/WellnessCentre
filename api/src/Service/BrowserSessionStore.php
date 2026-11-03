@@ -43,6 +43,7 @@ final class BrowserSessionStore
     {
         if ($p->realm === 'client') { $this->customers->insert($row, $claims); return; }
         $columns = ['secret_hash','scope_hash','principal_hash','realm','host','clinic_id','authenticated_at','created_at','last_activity_at','absolute_expires_at','policy_version','issued_epoch'];
+        if(array_filter([$row['local_user_id'] ?? null,$row['product_identity_id'] ?? null,$row['application_administrator_id'] ?? null],static fn($id)=>$id!==null)!==[])$columns=array_merge($columns,['local_user_id','product_identity_id','application_administrator_id']);
         $this->query('INSERT INTO browser_sessions(' . implode(',',$columns) . ') VALUES(' . implode(',',array_fill(0,count($columns),'?')) . ')', array_map(static fn($c) => $row[$c],$columns));
     }
     public function find(BrowserSessionPolicy $p, string $hash, bool $lock = true): ?array

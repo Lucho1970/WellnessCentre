@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
@@ -65,13 +66,13 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
       const token = await getAccessToken(); const headers = { Authorization: `Bearer ${token}` };
       const responses = practitionerMode
         ? await Promise.all([
-          fetch(`${api}/practitioner/availability-context`, { headers }),
-          fetch(`${api}/admin/availability-rules`, { headers }),
-          fetch(`${api}/admin/schedule-exceptions`, { headers }),
+          sessionFetch(`${api}/practitioner/availability-context`, { headers }),
+          sessionFetch(`${api}/admin/availability-rules`, { headers }),
+          sessionFetch(`${api}/admin/schedule-exceptions`, { headers }),
         ])
         : await Promise.all([
-          fetch(`${api}/admin/practitioners`, { headers }), fetch(`${api}/admin/locations`, { headers }),
-          fetch(`${api}/admin/availability-rules`, { headers }), fetch(`${api}/admin/schedule-exceptions`, { headers }),
+          sessionFetch(`${api}/admin/practitioners`, { headers }), sessionFetch(`${api}/admin/locations`, { headers }),
+          sessionFetch(`${api}/admin/availability-rules`, { headers }), sessionFetch(`${api}/admin/schedule-exceptions`, { headers }),
         ]);
       const bodies = await Promise.all(responses.map(response => response.json()));
       const failed = responses.findIndex(response => !response.ok);
@@ -137,14 +138,14 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
         ? { practitioner_id: selectedPractitioner.practitioner_id, location_id: Number(form.location_id), weekday: Number(form.weekday), start_time: form.start_time, end_time: form.end_time, valid_from: form.valid_from, valid_until: form.valid_until || null, recurrence_interval_weeks: 1 }
         : { practitioner_id: selectedPractitioner.practitioner_id, location_id: Number(form.location_id), starts_at: form.starts_at, ends_at: form.ends_at, ...(panelKind === 'override' ? { override_type: form.type, reason: form.reason } : { reason_type: form.type, notes: form.reason }) };
       if (panelKind === 'time_off' && impactReview === null) {
-        const review = await fetch(`${api}/admin/time-off/impact`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const review = await sessionFetch(`${api}/admin/time-off/impact`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const reviewBody = await review.json();
         if (!review.ok) throw new ApiError(reviewBody, review.status, t('Unable to review affected appointments.'));
         setImpactReview(normalizeNumericIds<AffectedAppointment[]>(reviewBody.data.appointments));
         return;
       }
       const savePayload = panelKind === 'time_off' ? { ...payload, expected_affected_appointment_ids: impactReview?.map(item => item.id) ?? [] } : payload;
-      const response = await fetch(`${api}/admin/${resource}${editingId ? `/${editingId}` : ''}`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(savePayload) });
+      const response = await sessionFetch(`${api}/admin/${resource}${editingId ? `/${editingId}` : ''}`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(savePayload) });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save availability.'));
       formGuard.markClean(); setImpactReview(null);
@@ -161,7 +162,7 @@ function AvailabilityAdminForm({ practitionerMode = false }: { practitionerMode?
     setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken(); const resource = selected.kind === 'rule' ? 'availability-rules' : selected.kind === 'override' ? 'availability-overrides' : 'time-off';
-      const response = await fetch(`${api}/admin/${resource}/${selected.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const response = await sessionFetch(`${api}/admin/${resource}/${selected.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json(); if (!response.ok) throw new ApiError(body, response.status, t('Unable to remove schedule item.'));
       setSelected(null); await load(); setSaved(t(selected.kind === 'rule' ? 'Working hours archived.' : 'Schedule item removed.'));
     } catch (cause) { formValidation.capture(cause); if (cause instanceof ApiError && [401,403,404].includes(cause.status)) { setSelected(null); setPanelMode(null); setImpactReview(null); } setLoadError(cause instanceof Error ? cause.message : t('Unable to remove schedule item.')); }
@@ -265,7 +266,7 @@ function SavedTimeOffImpactValidated({ id, getAccessToken, appointmentsPath, lan
       try {
         const token = await getAccessToken();
         if (controller.signal.aborted) return;
-        const response = await fetch(`${api}/admin/time-off/${id}/impact`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+        const response = await sessionFetch(`${api}/admin/time-off/${id}/impact`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
         const body = await response.json();
         if (!response.ok) throw new ApiError(body, response.status, t('Unable to load affected appointments.'));
         if (!controller.signal.aborted) setAppointments(normalizeNumericIds<AffectedAppointment[]>(body.data.appointments));

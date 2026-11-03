@@ -108,12 +108,14 @@ final class EntraAuthenticator implements IdentityAdapter
         return new AuthContext((int)$user['id'], (int)$user['clinic_id'], $objectId, $user['email'], $user['display_name'], $user['user_type'], $effectiveRoles, $permissions);
     }
 
-    private function jwks(): array
+    public function sessionKeys(bool $refresh): array { return $this->jwks($refresh); }
+
+    private function jwks(bool $refresh = false): array
     {
         if ($this->keyLoader) return ($this->keyLoader)();
         $cacheDir = dirname(__DIR__, 2) . '/var/cache';
         $cacheFile = $cacheDir . '/entra-jwks.json';
-        if (is_file($cacheFile) && filemtime($cacheFile) > time() - $this->config->entraJwksCacheSeconds) {
+        if (is_file($cacheFile) && filemtime($cacheFile) > time() - ($refresh ? 60 : $this->config->entraJwksCacheSeconds)) {
             $cached = json_decode((string)file_get_contents($cacheFile), true);
             if (is_array($cached) && isset($cached['keys'])) return $cached;
         }

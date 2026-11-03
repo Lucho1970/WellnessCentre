@@ -95,6 +95,7 @@ final class StaffNotificationPreferences
     public function sendVerification(AuthContext $actor, string $correlationId): array
     {
         $this->staff($actor);
+        if($this->database->connection() instanceof \Wellness\SessionConnection && $this->database->connection()->requestActive())throw new ApiException(503,'mail_unavailable','Verification email is temporarily unavailable. Contact the clinic.');
         if (!filter_var($_ENV['MAIL_ENABLED'] ?? getenv('MAIL_ENABLED') ?: 'false', FILTER_VALIDATE_BOOL)) {
             throw new ApiException(503, 'mail_unavailable', 'Email delivery is not enabled.');
         }
@@ -132,6 +133,7 @@ final class StaffNotificationPreferences
             $row = $query->fetch(PDO::FETCH_ASSOC);
             if (!$row || !$row['email_code_hash'] || !$row['email_code_expires_at'] || strtotime($row['email_code_expires_at'] . ' UTC') < time() || (int)$row['email_code_attempts'] >= 5) throw new ApiException(422, 'code_expired', 'Request a new verification code.');
             if (!password_verify($code, (string)$row['email_code_hash'])) {
+                if($pdo instanceof \Wellness\SessionConnection && $pdo->requestActive())$pdo->preserveDenialCounter('verification-attempt',[$actor->userId,$row['email_code_hash']]);
                 $pdo->prepare('UPDATE staff_notification_preferences SET email_code_attempts=email_code_attempts+1 WHERE user_id=:user')->execute(['user' => $actor->userId]);
                 $pdo->commit();
                 throw new ApiException(422, 'invalid_code', 'The verification code is incorrect.');

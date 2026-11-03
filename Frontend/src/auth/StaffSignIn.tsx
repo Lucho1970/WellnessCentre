@@ -1,3 +1,4 @@
+import { privateSessionStorage } from './privateSessionStorage';
 import { withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
@@ -14,7 +15,7 @@ type StaffAccess = { roles: string[]; permissions: string[] };
 function StaffSignInForm({ children }: { children: (access: StaffAccess) => ReactNode }) {
   const formValidation = useFormValidation();
   const externalAvailable = practitionerIdentityEnabled;
-  const externalStaff = externalAvailable && sessionStorage.getItem('wellness.staff.provider') === 'external';
+  const externalStaff = externalAvailable && privateSessionStorage.getItem('wellness.staff.provider') === 'external';
   const { t } = useTranslation();
   const { account, configured, isAuthenticated, sessionExpired, signInError, signIn, signOut, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';

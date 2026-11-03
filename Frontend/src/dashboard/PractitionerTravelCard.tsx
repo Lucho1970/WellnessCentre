@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Link as MuiLink, Paper, Stack, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -35,7 +36,7 @@ export function PractitionerTravelCard() {
     setLoading(true); setError(''); setEstimate(null); setVisit(null);
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${apiBaseUrl}/practitioner/next-onsite`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await sessionFetch(`${apiBaseUrl}/practitioner/next-onsite`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json().catch(() => null);
       if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); throw new Error(apiErrorMessage(body, response.status)); }
       if (!body || !('data' in body)) throw new Error(t('Unable to load the next On-Site visit.'));
@@ -51,7 +52,7 @@ export function PractitionerTravelCard() {
     try {
       const coordinates = source === 'current' ? await currentLocation() : null;
       const token = await getAccessToken();
-      const response = await fetch(`${apiBaseUrl}/practitioner/next-onsite/${visit.id}/travel-estimate`, {
+      const response = await sessionFetch(`${apiBaseUrl}/practitioner/next-onsite/${visit.id}/travel-estimate`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ source, ...coordinates }),
       });

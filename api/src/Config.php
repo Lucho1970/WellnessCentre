@@ -51,6 +51,9 @@ final readonly class Config
         public bool $smsBudgetEnforcementEnabled = false,
         public bool $providerEvidenceEnabled = false,
         public bool $practitionerPilotAccessEnabled = false,
+        public array $browserSessionClinicIds = [],
+        public bool $browserSessionCentralEnabled = false,
+        public string $entraSpaClientId = '',
     ) {}
 
     public static function fromEnvironment(): self
@@ -112,7 +115,23 @@ final readonly class Config
             filter_var($value('SMS_BUDGET_ENFORCEMENT_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             filter_var($value('PROVIDER_EVIDENCE_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
             $managedPilot === 'true',
+            self::sessionClinics($value('BROWSER_SESSION_CLINIC_IDS','[]')),
+            self::strictBool($value('BROWSER_SESSION_CENTRAL_ENABLED','false')),
+            $value('ENTRA_SPA_CLIENT_ID'),
         );
+    }
+
+    private static function strictBool(string $value): bool
+    {
+        if (!in_array($value,['true','false'],true)) throw new RuntimeException('Invalid browser session enable setting.');
+        return $value === 'true';
+    }
+    private static function sessionClinics(string $value): array
+    {
+        $ids = json_decode($value,true,16,JSON_THROW_ON_ERROR);
+        if (!is_array($ids) || !array_is_list($ids) || count($ids)>1000) throw new RuntimeException('Browser session clinic IDs must be a bounded list.');
+        foreach($ids as $id) if(!is_int($id) || $id<1) throw new RuntimeException('Invalid browser session clinic ID.');
+        return array_values(array_unique($ids));
     }
 
     private static function hostMap(string $json): array

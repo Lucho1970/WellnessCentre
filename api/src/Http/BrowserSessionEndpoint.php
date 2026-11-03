@@ -4,7 +4,7 @@ namespace Wellness\Http;
 
 use Wellness\Service\{BrowserSessionGrant,BrowserSessionPolicy,BrowserSessionService};
 
-/** Explicit opt-in composition. No Api.php registration or environment activation. */
+/** Explicit opt-in transport; the API gateway separately controls activation. */
 final class BrowserSessionEndpoint
 {
     public function __construct(private readonly BrowserSessionPolicy $policy, private readonly BrowserSessionService $service, private readonly bool $enabled = false) {}
@@ -23,7 +23,7 @@ final class BrowserSessionEndpoint
             || $request->method !== ($action === 'me' ? 'GET' : 'POST')) throw new ApiException(404,'not_found','Route not found.');
         $host = $request->headers['host'] ?? '';
         if (!is_string($host) || $host !== $this->policy->host) throw new ApiException(404,'not_found','Route not found.');
-        if ($request->method !== 'GET') SessionCookie::origin($this->policy,self::header($request,'origin'),$host);
+        if ($request->method !== 'GET' || array_key_exists('origin',$request->headers)) SessionCookie::origin($this->policy,self::header($request,'origin'),$host);
         if ($request->query !== [] || strlen(json_encode($request->body,JSON_THROW_ON_ERROR)) > 65536) throw new ApiException(400,'invalid_session_request','Invalid session request.');
         $allowed = in_array($action,['start','action-proof'],true) ? ['id_token'] : [];
         if (array_diff(array_keys($request->body),$allowed) !== []) throw new ApiException(400,'invalid_session_request','Invalid session request.');

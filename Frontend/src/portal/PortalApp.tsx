@@ -1,3 +1,4 @@
+import { privateSessionStorage } from '../auth/privateSessionStorage';
 import {
   Alert,
   AppBar,
@@ -48,7 +49,7 @@ function ClientBookingInformation() {
 }
 export function PortalApp() {
   const location=useLocation();
-  const applicationPath=location.pathname==='/staff/apply' || (location.pathname==='/staff/external' && sessionStorage.getItem('wellness.staff.application-return')==='1');
+  const applicationPath=location.pathname==='/staff/apply' || (location.pathname==='/staff/external' && privateSessionStorage.getItem('wellness.staff.application-return')==='1');
   const { config } = useClinicConfig();
   const { t } = useTranslation();
   return (
@@ -107,9 +108,9 @@ export function PortalApp() {
       >
         <Routes>
           {import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && <Route path="/staff/apply" element={<PractitionerApplicationPage/>}/>}
-          {import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.application-return')==='1' && <Route path="/staff/external" element={<Navigate replace to="/staff/apply"/>}/>}
+          {import.meta.env.VITE_PRACTITIONER_APPLICATIONS_ENABLED === 'true' && privateSessionStorage.getItem('wellness.staff.application-return')==='1' && <Route path="/staff/external" element={<Navigate replace to="/staff/apply"/>}/>}
           {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && <Route path="/staff/invitation" element={<StaffInvitationPage/>}/>}
-          {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && sessionStorage.getItem('wellness.staff.invitation') && <Route path="/staff/external" element={<Navigate replace to="/staff/invitation"/>}/>}
+          {import.meta.env.VITE_STAFF_INVITATIONS_ENABLED === 'true' && privateSessionStorage.getItem('wellness.staff.invitation') && <Route path="/staff/external" element={<Navigate replace to="/staff/invitation"/>}/>}
           <Route path="/client/*" element={<ClientBookingInformation />} />
           <Route
             path="*"

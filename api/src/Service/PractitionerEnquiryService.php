@@ -137,6 +137,7 @@ final class PractitionerEnquiryService
     private function deliver(AuthContext|ApplicationAdminContext|null $actor,int $clinic,int $id,string $cid,?callable $send): array
     {
         $pdo=$this->database->connection();
+        if($pdo instanceof \Wellness\SessionConnection && $pdo->requestActive())throw new ApiException(503,'mail_unavailable','Notification retry is temporarily unavailable. Contact the application administrator.');
         if($pdo->inTransaction())throw new \LogicException('Enquiry notification requires its own transaction.');
         $lock=new ConsentLock($pdo);$lock->acquire($clinic);
         try{

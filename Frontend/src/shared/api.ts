@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import i18n from '../i18n';
 import { reportStaffAccessFailure } from '../auth/staffAccessInvalidation';
 
@@ -70,7 +71,7 @@ export function apiErrorMessage(body: ErrorBody, status: number, fallback?: stri
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, init);
+  const response = await sessionFetch(`${apiBaseUrl}${path}`, init);
   const text = await response.text();
   let body;
   try { body = text ? JSON.parse(text) : null; } catch { /* Infrastructure failures may be HTML. */ }

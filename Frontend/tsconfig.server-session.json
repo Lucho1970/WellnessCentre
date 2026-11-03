@@ -1,0 +1,6 @@
+{
+  "extends":"./tsconfig.json",
+  "compilerOptions":{"types":["node","vite/client"]},
+  "include":["src","tests/server-session/**/*.tsx","tests/helpers/serverSessionBrowser.ts","tests/server-session-integration.spec.ts","playwright.server-session.config.ts","vite.server-session.config.ts"],
+  "references":[]
+}

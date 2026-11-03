@@ -2,6 +2,7 @@
 declare const __APP_SURFACE__: 'public' | 'portal' | 'application-admin';
 
 interface ImportMetaEnv {
+  readonly VITE_SERVER_SESSIONS_ENABLED?: string;
   readonly VITE_CUSTOMER_ENTRA_TENANT_ID?: string;
   readonly VITE_CUSTOMER_ENTRA_SUBDOMAIN?: string;
   readonly VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID?: string;

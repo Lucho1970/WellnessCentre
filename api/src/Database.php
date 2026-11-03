@@ -13,7 +13,9 @@ final class Database
 
     public function connection(): PDO
     {
-        return $this->connection ??= new PDO(
+        if($this->connection!==null)return $this->connection;
+        $class = $this->config->browserSessionClinicIds !== [] || $this->config->browserSessionCentralEnabled ? SessionConnection::class : PDO::class;
+        return $this->connection ??= new $class(
             "mysql:host={$this->config->dbHost};port={$this->config->dbPort};dbname={$this->config->dbName};charset=utf8mb4",
             $this->config->dbUser,
             $this->config->dbPassword,

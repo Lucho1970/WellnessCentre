@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Stack, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -29,7 +30,7 @@ export function PractitionerToday() {
   const [error, setError] = useState('');
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
-    const response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
+    const response = await sessionFetch(`${apiBaseUrl}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const body = await response.json().catch(() => null);
     if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); throw new Error(apiErrorMessage(body, response.status)); }
     if (!body || !('data' in body)) throw new Error(t('Unable to load today’s visits.'));

@@ -1,3 +1,4 @@
+import { privateSessionStorage } from '../auth/privateSessionStorage';
 import { AppBar, Box, Button, Container, Stack, Toolbar, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
@@ -12,7 +13,7 @@ import { practitionerIdentityEnabled } from '../auth/practitionerIdentity';
 
 function hasRecentClientSession() {
   try {
-    const session = JSON.parse(sessionStorage.getItem('wellness.customer.session.v1') ?? 'null');
+    const session = JSON.parse(privateSessionStorage.getItem('wellness.customer.session.v1') ?? 'null');
     return typeof session?.session_token === 'string' && Math.min(session.idle_expires_at, session.absolute_expires_at) * 1000 > Date.now();
   } catch { return false; }
 }

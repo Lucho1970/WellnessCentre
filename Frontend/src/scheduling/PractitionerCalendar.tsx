@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
@@ -72,7 +73,7 @@ export function PractitionerCalendar() {
         const token = await getAccessToken();
         if (controller.signal.aborted) return;
         const params = new URLSearchParams(range);
-        const response = await fetch(`${apiBaseUrl}/practitioner/calendar?${params}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+        const response = await sessionFetch(`${apiBaseUrl}/practitioner/calendar?${params}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
         const body = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(body, response.status));
         if (!controller.signal.aborted) setRows(normalizeNumericIds(body.data));

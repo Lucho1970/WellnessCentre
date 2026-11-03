@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useRef, useState } from 'react';
@@ -72,10 +73,10 @@ function ServiceAssignmentsForm({ initialServiceId, lockService = false, onDirty
         const token = await getAccessToken();
         const headers = { Authorization: `Bearer ${token}` };
         const responses = await Promise.all([
-          fetch(`${api}/admin/services`, { headers }),
-          fetch(`${api}/admin/locations`, { headers }),
-          fetch(`${api}/admin/practitioners`, { headers }),
-          fetch(`${api}/admin/service-assignments`, { headers }),
+          sessionFetch(`${api}/admin/services`, { headers }),
+          sessionFetch(`${api}/admin/locations`, { headers }),
+          sessionFetch(`${api}/admin/practitioners`, { headers }),
+          sessionFetch(`${api}/admin/service-assignments`, { headers }),
         ]);
         const bodies = await Promise.all(responses.map((response) => response.json()));
         if (current !== generation.current) return false;
@@ -127,7 +128,7 @@ function ServiceAssignmentsForm({ initialServiceId, lockService = false, onDirty
     formValidation.clear(); setError('');
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${api}/admin/services/${service}/assignments`, {
+      const response = await sessionFetch(`${api}/admin/services/${service}/assignments`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ location_ids: selectedLocations, practitioners: selectedPeople }),

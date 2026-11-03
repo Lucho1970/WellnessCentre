@@ -1,3 +1,5 @@
+import { sessionFetch } from './serverSession';
+import { privateSessionStorage } from './privateSessionStorage';
 import {
   useCallback,
   useEffect,
@@ -58,7 +60,7 @@ export function UserAccountMenu() {
     if (!isAuthenticated) return;
     try {
       const token = await getAccessToken(),
-        r = await fetch(
+        r = await sessionFetch(
           `${import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1"}/profile/avatar`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -99,13 +101,13 @@ export function UserAccountMenu() {
     return (
       <Button
         component={Link}
-        to={practitionerIdentityEnabled && sessionStorage.getItem('wellness.staff.provider') === 'external' ? '/staff/external' : '/staff/login'}
+        to={practitionerIdentityEnabled && privateSessionStorage.getItem('wellness.staff.provider') === 'external' ? '/staff/external' : '/staff/login'}
         variant="contained"
         size="small"
         sx={{ minWidth: 0, maxWidth: '100%', overflowWrap: 'anywhere' }}
         startIcon={<LogIn size={17} />}
       >
-        {t(practitionerIdentityEnabled && sessionStorage.getItem('wellness.staff.provider') === 'external' ? 'Practitioner sign-in' : 'Staff sign in')}
+        {t(practitionerIdentityEnabled && privateSessionStorage.getItem('wellness.staff.provider') === 'external' ? 'Practitioner sign-in' : 'Staff sign in')}
       </Button>
     );
   const name = profile?.display_name || t("Staff member");

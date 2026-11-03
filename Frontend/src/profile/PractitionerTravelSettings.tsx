@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Alert, Button, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -58,7 +59,7 @@ export function PractitionerTravelSettings() {
   const [reload, setReload] = useState(0);
   const request = useCallback<Request>(async (path, body) => {
     const token = await getAccessToken();
-    const response = await fetch(`${api}${path}`, {
+    const response = await sessionFetch(`${api}${path}`, {
       method: body === undefined ? 'GET' : 'PUT',
       headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),

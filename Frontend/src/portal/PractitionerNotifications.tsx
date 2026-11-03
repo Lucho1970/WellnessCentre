@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useState } from 'react';
@@ -48,7 +49,7 @@ function PractitionerNotificationsForm() {
       if (status) params.set('status', status);
       if (channel) params.set('channel', channel);
       if (period) params.set('period', period);
-      const response = await fetch(`${apiBaseUrl}/practitioner/notifications?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await sessionFetch(`${apiBaseUrl}/practitioner/notifications?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status);
       const next = normalizeNumericIds<Result>(body.data);

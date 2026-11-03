@@ -1,3 +1,4 @@
+import { privateSessionStorage } from '../auth/privateSessionStorage';
 import { StaffTravelEnquiries, TravelEnquiryNotice, useTravelRequest } from '../discovery/TravelEnquiries';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useLocation } from 'react-router-dom';
@@ -121,10 +122,10 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
   const workspaces = workspacesFor(roles);
   const preferenceKey = `wellness.workspace.${account?.homeAccountId ?? 'staff'}`;
   const rememberWorkspace = (choice: Workspace) => {
-    try { sessionStorage.setItem(preferenceKey, choice); } catch { /* Preference only, never authority. */ }
+    try { privateSessionStorage.setItem(preferenceKey, choice); } catch { /* Preference only, never authority. */ }
   };
   let remembered: string | null = null;
-  try { remembered = sessionStorage.getItem(preferenceKey); } catch { /* Storage may be disabled. */ }
+  try { remembered = privateSessionStorage.getItem(preferenceKey); } catch { /* Storage may be disabled. */ }
   const defaultWorkspace = workspaces.find(item => item === remembered) ?? workspaces[0];
   const workspace = location.pathname.split('/')[1] as Workspace;
   const allowedPages = pagesFor(roles, workspace, permissions);
@@ -133,7 +134,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
   useEffect(() => {
     if (workspacesFor(roles).includes(workspace)) {
-      try { sessionStorage.setItem(preferenceKey, workspace); } catch { /* Preference only, never authority. */ }
+      try { privateSessionStorage.setItem(preferenceKey, workspace); } catch { /* Preference only, never authority. */ }
     }
   }, [roles, workspace, preferenceKey]);
   if (!defaultWorkspace) return <Alert severity="warning">{t('This account has no available staff workspace. Please contact the clinic administrator.')}</Alert>;

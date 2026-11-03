@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, InputAdornment, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, Typography } from '@mui/material';
@@ -72,7 +73,7 @@ function ClientManagementForm({ canMerge = false }: { canMerge?: boolean }) {
 
   const request = useCallback(async (path: string, init: RequestInit = {}) => {
     const token = await getAccessToken();
-    const response = await fetch(`${api}/clients${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
+    const response = await sessionFetch(`${api}/clients${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     const body = await response.json();
     if (!response.ok) throw new ClientRequestError(apiErrorMessage(body, response.status, t('Unable to complete the client request.')),typeof body?.error?.code==='string'?body.error.code:'',body?.error?.fields??{});
     return normalizeNumericIds(body.data);

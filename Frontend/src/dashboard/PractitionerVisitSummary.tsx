@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Stack, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -20,7 +21,7 @@ export function PractitionerVisitSummary() {
     setLoading(true); setError('');
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${apiBaseUrl}/practitioner/visit-summary?refresh=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await sessionFetch(`${apiBaseUrl}/practitioner/visit-summary?refresh=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json().catch(() => null);
       if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); throw new Error(apiErrorMessage(body, response.status)); }
       const data = normalizeNumericIds(body?.data);

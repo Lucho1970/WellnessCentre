@@ -8,6 +8,12 @@ final class Response
     private const STRING_IDENTIFIER_KEYS = ['object_id', 'tenant_id', 'correlation_id', 'external_id', 'source_event_id', 'home_account_id'];
     private static ?\Closure $afterJson = null;
     private static ?\Closure $beforeJson = null;
+    private static bool $privateSession = false;
+    public static function privateSession():void { self::$privateSession=true; }
+    private static function prepare(array $payload,int $status):void
+    {
+        if(self::$beforeJson!==null){$callback=self::$beforeJson;self::$beforeJson=null;$callback($payload,$status);}
+    }
 
     public static function beforeJson(callable $callback): void
     {
@@ -45,11 +51,7 @@ final class Response
     public static function json(array $payload, int $status = 200, ?string $correlationId = null): never
     {
         $encoded = $status === 204 ? '' : json_encode(self::normalizeNumericIds($payload), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        if (self::$beforeJson !== null) {
-            $callback = self::$beforeJson;
-            self::$beforeJson = null; // A failure response must not recurse into the same failing audit.
-            $callback($payload,$status);
-        }
+        self::prepare($payload,$status);
         http_response_code($status);
         if ($correlationId) header('X-Correlation-ID: ' . $correlationId);
         // A 204 response ends at the headers. Do not serialize even an empty
@@ -86,11 +88,12 @@ final class Response
         if (!in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true)) {
             throw new ApiException(500, 'invalid_image', 'The published image format is not supported.');
         }
+        self::prepare([],200);
         http_response_code(200);
         if ($correlationId) header('X-Correlation-ID: ' . $correlationId);
         header('Content-Type: ' . $mimeType);
         header('Content-Length: ' . strlen($data));
-        header('Cache-Control: public, max-age=3600');
+        header(self::$privateSession?'Cache-Control: no-store':'Cache-Control: public, max-age=3600');
         header('ETag: "' . $contentHash . '"');
         echo $data;
         exit;
@@ -98,9 +101,10 @@ final class Response
 
     public static function notModified(string $contentHash, ?string $correlationId = null): never
     {
+        self::prepare([],304);
         http_response_code(304);
         if ($correlationId) header('X-Correlation-ID: ' . $correlationId);
-        header('Cache-Control: public, max-age=3600');
+        header(self::$privateSession?'Cache-Control: no-store':'Cache-Control: public, max-age=3600');
         header('ETag: "' . $contentHash . '"');
         header_remove('Content-Type');
         exit;

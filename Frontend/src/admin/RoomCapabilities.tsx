@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useRef, useState } from "react";
@@ -55,9 +56,9 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
     const token = await getAccessToken(),
       h = { Authorization: `Bearer ${token}` },
       rs = await Promise.all([
-        fetch(`${api}/admin/room-capabilities`, { headers: h }),
-        fetch(`${api}/admin/rooms`, { headers: h }),
-        fetch(`${api}/admin/services`, { headers: h }),
+        sessionFetch(`${api}/admin/room-capabilities`, { headers: h }),
+        sessionFetch(`${api}/admin/rooms`, { headers: h }),
+        sessionFetch(`${api}/admin/services`, { headers: h }),
       ]),
       b = await Promise.all(rs.map((r) => r.json()));
     if (current !== generation.current) return false;
@@ -107,7 +108,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
     formValidation.clear(); setError("");
     try {
       const token = await getAccessToken(),
-        r = await fetch(`${api}/admin/room-capabilities`, {
+        r = await sessionFetch(`${api}/admin/room-capabilities`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -134,7 +135,7 @@ function RoomCapabilitiesForm({ onDirtyChange }: { onDirtyChange?: (dirty: boole
     formValidation.clear(); setError("");
     try {
       const token = await getAccessToken(),
-        r = await fetch(`${api}/admin/room-capability-assignments`, {
+        r = await sessionFetch(`${api}/admin/room-capability-assignments`, {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,

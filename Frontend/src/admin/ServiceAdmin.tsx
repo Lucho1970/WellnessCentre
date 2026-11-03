@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -108,8 +109,8 @@ function ServiceAdminForm() {
       const token = await getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
       const [response, settingsResponse] = await Promise.all([
-        fetch(`${api}/admin/services`, { headers }),
-        fetch(`${api}/admin/catalogue-settings`, { headers }),
+        sessionFetch(`${api}/admin/services`, { headers }),
+        sessionFetch(`${api}/admin/catalogue-settings`, { headers }),
       ]);
       const [body, settingsBody] = await Promise.all([response.json(), settingsResponse.json()]);
       if (current !== generation.current) return false;
@@ -163,7 +164,7 @@ function ServiceAdminForm() {
       const cancellationValue = form.cancellation_fee_type === 'fixed' ? Math.round(Number(form.cancellation_fee_value) * 100) : form.cancellation_fee_type === 'percentage' ? Math.round(Number(form.cancellation_fee_value) * 100) : 0;
       const payload = { ...form, category_id: form.category_id ? Number(form.category_id) : null, duration_options: durationOptions, price_cents: Math.min(...durationOptions.map(option => option.price_cents)), durations: durationOptions.map(option => option.minutes), lead_time_minutes: Number(form.lead_time_minutes), booking_horizon_days: Number(form.booking_horizon_days), cancellation_window_minutes: Number(form.cancellation_window_minutes), cancellation_fee_value: cancellationValue, buffer_before_minutes: Number(form.buffer_before_minutes), buffer_after_minutes: Number(form.buffer_after_minutes), display_order: Number(form.display_order) };
       const token = await getAccessToken();
-      const response = await fetch(editingId ? `${api}/admin/services/${editingId}` : `${api}/admin/services`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await sessionFetch(editingId ? `${api}/admin/services/${editingId}` : `${api}/admin/services`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save service.'));
       const savedId = Number(body.data?.id ?? editingId ?? 0) || null;

@@ -53,7 +53,9 @@ final class CustomerOnboarding
     }
     public function rate(string $purpose, string $key, int $limit, int $seconds): void {
         $bucket = hash_hmac('sha256', $purpose . ':' . $key . ':' . intdiv(time(), $seconds), $this->config->appKey);
-        $this->query('INSERT INTO customer_rate_limits(bucket_hash,attempts,expires_at) VALUES(?,1,?) ON DUPLICATE KEY UPDATE attempts=attempts+1', [$bucket, self::stamp(time() + $seconds)]);
+        $params=[$bucket, self::stamp(time() + $seconds)];
+        $this->query('INSERT INTO customer_rate_limits(bucket_hash,attempts,expires_at) VALUES(?,1,?) ON DUPLICATE KEY UPDATE attempts=attempts+1', $params);
+        if($this->db instanceof \Wellness\SessionConnection && $this->db->requestActive())$this->db->preserveDenialCounter('customer-rate',$params);
         if ((int)$this->query('SELECT attempts FROM customer_rate_limits WHERE bucket_hash=?', [$bucket])->fetchColumn() > $limit)
             throw new ApiException(429, 'rate_limited', 'Too many attempts. Please wait before trying again.');
     }
@@ -218,6 +220,7 @@ final class CustomerOnboarding
     }
     public function invite(AuthContext $actor, int $client, string $cid, string $delivery = 'manual'): array {
         if (!in_array($delivery, ['manual', 'email'], true)) throw new ApiException(422, 'validation_error', 'Select manual or email invitation delivery.');
+        if($delivery==='email' && $this->db instanceof \Wellness\SessionConnection && $this->db->requestActive())throw new ApiException(503,'mail_unavailable','Email invitations are temporarily unavailable. Use the approved manual invitation process.');
         $this->staffClient($actor, $client, true);
         $result = $this->transaction(function () use ($actor, $client, $cid) {
             $this->clinic(true);

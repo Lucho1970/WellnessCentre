@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
@@ -64,7 +65,7 @@ function BusinessSettingsForm() {
   };
   const request = async (path: string, method = 'GET', payload?: unknown) => {
     const token = await getAccessToken();
-    const response = await fetch(`${apiBaseUrl}${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: payload === undefined ? undefined : JSON.stringify(payload) });
+    const response = await sessionFetch(`${apiBaseUrl}${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: payload === undefined ? undefined : JSON.stringify(payload) });
     const body = await response.json();
     if (!response.ok) throw new ApiError(body, response.status, t('Unable to save business settings.'));
     return body.data;

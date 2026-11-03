@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -18,7 +19,7 @@ export function QualificationReminder() {
     void (async () => {
       try {
         const token = await getAccessToken();
-        const response = await fetch(`${api}/profile/qualifications`, { headers: { Authorization: `Bearer ${token}` } });
+        const response = await sessionFetch(`${api}/profile/qualifications`, { headers: { Authorization: `Bearer ${token}` } });
         const body = await response.json().catch(() => null);
         if (!response.ok) { reportStaffAccessFailure(response.status, body?.error?.code); return; }
         if (!body) return;

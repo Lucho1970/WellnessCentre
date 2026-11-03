@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useState } from 'react';
@@ -24,7 +25,7 @@ function PublicCardSettingsForm() {
     void (async () => {
       try {
         const token = await getAccessToken();
-        const response = await fetch(`${api}/profile/public-card`, { headers: { Authorization: `Bearer ${token}` } });
+        const response = await sessionFetch(`${api}/profile/public-card`, { headers: { Authorization: `Bearer ${token}` } });
         const body = await response.json();
         if (!response.ok) throw new ApiError(body, response.status, t('Unable to load your public card.'));
         if (!active) return;
@@ -41,7 +42,7 @@ function PublicCardSettingsForm() {
     setBusy(true); formValidation.clear(); setError(''); setSaved(false);
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${api}/profile/public-card`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const response = await sessionFetch(`${api}/profile/public-card`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save your public card.'));
       setSaved(true);

@@ -1,6 +1,8 @@
 import { InteractionRequiredAuthError, PublicClientApplication } from '@azure/msal-browser';
 import { selectAccount } from '../auth/accountSelection';
 import { freshCustomerLoginParameters, shouldClearCustomerAccountHint } from './providerRouting';
+import { eraseLegacyIdentityCache, serverSessionsEnabled } from '../auth/serverSessionMode';
+import { configureServerSession, readServerSessionToken, signInServerSession, signOutServerSession } from '../auth/serverSession';
 
 const tenant = import.meta.env.VITE_CUSTOMER_ENTRA_TENANT_ID ?? '';
 const subdomain = import.meta.env.VITE_CUSTOMER_ENTRA_SUBDOMAIN ?? '';
@@ -11,6 +13,7 @@ const root = new URL(import.meta.env.BASE_URL, window.location.origin);
 export const customerHome = new URL('client', root).href;
 export const customerScopes = [`api://${apiId}/access_as_client`];
 const customerHosts = [`${subdomain}.ciamlogin.com`, `${tenant}.ciamlogin.com`];
+eraseLegacyIdentityCache([import.meta.env.VITE_ENTRA_SPA_CLIENT_ID ?? '',import.meta.env.VITE_STAFF_EXTERNAL_SPA_CLIENT_ID ?? '',clientId]);
 export const customerInstance = new PublicClientApplication({
   auth: {
     clientId: clientId || '00000000-0000-0000-0000-000000000000',
@@ -19,14 +22,18 @@ export const customerInstance = new PublicClientApplication({
     redirectUri: new URL('client/auth/callback', root).href,
     postLogoutRedirectUri: customerHome,
   },
-  cache: { cacheLocation: 'sessionStorage' },
+  cache: { cacheLocation: serverSessionsEnabled() ? 'memoryStorage' : 'sessionStorage' },
 });
+export function configureCustomerServerSession() {
+  configureServerSession('client', { instance: customerInstance, scopes: customerScopes, redirectUri: new URL('client/auth/callback',root).href });
+}
 
 export function selectCustomerAccount(preferred = customerInstance.getActiveAccount()) {
   return selectAccount(customerInstance.getAllAccounts(), preferred, tenant, customerHosts);
 }
 
 export async function customerToken() {
+  if(serverSessionsEnabled())return readServerSessionToken();
   const account = selectCustomerAccount();
   if (!account) throw new Error('Please sign in to your client account.');
   try {
@@ -38,6 +45,7 @@ export async function customerToken() {
 }
 
 export async function customerSignIn() {
+  if(serverSessionsEnabled()){await signInServerSession();return;}
   const { beginCustomerLogin } = await import('./session');
   const nonce = await beginCustomerLogin();
   const account = selectCustomerAccount();
@@ -66,6 +74,7 @@ export async function customerSignIn() {
 }
 
 export async function customerSignOut() {
+  if(serverSessionsEnabled()){await signOutServerSession();return;}
   const { endCustomerSession } = await import('./session');
   await endCustomerSession();
   const account = selectCustomerAccount();

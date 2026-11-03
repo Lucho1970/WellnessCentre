@@ -1,3 +1,6 @@
+import { privateSessionStorage } from '../auth/privateSessionStorage';
+import { serverSessionsEnabled } from '../auth/serverSessionMode';
+import { sessionSnapshot } from '../auth/serverSession';
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -41,7 +44,7 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const { t } = useTranslation();
   // MSAL returns a new AccountInfo object on each read. Keep a stable snapshot for
   // this page lifetime (sign-in/out navigate away), not an effect dependency loop.
-  const [account] = useState(() =>
+  const [account,setAccount] = useState(() =>
     customerConfigured ? customerInstance.getActiveAccount() : null,
   );
   const [error, setError] = useState(initialError);
@@ -53,18 +56,18 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const [status, setStatus] = useState<CustomerStatus | null>(null);
   const [session, setSession] = useState<SessionTimes | null>(null);
   useEffect(() => {
-    const bookingRequested=sessionStorage.getItem(bookingSignInKey)==='pending';
-    const browseRequested=sessionStorage.getItem('wellness.customer.return-to-browse.v1')==='pending';
+    const bookingRequested=privateSessionStorage.getItem(bookingSignInKey)==='pending';
+    const browseRequested=privateSessionStorage.getItem('wellness.customer.return-to-browse.v1')==='pending';
     if (!customerConfigured || initialError || (!bookingRequested&&!browseRequested)) return;
-    if (bookingRequested) sessionStorage.removeItem(bookingSignInKey);
+    if (bookingRequested) privateSessionStorage.removeItem(bookingSignInKey);
     const existing = savedSession();
     if (existing && Math.min(existing.idle_expires_at, existing.absolute_expires_at) * 1000 > Date.now()) return;
     setBusy(true);
     void customerSignIn().catch(() => setError(t('Unable to start client sign-in. Please try again.'))).finally(() => setBusy(false));
   }, [initialError, t]);
   useEffect(() => {
-    if (!verified || sessionStorage.getItem('wellness.customer.return-to-browse.v1')!=='pending') return;
-    sessionStorage.removeItem('wellness.customer.return-to-browse.v1');
+    if (!verified || privateSessionStorage.getItem('wellness.customer.return-to-browse.v1')!=='pending') return;
+    privateSessionStorage.removeItem('wellness.customer.return-to-browse.v1');
     if(status?.onboarding_status==='linked')window.location.replace(import.meta.env.BASE_URL);
   }, [verified,status]);
   useEffect(() => {
@@ -75,8 +78,16 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
       setSession(null);
       setChecking(false);
       setError(t("Your client session has ended. Please sign in again."));
+      if(serverSessionsEnabled())setAccount(null);
     };
     window.addEventListener("customer-session-ended", end);
+    if(serverSessionsEnabled()){
+      const start=()=>{setError('');setAccount(customerInstance.getActiveAccount());};
+      const times=()=>setSession(sessionSnapshot().lease);
+      const recheck=()=>setAttempt(value=>value+1);
+      window.addEventListener('customer-session-started',start);window.addEventListener('server-session-times',times);window.addEventListener('customer-session-recheck',recheck);
+      return()=>{window.removeEventListener('customer-session-ended',end);window.removeEventListener('customer-session-started',start);window.removeEventListener('server-session-times',times);window.removeEventListener('customer-session-recheck',recheck);};
+    }
     const expires = session
       ? Math.min(session.idle_expires_at, session.absolute_expires_at) * 1000
       : null;

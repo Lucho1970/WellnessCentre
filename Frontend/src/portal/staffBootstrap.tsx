@@ -4,6 +4,8 @@ import { AppProviders } from '../shared/AppProviders';
 import { StaffAuthProvider, msalInstance, selectStaffAccount } from '../auth/AuthProvider';
 import { PortalApp } from './PortalApp';
 import { clearStaffRedirectResponse } from '../auth/staffRedirectCleanup';
+import { serverSessionsEnabled } from '../auth/serverSessionMode';
+import { prepareServerSession } from '../auth/serverSession';
 
 export async function bootstrap() {
   // MSAL may load the portal redirect URI in a hidden iframe for silent token
@@ -14,7 +16,7 @@ export async function bootstrap() {
   let result = null;
   let redirectFailed = false;
   const callbackUrl = window.location.href;
-  try { result = await msalInstance.handleRedirectPromise(); }
+  try { if(serverSessionsEnabled()){(await import('../auth/AuthProvider')).configureStaffServerSession();await prepareServerSession();}else result = await msalInstance.handleRedirectPromise(); }
   catch { redirectFailed = true; } // Render a safe recovery state; never expose raw provider errors.
   finally { clearStaffRedirectResponse(callbackUrl); }
   const account = redirectFailed ? null : selectStaffAccount(result?.account ?? msalInstance.getActiveAccount());

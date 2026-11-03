@@ -1,4 +1,5 @@
 /// <reference types="google.maps" />
+import { privateSessionStorage } from '../auth/privateSessionStorage';
 import { useEffect, useRef, useState } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import './discovery.css';
@@ -45,7 +46,7 @@ export function LocationSearch({request,onResult,defaultArea,savedAddressLink,t=
       if(!Array.isArray(data.matches)||!data.point||!data.settings)throw new Error(t('Location search returned an unexpected response.'));
       if(!mounted.current||current!==generation.current)return;
       setResult(data);setPoint(data.point);resultRef.current({...data,matches:onlyRef.current?data.matches.filter(row=>row.status==='within_area'):data.matches});
-      try{sessionStorage.setItem(storageKey,JSON.stringify({point:data.point,expires:Date.now()+1800000,only:onlyRef.current}));}catch{/* Optional tab-local preference. */}
+      try{privateSessionStorage.setItem(storageKey,JSON.stringify({point:data.point,expires:Date.now()+1800000,only:onlyRef.current}));}catch{/* Optional tab-local preference. */}
     }catch(cause){if(mounted.current&&current===generation.current)setError(cause instanceof Error?cause.message:t('Location search is temporarily unavailable.'));}
     finally{if(mounted.current&&current===generation.current)setBusy(false);}
   };
@@ -53,7 +54,7 @@ export function LocationSearch({request,onResult,defaultArea,savedAddressLink,t=
   useEffect(()=>{let live=true;void request<{ map_browser_key?: string }>('/public/discovery/options').then(data=>{if(live&&typeof data.map_browser_key==='string')setMapKey(data.map_browser_key);}).catch(()=>{});return()=>{live=false;};},[request]);
   useEffect(()=>{
     if(initialized.current)return;
-    try{const saved=JSON.parse(sessionStorage.getItem(storageKey)??'null');if(saved?.expires>Date.now()&&Number.isFinite(saved.point?.latitude)&&Number.isFinite(saved.point?.longitude)){initialized.current=true;setOnly(Boolean(saved.only));void search({point:saved.point});return;}}catch{/* No saved point. */}
+    try{const saved=JSON.parse(privateSessionStorage.getItem(storageKey)??'null');if(saved?.expires>Date.now()&&Number.isFinite(saved.point?.latitude)&&Number.isFinite(saved.point?.longitude)){initialized.current=true;setOnly(Boolean(saved.only));void search({point:saved.point});return;}}catch{/* No saved point. */}
     if(defaultArea){initialized.current=true;setArea(defaultArea);void search({area:defaultArea});}
   },[defaultArea]);
   const locate=()=>{
@@ -69,9 +70,9 @@ export function LocationSearch({request,onResult,defaultArea,savedAddressLink,t=
       <label>{t('City, postal code or address')}<input value={area} maxLength={250} onChange={event=>setArea(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(area.trim().length>=3)void search({area});}}}/></label>
       <div className="discovery-actions"><button type="button" disabled={area.trim().length<3} onClick={()=>void search({area})}>{t('Search this area')}</button><button type="button" onClick={locate}>{t('Use my current location')}</button><button type="button" onClick={()=>setShowMap(value=>!value)}>{t('Choose on map')}</button></div>
       {defaultArea&&<button type="button" onClick={()=>{setArea(defaultArea);void search({area:defaultArea});}}>{t('Use my saved address')}</button>}
-      <label className="discovery-check"><input type="checkbox" checked={only} onChange={event=>{const checked=event.target.checked;setOnly(checked);if(result){resultRef.current({...result,matches:checked?result.matches.filter(row=>row.status==='within_area'):result.matches});try{sessionStorage.setItem(storageKey,JSON.stringify({point:result.point,expires:Date.now()+1800000,only:checked}));}catch{/* Optional. */}}}}/>{t('Only show practitioners within their normal travel limit')}</label>
+      <label className="discovery-check"><input type="checkbox" checked={only} onChange={event=>{const checked=event.target.checked;setOnly(checked);if(result){resultRef.current({...result,matches:checked?result.matches.filter(row=>row.status==='within_area'):result.matches});try{privateSessionStorage.setItem(storageKey,JSON.stringify({point:result.point,expires:Date.now()+1800000,only:checked}));}catch{/* Optional. */}}}}/>{t('Only show practitioners within their normal travel limit')}</label>
       {showMap&&(mapKey?<><p>{t('Click a point, or move the map and use its centre. Then search that point.')}</p><SearchMap point={point} apiKey={mapKey} choose={setPoint} t={t}/><button type="button" onClick={()=>void search({point})}>{t('Search selected point')}</button></>:<p>{t('Map selection is not configured yet. Address and current-location search are available.')}</p>)}
-      {result&&<button type="button" onClick={()=>{initialized.current=true;setOnly(false);setResult(null);resultRef.current(null);try{sessionStorage.removeItem(storageKey);}catch{/* Optional. */}}}>{t('Clear location filter')}</button>}
+      {result&&<button type="button" onClick={()=>{initialized.current=true;setOnly(false);setResult(null);resultRef.current(null);try{privateSessionStorage.removeItem(storageKey);}catch{/* Optional. */}}}>{t('Clear location filter')}</button>}
     </fieldset>
     {busy&&<p role="status">{t('Checking travel areas…')}</p>}{error&&<p role="alert">{error}</p>}
     {result&&<p role="status">{t('Showing results for:')} {result.label}. {t('Travel approval required means you can enquire; it does not allow online booking. Exact visit coverage and fees are checked before booking.')}</p>}

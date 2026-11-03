@@ -1,3 +1,4 @@
+import { sessionFetch } from '../auth/serverSession';
 import { ApiError } from '../shared/api';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -45,7 +46,7 @@ function LocationAdminForm() {
     const scope = ++generation.current; setLoaded(false); setBusy(true); formValidation.clear(); setLoadError('');
     try {
       const token = await getAccessToken();
-      const response = await fetch(`${api}/admin/locations`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await sessionFetch(`${api}/admin/locations`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json();
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to load locations.'));
       if (scope !== generation.current) return false;
@@ -73,7 +74,7 @@ function LocationAdminForm() {
     event.preventDefault(); const scope = ++generation.current; setBusy(true); formValidation.clear(); setPanelError(''); setSaved('');
     try {
       const token = await getAccessToken();
-      const response = await fetch(editingId ? `${api}/admin/locations/${editingId}` : `${api}/admin/locations`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const response = await sessionFetch(editingId ? `${api}/admin/locations/${editingId}` : `${api}/admin/locations`, { method: editingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const body = await response.json();
       if (scope !== generation.current) return;
       if (!response.ok) throw new ApiError(body, response.status, t('Unable to save location.'));

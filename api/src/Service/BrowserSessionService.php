@@ -31,11 +31,12 @@ final class BrowserSessionService
         if (!is_string($csrf) || !hash_equals($this->csrf($secret),$csrf)) throw new ApiException(403,'session_csrf_denied','Refresh the original portal and try again.');
     }
     private static function denied(): never { throw new ApiException(401,'session_required','Please sign in again.'); }
-    private function actor(array $claims): ?int
+    private function actor(array $claims): BrowserSessionAuthority
     {
         $actor = ($this->authority)($this->store->pdo,$this->policy,$claims);
+        if($actor instanceof BrowserSessionAuthority)return $actor;
         if ($actor !== null && (!is_int($actor) || $actor < 1)) throw new \LogicException('Invalid current session authority.');
-        return $actor;
+        return new BrowserSessionAuthority($actor);
     }
     private function operation(string $correlation, ?string $principal, callable $operation): mixed
     {
@@ -107,9 +108,9 @@ final class BrowserSessionService
                 'realm'=>$this->policy->realm,'host'=>$this->policy->host,'clinic_id'=>$this->policy->clinicId,
                 'authenticated_at'=>BrowserSessionStore::stamp($fresh['auth_time']),'created_at'=>BrowserSessionStore::stamp($now),
                 'last_activity_at'=>BrowserSessionStore::stamp($now),'absolute_expires_at'=>BrowserSessionStore::stamp($fresh['auth_time']+28800),
-                'policy_version'=>$this->policy->version,'issued_epoch'=>$epoch];
+                'policy_version'=>$this->policy->version,'issued_epoch'=>$epoch] + $actor->columns();
             $this->store->insert($this->policy,$row,$claims);
-            $this->store->audit($this->policy,$principal,$actor,$correlation,'start');
+            $this->store->audit($this->policy,$principal,$actor->actorId,$correlation,'start');
             return new BrowserSessionGrant($secret,$this->metadata($row,$secret));
         });
     }
@@ -144,10 +145,10 @@ final class BrowserSessionService
                 $row['last_activity_at'] = BrowserSessionStore::stamp($this->now());
                 $this->store->touch($this->policy,$hash,$this->now());
             }
-            $result = $effect($this->store->pdo,$row,$claims,$actor);
+            $result = $effect($this->store->pdo,$row,$claims,$actor->actorId,$actor);
             $this->locked($hash,$principal,$epoch); // An interrupted/long effect cannot slide a deadline.
             $this->verifier->access($bearer,$this->now());
-            $this->store->audit($this->policy,$principal,$actor,$correlation,$mutation ? 'effect' : 'check');
+            $this->store->audit($this->policy,$principal,$actor->actorId,$correlation,$mutation ? 'effect' : 'check');
             return $result;
         });
     }

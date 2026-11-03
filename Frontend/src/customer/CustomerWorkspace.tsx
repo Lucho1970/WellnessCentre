@@ -1,3 +1,4 @@
+import { privateSessionStorage } from '../auth/privateSessionStorage';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Box, Button, Checkbox, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Typography } from '@mui/material';
@@ -32,15 +33,15 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
   const canBook=status.capabilities?.includes('book_own_appointments')??false;
   const previousOnboarding = useRef(status.onboarding_status);
   const [workflowLocked, setWorkflowLocked] = useState(false);
-  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking' | 'manage' | 'link' | 'forms' | 'receipts' | 'discovery' | 'travel' | 'consent'>(status.onboarding_status === 'linked' ? (sessionStorage.getItem('wellness.discover-requested') === '1' ? 'discovery' : pendingAppointmentLink() ? 'link' : canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
+  const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking' | 'manage' | 'link' | 'forms' | 'receipts' | 'discovery' | 'travel' | 'consent'>(status.onboarding_status === 'linked' ? (privateSessionStorage.getItem('wellness.discover-requested') === '1' ? 'discovery' : pendingAppointmentLink() ? 'link' : canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
   const [discoverySelection,setDiscoverySelection]=useState<Match|undefined>();
-  useEffect(()=>{if(mode==='discovery')sessionStorage.removeItem('wellness.discover-requested');},[mode]);
+  useEffect(()=>{if(mode==='discovery')privateSessionStorage.removeItem('wellness.discover-requested');},[mode]);
   const [appointmentView, setAppointmentView] = useState<AppointmentView>('upcoming');
   const [showCanceled, setShowCanceled] = useState(() => { try { return localStorage.getItem('wellness.client.showCanceledAppointments') === 'true'; } catch { return false; } });
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [managing, setManaging] = useState<Appointment | null>(null);
-  const [token, setToken] = useState(() => sessionStorage.getItem('wellness.customer.invitation') ?? '');
+  const [token, setToken] = useState(() => privateSessionStorage.getItem('wellness.customer.invitation') ?? '');
   const [claimantName, setClaimantName] = useState('');
   const [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [reload, setReload] = useState(0);
@@ -53,7 +54,7 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
     const wasLinked = previousOnboarding.current === 'linked';
     previousOnboarding.current = status.onboarding_status;
     if (!wasLinked && status.onboarding_status === 'linked') {
-      if (sessionStorage.getItem('wellness.discover-requested')==='1') setMode('discovery'); else if (pendingAppointmentLink()) setMode('link'); else if (canBook && customerBookingIntent()) setMode('booking');
+      if (privateSessionStorage.getItem('wellness.discover-requested')==='1') setMode('discovery'); else if (pendingAppointmentLink()) setMode('link'); else if (canBook && customerBookingIntent()) setMode('booking');
     }
   }, [canBook, status.onboarding_status]);
   useEffect(() => {
@@ -80,7 +81,7 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
     try {
       if (mode === 'invite') {
         await customerFetch('/invitations/accept', { method: 'POST', body: JSON.stringify({ token, claimant_name: claimantName }) });
-        markClean(); sessionStorage.removeItem('wellness.customer.invitation'); setToken(''); onRefresh();
+        markClean(); privateSessionStorage.removeItem('wellness.customer.invitation'); setToken(''); onRefresh();
       } else if (status.onboarding_status === 'linked') {
         const data = await customerFetch('/profile', { method: 'PATCH', body: JSON.stringify(profile) });
         markClean(); setProfile(data); setNotice(t('Profile saved. Existing appointment destinations have not changed.'));
