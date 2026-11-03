@@ -134,6 +134,7 @@ export class IdentityFixture {
   }
   async visit(page: Page, realm: Realm = 'practitioner', host = 'clinic-a.session.test', lang = 'en') {
     await page.goto(`https://${host}/?realm=${realm}&lang=${lang}`);
+    await expect(page.locator('#status')).toHaveText(lang === 'fr' ? 'Connexion requise' : 'Sign in required');
     await expect(page.locator('#login')).toBeEnabled();
   }
   async login(page: Page) {

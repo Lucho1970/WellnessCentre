@@ -90,6 +90,8 @@ async function login() {
   if (!challenge || busy) return;
   busy = true; button('login').disabled = true;
   const revision = ++generation; hide();
+  node('status').textContent = message('Signing in…', 'Connexion en cours…');
+  delete node('status').dataset.failure;
   const nonce = challenge; challenge = null;
   try {
     const result = await sdk.loginPopup({ scopes: [`api://${config.api}/${config.scope}`], ...practitionerLoginParameters(), ...freshCustomerLoginParameters(nonce) });

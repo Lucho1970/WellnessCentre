@@ -93,11 +93,13 @@ test('cancelled popup inventories temporary storage and clears it with the suppo
   await identity.install(context); await identity.visit(page);
   const popupPromise = context.waitForEvent('page'); await page.locator('#login').click(); const popup = await popupPromise;
   await expect(popup.getByRole('link', { name: 'Complete synthetic sign-in' })).toBeVisible();
+  await expect(page.locator('#status')).toHaveText('Signing in…');
   const temporary = await page.evaluate(() => Object.keys(sessionStorage));
   expect(temporary.some(key => key.includes('interaction.status'))).toBe(true);
   // Inventory names only. A residual transaction item is still AUTH-04 review scope.
   test.info().annotations.push({ type: 'temporary-key-names', description: temporary.join(', ') });
   await popup.close();
+  await page.bringToFront();
   await expect(page.locator('#status')).toHaveText('Sign-in failed; try again');
   await noTransactionSecrets(page);
   identity.mode = 'success'; await identity.login(page);

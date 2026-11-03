@@ -11,6 +11,7 @@ export default defineConfig({
   use: { serviceWorkers: 'block', trace: 'off' },
   projects: [
     { name: 'edge', use: { browserName: 'chromium', channel: 'msedge' } },
+    { name: 'firefox', use: { browserName: 'firefox' } },
     { name: 'webkit', use: { browserName: 'webkit' } },
   ],
   webServer: [
