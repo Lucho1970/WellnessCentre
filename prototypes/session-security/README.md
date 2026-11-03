@@ -12,9 +12,15 @@ npm run lint
 npm run test:session-prototype
 ```
 
-The latest full run exits 1: Edge and Firefox each pass all 44 cases; WebKit passes
-40 with four strict SameSite failures. Cancellation passed 10 focused repeats and
-the full matrix. The independent native cookie/cross-site POST probe confirms the
+The latest matrix/proof contract is in the [ID-proof correction report](../../documentation/SESSION_PROOF_CONTRACT_2026-11-02.md).
+ID proofs require their exact SPA audience and allow an omitted azp; any present
+invalid azp is rejected. API tokens still require the approved caller azp and scope.
+The synthetic issuer omits ID azp by default, exercising this through the real SDK.
+The final 168-case run passes 56/56 in Edge, 56/56 in Firefox and 52/56 in Windows
+WebKit; its four strict SameSite failures remain. Exact idle-boundary tests use an
+explicit authenticated fixture freeze control; other scenarios use the live clock.
+The prior browser investigation
+passed 10 focused cancellation repeats. The independent cookie/cross-site POST probe confirms the
 Windows WebKit build sends a dummy Lax cookie on cross-site POST. Keep the failing
 checks; actual Safari/macOS/iOS and trusted HTTPS acceptance remain unverified.
 
