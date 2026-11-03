@@ -1,5 +1,7 @@
 # Commit-safe account email delivery
 
+**Follow-up:** [Account email scheduler preparation](ACCOUNT_EMAIL_SCHEDULER_2026-11-03.md) adds a separate default-off authenticated one-minute trigger and disabled Azure template. This report's unscheduled-worker status describes revision `766fffcd` before that later branch. Neither branch has been merged or deployed.
+
 3 November 2026. Branch `feature/commit-safe-email`, based on `1025b355593033feec83c92217f2d76962ec3e1a`. Local implementation, disposable synthetic testing and documentation were authorized. Production files, databases, private configuration, identity providers, permissions, accounts, mail delivery and schedulers are unchanged. No merge or deployment is authorized by this report. Implementation revision: `5e279864ca3c211637f847495068c2e7783afbc2` (21 source/test/config files), comprising core `fecf1cf60e952ed8b3d0c9ab44b3e69669acd9b2` and a CLI-only HTTP boundary follow-up. The documentation follow-up adds this report and index/history links; it does not change executable behavior.
 
 ## Behavior and boundaries

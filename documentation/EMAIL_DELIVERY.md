@@ -4,6 +4,12 @@ For current package destinations and shared portal hosting, see [Deployment layo
 
 The PHP API queues booking confirmation, change, and cancellation events in MySQL. A private worker sends minimal bilingual email through Microsoft Graph. The optional HTTPS trigger is a small public pointer protected by a separate high-entropy key; no Graph secret belongs in the frontend or Git.
 
+## Separate account-email outbox (3 November 2026, local preparation)
+
+The three account-email paths—staff personal-address verification, emailed client invitation and practitioner-enquiry retry—have a distinct encrypted commit-safe outbox and private worker. The existing 15-minute Azure notification trigger does **not** drain it. Verification codes live for 15 minutes, so a separate one-minute scheduler is prepared on `feature/account-email-worker-scheduling`. See the [scheduler preparation, test evidence and release gates](ACCOUNT_EMAIL_SCHEDULER_2026-11-03.md). The public pointer and Azure template have not been deployed or enabled. The queue and mail flags remain off in source defaults. Do not infer account email delivery from the existing notification-worker health widget.
+
+If an approved host supports private PHP cron, use the existing private `api/bin/send-account-emails.php --limit=20` under an independently reviewed schedule. Otherwise the new HTTPS pointer can be copied to `/public_html/livinlively.ca/api/cron/send-account-emails.php` and the separate `hosting/azure/account-email-trigger.json` template can prepare a disabled one-minute Logic App. It has its **own** `ACCOUNT_EMAIL_TRIGGER_SECRET`; do not reuse `MAIL_TRIGGER_SECRET`. Choose one driver, verify the actual hosted path, key, Graph sender and backup/migrations, and require the reviewed activation procedure before enabling mail. A 204 may mean cooldown/overlap; confirm worker logs and outbox states. Monitor backlog age and `needs_review` before treating this as operational.
+
 ## Sender and tenant
 
 The proposed development sender is `wellness@lucho1970.onmicrosoft.com`. Confirm that this is an actual Exchange Online mailbox with the ability to send mail. A directory user without an Exchange mailbox is not sufficient. This is the workforce Microsoft 365 tenant, **not** the separate customer External ID tenant. Change `MAIL_FROM_ADDRESS` when the production domain and mailbox are ready.

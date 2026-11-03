@@ -1,5 +1,7 @@
 - [Commit-safe account email — 3 November 2026](COMMIT_SAFE_EMAIL_2026-11-03.md): default-off encrypted queue for verification, invitations and enquiry retries; commit/audit/revocation/concurrency tests, worker operations and remaining release gates. Production unchanged.
 
+- [Account email scheduler preparation — 3 November 2026](ACCOUNT_EMAIL_SCHEDULER_2026-11-03.md): separate authenticated one-minute trigger and disabled Azure template, synthetic HTTP checks and operational rollout gates. Production unchanged.
+
 - [Server sessions: existing routes and browser integration - 3 November 2026](SESSION_SERVER_INTEGRATION_2026-11-03.md): default-off API/browser integration, real-route registration/approval/activation and revocation, disposable SQL/browser evidence, 38 controls and remaining messaging/provider/Safari/hosted gates. Production unchanged.
 
 # Wellness Centre Documentation
