@@ -1802,6 +1802,9 @@ test("appointment client finder filters by exact birthdate and debounced contact
   ).toBeVisible();
   expect(searches).toEqual([{ q: "", dateOfBirth: "1980-05-06" }]);
   await page.clock.install();
+  // Installation alone still advances real time while Playwright fills fields.
+  // Freeze it so machine load cannot emit an intermediate debounced search.
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
   await search.fill("Te");
   await page.clock.fastForward(100);
   expect(searches).toHaveLength(1);
@@ -1814,6 +1817,7 @@ test("appointment client finder filters by exact birthdate and debounced contact
     { q: "", dateOfBirth: "1980-05-06" },
     { q: "Test", dateOfBirth: "1980-05-06" },
   ]);
+  await page.clock.resume();
   await expect(page.getByText("test@example.test")).toBeVisible();
   await expect(page.getByText("905-555-0100")).toBeVisible();
   await expect(
@@ -4828,7 +4832,9 @@ for (const action of ['refresh', 'status', 'notify'] as const) test(`practitione
     return route.fulfill(denied ? { status: action === 'notify' ? 404 : 403, json: { error: { code: action === 'notify' ? 'enquiry_not_found' : 'forbidden' } } }
       : { json: { data: { items: [item], has_more: false, settings: { recipient_email: 'recipient@example.test', enabled: true, revision: 1, mail_configured: true } } } });
   });
+  const initialList=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/practitioner-enquiries' && response.request().method()==='GET' && response.status()===200);
   await page.goto(`${portalHost}/admin/enquiries`);
+  await initialList;
   await expect(page.getByText(item.email, { exact: false })).toBeVisible();
   if (action === 'refresh') { denied = true; await page.getByRole('button', { name: 'Refresh', exact: true }).click(); }
   else if (action === 'notify') await page.getByRole('button', { name: 'Send email notification', exact: true }).click();
