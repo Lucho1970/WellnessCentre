@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+// Private CLI entry point: refuse HTTP before loading any private configuration.
+if (PHP_SAPI!=='cli') { http_response_code(404);exit; }
 use Wellness\{Config,Database};
 use Wellness\Service\{CommitSafeEmail,GraphMailClient};
 require dirname(__DIR__).'/vendor/autoload.php';
