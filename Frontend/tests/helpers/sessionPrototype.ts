@@ -24,8 +24,9 @@ function realmFor(client: string): Realm {
 function oid(profile: string) { return `aaaaaaaa-aaaa-4aaa-8aaa-${createHash('sha256').update(profile).digest('hex').slice(0, 12)}`; }
 export function tokens(realm: Realm, nonce: string, profile = 'microsoft', now = Math.floor(Date.now() / 1000), overrides: { api?: Claims; id?: Claims } = {}): TokenPair {
   const config = realms[realm];
-  const common = { iss: issuer, tid: tenant, oid: oid(profile), azp: config.client, ver: '2.0', iat: now - 5, nbf: now - 5, exp: now + 86400 };
-  const apiClaims: Claims = { ...common, aud: config.api, sub: `api-${profile}`, scp: config.scope, ...overrides.api };
+  const common = { iss: issuer, tid: tenant, oid: oid(profile), ver: '2.0', iat: now - 5, nbf: now - 5, exp: now + 86400 };
+  const apiClaims: Claims = { ...common, azp: config.client, aud: config.api, sub: `api-${profile}`, scp: config.scope, ...overrides.api };
+  // Model the ordinary ID-token contract without borrowing API caller claims.
   const idClaims: Claims = { ...common, aud: config.client, sub: `spa-${profile}`, nonce, auth_time: now, name: `Synthetic ${profile}`, preferred_username: `${profile}@example.test`, ...overrides.id };
   return { access: signClaims(apiClaims), id: signClaims(idClaims), refresh: `synthetic-refresh-${randomBytes(16).toString('hex')}`, apiClaims, idClaims };
 }

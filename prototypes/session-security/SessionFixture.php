@@ -24,6 +24,7 @@ final class SessionFixture
     public function __construct(private readonly string $runtime) {}
 
     public static function initial(): array { return ['offset' => 0, 'sessions' => [], 'challenges' => [], 'events' => []]; }
+    private static function now(array $state): int { return ($state['frozen_at'] ?? time()) + $state['offset']; }
 
     /** File locking is for this local experiment only; it is not SQL race evidence. */
     private function state(callable $action): mixed
@@ -54,6 +55,9 @@ final class SessionFixture
         return $this->state(function (array &$state) use ($body): array {
             switch ($body['action'] ?? '') {
                 case 'reset': $state = self::initial(); break;
+                // Freeze only explicitly selected synthetic boundary tests; all
+                // other scenarios retain the live wall clock plus test offset.
+                case 'freeze': $state['frozen_at'] = time(); break;
                 case 'advance':
                     if (!is_int($body['seconds'] ?? null) || $body['seconds'] < 0 || $body['seconds'] > 86400) throw new FixtureError(422, 'fixture_clock_invalid');
                     $state['offset'] += $body['seconds']; break;
@@ -65,7 +69,7 @@ final class SessionFixture
                 case 'snapshot': break;
                 default: throw new FixtureError(422, 'fixture_control_invalid');
             }
-            return ['now' => time() + $state['offset'], 'state' => $state];
+            return ['now' => self::now($state), 'state' => $state];
         });
     }
     private static function cookieName(string $realm, bool $challenge = false): string { return '__Host-wc-poc-' . ($challenge ? 'challenge-' : '') . $realm; }
@@ -95,7 +99,11 @@ final class SessionFixture
         [$spa, $api, $scope] = self::REALMS[$realm];
         if (($claims['iss'] ?? null) !== self::ISSUER || ($claims['tid'] ?? null) !== self::TENANT
             || ($claims['aud'] ?? null) !== ($proof ? $spa : $api)
-            || ($claims['azp'] ?? null) !== $spa || ($claims['ver'] ?? null) !== '2.0'
+            // ID proof is addressed to this SPA; azp is optional, but invalid if
+            // present with another value/type. API caller binding stays mandatory.
+            || (!$proof && ($claims['azp'] ?? null) !== $spa)
+            || ($proof && array_key_exists('azp', $claims) && $claims['azp'] !== $spa)
+            || ($claims['ver'] ?? null) !== '2.0'
             || !is_int($claims['iat'] ?? null) || !is_int($claims['exp'] ?? null)
             || $claims['iat'] > $now + 60 || $claims['exp'] <= $now || $claims['exp'] <= $claims['iat']
             || !is_string($claims['sub'] ?? null) || $claims['sub'] === '' || strlen($claims['sub']) > 255
@@ -125,7 +133,7 @@ final class SessionFixture
         if (($action === 'me' ? 'GET' : 'POST') !== $method || !in_array($action, ['challenge','start','me','activity','logout'], true)) throw new FixtureError(404, 'fixture_route_unknown');
         if ($method === 'POST') self::origin($host);
         return $this->state(function (array &$state) use ($host, $realm, $action, $body, $bearer): array {
-            $now = time() + $state['offset'];
+            $now = self::now($state);
             if ($action === 'challenge') {
                 if (count($state['challenges']) >= 512) throw new FixtureError(429, 'fixture_challenge_limit');
                 $nonce = bin2hex(random_bytes(32)); $secret = bin2hex(random_bytes(32));

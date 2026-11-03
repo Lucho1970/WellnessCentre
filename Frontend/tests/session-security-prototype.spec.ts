@@ -2,7 +2,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
-import { realms, type Realm } from '../prototypes/session-security/protocol';
+import { realmNames, realms, type Realm } from '../prototypes/session-security/protocol';
 import { IdentityFixture, api, backend, challengeFor, control, cookieHeader, sessionFor, signClaims, tokens, type Mode } from './helpers/sessionPrototype';
 import { runtimeDirectory } from './helpers/sessionPrototypeSetup';
 
@@ -224,6 +224,65 @@ test('fresh authentication proof is nonce bound, one-use, time bounded and accou
   expect((await api(request, 'practitioner', 'me', { cookie, bearer: pair.access })).status()).toBe(200);
 });
 
+for (const realm of realmNames) {
+  const host = realm === 'central' ? 'admin.session.test' : 'clinic-a.session.test';
+  test(`${realm}: ID proof accepts omitted or matching azp with exact SPA audience`, async ({ request }) => {
+    for (const representation of ['omitted', 'matching'] as const) {
+      const challenge = await challengeFor(request, realm, host);
+      const pair = tokens(realm, challenge.nonce, 'microsoft', (await control(request)).now);
+      const proof = { ...pair.idClaims };
+      if (representation === 'omitted') delete proof.azp;
+      else proof.azp = realms[realm].client;
+      expect(proof.sub).not.toBe(pair.apiClaims.sub); // Pairwise subjects; stable oid/tid bind the proof.
+      const options = { host, cookie: challenge.cookie, bearer: pair.access, body: { id_token: signClaims(proof) } };
+      expect((await api(request, realm, 'start', options)).status(), representation).toBe(200);
+      expect((await api(request, realm, 'start', options)).status(), 'proof remains single-use').toBe(401);
+    }
+  });
+
+  test(`${realm}: optional ID-proof azp preserves signature audience freshness and account boundaries`, async ({ request }) => {
+    const invalid = [
+      ['wrong azp', 'azp', 'unapproved-client'], ['null azp', 'azp', null],
+      ['empty azp', 'azp', ''], ['number azp', 'azp', 1], ['array azp', 'azp', [realms[realm].client]],
+      ['API audience', 'aud', realms[realm].api], ['unknown audience', 'aud', 'unapproved-app'],
+      ['array audience', 'aud', [realms[realm].client]], ['wrong issuer', 'iss', 'https://unapproved.example.test'],
+      ['wrong tenant', 'tid', 'unapproved-tenant'], ['wrong nonce', 'nonce', 'unapproved-nonce'],
+      ['wrong account', 'oid', 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001'], ['missing freshness', 'auth_time', null],
+    ] as const;
+    for (const [label, claim, value] of invalid) {
+      const challenge = await challengeFor(request, realm, host);
+      const pair = tokens(realm, challenge.nonce, 'microsoft', (await control(request)).now);
+      const proof = { ...pair.idClaims }; delete proof.azp; proof[claim] = value;
+      const response = await api(request, realm, 'start', { host, cookie: challenge.cookie, bearer: pair.access, body: { id_token: signClaims(proof) } });
+      expect(response.status(), label).toBe(401);
+    }
+    const challenge = await challengeFor(request, realm, host);
+    const pair = tokens(realm, challenge.nonce, 'microsoft', (await control(request)).now);
+    const proof = { ...pair.idClaims }; delete proof.azp;
+    const untrustedKey = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+    expect((await api(request, realm, 'start', { host, cookie: challenge.cookie, bearer: pair.access, body: { id_token: signClaims(proof, untrustedKey.privateKey) } })).status()).toBe(401);
+    expect(Object.keys((await control(request)).state.sessions)).toHaveLength(0);
+  });
+
+  test(`${realm}: missing ID-proof azp never relaxes API caller audience or scope`, async ({ request }) => {
+    for (const mutation of ['missing-azp', 'null-azp', 'wrong-azp', 'SPA-audience', 'missing-scope', 'ID-as-bearer'] as const) {
+      const challenge = await challengeFor(request, realm, host);
+      const pair = tokens(realm, challenge.nonce, 'microsoft', (await control(request)).now);
+      const proof = { ...pair.idClaims }; delete proof.azp;
+      const access = { ...pair.apiClaims };
+      if (mutation === 'missing-azp') delete access.azp;
+      if (mutation === 'null-azp') access.azp = null;
+      if (mutation === 'wrong-azp') access.azp = 'unapproved-client';
+      if (mutation === 'SPA-audience') access.aud = realms[realm].client;
+      if (mutation === 'missing-scope') access.scp = 'unapproved_scope';
+      const bearer = mutation === 'ID-as-bearer' ? signClaims(proof) : signClaims(access);
+      const response = await api(request, realm, 'start', { host, cookie: challenge.cookie, bearer, body: { id_token: signClaims(proof) } });
+      expect(response.status(), mutation).toBe(mutation === 'missing-scope' ? 403 : 401);
+    }
+    expect(Object.keys((await control(request)).state.sessions)).toHaveLength(0);
+  });
+}
+
 test('same-origin POST and session CSRF are mandatory for activity and logout', async ({ request }) => {
   const { cookie, pair, lease } = await sessionFor(request);
   for (const action of ['activity', 'logout']) {
@@ -238,11 +297,15 @@ test('same-origin POST and session CSRF are mandatory for activity and logout', 
 
 for (const realm of ['practitioner', 'client'] as const) {
   test(`${realm}: idle boundary is enforced independently of valid JWT expiry`, async ({ request }) => {
+    const frozen = (await control(request, 'freeze')).now;
     const { cookie, pair, lease } = await sessionFor(request, realm);
     const idle = realm === 'client' ? 1800 : 900;
+    expect(lease.idle_expires_at).toBe(frozen + idle);
     await control(request, 'advance', { seconds: idle - 1 });
+    expect((await control(request)).now).toBe(lease.idle_expires_at - 1);
     expect((await api(request, realm, 'me', { cookie, bearer: pair.access })).status()).toBe(200);
     await control(request, 'advance', { seconds: 1 });
+    expect((await control(request)).now).toBe(lease.idle_expires_at);
     expect((await api(request, realm, 'activity', { cookie, bearer: pair.access, csrf: lease.csrf })).status()).toBe(401);
   });
 }
