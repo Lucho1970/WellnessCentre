@@ -1,0 +1,68 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "type": "string",
+      "defaultValue": "wellness-account-email-scheduler",
+      "metadata": { "description": "Dedicated account-email Consumption Logic App name; do not overwrite the existing notification workflow." }
+    },
+    "logicAppLocation": {
+      "type": "string",
+      "defaultValue": "canadacentral"
+    },
+    "accountEmailTriggerSecret": {
+      "type": "securestring",
+      "minLength": 32,
+      "metadata": { "description": "Private ACCOUNT_EMAIL_TRIGGER_SECRET; enter only as a secure deployment parameter." }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "state": "Disabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "accountEmailTriggerSecret": { "type": "SecureString" }
+          },
+          "triggers": {
+            "Every_minute": {
+              "type": "Recurrence",
+              "recurrence": { "frequency": "Minute", "interval": 1 }
+            }
+          },
+          "actions": {
+            "Call_Account_Email_Trigger": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "https://livinlively.ca/api/cron/send-account-emails.php",
+                "headers": {
+                  "X-Wellness-Account-Email-Key": "@parameters('accountEmailTriggerSecret')",
+                  "Content-Type": "application/json"
+                },
+                "body": {},
+                "retryPolicy": { "type": "none" }
+              },
+              "runtimeConfiguration": {
+                "secureData": { "properties": ["inputs", "outputs"] }
+              },
+              "runAfter": {}
+            }
+          },
+          "outputs": {}
+        },
+        "parameters": {
+          "accountEmailTriggerSecret": { "value": "[parameters('accountEmailTriggerSecret')]" }
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
