@@ -1,5 +1,7 @@
 # Wellness Centre Documentation
 
+- [Server-session core — 3 November 2026](SESSION_SERVER_CORE_2026-11-03.md): local policy/proof, additive stores, disabled transport, legacy downgrade prevention, repeated MariaDB/MySQL and HTTP tests; current integration boundaries and all 38 controls. Production unchanged.
+
 - [Prototype ID-proof contract correction — 2 November 2026](SESSION_PROOF_CONTRACT_2026-11-02.md): ID-token audience/optional azp, strict API caller binding, four-realm signed regression and unchanged production; [concrete server-session core plan](SESSION_SERVER_CORE_IMPLEMENTATION_PLAN.md) prepares the next implementation slice.
 - [Safari and identity verification preflight — 2 November 2026](SESSION_PROVIDER_PREFLIGHT_2026-11-02.md): live workforce registration/API/consent reads, unverified MFA and blocked External ID evidence; BrowserStack access deferred by owner, no cloud session or production change.
 - [Session prototype browser follow-up — 2 November 2026](SESSION_SECURITY_BROWSER_FOLLOWUP_2026-11-02.md): Firefox matrix, cancellation/readiness recovery and independent native cookie/cross-site POST probe; four strict Windows WebKit failures retained. Production unchanged.

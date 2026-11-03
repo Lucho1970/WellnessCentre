@@ -1,5 +1,11 @@
 # Server application-session core — implementation proposal
 
+**3 November implementation update:** the [local core and disabled adapter](SESSION_SERVER_CORE_2026-11-03.md)
+now implement the policy/proof, store/migration and service/transport slices, with
+repeated dual-engine SQL/HTTP/concurrency evidence. Existing API/business-route adoption
+and browser work remain incomplete; there is no production activation or migration.
+The proposal below is retained as the full roadmap, not a claim that all slices shipped.
+
 2 November 2026. Prepared against `b55c9b64c9624f785df40a0feea4fa787a824c87`, with
 the separate prototype proof correction described in
 [the validation report](SESSION_PROOF_CONTRACT_2026-11-02.md).
