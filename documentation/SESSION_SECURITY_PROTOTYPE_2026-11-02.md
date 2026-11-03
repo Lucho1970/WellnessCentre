@@ -2,6 +2,10 @@
 
 **Local synthetic WP0 only. Production authentication is unchanged. NOT READY FOR RELEASE.**
 
+**Later browser follow-up:** [Firefox, cancellation and native cookie capability results](SESSION_SECURITY_BROWSER_FOLLOWUP_2026-11-02.md)
+records 128/132 passing cases and four retained Windows WebKit failures against a later
+source revision. Initial results below remain historical evidence, not the latest matrix.
+
 Baseline: `2858e2dcfa291c3775c685736ebe4c33a9ab79ca`.
 Branch: `feature/session-security-prototype`. Implementation source:
 `1dfc098ceafd309124384a171b25571b51caeddc`; the following documentation commit records these results.

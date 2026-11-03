@@ -12,9 +12,31 @@ npm run lint
 npm run test:session-prototype
 ```
 
-The recorded full run exits 1: Edge passes all 44 cases; WebKit passes 39 with four
-strict SameSite mismatches and one cancellation-recovery failure. The failing checks
-are retained. See the dated report before interpreting results as browser acceptance.
+The latest full run exits 1: Edge and Firefox each pass all 44 cases; WebKit passes
+40 with four strict SameSite failures. Cancellation passed 10 focused repeats and
+the full matrix. The independent native cookie/cross-site POST probe confirms the
+Windows WebKit build sends a dummy Lax cookie on cross-site POST. Keep the failing
+checks; actual Safari/macOS/iOS and trusted HTTPS acceptance remain unverified.
+
+For the Windows Firefox activation issue, use an isolated, process-scoped browser
+cache. From `Frontend`:
+
+```powershell
+$previousBrowserCache = $env:PLAYWRIGHT_BROWSERS_PATH
+try {
+    $env:PLAYWRIGHT_BROWSERS_PATH = [IO.Path]::GetFullPath((Join-Path (Get-Location) '../.tmp/session-browsers'))
+    npx playwright install firefox webkit
+    npm run test:session-prototype
+    node scripts/check-session-browser-capabilities.mjs
+} finally {
+    $env:PLAYWRIGHT_BROWSERS_PATH = $previousBrowserCache
+}
+```
+
+This downloads only the locked test-browser builds; no global cache replacement or
+system dependency change. Both validation commands currently exit 1 for WebKit.
+The independent probe uses only fixed synthetic cookies on two random-port loopback
+HTTP servers and intercepted fake HTTPS; it never loads the application or provider.
 
 The dedicated Playwright configuration starts Vite and PHP on loopback ports 5196
 and 5197. It generates disposable signing/control secrets in ignored
@@ -51,4 +73,5 @@ do not share those logs as sanitized output. Its UI and fixtures must never be
 pointed at real identities.
 
 See [the dated results and remaining gates](../../documentation/SESSION_SECURITY_PROTOTYPE_2026-11-02.md)
+and [the browser follow-up](../../documentation/SESSION_SECURITY_BROWSER_FOLLOWUP_2026-11-02.md)
 and [the implementation plan](../../documentation/SESSION_SECURITY_REVIEW_2026-11-02.md).

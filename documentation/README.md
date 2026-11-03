@@ -1,6 +1,7 @@
 # Wellness Centre Documentation
 
-- [Session security feasibility prototype — 2 November 2026](SESSION_SECURITY_PROTOTYPE_2026-11-02.md): isolated MSAL memory/popup and PHP bearer-plus-cookie experiment, local browser/HTTP results, temporary-storage inventory, limitations and remaining production decisions. Production unchanged.
+- [Session prototype browser follow-up — 2 November 2026](SESSION_SECURITY_BROWSER_FOLLOWUP_2026-11-02.md): Firefox matrix, cancellation/readiness recovery and independent native cookie/cross-site POST probe; four strict Windows WebKit failures retained. Production unchanged.
+- [Session security feasibility prototype — 2 November 2026](SESSION_SECURITY_PROTOTYPE_2026-11-02.md): initial isolated MSAL memory/popup and PHP bearer-plus-cookie experiment, storage inventory and remaining production decisions; later browser results linked above.
 - [Session security review and implementation plan — 2 November 2026](SESSION_SECURITY_REVIEW_2026-11-02.md): staff/client/central storage and expiry findings, proposed session design, decisions, work packages and rollout/rollback. Later authorization covers the separate local WP0 prototype only.
 - [Practitioner UI reliability — 2 November 2026](PRACTITIONER_UI_RELIABILITY_2026-11-02.md): post-rehearsal contact-edit, access-denial, callback and filter fixes; validation, control ledger and frontend-only package/rollback. Prepared work does not reopen hosted access.
 - [Practitioner application review JSON fix](PRACTITIONER_APPLICATION_JSON_FIX_2026-11-02.md): submitted application, hosted UTF-8 decode failure, evidence-preserving JSON retrieval, dual-engine regression and one-file rollback.
