@@ -1,3 +1,5 @@
+- [Server sessions: existing routes and browser integration - 3 November 2026](SESSION_SERVER_INTEGRATION_2026-11-03.md): default-off API/browser integration, real-route registration/approval/activation and revocation, disposable SQL/browser evidence, 38 controls and remaining messaging/provider/Safari/hosted gates. Production unchanged.
+
 # Wellness Centre Documentation
 
 - [Server-session core — 3 November 2026](SESSION_SERVER_CORE_2026-11-03.md): local policy/proof, additive stores, disabled transport, legacy downgrade prevention, repeated MariaDB/MySQL and HTTP tests; current integration boundaries and all 38 controls. Production unchanged.

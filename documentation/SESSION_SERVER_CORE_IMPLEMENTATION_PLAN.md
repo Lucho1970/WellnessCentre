@@ -1,5 +1,7 @@
 # Server application-session core — implementation proposal
 
+**Later local integration update - 3 November 2026:** [existing-route and browser integration](SESSION_SERVER_INTEGRATION_2026-11-03.md) records the default-off gateway, browser memory mode, request transactions, actual-route synthetic tests and remaining release gates. Production remains unchanged; earlier results below describe their own revisions.
+
 **3 November implementation update:** the [local core and disabled adapter](SESSION_SERVER_CORE_2026-11-03.md)
 now implement the policy/proof, store/migration and service/transport slices, with
 repeated dual-engine SQL/HTTP/concurrency evidence. Existing API/business-route adoption

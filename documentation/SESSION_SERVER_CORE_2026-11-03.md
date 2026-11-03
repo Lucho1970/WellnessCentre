@@ -1,5 +1,7 @@
 # Server-session core — local implementation and evidence
 
+**Later local integration update - 3 November 2026:** [existing-route and browser integration](SESSION_SERVER_INTEGRATION_2026-11-03.md) records the default-off gateway, browser memory mode, request transactions, actual-route synthetic tests and remaining release gates. Production remains unchanged; earlier results below describe their own revisions.
+
 3 November 2026. **Production unchanged. NOT READY FOR RELEASE.**
 Baseline: `d82ac1a13daf593d48d41942049dbd062737e844`.
 Implementation revision: `54e5d81bc267a625df9aee45e65263329816e2b2`, branch `feature/server-session-core`.
