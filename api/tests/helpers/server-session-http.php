@@ -6,11 +6,11 @@ final class ServerSessionHttp
     public readonly string $runtime;
     public readonly int $port;
     public readonly SessionTestTokens $tokens;
-    public function __construct(int $databasePort,string $name)
+    public function __construct(int $databasePort,string $name,bool $accountEmail=false)
     {
         $this->tokens=new SessionTestTokens();
         $this->runtime=dirname(__DIR__,3).'/.tmp/server-session-integration-'.bin2hex(random_bytes(6));mkdir($this->runtime,0700,true);
-        file_put_contents($this->runtime.'/settings.json',json_encode(['port'=>$databasePort,'database'=>$name],JSON_THROW_ON_ERROR));
+        file_put_contents($this->runtime.'/settings.json',json_encode(['port'=>$databasePort,'database'=>$name,'account_email'=>$accountEmail,'email_key'=>$accountEmail?bin2hex(random_bytes(32)):''],JSON_THROW_ON_ERROR));
         file_put_contents($this->runtime.'/jwks.json',json_encode($this->tokens->jwks,JSON_THROW_ON_ERROR));
         openssl_pkey_export($this->tokens->key,$private);file_put_contents($this->runtime.'/private.pem',$private);unset($private);
         $listener=stream_socket_server('tcp://127.0.0.1:0',$errno,$message);if(!$listener)throw new RuntimeException('Cannot reserve test port.');

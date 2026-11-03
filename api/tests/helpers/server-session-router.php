@@ -11,6 +11,13 @@ $runtime=getenv('SERVER_SESSION_TEST_RUNTIME');
 $settings=json_decode(file_get_contents($runtime.'/settings.json'),true,flags:JSON_THROW_ON_ERROR);
 if(!preg_match('/^wellness_session_integration_[a-f0-9]{12}$/D',$settings['database']))throw new RuntimeException('Unsafe fixture database.');
 ServerSessionFixture::pilot();
+if (($settings['account_email']??false)===true) {
+    putenv('COMMIT_SAFE_EMAIL_ENABLED=true');putenv('COMMIT_SAFE_EMAIL_KEY='.$settings['email_key']);
+    putenv('MAIL_ENABLED=true');putenv('MAIL_FROM_ADDRESS=sender@example.test');
+    putenv('MAIL_TENANT_ID=11111111-1111-4111-8111-111111111111');putenv('MAIL_CLIENT_ID=22222222-2222-4222-8222-222222222222');
+    putenv('PILOT_ALLOWED_EMAILS=["sender@example.test","personal@example.test","fresh@example.test","inbox@example.test"]');
+} else {putenv('COMMIT_SAFE_EMAIL_ENABLED=false');putenv('COMMIT_SAFE_EMAIL_KEY=');}
+
 $config=ServerSessionFixture::config($settings['port'],$settings['database'],!isset($_SERVER['HTTP_X_TEST_LEGACY']));
 $keys=fn()=>json_decode(file_get_contents($runtime.'/jwks.json'),true,flags:JSON_THROW_ON_ERROR);
 $clock=fn()=>time()+(int)(is_file($runtime.'/clock')?file_get_contents($runtime.'/clock'):0);

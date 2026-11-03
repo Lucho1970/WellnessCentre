@@ -220,9 +220,9 @@ final class CustomerOnboarding
     }
     public function invite(AuthContext $actor, int $client, string $cid, string $delivery = 'manual'): array {
         if (!in_array($delivery, ['manual', 'email'], true)) throw new ApiException(422, 'validation_error', 'Select manual or email invitation delivery.');
-        if($delivery==='email' && $this->db instanceof \Wellness\SessionConnection && $this->db->requestActive())throw new ApiException(503,'mail_unavailable','Email invitations are temporarily unavailable. Use the approved manual invitation process.');
+        if($delivery==='email' && !CommitSafeEmail::enabled() && $this->db instanceof \Wellness\SessionConnection && $this->db->requestActive())throw new ApiException(503,'mail_unavailable','Email invitations are temporarily unavailable. Use the approved manual invitation process.');
         $this->staffClient($actor, $client, true);
-        $result = $this->transaction(function () use ($actor, $client, $cid) {
+        $result = $this->transaction(function () use ($actor, $client, $cid, $delivery) {
             $this->clinic(true);
             $status = $this->query('SELECT status FROM users WHERE id=? FOR UPDATE', [$client])->fetchColumn();
             if ($status !== 'active' || $this->invitations($actor, $client)['linked']) throw new ApiException(409, 'invitation_unavailable', 'Only active, unlinked clients can be invited.');
@@ -231,9 +231,23 @@ final class CustomerOnboarding
             $token = bin2hex(random_bytes(32)); $expires = time() + 172800;
             $this->query('INSERT INTO client_link_invitations(clinic_id,client_id,token_hash,created_by,created_at,expires_at) VALUES(?,?,?,?,?,?)', [$actor->clinicId, $client, hash('sha256', $token), $actor->userId, self::stamp(), self::stamp($expires)]);
             $id = (int)$this->db->lastInsertId(); $this->audit('customer.invitation.issue', $id, $cid, $actor);
+            if ($delivery==='email' && CommitSafeEmail::enabled()) {
+                $portal=rtrim(ClinicPortalUrl::resolve($this->db,$actor->clinicId,$this->config->clientPortalUrl,$this->config->clinicManagementEnabled),'/');
+                if (!filter_var($portal,FILTER_VALIDATE_URL) || !str_starts_with($portal,'https://')) throw new ApiException(503,'mail_unavailable','Client portal URL is unavailable.');
+                $recipient=(string)$this->query('SELECT email FROM users WHERE id=? AND clinic_id=?',[$client,$actor->clinicId])->fetchColumn();
+                (new CommitSafeEmail($this->db))->enqueue('client_invitation',$actor->clinicId,$id,$actor,$cid,[
+                    'client_id'=>$client,'token'=>$token,'recipient'=>$recipient,
+                    'subject'=>'Client portal invitation / Invitation au portail client',
+                    'text'=>"You have been invited to create a client portal sign-in. Open this private link within 48 hours:\n{$portal}/invite#token={$token}\n\n".
+                        "Accepting an invitation does not provide access to a client record until the clinic independently verifies and approves your identity. If you did not expect this invitation, contact the clinic.\n\n".
+                        "Vous êtes invité(e) à créer un compte pour le portail client. Ouvrez ce lien privé dans les 48 heures :\n{$portal}/invite#token={$token}\n\n".
+                        "L’acceptation de l’invitation ne donne pas accès à un dossier client tant que la clinique n’a pas vérifié et approuvé votre identité. Si vous n’attendiez pas cette invitation, communiquez avec la clinique."
+                ],self::stamp($expires));
+                return ['id'=>$id,'expires_at'=>$expires,'delivery'=>'email_queued'];
+            }
             return ['id' => $id, 'token' => $token, 'expires_at' => $expires, 'delivery' => 'manual'];
         });
-        if ($delivery === 'email') {
+        if ($delivery === 'email' && $result['delivery']!=='email_queued') {
             try {
                 $env = static fn(string $key): string => trim((string)($_ENV[$key] ?? getenv($key) ?: ''));
                 if (!filter_var($env('MAIL_ENABLED'), FILTER_VALIDATE_BOOL)) throw new \RuntimeException('Mail is disabled.');

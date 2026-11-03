@@ -25,8 +25,8 @@ function ClientInvitationsForm({ clientId, request }: { clientId: number; reques
   const issue = (delivery: 'email' | 'manual') => void run(async () => {
     if (!window.confirm(t('Create a new invitation? Previous invitations and pending claims for this client will be revoked.'))) return;
     const result = await request<{ delivery: string; token?: string }>(`/${clientId}/invitations`, { method: 'POST', body: JSON.stringify({ delivery }) });
-    setDeliveryNotice(result.delivery === 'email_accepted' ? t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.') : delivery === 'email' ? t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.') : '');
-    setLink(result.delivery === 'email_accepted' ? '' : `${portalLink('client/invite')}#token=${result.token}`);
+    setDeliveryNotice(result.delivery === 'email_queued' ? t('Invitation email queued. Delivery has not been confirmed. The client must still complete sign-in and identity review.') : result.delivery === 'email_accepted' ? t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.') : delivery === 'email' ? t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.') : '');
+    setLink(['email_accepted', 'email_queued'].includes(result.delivery) ? '' : `${portalLink('client/invite')}#token=${result.token}`);
   });
   const review = (id: number, action: string) => void run(async () => {
     if (!window.confirm(t(action === 'approve' ? 'Approve this identity link?' : 'Reject/revoke this invitation?'))) return;

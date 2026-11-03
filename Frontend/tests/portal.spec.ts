@@ -3402,13 +3402,13 @@ test("guest catalogue groups multilingual treatments and links public practition
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
 
-test("practitioner stores notification preferences and verifies a separate personal email", async ({ page }) => {
+for (const queued of [false, true]) test(`practitioner stores notification preferences and verifies a separate personal email (${queued ? "queued" : "legacy"})`, async ({ page }) => {
   await fixtures(page, ["practitioner"]);
   let preferences = { work_email: "staff@example.test", email_enabled: false, email_destination: "work", personal_email: null as string | null, personal_email_verified: false, mobile_phone: null as string | null, sms_requested: false, sms_delivery_active: false };
   await page.route("**/api/v1/profile/notifications**", async route => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = preferences;
-    if (path.endsWith("/send-code")) data = { sent: true };
+    if (path.endsWith("/send-code")) data = queued ? { queued: true, sent: false } : { sent: true };
     else if (path.endsWith("/verify")) { preferences = { ...preferences, personal_email_verified: true }; data = preferences; }
     else if (route.request().method() === "PUT") {
       const body = route.request().postDataJSON();
@@ -3423,6 +3423,7 @@ test("practitioner stores notification preferences and verifies a separate perso
   await page.getByLabel("Personal notification email").fill("personal@example.test");
   await page.getByRole("button", { name: "Save notification preferences" }).click();
   await page.getByRole("button", { name: "Send verification code" }).click();
+  await expect(page.getByText(queued ? "Verification email queued. Delivery has not been confirmed." : "Verification code sent to your personal email.", { exact: true })).toBeVisible();
   await page.getByLabel("Eight-digit code").fill("12345678");
   await page.getByRole("button", { name: "Verify email" }).click();
   await page.getByRole("checkbox", { name: "Send appointment notices by email" }).check();
@@ -3434,6 +3435,34 @@ test("practitioner stores notification preferences and verifies a separate perso
   await expect(page.getByText("Notification preferences saved.")).toBeVisible();
   await expect(page.getByText(/SMS delivery is not active yet/)).toBeVisible();
   expect(preferences).toMatchObject({ email_enabled: true, email_destination: "personal", sms_requested: true });
+});
+
+test('client invitation queue confirmation exposes no absent token or false manual fallback', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const client = { id: 7, display_name: 'Synthetic Client', given_name: 'Synthetic', family_name: 'Client', email: 'fresh@example.test', phone: '', status: 'active', preferred_contact: 'email', revision: 'synthetic-revision' };
+  await page.route('**/api/v1/clients**', route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/invitations')) return route.fulfill({ json: { data: route.request().method() === 'POST' ? { id: 9, delivery: 'email_queued' } : { linked: false, items: [] } } });
+    return route.fulfill({ json: { data: path.endsWith('/7') ? client : { items: [client], has_more: false } } });
+  });
+  page.on('dialog', dialog => void dialog.accept());
+  await page.goto(`${portalHost}/admin/clients`);
+  await page.getByRole('button', { name: /Synthetic Client.*fresh@example\.test/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Send portal invitation email', exact: true }).click();
+  await expect(page.getByText('Invitation email queued. Delivery has not been confirmed. The client must still complete sign-in and identity review.', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Private invitation link — shown only now')).toHaveCount(0);
+  await expect(page.getByText(/Copy and send this private link/)).toHaveCount(0);
+});
+
+for (const language of ['en', 'fr']) for (const state of ['queued', 'accepted']) test(`enquiry ${state} distinguishes provider acceptance and disables duplicate sends (${language})`, async ({ page }) => {
+  await fixtures(page, ['clinic_admin']);
+  await page.addInitScript(language => localStorage.setItem('wellness.language', language), language);
+  const item = { id: 31, reference: 'synthetic-enquiry', full_name: 'Synthetic Applicant', email: 'applicant@example.test', phone: '', discipline: 'Test', credentials: '', service_area: 'Test', message: 'Synthetic message', status: 'new', revision: 1, notification_status: state, created_at: '2026-11-03 10:00:00' };
+  await page.route('**/api/v1/admin/practitioner-enquiries**', route => route.fulfill({ json: { data: { items: [item], has_more: false, settings: { recipient_email: 'inbox@example.test', enabled: true, revision: 1, mail_configured: true } } } }));
+  await page.goto(`${portalHost}/admin/enquiries`);
+  await expect(page.getByText(language === 'fr' ? (state === 'queued' ? /Courriel en attente; livraison non confirmée/ : /Accepté par le fournisseur de courriel; livraison non confirmée/) : (state === 'queued' ? /Email queued; delivery not confirmed/ : /Accepted by mail provider; delivery not confirmed/))).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send email notification', exact: true })).toHaveCount(0);
 });
 
 test("appointment ribbon filters, refreshes, and enables actions only for a selected future booking", async ({ page }) => {
@@ -3756,7 +3785,7 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   ).toBeVisible();
 });
 
-test("permitted practitioner adds a booking client and emails a portal invitation without identity approval", async ({ page }) => {
+for (const queued of [false, true]) test(`permitted practitioner adds a booking client and emails a portal invitation without identity approval (${queued ? "queued" : "legacy"})`, async ({ page }) => {
   await fixtures(page, ["practitioner"], ["add_clients"]);
   const created: Record<string, unknown>[] = [];
   const invitations: Record<string, unknown>[] = [];
@@ -3772,7 +3801,7 @@ test("permitted practitioner adds a booking client and emails a portal invitatio
   });
   await page.route("**/api/v1/clients/42/invitations", route => {
     invitations.push(route.request().postDataJSON());
-    return route.fulfill({ json: { data: { id: 7, token: "a".repeat(64), delivery: "email_accepted" } } });
+    return route.fulfill({ json: { data: { id: 7, ...(queued ? { delivery: "email_queued" } : { token: "a".repeat(64), delivery: "email_accepted" }) } } });
   });
   page.on("dialog", dialog => void dialog.accept());
   await page.goto(`${portalHost}/practitioner/schedule`);
@@ -3785,7 +3814,10 @@ test("permitted practitioner adds a booking client and emails a portal invitatio
   await page.getByRole("button", { name: "Save new client" }).click();
   await expect(page.getByText("Selected client")).toBeVisible();
   await page.getByRole("button", { name: "Send portal invitation email" }).click();
-  await expect(page.getByText(/mail provider accepted the invitation/i)).toBeVisible();
+  await expect(page.getByText(queued ? "Invitation email queued. Delivery has not been confirmed. The client must still complete sign-in and identity review." : "The mail provider accepted the invitation. The client must still complete sign-in and identity review.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /Private invitation/ })).toHaveCount(0);
+  if (queued) await expect(page.getByText(/mail provider accepted the invitation/i)).toHaveCount(0);
+  else await expect(page.getByText(/mail provider accepted the invitation/i)).toBeVisible();
   expect(created).toMatchObject([{ given_name: "New", family_name: "Client", email: "new-client@example.test", preferred_contact: "email" }]);
   expect(invitations).toEqual([{ delivery: "email" }]);
   await expect(page.getByRole("link", { name: /My clients/ })).toBeVisible();

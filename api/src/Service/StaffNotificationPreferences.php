@@ -95,6 +95,7 @@ final class StaffNotificationPreferences
     public function sendVerification(AuthContext $actor, string $correlationId): array
     {
         $this->staff($actor);
+        if (CommitSafeEmail::enabled()) return $this->queueVerification($actor, $correlationId);
         if($this->database->connection() instanceof \Wellness\SessionConnection && $this->database->connection()->requestActive())throw new ApiException(503,'mail_unavailable','Verification email is temporarily unavailable. Contact the clinic.');
         if (!filter_var($_ENV['MAIL_ENABLED'] ?? getenv('MAIL_ENABLED') ?: 'false', FILTER_VALIDATE_BOOL)) {
             throw new ApiException(503, 'mail_unavailable', 'Email delivery is not enabled.');
@@ -118,6 +119,27 @@ final class StaffNotificationPreferences
         }
         $this->audit->write($actor->clinicId, $actor, $correlationId, 'staff.notification_email.verify_requested', 'user', $actor->userId);
         return ['sent' => true];
+    }
+
+    private function queueVerification(AuthContext $actor, string $cid): array
+    {
+        CommitSafeEmail::requireConfigured();
+        $pdo=$this->database->connection();
+        try {
+            $pdo->beginTransaction();
+            $q=$pdo->prepare('SELECT personal_email,personal_email_verified_at,email_code_sent_at FROM staff_notification_preferences WHERE user_id=? FOR UPDATE');$q->execute([$actor->userId]);$row=$q->fetch();
+            if (!$row || !$row['personal_email'] || $row['personal_email_verified_at']) throw new ApiException(422,'validation_error','Save a new personal email address before requesting verification.');
+            if ($row['email_code_sent_at'] && strtotime($row['email_code_sent_at'].' UTC')>time()-60) throw new ApiException(429,'rate_limited','Wait one minute before requesting another code.');
+            $code=str_pad((string)random_int(0,99999999),8,'0',STR_PAD_LEFT);$hash=password_hash($code,PASSWORD_DEFAULT);$expires=gmdate('Y-m-d H:i:s',time()+900);
+            $pdo->prepare('UPDATE staff_notification_preferences SET email_code_hash=?,email_code_expires_at=?,email_code_sent_at=UTC_TIMESTAMP(),email_code_attempts=0 WHERE user_id=?')->execute([$hash,$expires,$actor->userId]);
+            (new CommitSafeEmail($pdo))->enqueue('staff_verification',$actor->clinicId,$actor->userId,$actor,$cid,[
+                'recipient'=>$row['personal_email'],'code_hash'=>$hash,
+                'subject'=>'Verify your wellness staff notification email / Vérifiez votre courriel de notification',
+                'text'=>"Your verification code is {$code}. It expires in 15 minutes. If you did not request this, ignore it.\n\nVotre code de vérification est {$code}. Il expire dans 15 minutes. Si vous n'en avez pas fait la demande, ignorez ce message."
+            ],$expires);
+            $this->audit->write($actor->clinicId,$actor,$cid,'staff.notification_email.verify_requested','user',$actor->userId,'success',['delivery'=>'queued']);
+            $pdo->commit();return ['queued'=>true,'sent'=>false];
+        } catch (Throwable $error) { if ($pdo->inTransaction()) $pdo->rollBack();throw $error; }
     }
 
     public function verify(AuthContext $actor, array $body, string $correlationId): array

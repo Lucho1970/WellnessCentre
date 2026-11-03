@@ -462,7 +462,8 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
     setInvitationBusy(true); setInvitationStatus(''); setInvitationLink('');
     try {
       const result = await request<{ delivery: string; token?: string }>(`/clients/${client.id}/invitations`, { method: 'POST', body: JSON.stringify({ delivery: 'email' }) });
-      if (result.delivery === 'email_accepted') setInvitationStatus(t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.'));
+      if (result.delivery === 'email_queued') setInvitationStatus(t('Invitation email queued. Delivery has not been confirmed. The client must still complete sign-in and identity review.'));
+      else if (result.delivery === 'email_accepted') setInvitationStatus(t('The mail provider accepted the invitation. The client must still complete sign-in and identity review.'));
       else { setInvitationStatus(t('The invitation email was not confirmed. Copy and send this private link through a verified contact channel.')); setInvitationLink(`${portalLink('client/invite')}#token=${result.token}`); }
     } catch (cause) { formValidation.capture(cause); setInvitationStatus(cause instanceof Error ? cause.message : t('Unable to send the invitation.')); }
     finally { setInvitationBusy(false); }

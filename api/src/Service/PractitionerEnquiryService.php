@@ -128,7 +128,25 @@ final class PractitionerEnquiryService
         });
     }
     public function retryNotification(AuthContext|ApplicationAdminContext $actor,int $clinic,int $id,string $cid): array
-    {return $this->deliver($actor,$clinic,$id,$cid,$this->send);}
+    {
+        if (!CommitSafeEmail::enabled()) return $this->deliver($actor,$clinic,$id,$cid,$this->send);
+        CommitSafeEmail::requireConfigured();
+        return $this->access($actor,$clinic,function($pdo) use($actor,$clinic,$id,$cid): array {
+            $q=$pdo->prepare('SELECT e.reference,e.revision,e.notification_status,c.name FROM practitioner_enquiries e JOIN clinics c ON c.id=e.clinic_id WHERE e.id=? AND e.clinic_id=? FOR UPDATE');$q->execute([$id,$clinic]);$row=$q->fetch();
+            if (!$row) throw new ApiException(404,'enquiry_not_found','Enquiry not found.');
+            if (!in_array($row['notification_status'],['pending','failed','disabled'],true)) return ['id'=>$id,'notification_status'=>$row['notification_status']];
+            $settings=$this->settings($clinic);
+            if (!$settings['enabled'] || !$settings['recipient_email']) throw new ApiException(503,'mail_unavailable','Enquiry notifications are not configured.');
+            (new CommitSafeEmail($pdo))->enqueue('enquiry_retry',$clinic,$id,$actor,$cid,[
+                'recipient'=>$settings['recipient_email'],'revision'=>(int)$row['revision'],'settings_revision'=>$settings['revision'],'enquiry_reference'=>$row['reference'],
+                'subject'=>'New practitioner enquiry',
+                'text'=>"A practitioner enquiry was saved for {$row['name']}.\nReference: {$row['reference']}\n\nSign in to Application administration or the clinic portal and open Practitioner enquiries to review it. No application has been approved automatically."
+            ],gmdate('Y-m-d H:i:s',time()+86400));
+            $pdo->prepare("UPDATE practitioner_enquiries SET notification_status='queued' WHERE id=? AND clinic_id=?")->execute([$id,$clinic]);
+            $this->audit($actor,$clinic,$cid,'practitioner_enquiry.notification_claim','practitioner_enquiry',$id,['notification_status'=>'queued']);
+            return ['id'=>$id,'notification_status'=>'queued'];
+        });
+    }
 
     /** Trusted saved-enquiry delivery, called after public submission. Not an HTTP entry point. */
     public function notify(int $clinic,int $id,?callable $send=null): array
