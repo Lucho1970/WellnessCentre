@@ -1,5 +1,6 @@
 # Wellness Centre Documentation
 
+- [Safari and identity verification preflight — 2 November 2026](SESSION_PROVIDER_PREFLIGHT_2026-11-02.md): live workforce registration/API/consent reads, unverified MFA and blocked External ID evidence; BrowserStack access deferred by owner, no cloud session or production change.
 - [Session prototype browser follow-up — 2 November 2026](SESSION_SECURITY_BROWSER_FOLLOWUP_2026-11-02.md): Firefox matrix, cancellation/readiness recovery and independent native cookie/cross-site POST probe; four strict Windows WebKit failures retained. Production unchanged.
 - [Session security feasibility prototype — 2 November 2026](SESSION_SECURITY_PROTOTYPE_2026-11-02.md): initial isolated MSAL memory/popup and PHP bearer-plus-cookie experiment, storage inventory and remaining production decisions; later browser results linked above.
 - [Session security review and implementation plan — 2 November 2026](SESSION_SECURITY_REVIEW_2026-11-02.md): staff/client/central storage and expiry findings, proposed session design, decisions, work packages and rollout/rollback. Later authorization covers the separate local WP0 prototype only.
