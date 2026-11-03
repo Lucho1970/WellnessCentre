@@ -93,7 +93,9 @@ final class CustomerOnboarding
         });
     }
     public static function sessionIsActive(array $session, int $now): bool {
-        return $session['revoked_at'] === null && strtotime($session['expires_at'] . ' UTC') > $now
+        // Versioned cookie sessions require the new epoch/CSRF/authority guard.
+        // Legacy rows (including databases before migration 059) have no version.
+        return ($session['policy_version'] ?? null) === null && $session['revoked_at'] === null && strtotime($session['expires_at'] . ' UTC') > $now
             && strtotime($session['last_activity_at'] . ' UTC') + 1800 > $now;
     }
     public function session(array $claims, ?string $token, bool $activity = false): array {
@@ -114,7 +116,8 @@ final class CustomerOnboarding
         $this->clinic();
         if (is_string($token) && preg_match('/^[a-f0-9]{64}$/D', $token)) {
             $this->transaction(function () use ($token, $cid) {
-                $row = $this->query('SELECT identity_id'.($this->config->clinicManagementEnabled?',clinic_id':'').' FROM customer_sessions WHERE token_hash=? FOR UPDATE', [hash('sha256', $token)])->fetch();
+                $row = $this->query('SELECT * FROM customer_sessions WHERE token_hash=? FOR UPDATE', [hash('sha256', $token)])->fetch();
+                if (($row['policy_version'] ?? null) !== null) throw new ApiException(401,'customer_session_expired','Use the current portal to end this secure session.');
                 if ($this->config->clinicManagementEnabled && (int)($row['clinic_id']??0)!==$this->clinicId) return;
                 $this->query('UPDATE customer_sessions SET revoked_at=? WHERE token_hash=?', [self::stamp(), hash('sha256', $token)]);
                 if ($row) $this->audit('customer.session.end', (int)$row['identity_id'], $cid);
