@@ -36,6 +36,8 @@ Source branch: `feature/wellnexa-privacy-statement`; baseline `6cee57b59f6c4aebe
 | `git diff --check` | Passed after final documentation. |
 | Hosted English/French page, portal link on both hosts, mailbox receipt, headers and private release controls | Not yet verified. |
 
+Two controlled archives were generated under ignored `deployments/wellnexa-privacy-2026-11-04/`; `manifest.json` and `website-manifest.json` record each ZIP's final source SHA, SHA-256, build time and destination. ZIP inspection found 10 website files and 81 portal files, both with root `index.html` and `.htaccess`, and no `.env`, dependencies, SQL dumps, source maps, private keys or test results. The portal bundle keyword scan found the identity library's literal `client_secret` parameter name and a library fallback `http://localhost`; neither was an assigned credential or configured release endpoint. The public identity application IDs in the bundle are expected browser identifiers. This inspection does not replace hosted configuration and header review.
+
 There are no PHP, SQL, migrations or disposable database changes in this slice; PHP/database suites are not applicable to the changed code. Local browser tests use synthetic responses. They do not verify hosted privacy practices or operational controls.
 
 ## Package, upload and rollback
@@ -76,15 +78,15 @@ Statuses describe the scope verified here, not the whole application. Review dat
 | SEC-07 | Partial | Page has no secret diagnostics; hosted error/log redaction remains unverified. |
 | SEC-08 | Partial | Notice discloses categories of existing providers; endpoint/subprocessor register, actual terms/geography and approval remain open. |
 | SEC-09 | Partial | Notice mentions optional messages and avoids clinical detail; delivery/consent enforcement unchanged and not revalidated. |
-| DEV-01 | Partial | Branch/source/package/config/workflow reviewed; final commit/push and host checks pending. |
+| DEV-01 | Partial | Dedicated branch committed and pushed; host checks and review/merge remain pending. |
 | DEV-02 | Partial | Focused static change and code review; final diff/validation pending. |
-| DEV-03 | Partial | Exact restores and audits performed; classify Frontend development advisories and final package inclusion. |
-| DEV-04 | Partial | Builds/browser checks above; final reruns and hosted checks pending. |
+| DEV-03 | Partial | Exact restores and audits performed; 10 moderate ESLint/toolchain advisories are development-only in this package, with no runtime advisories; maintain quality-gate follow-up. |
+| DEV-04 | Partial | All affected local builds/browser checks passed with two documented optional skips; hosted checks pending. |
 | DEV-05 | Partial | Semantic page, language and phone-width browser checks; keyboard/screen-reader/zoom and human accessibility review remain open. |
 | DEV-06 | Partial | Build size warnings retained; impact review remains open. |
 | REL-01 | Partial | This ledger records each control and gaps; named reviewer decisions are pending. |
-| REL-02 | Partial | Local UI builds/browser checks recorded; no PHP/SQL change; final results pending. |
-| REL-03 | Missing | Final artifact inspection and hosted acceptance pending. |
+| REL-02 | Partial | Local UI builds/browser checks passed; no PHP/SQL change; hosted checks are separate. |
+| REL-03 | Partial | Final website/portal archives inspected and manifest-provenanced; hosted acceptance pending. |
 | REL-04 | Missing | Real-data and overall release gates remain open. |
 | REL-05 | Partial | Owner requested publication, supplied custody/contact and approved wording; host upload and accountable operational/clinical/release sign-off pending. |
 | REL-06 | Partial | Completion report must list files, exact checks, omitted/hosted evidence, rollback and final release line. |
