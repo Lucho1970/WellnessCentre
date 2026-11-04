@@ -6,6 +6,9 @@
 
 # Wellness Centre Documentation
 
+- [Jane public feature inventory — 4 November 2026](JANE_FEATURE_INVENTORY_2026-11-04.md): source-linked Jane capabilities, including Canadian insurance and plan/add-on distinctions.
+- [Jane / Copihue feature comparison — 4 November 2026](JANE_FEATURE_COMPARISON_2026-11-04.md): local evidence, gaps and review priorities; no roadmap commitment or hosted acceptance implied.
+
 - [Main integration checkpoint — 3 November 2026](MAIN_INTEGRATION_2026-11-03.md): local build, browser, PHP and disposable SQL results for the reviewed source merge; remaining release gates and branch scope.
 
 - [Server-session core — 3 November 2026](SESSION_SERVER_CORE_2026-11-03.md): local policy/proof, additive stores, disabled transport, legacy downgrade prevention, repeated MariaDB/MySQL and HTTP tests; current integration boundaries and all 38 controls. Production unchanged.
