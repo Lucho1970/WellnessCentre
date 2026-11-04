@@ -1,4 +1,5 @@
 const en = {
+  "Privacy statement": "Privacy statement",
   "Edit name and email": "Edit name and email",
   "Cancel name and email changes": "Cancel name and email changes",
   "API error: pilot_access_denied": "This pilot is limited to approved test accounts. Contact the clinic for access.",

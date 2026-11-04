@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Wellnexa privacy statement — 4 November 2026](WELLNEXA_PRIVACY_STATEMENT_2026-11-04.md): bilingual public statement, custody/contact wording, site and portal links, validation, controlled upload and 38-control ledger.
+
 - [Main integration checkpoint — 3 November 2026](MAIN_INTEGRATION_2026-11-03.md): local build, browser, PHP and disposable SQL results for the reviewed source merge; remaining release gates and branch scope.
 
 - [Server-session core — 3 November 2026](SESSION_SERVER_CORE_2026-11-03.md): local policy/proof, additive stores, disabled transport, legacy downgrade prevention, repeated MariaDB/MySQL and HTTP tests; current integration boundaries and all 38 controls. Production unchanged.

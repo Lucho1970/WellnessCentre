@@ -102,6 +102,23 @@ test("public website destination changes after refresh without rebuilding", asyn
   ).toHaveAttribute("href", "https://example.test/clinic/?lang=en");
 });
 
+test("Wellnexa portal shows its privacy statement without sending another clinic there", async ({ page }, info) => {
+  const wellnexaOrigin = "https://wellnexa.copihue.ca";
+  await page.route(`${wellnexaOrigin}/**`, async route => {
+    if (new URL(route.request().url()).pathname.endsWith("/api/runtime-config.php")) {
+      await route.fulfill({ json: { publicWebsiteUrl: "https://wellnexa.ca/" } });
+      return;
+    }
+    const response = await route.fetch({ url: route.request().url().replace(wellnexaOrigin, "http://localhost:5194") });
+    await route.fulfill({ response });
+  });
+  await page.route("**/api/v1/**", route => route.fulfill({ json: { data: [] } }));
+  await page.goto(`${wellnexaOrigin}${info.config.metadata.portalBase}`);
+  await expect(page.getByRole("link", { name: "Privacy statement" })).toHaveAttribute("href", "https://wellnexa.ca/privacy?lang=en");
+  await page.goto(`${portalOrigin}${info.config.metadata.portalBase}`);
+  await expect(page.getByRole("link", { name: "Privacy statement" })).toHaveCount(0);
+});
+
 test("unavailable runtime settings stop startup instead of using a stale domain", async ({
   page,
 }, info) => {

@@ -18,6 +18,7 @@ import { UserAccountMenu } from "../auth/UserAccountMenu";
 import { useClinicConfig } from "../config/ClinicConfigProvider";
 import { BrandLogo } from "../config/BrandLogo";
 import { publicLink } from "../shared/urls";
+import { WellnexaPrivacyLink } from "../shared/WellnexaPrivacyLink";
 import { StaffPortal } from "./StaffPortal";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
@@ -91,6 +92,7 @@ export function PortalApp() {
               <Button href={publicLink()} size="small">
                 {t("Public website")}
               </Button>
+              <WellnexaPrivacyLink />
               <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }}>
                 <LanguageSwitcher />
                 {!applicationPath && <UserAccountMenu />}

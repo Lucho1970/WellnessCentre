@@ -6,6 +6,7 @@ import { BrandLogo } from '../config/BrandLogo';
 import { useClinicConfig } from '../config/ClinicConfigProvider';
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher';
 import { publicLink } from '../shared/urls';
+import { WellnexaPrivacyLink } from '../shared/WellnexaPrivacyLink';
 import { GuestCatalogue } from './GuestCatalogue';
 import { GuestPractitionerDetails } from './GuestPractitionerDetails';
 import { GuestBooking } from './GuestBooking';
@@ -43,6 +44,7 @@ export function GuestPortal() {
       <BrandLogo/><Typography fontWeight={800} sx={{ flexGrow: 1 }}>{config.name}</Typography>
       <Stack component="nav" aria-label={t('Portal navigation')} direction="row" gap={1} alignItems="center" flexWrap="wrap">
         <Button href={publicLink()} size="small">{t('Public website')}</Button>
+        <WellnexaPrivacyLink />
         <Button href={import.meta.env.BASE_URL} size="small">{t('Treatments')}</Button>
         <Button href={`${import.meta.env.BASE_URL}client`} size="small">{t('My appointments')}</Button>
         <Button href={`${import.meta.env.BASE_URL}client${hasClientSession ? '' : '?return=browse'}`} variant="contained" size="small">{t(hasClientSession ? 'My account' : 'Log in')}</Button>

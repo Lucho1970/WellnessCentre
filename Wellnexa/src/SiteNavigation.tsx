@@ -8,6 +8,7 @@ export function SiteNavigation() {
   const [activeSection, setActiveSection] = useState('')
   const path = window.location.pathname
   const home = path === '/'
+  const french = (path === '/privacy' || path === '/privacy/' || path === '/contact' || path === '/contact/') && new URLSearchParams(window.location.search).get('lang') === 'fr'
 
   useLayoutEffect(() => {
     const header = headerRef.current!
@@ -71,7 +72,8 @@ export function SiteNavigation() {
       <a href="/#practitioners" aria-current={current('practitioners')}>Practitioners</a>
       <a href="/#faq" aria-current={current('faq')}>FAQ</a>
       <a href="/join" aria-current={current('join')}>Join the collective</a>
-      <a href="/contact" aria-current={current('contact')}>Contact</a>
+      <a href={`/contact?lang=${french ? 'fr' : 'en'}`} aria-current={current('contact')}>{french ? 'Contactez-nous' : 'Contact'}</a>
+      <a href={`/privacy?lang=${french ? 'fr' : 'en'}`} aria-current={current('privacy')}>{french ? 'Confidentialité' : 'Privacy'}</a>
       <a className="portal-link" href={site.portalUrl}>Clinic portal <span aria-hidden="true">↗</span></a>
     </nav>
   </header>

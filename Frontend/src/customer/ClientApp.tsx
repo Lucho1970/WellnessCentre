@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import { useClinicConfig } from "../config/ClinicConfigProvider";
 import { publicLink } from "../shared/urls";
+import { WellnexaPrivacyLink } from "../shared/WellnexaPrivacyLink";
 import {
   customerConfigured,
   customerInstance,
@@ -247,6 +248,7 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
               }}
             >
               <Button href={publicLink()}>{t("Public website")}</Button>
+              <WellnexaPrivacyLink />
               <Button href={`${import.meta.env.BASE_URL}staff/login`}>
                 {t("StaffSignIn")}
               </Button>

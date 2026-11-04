@@ -1,4 +1,5 @@
 const fr: Record<string, string> = {
+  "Privacy statement": "Déclaration de confidentialité",
   "Edit name and email": "Modifier le nom et le courriel",
   "Cancel name and email changes": "Annuler les changements de nom et de courriel",
   "API error: pilot_access_denied": "Ce projet pilote est réservé aux comptes de test approuvés. Contactez la clinique pour obtenir un accès.",

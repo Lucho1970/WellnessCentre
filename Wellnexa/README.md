@@ -79,4 +79,6 @@ Browser tests use synthetic published cards and failure/empty fixtures. On Windo
 
 Upload the contents of `Wellnexa/dist/` (including `api/` and hidden `.htaccess`) to `/public_html/wellnexa.ca/`. This marketing build is separate from the shared clinic portal in `/public_html/wellness-common-portal/`. See [Deployment layout](../documentation/DEPLOYMENT_LAYOUT.md).
 
+The bilingual privacy statement is served from `/privacy?lang=en` and `/privacy?lang=fr`. Its custodian/contact wording, validation and release checks are recorded in the [4 November privacy statement note](../documentation/WELLNEXA_PRIVACY_STATEMENT_2026-11-04.md).
+
 Contact fix validation: TypeScript/production build, eight browser scenarios (including direct contact entry, French refresh, mobile width, missing contact details and upstream failure), 22 PHP projection assertions and changed-PHP lint. Browser tests use Vite; after deployment verify Apache returns HTTP 200 for `https://wellnexa.ca/contact?lang=en` and `/contact/?lang=fr`, contact API returns JSON, and portal links still target `wellnexa.copihue.ca`. The hosted rewrite remains an upload-time acceptance check.
