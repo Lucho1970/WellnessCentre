@@ -25,6 +25,8 @@ Acceptance must cover guessed conversation IDs, participant removal, wrong-clini
 
 ## Official receipts for benefits reimbursement
 
+**Owner priority, 4 November 2026:** client-submittable receipts for completed, actually paid services are part of initial-release acceptance. Direct insurer billing and insurer-portal claim tracking are post-initial-release FIN-05 work. The client submits the receipt to their own benefits provider; no reimbursement is promised. Before live issuance, accept the actual issuer/payee model for each independent practitioner and verify profession/insurer-specific receipt fields. The existing shared clinic template and full-manual-payment slice do not by themselves prove every independent-practice receipt is correct.
+
 Implementation follow-up: the clinic owns the shared template and issuer fields; practitioners maintain clinic/service-specific professional names, designations, registration and optional logos. The [first manual payment and portal receipt workflow](SESSION_RECEIPTS.md) is implemented behind a default-off flag, pending hosted acceptance. The remaining broader roadmap below is not a claim of completed billing or insurer integration.
 
 Produce an official PDF receipt from recorded services and payments. Candidate fields include a unique receipt number, issuer/business details, client name, actual treating practitioner, applicable professional designation and registration, service date/type/duration, itemized charge, applicable taxes, payment date/method, amount paid and any remaining balance. These are product requirements to validate with the relevant professions and insurers, not a legal or insurer-approved universal template.

@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Receipt-first insurance roadmap decision — 4 November 2026](RECEIPT_FIRST_INSURANCE_ROADMAP_DECISION_2026-11-04.md): client-submittable receipts for initial release; direct insurer billing after initial release, with acceptance gaps and control ledger.
+
 - [Main integration checkpoint — 3 November 2026](MAIN_INTEGRATION_2026-11-03.md): local build, browser, PHP and disposable SQL results for the reviewed source merge; remaining release gates and branch scope.
 
 - [Server-session core — 3 November 2026](SESSION_SERVER_CORE_2026-11-03.md): local policy/proof, additive stores, disabled transport, legacy downgrade prevention, repeated MariaDB/MySQL and HTTP tests; current integration boundaries and all 38 controls. Production unchanged.
