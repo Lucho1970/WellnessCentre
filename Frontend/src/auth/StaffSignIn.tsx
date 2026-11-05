@@ -20,6 +20,7 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
   const { account, configured, isAuthenticated, sessionExpired, signInError, signIn, signOut, getAccessToken } = useStaffAuth();
   const accountKey = account?.homeAccountId ?? '';
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [retry, setRetry] = useState(0);
+  const loginInFlight = useRef(false);
   const retryButton = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (error) retryButton.current?.focus(); }, [error]);
   const [access, setAccess] = useState<(StaffAccess & { account: string; revision: number }) | null>(null);
@@ -41,9 +42,14 @@ function StaffSignInForm({ children }: { children: (access: StaffAccess) => Reac
     return () => controller.abort();
   }, [getAccessToken, isAuthenticated, sessionExpired, accountKey, retry, t]);
   const login = async (provider?: PractitionerProvider) => {
+    if (loginInFlight.current) return;
+    loginInFlight.current = true;
     setBusy(true); formValidation.clear(); setError('');
-    try { await signIn(provider); } catch (cause) { formValidation.capture(cause); setError(cause instanceof Error ? cause.message : t('Sign-in failed.')); }
-    finally { setBusy(false); }
+    try { await signIn(provider); } catch (cause) {
+      formValidation.capture(cause);
+      const code = cause && typeof cause === 'object' && 'errorCode' in cause ? cause.errorCode : null;
+      setError(code === 'interaction_in_progress' ? t('A sign-in is already in progress. Complete it or refresh this page, then try again.') : t('Sign-in failed.'));
+    } finally { loginInFlight.current = false; setBusy(false); }
   };
   if (!isAuthenticated) return <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, maxWidth: 650, mx: 'auto' }}>
     <Stack spacing={2} alignItems="center" textAlign="center"><ShieldCheck size={44} color="#176b62" />

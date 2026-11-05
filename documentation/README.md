@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.
+
 - [HTTPS enforcement — 5 November 2026](HTTPS_ENFORCEMENT_2026-11-05.md): Netfirms host-specific 302 staging, HTTP API denial, backup/verification/rollback and control ledger.
 
 - [Wellnexa privacy statement — 4 November 2026](WELLNEXA_PRIVACY_STATEMENT_2026-11-04.md): bilingual public statement, custody/contact wording, site and portal links, validation, controlled upload and 38-control ledger.

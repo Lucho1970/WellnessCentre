@@ -426,6 +426,8 @@ const fr: Record<string, string> = {
     "Le service a retourné des autorisations du personnel non valides.",
   "Staff authorization failed.": "L’autorisation du personnel a échoué.",
   "Sign-in failed.": "La connexion a échoué.",
+  "A sign-in is already in progress. Complete it or refresh this page, then try again.":
+    "Une connexion est déjà en cours. Terminez-la ou actualisez cette page, puis réessayez.",
   "Account action failed.": "L’action sur le compte a échoué.",
   "Staff member": "Membre du personnel",
   "Open account menu for {{name}}": "Ouvrir le menu du compte de {{name}}",

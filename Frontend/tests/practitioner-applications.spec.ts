@@ -148,6 +148,43 @@ test('application-only entry uses the real dedicated practitioner MSAL configura
   expect(configuration).toEqual({ external: true, client: '77777777-7777-7777-7777-777777777777', authority: 'https://teststaff.ciamlogin.com/44444444-4444-4444-4444-444444444444', redirect: `${host}/staff/external` });
 });
 
+test('workforce sign-in recovers safely from a pending interaction and keeps personal practitioner entry separate', async ({ page }) => {
+  await page.route('**/api/runtime-config.php', route => route.fulfill({ json: {} }));
+  await page.route('**/api/v1/**', route => route.fulfill({ json: { data: { name: 'Synthetic clinic' } } }));
+  await page.goto(`${host}/staff/login`);
+  await expect(page.getByRole('heading', { name: 'Staff portal', exact: true })).toBeVisible();
+  await page.evaluate(async () => {
+    const { msalInstance } = await import(/* @vite-ignore */ '/src/auth/AuthProvider.tsx');
+    msalInstance.loginRedirect = async () => {
+      throw Object.assign(new Error('interaction_in_progress: See https://example.test/private-diagnostic'), { errorCode: 'interaction_in_progress' });
+    };
+  });
+  await page.getByRole('button', { name: 'Sign in with Microsoft', exact: true }).click();
+  await expect(page.getByText('A sign-in is already in progress. Complete it or refresh this page, then try again.')).toBeVisible();
+  await expect(page.getByText('private-diagnostic', { exact: false })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Practitioner sign-in' }).click();
+  await expect(page.getByRole('heading', { name: 'Practitioner sign-in', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue with personal Microsoft account' })).toBeVisible();
+});
+
+test('rapid workforce clicks start only one interactive sign-in', async ({ page }) => {
+  await page.route('**/api/runtime-config.php', route => route.fulfill({ json: {} }));
+  await page.route('**/api/v1/**', route => route.fulfill({ json: { data: { name: 'Synthetic clinic' } } }));
+  await page.goto(`${host}/staff/login`);
+  await expect(page.getByRole('button', { name: 'Sign in with Microsoft', exact: true })).toBeEnabled();
+  const calls = await page.evaluate(async () => {
+    const { msalInstance } = await import(/* @vite-ignore */ '/src/auth/AuthProvider.tsx');
+    let count = 0;
+    msalInstance.loginRedirect = async () => { count++; await new Promise<void>(() => {}); };
+    const button = [...document.querySelectorAll('button')].find(element => element.textContent?.includes('Sign in with Microsoft'));
+    if (!button) throw new Error('Staff sign-in button is missing');
+    button.click(); button.click();
+    return count;
+  });
+  expect(calls).toBe(1);
+  await expect(page.getByRole('button', { name: 'Sign in with Microsoft', exact: true })).toBeDisabled();
+});
+
 test('the public portal separates practitioner and clinic workforce entry points', async ({ page }) => {
   await fixture(page, false); await page.goto(host);
   await expect(page.getByRole('link', { name: 'Clinic staff sign-in', exact: true })).toHaveAttribute('href', '/staff/login');

@@ -468,6 +468,8 @@ const en = {
     "The service returned invalid staff permissions.",
   "Staff authorization failed.": "Staff authorization failed.",
   "Sign-in failed.": "Sign-in failed.",
+  "A sign-in is already in progress. Complete it or refresh this page, then try again.":
+    "A sign-in is already in progress. Complete it or refresh this page, then try again.",
   "Account action failed.": "Account action failed.",
   "Staff member": "Staff member",
   "Open account menu for {{name}}": "Open account menu for {{name}}",

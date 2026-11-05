@@ -1,6 +1,6 @@
 import { privateSessionStorage } from './privateSessionStorage';
 import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore, type PropsWithChildren } from 'react';
-import { PublicClientApplication, type AccountInfo } from '@azure/msal-browser';
+import { InteractionStatus, PublicClientApplication, type AccountInfo } from '@azure/msal-browser';
 import { MsalProvider, useMsal } from '@azure/msal-react';
 import { useTranslation } from 'react-i18next';
 import { selectAccount } from './accountSelection';
@@ -46,7 +46,7 @@ let sessionRecoveryRedirect: Promise<void> | null = null;
 
 function StaffAuthBridge({ children, redirectFailed = false }: PropsWithChildren<{ redirectFailed?: boolean }>) {
   const { t } = useTranslation();
-  const { instance, accounts } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
   const session = useSyncExternalStore(subscribeSession,sessionSnapshot);
   const selected = useMemo(() => redirectFailed && !serverSessionsEnabled() ? null : selectStaffAccount(instance.getActiveAccount()), [instance, accounts, redirectFailed]);
   const account = serverSessionsEnabled() && session.state !== 'active' ? null : selected;
@@ -56,6 +56,7 @@ function StaffAuthBridge({ children, redirectFailed = false }: PropsWithChildren
     if (!configured) throw new Error(t('Microsoft Entra staff sign-in is not configured.'));
     if (provider && (!externalStaff || !practitionerSocialSignInEnabled)) throw new Error(t('Practitioner sign-in is not configured. Contact the clinic.'));
     if (serverSessionsEnabled()) { await signInServerSession(externalStaff ? practitionerLoginParameters(provider) : {}); return; }
+    if (inProgress !== InteractionStatus.None) throw new Error(t('A sign-in is already in progress. Complete it or refresh this page, then try again.'));
     if (sessionRecoveryRedirect) return sessionRecoveryRedirect;
     clearStaffSessionRecovery();
     if (!externalStaff) { await instance.loginRedirect({ scopes: apiScopes, prompt: 'select_account' }); return; }
@@ -63,7 +64,7 @@ function StaffAuthBridge({ children, redirectFailed = false }: PropsWithChildren
     instance.setActiveAccount(null);
     try { await instance.loginRedirect({ scopes: apiScopes, ...practitionerLoginParameters(provider) }); }
     catch (error) { instance.setActiveAccount(previous); throw error; }
-  }, [instance, t]);
+  }, [instance, inProgress, t]);
   const signOut = useCallback(async () => { if(serverSessionsEnabled()){await signOutServerSession();return;} await instance.logoutRedirect({ account: account ?? undefined, postLogoutRedirectUri: portalRoot }); }, [account, instance]);
   const getAccessToken = useCallback(async () => {
     if(serverSessionsEnabled())return readServerSessionToken();
