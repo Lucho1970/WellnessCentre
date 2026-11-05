@@ -1,4 +1,8 @@
 RewriteEngine On
+# Deny plaintext requests in the nested public API directory itself.
+# A redirect after a request body arrives would not protect that body.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ - [F,L]
 RewriteBase /api/
 
 RewriteCond %{REQUEST_FILENAME} !-f
