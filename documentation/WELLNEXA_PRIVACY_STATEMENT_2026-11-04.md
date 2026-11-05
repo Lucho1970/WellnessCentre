@@ -34,9 +34,18 @@ Source branch: `feature/wellnexa-privacy-statement`; baseline `6cee57b59f6c4aebe
 | `Frontend: npm test -- --reporter=line` | 298 passed, 2 expected skips (private service-import CSV/workbook acceptance inputs absent), 10.1 minutes. Default suite includes portal and client tests but omits dedicated application-admin/invitation suites; neither is changed here. |
 | `Wellnexa: npm audit --json`; `Frontend: npm audit --omit=dev --json`; `Frontend: npm audit --json` | Zero Wellnexa and Frontend runtime advisories; full Frontend tree has 10 moderate development dependency advisories in ESLint/typescript-eslint/minimatch paths. No forced major upgrade; assess with the existing quality-gate follow-up. |
 | `git diff --check` | Passed after final documentation. |
-| Hosted English/French page, portal link on both hosts, mailbox receipt, headers and private release controls | Not yet verified. |
+| Hosted English/French website page, route, links and asset integrity | Passed on 5 November 2026 as detailed below. |
+| Hosted shared-portal link, mailbox receipt and private release controls | Portal link intentionally held; mailbox receipt and broader controls remain unverified. |
 
-Two controlled archives were generated under ignored `deployments/wellnexa-privacy-2026-11-04/`; `manifest.json` and `website-manifest.json` record each ZIP's final source SHA, SHA-256, build time and destination. ZIP inspection found 10 website files and 81 portal files, both with root `index.html` and `.htaccess`, and no `.env`, dependencies, SQL dumps, source maps, private keys or test results. The portal bundle keyword scan found the identity library's literal `client_secret` parameter name and a library fallback `http://localhost`; neither was an assigned credential or configured release endpoint. The public identity application IDs in the bundle are expected browser identifiers. This inspection does not replace hosted configuration and header review.
+Two full controlled archives were generated under ignored `deployments/wellnexa-privacy-2026-11-04-final/`; `manifest.json` and `website-manifest.json` record each ZIP's source SHA, SHA-256, build time and destination. A third focused four-file archive was selected for the website upload. ZIP inspection found 10 full website files and 81 portal files, both with root `index.html` and `.htaccess`, and no `.env`, dependencies, SQL dumps, source maps, private keys or test results. The portal bundle keyword scan found the identity library's literal `client_secret` parameter name and a library fallback `http://localhost`; neither was an assigned credential or configured release endpoint. The public identity application IDs in the bundle are expected browser identifiers. This inspection does not replace hosted configuration and header review.
+
+### Hosted website check — 5 November 2026
+
+The owner reported uploading the focused four-file archive `deployments/wellnexa-privacy-2026-11-04-final/wellnexa-privacy-website-only.zip` (source `4f1560d9dd10b1b89ea3fc28a622f0458c1b671c`; SHA-256 `30f412b77a62103a019415384cc2640ca611c567c88328c04940ad2aa21ecad6`). It contains only `index.html`, `.htaccess` and two new hashed assets; no API or shared portal file was uploaded for this slice. Read-only HTTP checks returned 200 for the English/French privacy URLs and both assets, with the two hosted asset hashes identical to the tested local build. A genuine missing page returned 404. A hosted Edge browser check found both headings, correct `html lang`, approved custodian/separate-practitioner wording, the privacy mailto and IPC link, a working language switch, no horizontal overflow at 390 px, and working homepage-footer and practitioner-enquiry links. It recorded zero page JavaScript errors. No hosted account or patient data was used.
+
+The shared portal was **not** updated: its live entry asset still differs from the current build, so uploading a full common-portal archive could replace unrelated pending code on both clinic hosts. A read-only Edge check loaded both clinic guest portals and found zero hosted privacy links, as expected. The portal link is implemented and locally tested but remains absent from the hosted portal until a separately reviewed coordinated release. The public website statement is directly available before tester use.
+
+Hosting controls failed a read-only check: `http://wellnexa.ca/privacy?lang=en`, `http://wellnexa.copihue.ca/client` and `http://livinlively.copihue.ca/client` returned 200 rather than redirecting to HTTPS. The checked HTTPS Wellnexa privacy response omitted `Strict-Transport-Security`, `Content-Security-Policy`, `X-Content-Type-Options` and `Referrer-Policy`; its HTML `Cache-Control` was `max-age=3600`. The public statement itself contains no PHI, but the same host supports enquiries and the clinic portals support protected workflows. The security/hosting owner must implement and verify per-host HTTPS redirects and suitable headers, including API and asset behavior, before real-data release. Do not assume a website `.htaccess` edit fixes the shared portal or upstream proxy. Continue only with synthetic pilot data under the existing restrictions until the wider gate is signed.
 
 There are no PHP, SQL, migrations or disposable database changes in this slice; PHP/database suites are not applicable to the changed code. Local browser tests use synthetic responses. They do not verify hosted privacy practices or operational controls.
 
@@ -44,7 +53,7 @@ There are no PHP, SQL, migrations or disposable database changes in this slice; 
 
 Build from the final commit and record its SHA and lockfile hashes. Package `Wellnexa/dist/` including hidden `.htaccess` for `/public_html/wellnexa.ca/`. Package the tested `Frontend/dist/portal` with the maintained portal-only builder for `/public_html/wellness-common-portal/`. Preserve existing `.env`, API, uploads and all old hashed assets during upload; do not mirror-delete. The shared portal package serves both Wellnexa and Livin Lively. No database or private configuration change is needed. Check ZIP contents for secrets, source maps, localhost, private files, PHI and correct public URLs. Keep a copy of previous `index.html`, `.htaccess` and matching assets for both destinations.
 
-After upload, visit the English and French URLs directly and via footer, navigation and practitioner enquiry. Verify legal name, contact, language, mobile layout and link to IPC. Verify the Wellnexa portal client and staff link; verify the Livin Lively portal does not show a Wellnexa privacy link and its existing booking/sign-in pages still load. Check response headers and that true missing assets are not rewritten to the SPA. Do not use patient data for this smoke check. Roll back each affected destination by restoring its prior HTML, rewrite file and matching assets together. No schema rollback is required. Release owner, privacy review and hosted acceptance remain pending until recorded.
+The focused website upload and browser checks above are complete. For a later coordinated shared-portal release, verify the Wellnexa client, guest and staff links; verify Livin Lively does not show a Wellnexa privacy link and its booking/sign-in pages still load. Check response headers and that true missing assets are not rewritten to the SPA. Do not use patient data for this smoke check. Roll back each affected destination by restoring its prior HTML, rewrite file and matching assets together. No schema rollback is required. Release owner, operational security review and full hosted acceptance remain pending until recorded.
 
 ## Control ledger for this slice
 
@@ -57,7 +66,7 @@ Statuses describe the scope verified here, not the whole application. Review dat
 | GOV-03 | Unverified | PIPEDA applicability to non-health/site data and data flows needs owner/legal decision. |
 | GOV-04 | Partial | Notice describes administrative use only; any clinical decision function needs separate review. |
 | GOV-05 | Partial | Notice lists main classes and outside services; inventory, flow/PIA, risk assessment and residual acceptance remain open. |
-| PRIV-01 | Partial | Bilingual statement and collection-point/portal links implemented locally; owner wording review and hosted verification pending. |
+| PRIV-01 | Partial | Owner-approved bilingual statement and collection-point links verified on the hosted website; portal links and inbox receipt remain unverified. |
 | PRIV-02 | Partial | Notice distinguishes care, operational use and marketing; actual authority, consent capture and restrictions not changed or revalidated. |
 | PRIV-03 | Unverified | No server restriction work; current enforcement needs independent release evidence. |
 | PRIV-04 | Unverified | Representative/minor flows and treatment consent remain outside this page and need review. |
@@ -70,8 +79,8 @@ Statuses describe the scope verified here, not the whole application. Review dat
 | AUTH-04 | Unverified | No token storage change; exceptions/approved session rollout remain open. |
 | AUTH-05 | Not applicable | No API permissions or grants added by this slice; inventory remains a separate release obligation. |
 | SEC-01 | Partial | Source contains public contact/identifiers only; inspect final ZIP and tracked history before release. |
-| SEC-02 | Unverified | Public HTTPS destinations specified; hosted TLS, backup, at-rest and private-root controls need verification. |
-| SEC-03 | Unverified | Local route added; per-host live headers, caches and missing-asset behavior require hosted checks. |
+| SEC-02 | Partial | HTTPS website content verified, but HTTP still serves pages without redirect; hosted TLS details, backup, at-rest and private-root controls need review. |
+| SEC-03 | Partial | Missing page remains 404; sampled website/portal HTTP redirects and HTTPS headers fail the project gate. Hosting owner must remediate per host. |
 | SEC-04 | Partial | Statement is static React text, no unsafe HTML sink or new input; existing app input paths not revalidated. |
 | SEC-05 | Not applicable | No new request body, upload, export or worker batch in this slice. |
 | SEC-06 | Not applicable | Public static page adds no sensitive read/write; existing audit coverage remains separate. |
@@ -86,9 +95,9 @@ Statuses describe the scope verified here, not the whole application. Review dat
 | DEV-06 | Partial | Build size warnings retained; impact review remains open. |
 | REL-01 | Partial | This ledger records each control and gaps; named reviewer decisions are pending. |
 | REL-02 | Partial | Local UI builds/browser checks passed; no PHP/SQL change; hosted checks are separate. |
-| REL-03 | Partial | Final website/portal archives inspected and manifest-provenanced; hosted acceptance pending. |
+| REL-03 | Partial | Focused website archive and hosted page/asset checks passed; shared portal, headers and full hosted acceptance pending. |
 | REL-04 | Missing | Real-data and overall release gates remain open. |
-| REL-05 | Partial | Owner requested publication, supplied custody/contact and approved wording; host upload and accountable operational/clinical/release sign-off pending. |
+| REL-05 | Partial | Owner requested publication, supplied custody/contact, approved wording and uploaded the focused website files; operational/clinical/release sign-off pending. |
 | REL-06 | Partial | Completion report must list files, exact checks, omitted/hosted evidence, rollback and final release line. |
 
-**Current decision:** NOT READY FOR RELEASE. This source change may be reviewed and packaged for a controlled site upload, but it does not authorize real PHI or close the broader pilot gates.
+**Current decision:** The public statement is live and verified on the website. The shared portal link is held. NOT READY FOR REAL-DATA RELEASE: HTTP redirects, headers and the wider pilot/privacy gates remain open. This work does not authorize real PHI.
