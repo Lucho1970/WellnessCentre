@@ -1,8 +1,4 @@
 RewriteEngine On
-# A root-directory rewrite may not run for this nested API on Netfirms.
-# Refuse HTTP before any PHP entry can receive credentials or request bodies.
-RewriteCond %{HTTPS} !=on
-RewriteRule ^ - [F,L]
 RewriteRule ^public/discovery/(options|search)/?$ discovery.php?action=$1 [L]
 RewriteRule ^public/practitioner-enquiries/?$ practitioner-enquiries.php [L]
 RewriteRule ^public/(services|practitioners|contact)/?$ catalogue.php?resource=$1 [QSA,L]
