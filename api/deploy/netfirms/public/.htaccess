@@ -1,4 +1,8 @@
 RewriteEngine On
+# API directory rules do not inherit the portal root rewrite rules.
+# Refuse plaintext requests before the PHP front controller receives them.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ - [F,L]
 RewriteBase /api/
 
 RewriteCond %{REQUEST_FILENAME} !-f
