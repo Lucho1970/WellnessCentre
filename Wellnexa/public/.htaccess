@@ -7,6 +7,11 @@ RewriteRule ^ - [F,L]
 RewriteCond %{HTTPS} !=on
 RewriteRule ^ https://wellnexa.ca%{REQUEST_URI} [R=302,L,NE]
 
+# Short host-only trial. Browsers accept this header only over verified HTTPS.
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=300" "expr=%{REQUEST_SCHEME} == 'https'"
+</IfModule>
+
 # Only supported public pages need the React entry point.
 # Keep API routing and genuine missing assets under their own handlers.
 RewriteRule ^contact/?$ index.html [L]
