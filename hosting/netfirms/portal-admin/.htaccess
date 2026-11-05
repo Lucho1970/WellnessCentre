@@ -1,4 +1,12 @@
 RewriteEngine On
+Options -Indexes
+# Let the explicit /admin redirect run before Apache's HTTP directory-slash redirect.
+# Disabling the automatic slash is safe here only with indexes disabled and this rule.
+DirectorySlash Off
+RewriteOptions AllowNoSlash
+RewriteCond %{HTTP_HOST} ^portal\.copihue\.ca$ [NC]
+RewriteCond %{REQUEST_URI} ^/admin$ [NC]
+RewriteRule ^ https://portal.copihue.ca/admin/ [R=302,L,NE]
 
 # This child directory has its own rules; portal root rewrites are not inherited.
 # Keep central administration on its exact HTTPS hostname.
