@@ -26,6 +26,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-landing') -Dest
 $admin=Join-Path $stage 'admin'
 Copy-Item -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin') -Destination $admin -Recurse
 Move-Item -LiteralPath (Join-Path $admin 'central.html') -Destination (Join-Path $admin 'index.html')
+Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-admin/.htaccess') -Destination $admin -Force
 Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $stage 'api') -Recurse
 [IO.Compression.ZipFile]::CreateFromDirectory($stage,(Join-Path $destination 'copihue-portal-landing.zip'))
 $patch=[IO.Compression.ZipFile]::Open((Join-Path $destination 'wellness-api-enquiries-patch.zip'),[IO.Compression.ZipArchiveMode]::Create)

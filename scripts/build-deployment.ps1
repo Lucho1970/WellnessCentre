@@ -105,6 +105,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-landing') -Dest
 $adminStage = Join-Path $centralStage 'admin'
 Copy-Item -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin') -Destination $adminStage -Recurse
 Move-Item -LiteralPath (Join-Path $adminStage 'central.html') -Destination (Join-Path $adminStage 'index.html')
+# The Vite build copies the public-site .htaccess into application-admin.
+# Override it with the central Admin child rules before packaging.
+Copy-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-admin/.htaccess') -Destination $adminStage -Force
 Copy-Item -LiteralPath (Join-Path $repo 'api/deploy/netfirms/public') -Destination (Join-Path $centralStage 'api') -Recurse
 Write-DeploymentZip $centralStage (Join-Path $destination 'copihue-portal-landing.zip')
 Write-DeploymentZip $private (Join-Path $destination 'wellness-api-private.zip')

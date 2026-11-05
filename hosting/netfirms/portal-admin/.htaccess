@@ -1,0 +1,30 @@
+RewriteEngine On
+
+# This child directory has its own rules; portal root rewrites are not inherited.
+# Keep central administration on its exact HTTPS hostname.
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} ^portal\.copihue\.ca$ [NC]
+RewriteRule ^ https://portal.copihue.ca%{REQUEST_URI} [R=302,L,NE]
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ - [F,L]
+
+# The SPA shell selects the current hashed JS/CSS files.
+<Files "index.html">
+    <IfModule mod_expires.c>
+        ExpiresActive Off
+    </IfModule>
+    <IfModule mod_headers.c>
+        Header onsuccess unset Cache-Control
+        Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header onsuccess unset Expires
+        Header always set Expires "Thu, 01 Jan 1970 00:00:00 GMT"
+    </IfModule>
+</Files>
+
+RewriteRule ^api(?:/|$) - [L]
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.html [L]

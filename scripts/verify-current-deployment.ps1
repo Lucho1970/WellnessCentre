@@ -80,6 +80,7 @@ foreach($record in $manifest.archives){
             $root=(Resolve-Path -LiteralPath (Join-Path $repo 'Frontend/dist/application-admin')).Path
             foreach($source in Get-ChildItem -LiteralPath $root -Recurse -File){
                 $relative=$source.FullName.Substring($root.Length+1).Replace('\','/')
+                if($relative -eq '.htaccess'){$source=Get-Item -LiteralPath (Join-Path $repo 'hosting/netfirms/portal-admin/.htaccess')}
                 if($relative -eq 'central.html'){$relative='index.html'}
                 $entry=$zip.GetEntry('admin/'+$relative)
                 if($null -eq $entry -or (& $hashBytes (& $entryBytes $entry)) -ne (Get-FileHash -LiteralPath $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant()){throw "Central build mismatch: $relative"}
