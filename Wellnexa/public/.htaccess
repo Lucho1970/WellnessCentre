@@ -1,4 +1,11 @@
 RewriteEngine On
+# First enforce TLS on the website. API requests sent over HTTP are refused:
+# a redirect would happen only after the request had already crossed plaintext.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^api(?:/|$) - [F,L]
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://wellnexa.ca/$1 [R=302,L]
+
 # Only supported public pages need the React entry point.
 # Keep API routing and genuine missing assets under their own handlers.
 RewriteRule ^contact/?$ index.html [L]

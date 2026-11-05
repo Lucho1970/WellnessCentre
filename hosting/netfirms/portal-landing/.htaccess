@@ -1,6 +1,16 @@
 DirectoryIndex index.html
 RewriteEngine On
 
+# The central administration host must never serve the portal over HTTP.
+# Reject plaintext API requests before the existing API pass-through rule.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^api(?:/|$) - [F,L]
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} ^portal\.copihue\.ca$ [NC]
+RewriteRule ^(.*)$ https://portal.copihue.ca/$1 [R=302,L]
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ - [F,L]
+
 # The central host exposes only the application administration API; the API rejects clinic routes.
 RewriteRule ^api(?:/|$) - [L]
 RewriteRule ^admin/?$ admin/index.html [L]

@@ -1,5 +1,18 @@
 RewriteEngine On
 
+# Both clinic hostnames map to this directory. Preserve each exact host.
+# Refuse plaintext API requests rather than redirecting an already-sent body.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^api(?:/|$) - [F,L]
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} ^wellnexa\.copihue\.ca$ [NC]
+RewriteRule ^(.*)$ https://wellnexa.copihue.ca/$1 [R=302,L]
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP_HOST} ^livinlively\.copihue\.ca$ [NC]
+RewriteRule ^(.*)$ https://livinlively.copihue.ca/$1 [R=302,L]
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ - [F,L]
+
 # The SPA shell selects the current hashed JS/CSS files. Apply to index.html
 # after directory-index resolution and SPA rewrites, not API or asset responses.
 <Files "index.html">
