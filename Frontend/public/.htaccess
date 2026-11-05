@@ -7,6 +7,11 @@ RewriteCond %{HTTP_HOST} ^www\.livinlively\.ca$ [NC,OR]
 RewriteCond %{HTTPS} !=on
 RewriteRule ^(.*)$ https://livinlively.ca/$1 [R=302,L]
 
+# Short host-only HSTS trial; browsers ignore it on plaintext responses.
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=300" "expr=%{REQUEST_SCHEME} == 'https'"
+</IfModule>
+
 # The SPA shell selects the current hashed JS/CSS files. Apply to index.html
 # after directory-index resolution and SPA rewrites, not API or asset responses.
 <Files "index.html">

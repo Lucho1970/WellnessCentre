@@ -14,6 +14,11 @@ RewriteRule ^ https://livinlively.copihue.ca%{REQUEST_URI} [R=302,L,NE]
 RewriteCond %{HTTPS} !=on
 RewriteRule ^ - [F,L]
 
+# Short host-only HSTS trial after HTTPS and API denial checks.
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=300" "expr=%{REQUEST_SCHEME} == 'https'"
+</IfModule>
+
 # The SPA shell selects the current hashed JS/CSS files. Apply to index.html
 # after directory-index resolution and SPA rewrites, not API or asset responses.
 <Files "index.html">

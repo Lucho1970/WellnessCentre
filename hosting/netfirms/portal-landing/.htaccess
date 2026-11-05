@@ -12,6 +12,11 @@ RewriteRule ^ https://portal.copihue.ca%{REQUEST_URI} [R=302,L,NE]
 RewriteCond %{HTTPS} !=on
 RewriteRule ^ - [F,L]
 
+# Short host-only HSTS trial after HTTPS and API denial checks.
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=300" "expr=%{REQUEST_SCHEME} == 'https'"
+</IfModule>
+
 # The central host exposes only the application administration API; the API rejects clinic routes.
 RewriteRule ^api(?:/|$) - [L]
 RewriteRule ^admin/?$ admin/index.html [L]
