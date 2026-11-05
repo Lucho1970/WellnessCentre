@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Shared portal sign-in release preparation — 5 November 2026](PORTAL_SIGNIN_RELEASE_PREP_2026-11-05.md): merged-source package, narrow upload/rollback, local verifier, hosted baseline and release gates.
+
 - [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.
 
 - [HTTPS enforcement — 5 November 2026](HTTPS_ENFORCEMENT_2026-11-05.md): Netfirms host-specific 302 staging, HTTP API denial, backup/verification/rollback and control ledger.
