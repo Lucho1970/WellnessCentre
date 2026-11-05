@@ -17,7 +17,7 @@ The second source version tried a nested API denial rule. After the owner upload
 1. Confirm the active Netfirms domain mappings in [deployment layout](DEPLOYMENT_LAYOUT.md) and that HTTPS opens without browser certificate errors on each host. These read-only checks passed on 5 November.
 2. Download/back up each live root `.htaccess` privately. Compare it with the corresponding staged file. Stop if the remote file has hosting-only rules not represented in source; reconcile them before replacing. Do not mirror-delete directories, overwrite PHP files or upload a full portal bundle.
 3. The owner replaced only the Wellnexa website root `.htaccess` with the corrected root file, then replaced only its backed-up API child `.htaccess`. Both tests above passed. Keep both backups until permanent redirect/HSTS follow-up is accepted.
-4. Only after the website host passes, compare/back up the live shared portal root and API child `.htaccess` files. Stage and test them one at a time for **both** `wellnexa.copihue.ca` and `livinlively.copihue.ca` on `/`, `/client`, `/staff/login`, `/api/v1/site-config` and a missing route. Expected HTTP pages: one 302 to the same HTTPS host; HTTP API: 403; HTTPS behavior unchanged. The two hostnames must remain distinct. Test browser sign-in entry without submitting accounts or real records. Restore the individual backup if a host or API fails.
+4. The owner backed up and uploaded the shared portal root and API child `.htaccess` files one at a time. Fresh HTTP `/client` and `/staff/login` requests on **both** `wellnexa.copihue.ca` and `livinlively.copihue.ca` returned one 302 to the same HTTPS host and path/query. HTTP `/api/v1/site-config` and direct `/api/index.php` returned 403 on both; HTTPS site configuration returned JSON 200, HTTPS `/client` returned HTML 200, and direct HTTPS `/api/index.php` returned its normal JSON 404. No other files changed. Browser sign-in entry, authenticated API routes and representative clinic workflows remain pending. Keep both backups for rollback.
 5. Only after both clinic hosts pass, compare/back up the live central Admin root and API child `.htaccess` files, then stage and test `portal.copihue.ca` on `/`, `/admin/`, `/api/v1/...` and legacy redirects. Verify HTTPS Admin still loads with the existing workforce sign-in option. Do not change identity provider redirects or grants.
 6. After these 302 checks and exact remote `.htaccess` backups are recorded, change the tested page redirects to 301 (or 308 only if every client/hosting path has been tested) and add a short host-only HSTS policy on verified HTTPS responses. Recheck all hosts and APIs, including direct HTTP access, before increasing HSTS duration. Do **not** use `includeSubDomains` until every current and future child host is reviewed. CSP, cache, no-sniff, referrer, cookie and provider/endpoint controls need their own per-host review; a redirect alone does not close SEC-03 or the real-data gate.
 
@@ -25,7 +25,7 @@ For rollback, restore the one backed-up root `.htaccess` at the same directory; 
 
 ## Validation and release status
 
-Wellnexa root and child source diffs passed `git diff --check`, ZIP entries and SHA-256 were inspected, and the hosted public-route tests above passed on 5 November 2026. The owner backed up and compared the live Wellnexa root and nested API files. Pending: other-host redirect/API checks, permanent redirect/HSTS follow-up and full host/header acceptance. No database test or frontend build is relevant to these rewrite-only files; no API implementation is changed. Hosted tests used safe read-only routes with no credentials or PHI over HTTP. Valid API routes reject extra cache-busting query parameters, so repeat known safe public GETs and check `Age`/content type rather than treating a 404 from an unknown parameter as transport denial. Test 500/loop recovery before asking external testers to authenticate.
+Wellnexa and shared portal source diffs passed `git diff --check`, ZIP entries and SHA-256 were inspected, and the hosted read-only route tests above passed on 5 November 2026. The owner backed up and compared each live root and nested API file before replacing it. Pending: central Admin redirect/API checks, browser sign-in entry, authenticated paths, permanent redirect/HSTS follow-up and full host/header acceptance. No database test or frontend build is relevant to these rewrite-only files; no API implementation is changed. Hosted tests used safe read-only routes with no credentials or PHI over HTTP. Valid API routes reject extra cache-busting query parameters, so repeat known safe public GETs and check `Age`/content type rather than treating a 404 from an unknown parameter as transport denial. Test 500/loop recovery before asking external testers to authenticate.
 
 ## Control ledger for this change
 
@@ -46,15 +46,15 @@ Review date 5 November 2026; source SHA and hosting operator/reviewer decision w
 | PRIV-06 | Unverified | No retention/backup process change. |
 | PRIV-07 | Unverified | No incident runbook change. |
 | AUTH-01 | Partial | No token code change; verify HTTPS sign-in callbacks continue working. |
-| AUTH-02 | Partial | Fixed host destinations preserve clinic identity; verify both portal hosts. |
+| AUTH-02 | Partial | Fixed host destinations preserved both clinic hostnames in hosted redirect checks; authorization boundaries need separate tests. |
 | AUTH-03 | Unverified | No session configuration change; cookie/session acceptance remains separate. |
 | AUTH-04 | Unverified | No token storage change; HTTPS is necessary but insufficient. |
 | AUTH-05 | Not applicable | No API grants or privileges added. |
 | SEC-01 | Partial | Three root rewrite files and one staged API child file only; inspect final artifacts for private material. |
-| SEC-02 | Partial | HTTPS certificates, website redirect and tested Wellnexa API denial work; other hosts and authenticated paths pending. |
-| SEC-03 | Partial | Website redirect and public API denial verified; first nested API attempt broke HTTPS and was rolled back. Other hosts, headers/cache/HSTS pending. |
+| SEC-02 | Partial | HTTPS certificates, website and both clinic redirects, and tested public API denial work; central Admin and authenticated paths pending. |
+| SEC-03 | Partial | Website and clinic redirects and public API denial verified; first nested API attempt broke HTTPS and was rolled back. Central Admin, headers/cache/HSTS pending. |
 | SEC-04 | Partial | Fixed redirect hosts avoid user-controlled destination; verify pathological paths/query. |
-| SEC-05 | Partial | Tested public HTTP API routes now return 403; abuse/rate/body controls unchanged. |
+| SEC-05 | Partial | Tested public HTTP API routes on website and both clinic hosts now return 403; abuse/rate/body controls unchanged. |
 | SEC-06 | Unverified | No API audit change; host redirect/denial logs need operational review. |
 | SEC-07 | Partial | Redirect exposes no token/body in rule; verify server/proxy logs and errors. |
 | SEC-08 | Not applicable | No new endpoint or subprocessor. |
@@ -67,9 +67,9 @@ Review date 5 November 2026; source SHA and hosting operator/reviewer decision w
 | DEV-06 | Partial | Check loops and one-hop redirects; representative traffic/performance separate. |
 | REL-01 | Partial | This ledger covers all controls; owners/reviewer signatures pending. |
 | REL-02 | Partial | Config-only local checks pending; PHP/SQL suites not applicable. |
-| REL-03 | Partial | Wellnexa ZIPs inspected and hosted public routes verified; other hosts and full acceptance pending. |
+| REL-03 | Partial | Website and shared portal ZIPs inspected and hosted public routes verified; central Admin and full acceptance pending. |
 | REL-04 | Missing | Real-data release remains blocked by wider open controls. |
-| REL-05 | Partial | Owner requested HTTPS setup; Wellnexa root and API backups recorded, failed API change restored; other hosts pending. |
+| REL-05 | Partial | Owner requested HTTPS setup; Wellnexa/shared portal root and API backups recorded, failed website API change restored; central Admin pending. |
 | REL-06 | Partial | Final report must include file/permission/dependency scope, commands, hosted evidence and rollback. |
 
 **Decision:** NOT READY FOR RELEASE until hosted checks and the wider real-data gate are completed.
