@@ -1,4 +1,8 @@
 RewriteEngine On
+# The parent rewrite rules do not apply in this child directory on Apache.
+# Reject cleartext before routing any API request to PHP.
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ - [F,L]
 RewriteRule ^public/discovery/(options|search)/?$ discovery.php?action=$1 [L]
 RewriteRule ^public/practitioner-enquiries/?$ practitioner-enquiries.php [L]
 RewriteRule ^public/(services|practitioners|contact)/?$ catalogue.php?resource=$1 [QSA,L]
