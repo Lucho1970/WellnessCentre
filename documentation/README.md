@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Fullscript integration roadmap — 6 November 2026](FULLSCRIPT_INTEGRATION.md): documentation-only proposal, vendor/privacy approval gates, secure architecture and synthetic sandbox acceptance; no integration enabled.
+
 - [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.
 
 - [HTTPS enforcement — 5 November 2026](HTTPS_ENFORCEMENT_2026-11-05.md): Netfirms host-specific 302 staging, HTTP API denial, backup/verification/rollback and control ledger.
