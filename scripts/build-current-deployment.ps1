@@ -1,7 +1,15 @@
-param([Parameter(Mandatory=$true)][string]$ReleaseName)
+param([Parameter(Mandatory=$true)][string]$ReleaseName,[switch]$RequirePractitionerPilot)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 $guide='CURRENT_APP_RELEASE_2026-10-29.md'
+if ($RequirePractitionerPilot) {
+    foreach ($flag in @('VITE_PRACTITIONER_APPLICATIONS_ENABLED','VITE_STAFF_EXTERNAL_AUTH_ENABLED','VITE_PRACTITIONER_SOCIAL_SIGN_IN_ENABLED')) {
+        if ([Environment]::GetEnvironmentVariable($flag,'Process') -ne 'true') { throw "Required practitioner pilot build flag is not enabled: $flag" }
+    }
+    foreach ($setting in @('VITE_STAFF_EXTERNAL_TENANT_ID','VITE_STAFF_EXTERNAL_SUBDOMAIN','VITE_STAFF_EXTERNAL_API_CLIENT_ID','VITE_STAFF_EXTERNAL_SPA_CLIENT_ID')) {
+        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($setting,'Process'))) { throw "Required practitioner pilot build setting is missing: $setting" }
+    }
+}
 # The established builder checks committed source, validates production settings,
 # builds all clinic surfaces and installs the exact private Composer lock.
 $previousScanDirectory=[Environment]::GetEnvironmentVariable('PHP_INI_SCAN_DIR','Process')

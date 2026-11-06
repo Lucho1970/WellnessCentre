@@ -7,6 +7,7 @@
 # Wellness Centre Documentation
 
 - [Fullscript integration roadmap — 6 November 2026](FULLSCRIPT_INTEGRATION.md): documentation-only proposal, vendor/privacy approval gates, secure architecture and synthetic sandbox acceptance; no integration enabled.
+- [Shared portal sign-in release preparation — 5 November 2026](PORTAL_SIGNIN_RELEASE_PREP_2026-11-05.md): merged-source package, narrow upload/rollback, local verifier, hosted baseline and release gates.
 
 - [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.
 
