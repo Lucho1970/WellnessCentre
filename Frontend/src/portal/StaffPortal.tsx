@@ -58,6 +58,9 @@ const StaffAppointments = lazy(() => import('../booking/StaffAppointments').then
 const Dashboard = lazy(() => import('../dashboard/Dashboard').then(module => ({ default: module.Dashboard })));
 const DashboardWidgetAdmin = lazy(() => import('../admin/DashboardWidgetAdmin').then(module => ({ default: module.DashboardWidgetAdmin })));
 const PrivacyAuditReview = lazy(() => import('../admin/PrivacyAuditReview').then(module => ({default:module.PrivacyAuditReview})));
+const PractitionerSafety = lazy(() => import('../admin/PractitionerSafety').then(module => ({default:module.PractitionerSafety})));
+const AdminPolicyDocuments = lazy(() => import('../admin/AdminPolicyDocuments').then(module => ({default:module.AdminPolicyDocuments})));
+const PractitionerPolicyDocuments = lazy(() => import('./PractitionerPolicyDocuments').then(module => ({default:module.PractitionerPolicyDocuments})));
 const NotificationStatusAdmin = lazy(() => import('../admin/NotificationStatusAdmin').then(module => ({ default: module.NotificationStatusAdmin })));
 const PractitionerNotifications = lazy(() => import('./PractitionerNotifications').then(module => ({ default: module.PractitionerNotifications })));
 const PractitionerCalendar = lazy(() => import('../scheduling/PractitionerCalendar').then(module => ({ default: module.PractitionerCalendar })));
@@ -84,6 +87,8 @@ const navigation: NavigationItem[] = [
   { id: "rooms", label: "Rooms", description: "Spaces and turnaround time", icon: <DoorOpen size={20} /> },
   { id: "services", label: "Services", description: "Care, pricing, and booking rules", icon: <HandHeart size={20} /> },
   { id: "staff", label: "Staff access", description: "Roles and account status", icon: <Users size={20} /> },
+  { id: "documents", label: "Practitioner documents", description: "Review clinic agreements and acknowledgements", icon: <PanelsTopLeft size={20} /> },
+  { id: "practitioner_safety", label: "Practitioner access hold", description: "Immediately stop or restore practitioner sign-in", icon: <Users size={20} /> },
   { id: "travel", label: "Travel enquiries", description: "Private client travel enquiries", icon: <MailCheck size={20} /> },
   { id: "enquiries", label: "Practitioner enquiries", description: "Review interest in joining the clinic", icon: <MailCheck size={20} /> },
   { id: "team", label: "Public team", description: "Published staff profiles", icon: <Users size={20} /> },
@@ -182,7 +187,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         </Stack>
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>
         {page === "dashboard" && <Dashboard workspace={workspace} />}
-        {page === "clients" && (workspace === 'practitioner' ? <PractitionerClients /> : <ClientManagement canMerge={roles.includes('super_admin')} />)}
+        {page === "clients" && (workspace === 'practitioner' ? <PractitionerClients /> : <ClientManagement canMerge={roles.includes('super_admin')} canManageCare={roles.some(role => ['super_admin','clinic_admin'].includes(role))} />)}
         {page === "forms" && <FormTemplates />}
         {page === "appointments" && <StaffAppointments canManageFees={roles.some(role => ['super_admin', 'clinic_admin'].includes(role))} practitionerMode={workspace === 'practitioner'} canScheduleOthers={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('schedule_for_other_practitioners')} canAddClients={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || (roles.includes('practitioner') && permissions.includes('add_clients'))} canApproveOnsiteArea={roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role)) || permissions.includes('approve_onsite_service_area')} canBook={(workspace === 'admin' && roles.some(role => ['super_admin', 'clinic_admin', 'reception'].includes(role))) || (workspace === 'practitioner' && roles.includes('practitioner'))} />}
         {page === "schedule_calendar" && <PractitionerCalendar />}
@@ -193,6 +198,8 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {page === "business" && <BusinessSettings />}
         {page === "business" && <CatalogueSettings />}
         {page === "staff" && <StaffAdmin />}
+        {page === "documents" && (workspace === 'practitioner' ? <PractitionerPolicyDocuments /> : <AdminPolicyDocuments />)}
+        {page === "practitioner_safety" && <PractitionerSafety canRestore={roles.includes('super_admin')} />}
         {page === "team" && <TeamAdmin />}
         {page === "travel" && <StaffTravelEnquiries />}
         {page === "enquiries" && <PractitionerEnquiries />}

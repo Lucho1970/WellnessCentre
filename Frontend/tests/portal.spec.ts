@@ -1841,11 +1841,18 @@ test("role policies preserve current access without broadening permissions", () 
   expect(pagesFor(["reception"], "admin")).not.toContain("forms");
   expect(pagesFor(["accountant"], "admin")).not.toContain("forms");
   expect(pagesFor(["clinic_admin"], "admin")).toContain("forms");
+  expect(pagesFor(["clinic_admin"], "admin")).toContain("practitioner_safety");
+  expect(pagesFor(["reception"], "admin")).not.toContain("practitioner_safety");
+  expect(pagesFor(["reception"], "admin", ["hold_practitioner_access"])).toContain("practitioner_safety");
+  expect(pagesFor(["accountant"], "admin", ["hold_practitioner_access"])).not.toContain("practitioner_safety");
+  expect(pagesFor(["clinic_admin"], "admin")).not.toContain("documents");
+  expect(pagesFor(["super_admin"], "admin")).toContain("documents");
   expect(pagesFor(["practitioner"], "admin")).toEqual([]);
   expect(pagesFor(["super_admin"], "admin")).toContain("business");
   expect(pageAt("/admin/notifications", "admin")).toBe("notifications");
   expect(pagesFor(["practitioner"], "practitioner")).toEqual([
     "dashboard",
+    "documents",
     "schedule_calendar",
     "appointments",
     "clients",
@@ -3159,6 +3166,22 @@ test('staff status saves preserve contact details despite simulated extension au
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect.poll(() => writes.length).toBe(2);
   expect(writes[1].email).toBe('reviewed@example.test');
+});
+
+test('Super Admin grants the narrow emergency hold permission to reception staff', async ({ page }) => {
+  await fixtures(page, ['super_admin']);
+  const person = { id: 2, display_name: 'Synthetic Office', email: 'office@example.test', status: 'active', roles: ['reception'], permissions: [] as string[] };
+  let saved: Record<string, unknown> | null = null;
+  await page.route('**/api/v1/admin/staff**', route => {
+    if (route.request().method() === 'PATCH') { saved = route.request().postDataJSON(); return route.fulfill({ json: { data: { id: person.id } } }); }
+    return route.fulfill({ json: { data: [person] } });
+  });
+  await page.goto(`${portalHost}/admin/users`);
+  await page.getByRole('button', { name: /Synthetic Office/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Urgently stop practitioner access' }).check();
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  expect(saved).toMatchObject({ roles: ['reception'], permissions: ['hold_practitioner_access'] });
 });
 
 for (const denial of [

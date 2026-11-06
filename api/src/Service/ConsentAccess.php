@@ -76,6 +76,9 @@ final class ConsentAccess
             'practitionerEnquiries','updatePractitionerEnquiry','notifyPractitionerEnquiry', // Recruitment inbox only; service owns current authority, clinic scope and audited send claims.
             'saveReceiptTemplate', // SessionReceiptService checks current clinic administration; future issuer configuration only.
             'privacyAuditHistory','grantPrivacyReview','revokePrivacyReview','adminStaff', // Minimal oversight history has separate, explicit authority in PrivacyAuditService.
+            'emergencyPractitioners','emergencyPractitionerAccess', // Account containment only; no patient rows are loaded or changed.
+            'careNotes','createCareNote','clientCareTeam','setClientCareTeam', // ClinicCareRecordService owns client, assignment, staff and restriction checks.
+            'practitionerDocuments','acceptPractitionerDocument','adminPractitionerDocuments','createPractitionerDocument','publishPractitionerDocument', // Versioned policy text and authenticated acknowledgement only.
             'reminderSchedules','createReminderSchedule','toggleReminderSchedule', // ReminderScheduleService authorizes pending effects.
             // Declarative configuration only; DashboardService rechecks current clinic Super Admin authority.
             'adminDashboardWidgets','uploadDashboardWidget','toggleDashboardWidget','dashboardWidgetVersions','restoreDashboardWidget',

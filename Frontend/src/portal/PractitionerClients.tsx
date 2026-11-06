@@ -10,6 +10,7 @@ import { useStaffAuth } from '../auth/AuthProvider';
 import { apiBaseUrl, normalizeNumericIds } from '../shared/api';
 import { pagePath } from './access';
 import { ClientForms } from '../forms/ClientForms';
+import { PractitionerNotes } from './PractitionerNotes';
 
 type Client = { id: number; display_name: string; email: string; phone: string | null; preferred_contact: string | null; status: string; appointment_count: number; recent_appointment_id: number | null };
 type Result = { items: Client[]; page: number; has_more: boolean };
@@ -33,6 +34,7 @@ function PractitionerClientsForm() {
   const [data, setData] = useState<Result | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
   const [showForms, setShowForms] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const [formsLocked, setFormsLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -57,7 +59,7 @@ function PractitionerClientsForm() {
   const search = (event: FormEvent) => { event.preventDefault(); setPage(1); setQuery(draft.trim()); setSelected(null); };
   const email = selected && emailHref(selected.email);
   const phone = phoneHrefs(selected?.phone ?? null);
-  useEffect(() => { setShowForms(false); }, [selected?.id]);
+  useEffect(() => { setShowForms(false); setShowNotes(false); }, [selected?.id]);
   return <Stack spacing={2}>
     <Alert severity="info">{t('This list includes clients you have booked or added yourself. It is not the clinic-wide client directory.')}</Alert>
     <Paper variant="outlined" component="form" onSubmit={search} sx={{ p: 1.5 }}><Stack direction="row" flexWrap="wrap" useFlexGap gap={1} alignItems="center">
@@ -85,6 +87,7 @@ function PractitionerClientsForm() {
         {selected.recent_appointment_id && <Button component={RouterLink} to={`${pagePath('practitioner', 'appointments')}?appointment_id=${selected.recent_appointment_id}`} variant="outlined">{t('View latest appointment')}</Button>}
       </>}
       {selected && <><Button disabled={formsLocked} onClick={() => setShowForms(value => !value)}>{t('Client forms')}</Button>{showForms && <ClientForms key={selected.id} clientId={selected.id} onLockedChange={setFormsLocked}/>}</>}
+      {selected && <><Button disabled={formsLocked} onClick={() => setShowNotes(value => !value)}>{t('Clinic care notes')}</Button>{showNotes && <PractitionerNotes key={selected.id} clientId={selected.id}/>}</>}
     </Stack></Drawer>
   </Stack>;
 }

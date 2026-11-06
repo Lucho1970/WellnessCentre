@@ -157,10 +157,17 @@ function StaffAdminForm() {
             <Typography fontWeight={700}>{t('Local roles')}</Typography>
             {roleOptions.map(role => <FormControlLabel key={role} control={<Checkbox checked={editing.roles.includes(role)} onChange={event => {
               const roles = event.target.checked ? [...editing.roles, role] : editing.roles.filter(item => item !== role);
-              setEditing({ ...editing, roles, permissions: editing.permissions.filter(permission => permission === 'manage_client_consent' || (permission === 'review_privacy_audit' ? roles.some(role => ['super_admin','clinic_admin'].includes(role)) : roles.includes('practitioner'))) });
+              const permissions = editing.permissions.filter(permission => {
+                if (permission === 'manage_client_consent') return true;
+                if (permission === 'review_privacy_audit') return roles.some(item => ['super_admin','clinic_admin'].includes(item));
+                if (permission === 'hold_practitioner_access') return roles.includes('reception');
+                return roles.includes('practitioner');
+              });
+              setEditing({ ...editing, roles, permissions });
             }}/>} label={role.replaceAll('_', ' ')}/>)}
             <FormControlLabel control={<Checkbox checked={editing.permissions.includes('manage_client_consent')} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, 'manage_client_consent'] : editing.permissions.filter(item => item !== 'manage_client_consent'))}/>} label={t('Record verified consent instructions')}/>
             {editing.roles.some(role => ['super_admin','clinic_admin'].includes(role)) && <FormControlLabel control={<Checkbox checked={editing.permissions.includes('review_privacy_audit')} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, 'review_privacy_audit'] : editing.permissions.filter(item => item !== 'review_privacy_audit'))}/>} label={t('Review clinic privacy audit')}/>}
+            {editing.roles.includes('reception') && <><FormControlLabel control={<Checkbox checked={editing.permissions.includes('hold_practitioner_access')} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, 'hold_practitioner_access'] : editing.permissions.filter(item => item !== 'hold_practitioner_access'))}/>} label={t('Urgently stop practitioner access')}/><Typography variant="body2" color="text.secondary">{t('Allows this office user to stop a practitioner account immediately. Only a Super Admin can restore access.')}</Typography></>}
             {editing.roles.includes('practitioner') && <>
               <Typography fontWeight={700}>{t('Additional permissions')}</Typography>
               <FormControlLabel control={<Checkbox checked={editing.permissions.includes(scheduleOthers)} onChange={event => setEdit('permissions', event.target.checked ? [...editing.permissions, scheduleOthers] : editing.permissions.filter(item => item !== scheduleOthers))}/>} label={t('Schedule for other practitioners')}/>

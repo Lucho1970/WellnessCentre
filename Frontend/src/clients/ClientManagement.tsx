@@ -13,6 +13,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { pagePath } from '../portal/access';
 import { useSearchParams } from 'react-router-dom';
 import { ClientOverview, type OverviewTab } from './ClientOverview';
+import { ClientCareTeam } from './ClientCareTeam';
 
 const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 type Summary = { id: number; display_name: string; email: string; phone: string | null; status: string };
@@ -25,7 +26,7 @@ type MergePreview = { survivor: Detail; duplicate: Detail; relationship_counts: 
 type PanelMode = 'details' | 'new' | 'edit' | 'overview' | null;
 class ClientRequestError extends Error { constructor(message:string,public code='',public fields:Record<string,unknown>={}){super(message);} }
 
-function ClientManagementForm({ canMerge = false }: { canMerge?: boolean }) {
+function ClientManagementForm({ canMerge = false, canManageCare = false }: { canMerge?: boolean; canManageCare?: boolean }) {
   const formValidation = useFormValidation();
   const { t } = useTranslation();
   const { getAccessToken } = useStaffAuth();
@@ -156,7 +157,7 @@ function ClientManagementForm({ canMerge = false }: { canMerge?: boolean }) {
     </>}
     <Drawer anchor="right" open={panelMode !== null} onClose={close} slotProps={{ paper: { sx: { width: { xs: '100%', sm: 760 }, maxWidth: '100%' } } }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}><Box><Typography variant="overline" color="primary">{t(panelMode === 'overview' ? 'Client overview' : panelMode === 'details' ? 'Client details' : panelMode === 'edit' ? 'Edit client' : 'New client')}</Typography><Typography variant="h5">{panelMode === 'new' ? t('Add a client') : clientName}</Typography></Box><IconButton aria-label={t('Close panel')} disabled={formsLocked} onClick={close}><X/></IconButton></Stack>
-      {panelMode === 'details' && id !== null && <ClientDetails form={form} edit={() => void openClient(id, 'edit')} overview={tab => { setOverviewTab(tab); setPanelMode('overview'); }}><Stack spacing={2}>{form.status === 'active' && <Button component={RouterLink} to={pagePath('admin', 'appointments')} state={{ startBooking: true, bookingClient: { id, display_name: `${form.given_name} ${form.family_name}`, email: form.email, phone: form.phone } }} variant="contained">{t('Book appointment')}</Button>}<ClientInvitations key={id} clientId={id} request={request}/></Stack></ClientDetails>}
+      {panelMode === 'details' && id !== null && <ClientDetails form={form} edit={() => void openClient(id, 'edit')} overview={tab => { setOverviewTab(tab); setPanelMode('overview'); }}><Stack spacing={2}>{form.status === 'active' && <Button component={RouterLink} to={pagePath('admin', 'appointments')} state={{ startBooking: true, bookingClient: { id, display_name: `${form.given_name} ${form.family_name}`, email: form.email, phone: form.phone } }} variant="contained">{t('Book appointment')}</Button>}<ClientInvitations key={id} clientId={id} request={request}/>{canManageCare && <ClientCareTeam key={`care-${id}`} clientId={id}/>}</Stack></ClientDetails>}
       {panelMode === 'overview' && id !== null && <ClientOverview key={id} clientId={id} initialTab={overviewTab} request={request} onLockedChange={setFormsLocked} back={() => setPanelMode('details')}/>}
       {(panelMode === 'new' || panelMode === 'edit') && <Box component="form" onSubmit={save} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ p: 3, overflowY: 'auto', flex: 1 }}>

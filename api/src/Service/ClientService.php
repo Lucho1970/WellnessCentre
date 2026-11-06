@@ -220,6 +220,7 @@ final class ClientService
     public function mergePreview(AuthContext $actor,int $survivorId,int $duplicateId,string $cid): array
     {
         self::authorizeMerge($actor);
+        $this->careTeamMergeGuard($actor,$survivorId,$duplicateId);
         $consent=$this->database->connection()->prepare('SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND client_id IN (?,?) LIMIT 1');$consent->execute([$actor->clinicId,$survivorId,$duplicateId]);
         if($consent->fetchColumn())throw new ApiException(409,'consent_merge_review','Client records with consent instructions require a reviewed migration before merging.');
         if($survivorId===$duplicateId)throw new ApiException(422,'validation_error','Choose two different client records.');
@@ -234,6 +235,7 @@ final class ClientService
     public function merge(AuthContext $actor,int $survivorId,int $duplicateId,array $body,string $cid): array
     {
         self::authorizeMerge($actor);
+        $this->careTeamMergeGuard($actor,$survivorId,$duplicateId);
         $consent=$this->database->connection()->prepare('SELECT 1 FROM client_consent_directives WHERE clinic_id=? AND client_id IN (?,?) LIMIT 1');$consent->execute([$actor->clinicId,$survivorId,$duplicateId]);
         if($consent->fetchColumn())throw new ApiException(409,'consent_merge_review','Client records with consent instructions require a reviewed migration before merging.');
         if($survivorId===$duplicateId)throw new ApiException(422,'validation_error','Choose two different client records.');
@@ -248,6 +250,7 @@ final class ClientService
             $lock=$pdo->prepare("SELECT id FROM users WHERE clinic_id=:clinic AND user_type='client' AND id IN(:first,:second) ORDER BY id FOR UPDATE");
             $lock->execute(['clinic'=>$actor->clinicId,'first'=>min($survivorId,$duplicateId),'second'=>max($survivorId,$duplicateId)]);
             if(count($lock->fetchAll())!==2)throw new ApiException(404,'client_not_found','One of the client records was not found.');
+            $this->careTeamMergeGuard($actor,$survivorId,$duplicateId);
             $survivor=$this->find($actor,$survivorId);$duplicate=$this->find($actor,$duplicateId);
             if(!hash_equals($survivor['revision'],(string)($body['survivor_revision']??''))||!hash_equals($duplicate['revision'],(string)($body['duplicate_revision']??'')))throw new ApiException(409,'client_changed','One of these clients changed. Review the merge again before continuing.');
             if($survivor['status']!=='active')throw new ApiException(409,'invalid_survivor','The surviving client must be active.');
@@ -282,6 +285,13 @@ final class ClientService
         $tables=$this->relationshipTables();$counts=[];
         foreach($tables as $table){$s=$this->database->connection()->prepare("SELECT COUNT(*) FROM {$table} WHERE client_id=:id");$s->execute(['id'=>$clientId]);$counts[$table]=(int)$s->fetchColumn();}
         return $counts;
+    }
+
+    private function careTeamMergeGuard(AuthContext $actor,int $first,int $second): void
+    {
+        $q=$this->database->connection()->prepare('SELECT 1 FROM client_care_assignments WHERE clinic_id=? AND client_id IN (?,?) LIMIT 1');
+        $q->execute([$actor->clinicId,$first,$second]);
+        if($q->fetchColumn())throw new ApiException(409,'care_team_merge_review','Care assignments require a reviewed migration before these clients can be merged.');
     }
 
     private function relationshipTables(): array

@@ -36,6 +36,77 @@ final class AdminService
     public function practitioners(AuthContext $actor): array
     {return $this->clinicAdministration($actor,fn()=>$this->practitionerDirectory($actor));}
 
+    private function assertEmergencyAuthority(AuthContext $actor,bool $restore=false): void
+    {
+        $pdo=$this->database->connection();
+        $q=$pdo->prepare("SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id
+            WHERE ur.user_id=? AND ur.location_id IS NULL AND r.code IN ('super_admin','clinic_admin') LIMIT 1");
+        $q->execute([$actor->userId]);$administrator=(bool)$q->fetchColumn();
+        if($restore){
+            $q=$pdo->prepare("SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND ur.location_id IS NULL AND r.code='super_admin' LIMIT 1");
+            $q->execute([$actor->userId]);
+            if(!$q->fetchColumn()||!$actor->hasAnyRole('super_admin'))throw new ApiException(403,'forbidden','Only a Super Admin may restore practitioner access.');
+            return;
+        }
+        if($administrator&&$actor->hasAnyRole('super_admin','clinic_admin'))return;
+        if(!$actor->hasAnyRole('reception'))throw new ApiException(403,'forbidden','Emergency access permission is required.');
+        $q=$pdo->prepare("SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id AND r.code='reception'
+            JOIN user_permissions up ON up.user_id=ur.user_id JOIN permissions perm ON perm.id=up.permission_id AND perm.code='hold_practitioner_access'
+            WHERE ur.user_id=? AND ur.location_id IS NULL LIMIT 1");
+        $q->execute([$actor->userId]);
+        if(!$q->fetchColumn()||!$actor->hasPermission('hold_practitioner_access'))throw new ApiException(403,'forbidden','Emergency access permission is required.');
+    }
+
+    /** Emergency access control is separate from formal practitioner departure. */
+    public function emergencyPractitioners(AuthContext $actor): array
+    {
+        return $this->clinicAdministration($actor,function()use($actor):array{
+            $this->assertEmergencyAuthority($actor);
+            $q=$this->database->connection()->prepare("SELECT p.id practitioner_id,u.id user_id,u.display_name,u.status,COALESCE(h.active,0) access_held,h.reason_code,h.held_at
+                FROM practitioners p JOIN users u ON u.id=p.user_id
+                JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id AND r.code='practitioner'
+                LEFT JOIN practitioner_emergency_holds h ON h.user_id=u.id AND h.clinic_id=u.clinic_id
+                WHERE u.clinic_id=:clinic AND u.user_type='staff' AND u.id<>:actor
+                AND NOT EXISTS(SELECT 1 FROM user_roles elevated JOIN roles er ON er.id=elevated.role_id WHERE elevated.user_id=u.id AND er.code IN ('super_admin','clinic_admin'))
+                GROUP BY p.id,u.id,u.display_name,u.status,h.active,h.reason_code,h.held_at ORDER BY u.display_name,p.id");
+            $q->execute(['clinic'=>$actor->clinicId,'actor'=>$actor->userId]);return $q->fetchAll();
+        },['super_admin','clinic_admin','reception'],true);
+    }
+
+    public function emergencyPractitionerAccess(AuthContext $actor,int $practitionerId,array $body,string $cid): array
+    {
+        if(!isset($body['hold'])||!is_bool($body['hold']))throw new ApiException(422,'validation_error','Choose whether to hold access.');
+        $hold=$body['hold'];$reason=$body['reason_code']??null;
+        if($hold&&!in_array($reason,['security_concern','departure_review','other'],true))throw new ApiException(422,'validation_error','Choose a reason for the access hold.');
+        if(!$hold&&$reason!==null)throw new ApiException(422,'validation_error','A release does not set a new hold reason.');
+        return $this->clinicAdministration($actor,function()use($actor,$practitionerId,$hold,$reason,$cid):array{
+            $this->assertEmergencyAuthority($actor,!$hold);
+            $pdo=$this->database->connection();
+            $q=$pdo->prepare("SELECT u.id,u.status FROM practitioners p JOIN users u ON u.id=p.user_id AND u.clinic_id=:clinic AND u.user_type='staff'
+                WHERE p.id=:practitioner AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code='practitioner')
+                AND NOT EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code IN ('super_admin','clinic_admin')) FOR UPDATE");
+            $q->execute(['clinic'=>$actor->clinicId,'practitioner'=>$practitionerId]);$target=$q->fetch();
+            if(!$target||((int)$target['id']===$actor->userId))throw new ApiException(404,'practitioner_not_found','Practitioner not found.');
+            $q=$pdo->prepare('SELECT active FROM practitioner_emergency_holds WHERE user_id=? AND clinic_id=? FOR UPDATE');$q->execute([(int)$target['id'],$actor->clinicId]);$existing=$q->fetchColumn();
+            if($hold){
+                if($target['status']!=='active'||(int)$existing===1)throw new ApiException(409,'access_state_changed','Practitioner access changed. Refresh and review it again.');
+                $q=$pdo->prepare("INSERT INTO practitioner_emergency_holds(user_id,clinic_id,active,reason_code,held_by,held_at,released_by,released_at)
+                    VALUES(:user,:clinic,1,:reason,:actor,UTC_TIMESTAMP(),NULL,NULL)
+                    ON DUPLICATE KEY UPDATE active=1,reason_code=VALUES(reason_code),held_by=VALUES(held_by),held_at=VALUES(held_at),released_by=NULL,released_at=NULL");
+                $q->execute(['user'=>(int)$target['id'],'clinic'=>$actor->clinicId,'reason'=>$reason,'actor'=>$actor->userId]);
+                $q=$pdo->prepare("UPDATE users SET status='locked' WHERE id=? AND clinic_id=? AND status='active'");$q->execute([(int)$target['id'],$actor->clinicId]);
+                if($q->rowCount()!==1)throw new ApiException(409,'access_state_changed','Practitioner access changed. Refresh and review it again.');
+            }else{
+                if((int)$existing!==1||$target['status']!=='locked')throw new ApiException(409,'access_state_changed','Practitioner access changed. Refresh and review it again.');
+                $q=$pdo->prepare("UPDATE users SET status='active' WHERE id=? AND clinic_id=? AND status='locked'");$q->execute([(int)$target['id'],$actor->clinicId]);
+                if($q->rowCount()!==1)throw new ApiException(409,'access_state_changed','Practitioner access changed. Refresh and review it again.');
+                $q=$pdo->prepare('UPDATE practitioner_emergency_holds SET active=0,released_by=?,released_at=UTC_TIMESTAMP() WHERE user_id=? AND clinic_id=? AND active=1');$q->execute([$actor->userId,(int)$target['id'],$actor->clinicId]);
+            }
+            $this->audit->write($actor->clinicId,$actor,$cid,$hold?'practitioner.access_hold':'practitioner.access_restore','practitioner',$practitionerId,'success',$hold?['reason_code'=>$reason]:[]);
+            return ['practitioner_id'=>$practitionerId,'access_held'=>$hold,'status'=>$hold?'locked':'active'];
+        },['super_admin','clinic_admin','reception'],true);
+    }
+
     public function onboardPractitioner(AuthContext $actor,array $body,string $cid): array
     {return $this->clinicAdministration($actor,fn()=>$this->onboardPractitionerRecord($actor,$body,$cid));}
 
@@ -96,6 +167,7 @@ final class AdminService
         $pdo=$this->database->connection();
 
         $find=$pdo->prepare('SELECT p.user_id FROM practitioners p JOIN users u ON u.id=p.user_id AND u.user_type=\'staff\' WHERE p.id=:practitioner AND u.clinic_id=:clinic FOR UPDATE');$find->execute(['practitioner'=>$practitionerId,'clinic'=>$actor->clinicId]);$userId=$find->fetchColumn();if(!$userId)throw new ApiException(404,'practitioner_not_found','Practitioner not found.');
+        if($status==='active'){$hold=$pdo->prepare('SELECT 1 FROM practitioner_emergency_holds WHERE user_id=? AND clinic_id=? AND active=1');$hold->execute([(int)$userId,$actor->clinicId]);if($hold->fetchColumn())throw new ApiException(409,'access_held','Restore emergency access in its dedicated workflow first.');}
         if($this->globalPractitionersEnabled){
             $global=$pdo->prepare('SELECT a.status,p.discipline,p.credentials FROM global_practitioner_clinics a JOIN practitioners p ON p.id=a.practitioner_id WHERE a.practitioner_id=?');$global->execute([$practitionerId]);$registered=$global->fetch();
             if($registered){
@@ -478,13 +550,18 @@ final class AdminService
         $this->superAdmin($actor);$this->required($body,['display_name','email','status','roles']);
         if($userId===$actor->userId)throw new ApiException(422,'self_role_change','Use another Super Admin to change your own access.');
         $roles=array_values(array_unique($body['roles']));$allowed=['super_admin','clinic_admin','reception','practitioner','accountant'];foreach($roles as $role)if(!in_array($role,$allowed,true))throw new ApiException(422,'validation_error','Invalid role.');
-        $permissions=array_values(array_unique($body['permissions']??[]));$allowedPermissions=['schedule_for_other_practitioners','add_clients','approve_onsite_service_area','manage_client_consent','review_privacy_audit'];foreach($permissions as $permission)if(!in_array($permission,$allowedPermissions,true))throw new ApiException(422,'validation_error','Invalid permission.');
+        $permissions=array_values(array_unique($body['permissions']??[]));$allowedPermissions=['schedule_for_other_practitioners','add_clients','approve_onsite_service_area','manage_client_consent','review_privacy_audit','hold_practitioner_access'];foreach($permissions as $permission)if(!in_array($permission,$allowedPermissions,true))throw new ApiException(422,'validation_error','Invalid permission.');
         if(in_array('review_privacy_audit',$permissions,true)&&!array_intersect($roles,['super_admin','clinic_admin']))throw new ApiException(422,'validation_error','Privacy review requires a clinic administrator role.');
-        if(array_diff($permissions,['manage_client_consent','review_privacy_audit'])!==[]&&!in_array('practitioner',$roles,true))throw new ApiException(422,'validation_error','Additional permissions can only be assigned to a practitioner.');
+        if(in_array('hold_practitioner_access',$permissions,true)&&!in_array('reception',$roles,true))throw new ApiException(422,'validation_error','Emergency hold permission requires a reception role.');
+        if(array_diff($permissions,['manage_client_consent','review_privacy_audit','hold_practitioner_access'])!==[]&&!in_array('practitioner',$roles,true))throw new ApiException(422,'validation_error','Additional permissions can only be assigned to a practitioner.');
         if(!in_array($body['status'],['active','inactive','locked'],true))throw new ApiException(422,'validation_error','Invalid staff status.');
         $pdo=$this->database->connection();
         try{
-            $pdo->beginTransaction();$s=$pdo->prepare("UPDATE users SET display_name=:name,email=:email,status=:status WHERE id=:id AND clinic_id=:clinic AND user_type='staff'");$s->execute(['name'=>trim((string)$body['display_name']),'email'=>strtolower(trim((string)$body['email'])),'status'=>$body['status'],'id'=>$userId,'clinic'=>$actor->clinicId]);
+            $pdo->beginTransaction();
+            $target=$pdo->prepare("SELECT id FROM users WHERE id=? AND clinic_id=? AND user_type='staff' FOR UPDATE");$target->execute([$userId,$actor->clinicId]);
+            if(!$target->fetchColumn())throw new ApiException(404,'staff_not_found','Staff member not found.');
+            if($body['status']==='active'){$hold=$pdo->prepare('SELECT 1 FROM practitioner_emergency_holds WHERE user_id=? AND clinic_id=? AND active=1');$hold->execute([$userId,$actor->clinicId]);if($hold->fetchColumn())throw new ApiException(409,'access_held','Restore emergency access in its dedicated workflow first.');}
+            $s=$pdo->prepare("UPDATE users SET display_name=:name,email=:email,status=:status WHERE id=:id AND clinic_id=:clinic AND user_type='staff'");$s->execute(['name'=>trim((string)$body['display_name']),'email'=>strtolower(trim((string)$body['email'])),'status'=>$body['status'],'id'=>$userId,'clinic'=>$actor->clinicId]);
             $check=$pdo->prepare('SELECT 1 FROM users WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$userId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'staff_not_found','Staff member not found.');
             $pdo->prepare('DELETE FROM user_roles WHERE user_id=:id')->execute(['id'=>$userId]);$insert=$pdo->prepare('INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT :user,id,:actor FROM roles WHERE code=:role');foreach($roles as $role)$insert->execute(['user'=>$userId,'actor'=>$actor->userId,'role'=>$role]);
             $pdo->prepare('DELETE FROM user_permissions WHERE user_id=:id')->execute(['id'=>$userId]);$insertPermission=$pdo->prepare('INSERT INTO user_permissions(user_id,permission_id,assigned_by) SELECT :user,id,:actor FROM permissions WHERE code=:permission');foreach($permissions as $permission){$insertPermission->execute(['user'=>$userId,'actor'=>$actor->userId,'permission'=>$permission]);if($insertPermission->rowCount()!==1)throw new ApiException(503,'permission_unavailable','The requested permission is not installed. Apply the matching database migration first.');}

@@ -1,0 +1,77 @@
+<?php
+declare(strict_types=1);
+// Disposable synthetic SQL, no hosted identities or patient data.
+require __DIR__.'/booking-client-access.php';
+
+use Wellness\Service\ClinicCareRecordService;
+use Wellness\Service\PractitionerPolicyDocumentService;
+use Wellness\Auth\AuthContext;
+use Wellness\Http\ApiException;
+
+$pdo->exec('DROP TABLE practitioner_document_acceptances,practitioner_policy_documents,client_care_assignments,practitioner_emergency_holds');
+$pdo->exec('ALTER TABLE practitioner_client_notes ADD INDEX ix_test_notes_fk(client_id)');
+$pdo->exec('ALTER TABLE practitioner_client_notes DROP INDEX uq_clinic_note_request,DROP INDEX ix_clinic_notes_client,DROP COLUMN idempotency_key,DROP COLUMN visibility');
+$pdo->exec("DELETE FROM permissions WHERE code='hold_practitioner_access'");
+foreach(['062_practitioner_emergency_access.sql','063_clinic_care_notes.sql','064_practitioner_documents.sql'] as $migration)$pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/'.$migration));
+$pdo->exec('ALTER TABLE practitioner_client_notes DROP INDEX ix_test_notes_fk');
+if((int)$pdo->query("SELECT COUNT(*) FROM permissions WHERE code='hold_practitioner_access'")->fetchColumn()!==1)throw new RuntimeException('Emergency permission migration failed');
+
+$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='super_admin';
+    INSERT INTO user_roles(user_id,role_id) SELECT 3,id FROM roles WHERE code='practitioner'");
+$service=new ClinicCareRecordService($database,$audit);
+$documents=new PractitionerPolicyDocumentService($database,$audit);
+$assert=function(bool $ok,string $message)use(&$checks):void{if(!$ok)throw new RuntimeException($message);$checks++;};
+$deny=function(callable $action,int $status)use($assert):void{try{$action();throw new RuntimeException('Expected denial');}catch(ApiException $e){$assert($e->status===$status,'Wrong denial status: '.$e->status);}};
+$practitioner=new AuthContext(2,1,'synthetic-practitioner-2','','','staff',['practitioner']);
+$second=new AuthContext(3,1,'synthetic-practitioner-3','','','staff',['practitioner']);
+$draft=$documents->createDraft($operator,['kind'=>'records_agreement','version_code'=>'synthetic-1','title_en'=>'Synthetic agreement','title_fr'=>'Entente fictive','body_en'=>'Synthetic clinic rules','body_fr'=>'Règles fictives de la clinique'],'draft');
+$deny(fn()=>$service->notes($practitioner,101,[],'unpublished'),503);
+$documents->publish($operator,$draft['id'],['confirmed'=>true,'review_reference'=>'SYNTHETIC-REVIEW-1'],'publish');
+$deny(fn()=>$service->notes($practitioner,101,[],'unsigned'),403);
+$deny(fn()=>$documents->accept($practitioner,$draft['id'],['accepted'=>true,'language'=>'en','content_hash'=>str_repeat('0',64)],'wrong-hash'),409);
+$documents->accept($practitioner,$draft['id'],['accepted'=>true,'language'=>'en','content_hash'=>$draft['content_hash']],'accept-author');
+$documents->accept($second,$draft['id'],['accepted'=>true,'language'=>'fr','content_hash'=>$draft['content_hash']],'accept-second');
+$assert((int)$pdo->query('SELECT COUNT(*) FROM practitioner_document_acceptances')->fetchColumn()===2,'Exact version and identity acceptances retained');
+$servicesDraft=$documents->createDraft($operator,['kind'=>'services_agreement','version_code'=>'synthetic-services-1','title_en'=>'Synthetic services terms','title_fr'=>'Conditions fictives','body_en'=>'Synthetic services only','body_fr'=>'Services fictifs seulement'],'services-draft');
+$documents->publish($operator,$servicesDraft['id'],['confirmed'=>true,'review_reference'=>'SYNTHETIC-SERVICES-REVIEW'],'services-publish');
+$deny(fn()=>$service->notes($practitioner,101,[],'new-terms-unsigned'),403);
+$documents->accept($practitioner,$servicesDraft['id'],['accepted'=>true,'language'=>'en','content_hash'=>$servicesDraft['content_hash']],'accept-services-author');
+$documents->accept($second,$servicesDraft['id'],['accepted'=>true,'language'=>'fr','content_hash'=>$servicesDraft['content_hash']],'accept-services-second');
+$relinked=new AuthContext(2,1,'different-synthetic-identity','','','staff',['practitioner']);
+$deny(fn()=>$service->notes($relinked,101,[],'identity-relinked'),403);
+$deny(fn()=>$documents->accept($relinked,$draft['id'],['accepted'=>true,'language'=>'en','content_hash'=>$draft['content_hash']],'identity-relink-review'),409);
+$deny(fn()=>$service->team($practitioner,101,'no-admin'),403);
+$deny(fn()=>$service->team($operator,105,'foreign-client'),404);
+$deny(fn()=>$service->setAssignment($operator,101,5,['assigned'=>true],'foreign-practitioner'),404);
+$deny(fn()=>$service->notes($practitioner,101,[],'unassigned'),403);
+$service->setAssignment($operator,101,2,['assigned'=>true],'assign-author');
+$assert(count($service->team($operator,101,'team')['items'])>=2,'Clinic admin can inspect local care team');
+$deny(fn()=>$service->setAssignment($operator,101,2,['assigned'=>true],'duplicate'),409);
+$deny(fn()=>$service->addNote($practitioner,101,['note_text'=>''],'empty'),422);
+$privateBody=['note_text'=>'Synthetic private note','idempotency_key'=>'11111111-1111-4111-8111-111111111111'];
+$sharedBody=['note_text'=>'Synthetic care-team note','visibility'=>'care_team','idempotency_key'=>'22222222-2222-4222-8222-222222222222'];
+$private=$service->addNote($practitioner,101,$privateBody,'private');
+$shared=$service->addNote($practitioner,101,$sharedBody,'shared');
+$retry=$service->addNote($practitioner,101,$sharedBody,'retry');
+$assert($retry['id']===$shared['id'],'Same request key does not duplicate note');
+$deny(fn()=>$service->addNote($practitioner,101,['note_text'=>'Changed text','idempotency_key'=>$sharedBody['idempotency_key']],'reused'),409);
+$assert($private['id']!==$shared['id'],'Distinct append-only notes saved');
+$own=$service->notes($practitioner,101,[],'own');
+$assert(count($own['items'])===2,'Author reads both own notes');
+$service->setAssignment($operator,101,3,['assigned'=>true],'assign-second');
+$other=$service->notes($second,101,[],'other');
+$assert(count($other['items'])===1&&(int)$other['items'][0]['id']===$shared['id'],'Other care-team practitioner sees shared note only');
+$deny(fn()=>$service->notes($second,104,[],'unrelated'),403);
+$pdo->exec("INSERT INTO client_consent_directives(clinic_id,client_id,scope,target_staff_id,restricted,version)
+    VALUES(1,101,'staff_access',3,1,1)");
+$deny(fn()=>$service->notes($second,101,[],'restricted'),403);
+$pdo->exec("DELETE FROM client_consent_directives WHERE client_id=101 AND target_staff_id=3");
+$pdo->exec("UPDATE users SET status='locked' WHERE id=3");
+$assert(count(array_filter($service->team($operator,101,'team-locked')['items'],fn($row)=>(int)$row['practitioner_id']===3 && (int)$row['assigned']===1))===1,'Inactive assigned practitioner stays visible for cleanup');
+$service->setAssignment($operator,101,3,['assigned'=>false],'end-second');
+$pdo->exec("UPDATE users SET status='active' WHERE id=3");
+$deny(fn()=>$service->notes($second,101,[],'ended'),403);
+$service->setAssignment($operator,101,2,['assigned'=>false],'end-author');
+$deny(fn()=>$service->notes($practitioner,101,[],'ended-author'),403);
+$assert((int)$pdo->query('SELECT COUNT(*) FROM practitioner_client_notes WHERE client_id=101')->fetchColumn()===2,'Ending care preserves both clinic notes');
+echo "Clinic care records: $checks checks passed; disposable synthetic SQL only.\n";

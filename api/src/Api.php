@@ -259,6 +259,10 @@ final class Api
                 $routes->addRoute('GET','/api/v1/booking-options','bookingOptions');
                 $routes->addRoute('GET','/api/v1/booking-clients','bookingClients');
                 $routes->addRoute('GET','/api/v1/practitioner/clients','practitionerClients');
+                $routes->addRoute('GET','/api/v1/practitioner/clients/{id:\\d+}/notes','careNotes');
+                $routes->addRoute('POST','/api/v1/practitioner/clients/{id:\\d+}/notes','createCareNote');
+                $routes->addRoute('GET','/api/v1/practitioner/documents','practitionerDocuments');
+                $routes->addRoute('POST','/api/v1/practitioner/documents/{id:\\d+}/accept','acceptPractitionerDocument');
                 $routes->addRoute('GET','/api/v1/booking-clients/{id:\\d+}/address','bookingClientAddress');
                 $routes->addRoute('POST','/api/v1/address-coverage/validate','validateAddressCoverage');
                 $routes->addRoute('POST','/api/v1/address-coverage/approval','addressCoverageApproval');
@@ -271,6 +275,8 @@ final class Api
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments','clientAppointments');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/appointments/{appointment:\\d+}/history','clientAppointmentChanges');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/practitioner-access','clientPractitionerAccess');
+                $routes->addRoute('GET','/api/v1/clients/{id:\\d+}/care-team','clientCareTeam');
+                $routes->addRoute('PUT','/api/v1/clients/{id:\\d+}/care-team/{practitioner:\\d+}','setClientCareTeam');
                 $routes->addRoute('POST','/api/v1/clients','createClient');
                 $routes->addRoute('GET','/api/v1/clients/{id:\\d+}','client');
                 $routes->addRoute('PATCH','/api/v1/clients/{id:\\d+}','updateClient');
@@ -298,6 +304,11 @@ final class Api
                 $routes->addRoute('POST','/api/v1/admin/staff-invitations/{id:\\d+}/revoke','revokeStaffInvitation');
                 $routes->addRoute('POST','/api/v1/staff-invitations/claim','claimStaffInvitation');
                 $routes->addRoute('PATCH','/api/v1/admin/staff/{id:\\d+}','updateStaff');
+                $routes->addRoute('GET','/api/v1/admin/practitioner-emergency-access','emergencyPractitioners');
+                $routes->addRoute('POST','/api/v1/admin/practitioners/{id:\\d+}/emergency-access','emergencyPractitionerAccess');
+                $routes->addRoute('GET','/api/v1/admin/practitioner-documents','adminPractitionerDocuments');
+                $routes->addRoute('POST','/api/v1/admin/practitioner-documents','createPractitionerDocument');
+                $routes->addRoute('POST','/api/v1/admin/practitioner-documents/{id:\\d+}/publish','publishPractitionerDocument');
                 $routes->addRoute('GET','/api/v1/admin/team-profiles','teamProfiles');
                 $routes->addRoute('PUT','/api/v1/admin/team-profiles/{id:\\d+}','updateTeamProfile');
                 $routes->addRoute('POST','/api/v1/admin/practitioners','createPractitioner');
@@ -443,6 +454,10 @@ final class Api
                 'bookingOptions'=>$this->bookings->options($this->user($request),$request->query),
                 'bookingClients'=>$this->bookings->bookingClients($this->user($request),$request->query,$request->correlationId),
                 'practitionerClients'=>$this->clients->practitionerList($this->user($request),$request->query),
+                'careNotes'=>(new \Wellness\Service\ClinicCareRecordService($this->database,new AuditLogger($this->database)))->notes($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'createCareNote'=>(new \Wellness\Service\ClinicCareRecordService($this->database,new AuditLogger($this->database)))->addNote($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'practitionerDocuments'=>(new \Wellness\Service\PractitionerPolicyDocumentService($this->database,new AuditLogger($this->database)))->practitionerList($this->user($request)),
+                'acceptPractitionerDocument'=>(new \Wellness\Service\PractitionerPolicyDocumentService($this->database,new AuditLogger($this->database)))->accept($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'formDrafts'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->list($this->user($request),$request->query),
                 'saveFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId),
                 'updateFormDraft'=>(new \Wellness\Service\ClientFormDraftsService($this->database,new AuditLogger($this->database)))->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
@@ -479,6 +494,8 @@ final class Api
                 'clientAppointments'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointments($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
                 'clientAppointmentChanges'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->appointmentChanges($this->user($request),(int)$route[2]['id'],(int)$route[2]['appointment'],$request->query,$request->correlationId),
                 'clientPractitionerAccess'=>(new \Wellness\Service\ClientOverviewService($this->database,new AuditLogger($this->database),$this->config))->practitionerAccess($this->user($request),(int)$route[2]['id'],$request->query,$request->correlationId),
+                'clientCareTeam'=>(new \Wellness\Service\ClinicCareRecordService($this->database,new AuditLogger($this->database)))->team($this->user($request),(int)$route[2]['id'],$request->correlationId),
+                'setClientCareTeam'=>(new \Wellness\Service\ClinicCareRecordService($this->database,new AuditLogger($this->database)))->setAssignment($this->user($request),(int)$route[2]['id'],(int)$route[2]['practitioner'],$request->body,$request->correlationId),
                 'client'=>$this->clients->get($this->user($request),(int)$route[2]['id'],$request->correlationId),
                 'createClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId),
                 'updateClient'=>$this->clients->save($this->user($request),$request->body,$request->correlationId,(int)$route[2]['id']),
@@ -504,6 +521,11 @@ final class Api
                 'createStaff'=>$this->admin->createStaff($this->user($request),$request->body,$request->correlationId),
                 'adminStaff'=>$this->admin->staff($this->user($request)),
                 'updateStaff'=>$this->admin->updateStaff($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'emergencyPractitioners'=>$this->admin->emergencyPractitioners($this->user($request)),
+                'emergencyPractitionerAccess'=>$this->admin->emergencyPractitionerAccess($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
+                'adminPractitionerDocuments'=>(new \Wellness\Service\PractitionerPolicyDocumentService($this->database,new AuditLogger($this->database)))->adminList($this->user($request)),
+                'createPractitionerDocument'=>(new \Wellness\Service\PractitionerPolicyDocumentService($this->database,new AuditLogger($this->database)))->createDraft($this->user($request),$request->body,$request->correlationId),
+                'publishPractitionerDocument'=>(new \Wellness\Service\PractitionerPolicyDocumentService($this->database,new AuditLogger($this->database)))->publish($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'teamProfiles'=>$this->admin->teamProfiles($this->user($request)),
                 'updateTeamProfile'=>$this->admin->updateTeamProfile($this->user($request),(int)$route[2]['id'],$request->body,$request->correlationId),
                 'createPractitioner'=>$this->admin->createPractitioner($this->user($request),$request->body,$request->correlationId),
