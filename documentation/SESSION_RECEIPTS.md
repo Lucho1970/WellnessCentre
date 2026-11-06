@@ -1,5 +1,11 @@
 # Session receipts
 
+## Owner priority — 4 November 2026
+
+The initial release should let a client download a complete, accurate receipt for an actually paid service and submit it to their benefits provider. Direct insurer billing, including manual portal claim tracking and integrated submission, belongs to the post-initial-release [FIN-05 roadmap](MASTER_REQUIREMENTS.md). Do not hold receipt delivery for insurer integration. A receipt is evidence for a claim, not a promise that a particular insurer will accept or reimburse it.
+
+Before enabling real receipt issuance, verify the hosted workflow with the actual clinic and independent-practitioner issuer arrangements, each supported profession's designation/registration and receipt requirements, tax treatment, completed-service/payment evidence, bilingual PDF, client-only download, mobile print/save, void/reissue and historical snapshots. The current first slice is default off and records only full manual payments; generic email delivery notices, partial payments and hosted profession/insurer acceptance remain open. Record those results and owner/privacy/finance approval rather than treating the local tests below as release acceptance.
+
 ## First workflow
 
 The clinic maintains the receipt template and business/issuer details. Each practitioner has reusable professional name, designation, registration number where applicable, and optional logo for each clinic/service combination. A practitioner working in different disciplines can therefore use the appropriate details for each service without exposing or automatically importing their private global credential library.
