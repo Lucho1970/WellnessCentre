@@ -36,7 +36,9 @@ Read-only hosted checks on 5 November returned HTTP 200, no-store HTML and five-
 
 The owner explicitly approved the corrected ZIP and destination after reviewing the failed first attempt. Before the second transfer, the agent checked that the live index on Wellnexa matched the saved rollback file byte-for-byte and that the corrected ZIP checksum matched its manifest. Using the owner's open Beyond Compare session, the agent copied the corrected `assets/` folder first, without mirror deletion. HTTP HEAD checks then passed for all 68 asset paths at Wellnexa; `index-kq95j7Df.js` returned HTTP 200 and JavaScript content type on both clinic hosts. Only then did the agent copy `index.html`.
 
-Both hosts then served the new index with HTTP 200, `Cache-Control: no-store, must-revalidate, no-cache, max-age=0` and `Strict-Transport-Security: max-age=300`. In clean, unauthenticated Edge sessions, Wellnexa `/staff/external` and Livin Lively `/staff/external` displayed separate Practitioner sign-in with both Google and personal Microsoft buttons. Both `/staff/login` pages displayed the organization Staff portal without those personal-provider buttons. Wellnexa `/staff/apply` showed the application entry; both `/client` pages loaded. Seven checked pages had zero JavaScript page errors. French Wellnexa practitioner entry rendered `Connexion des praticiens` at 390-pixel width without horizontal overflow. Wellnexa's Privacy statement link resolved to `https://wellnexa.ca/privacy?lang=en` with HTTP 200. These are shell and unauthenticated workflow checks; an authenticated callback and actual authorization response remain pending.
+Both hosts then served the new index with HTTP 200, `Cache-Control: no-store, must-revalidate, no-cache, max-age=0` and `Strict-Transport-Security: max-age=300`. The live index on each host matched the corrected narrow ZIP's `index.html` exactly. In clean, unauthenticated Edge sessions, Wellnexa `/staff/external` and Livin Lively `/staff/external` displayed separate Practitioner sign-in with both Google and personal Microsoft buttons. Both `/staff/login` pages displayed the organization Staff portal without those personal-provider buttons. Wellnexa `/staff/apply` showed the application entry; both `/client` pages loaded. Seven checked pages had zero JavaScript page errors. French Wellnexa practitioner entry rendered `Connexion des praticiens` at 390-pixel width without horizontal overflow. Wellnexa's Privacy statement link resolved to `https://wellnexa.ca/privacy?lang=en` with HTTP 200.
+
+After deployment, the owner used a fresh/private browser session to choose **Continue with personal Microsoft account**, completed the password/MFA steps for the retained synthetic Hotmail practitioner identity, and reported **“Pilot denial shown as expected.”** This is owner-reported hosted evidence that the personal Microsoft callback returned to Wellnexa and the intentionally revoked pilot account remained blocked. The agent did not inspect credentials, the resulting private browser tab, API logs or the final server response; this report does not prove the wider role/clinic matrix, dashboard activation or workforce callback. The account remains intended to be Inactive and pilot-revoked; no role or approval was changed for this check.
 
 No `.htaccess`, `api/`, PHP, private settings, roles, pilot approvals or patient data were changed. The earlier rollback copy remains available. Do not delete old hashed assets while this release is being assessed.
 
@@ -62,8 +64,8 @@ Status is for this packaging slice only. Reviewer: Codex, 2026-11-05. Unverified
 | PRIV-05 | Unverified | Access/correction process unaffected. |
 | PRIV-06 | Unverified | Retention unaffected. |
 | PRIV-07 | Unverified | Breach process unaffected. |
-| AUTH-01 | Partial | Distinct identity routes render live; hosted authenticated callback after upload pending. |
-| AUTH-02 | Partial | Inactive/pilot-revoked test account denied live; full clinic/record matrix pending. |
+| AUTH-01 | Partial | Distinct identity routes render live; owner reports successful personal Microsoft callback and expected denial. Workforce/Google hosted callback not repeated in this release. |
+| AUTH-02 | Partial | Owner reports the Inactive/pilot-revoked test account denied after hosted sign-in; full clinic/record matrix pending. |
 | AUTH-03 | Partial | Duplicate sign-in guard tested locally; complete session policy pending. |
 | AUTH-04 | Unverified | No session architecture change; existing storage gate remains. |
 | AUTH-05 | Unverified | No permission grant change; deployed grant inventory pending. |
@@ -84,7 +86,7 @@ Status is for this packaging slice only. Reviewer: Codex, 2026-11-05. Unverified
 | DEV-06 | Partial | Existing bundle warnings remain; representative-volume review pending. |
 | REL-01 | Partial | This ledger records all 38 controls; owner decisions pending. |
 | REL-02 | Partial | Both builds/browser suites and artifact verifier pass; full baseline gate not repeated. |
-| REL-03 | Partial | First hosted artifact failed and was rolled back; corrected artifact passes local verifier and hosted shell checks, authenticated acceptance pending. |
+| REL-03 | Partial | First hosted artifact failed and was rolled back; corrected artifact passes local verifier and hosted shell checks, with owner-reported personal Microsoft pilot denial. Wider authenticated acceptance pending. |
 | REL-04 | Missing | Real-data release remains blocked by open gates. |
 | REL-05 | Partial | Both exact-artifact approvals recorded; first upload rolled back, second transferred and smoke-tested; formal owner sign-offs pending. |
 | REL-06 | Partial | Task report must include scope, checks, warning and rollback. |
