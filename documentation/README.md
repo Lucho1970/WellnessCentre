@@ -13,6 +13,8 @@
 - [HTTPS enforcement — 5 November 2026](HTTPS_ENFORCEMENT_2026-11-05.md): Netfirms host-specific 302 staging, HTTP API denial, backup/verification/rollback and control ledger.
 
 - [Wellnexa privacy statement — 4 November 2026](WELLNEXA_PRIVACY_STATEMENT_2026-11-04.md): bilingual public statement, custody/contact wording, site and portal links, validation, controlled upload and 38-control ledger.
+- [Jane public feature inventory — 4 November 2026](JANE_FEATURE_INVENTORY_2026-11-04.md): source-linked Jane capabilities, including Canadian insurance and plan/add-on distinctions.
+- [Jane / Copihue feature comparison — 4 November 2026](JANE_FEATURE_COMPARISON_2026-11-04.md): local evidence, gaps and review priorities; no roadmap commitment or hosted acceptance implied.
 
 - [Main integration checkpoint — 3 November 2026](MAIN_INTEGRATION_2026-11-03.md): local build, browser, PHP and disposable SQL results for the reviewed source merge; remaining release gates and branch scope.
 
