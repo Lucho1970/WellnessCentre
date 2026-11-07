@@ -340,6 +340,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
   const [newClient, setNewClient] = useState({ given_name: '', family_name: '', email: '', phone: '', date_of_birth: '' });
   const [newClientBusy, setNewClientBusy] = useState(false);
   const [newClientError, setNewClientError] = useState('');
+  const [newClientPendingAssignment, setNewClientPendingAssignment] = useState('');
   const [duplicateClients, setDuplicateClients] = useState<Client[]>([]);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
   const [invitationBusy, setInvitationBusy] = useState(false);
@@ -450,7 +451,9 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
     event.preventDefault(); setNewClientBusy(true); formValidation.clear(); setNewClientError(''); setDuplicateClients([]);
     try {
       const created: Client = await request('/clients', { method: 'POST', body: JSON.stringify({ ...newClient, preferred_contact: 'email', status: 'active' }) });
-      setClient(created); setCreatedClientId(Number(created.id)); setAddingClient(false); setClientQuery(''); setClientBirthdate(''); setClients([]);
+      if (practitionerMode) { setClient(null); setCreatedClientId(null); setNewClientPendingAssignment(created.display_name); }
+      else { setClient(created); setCreatedClientId(Number(created.id)); setNewClientPendingAssignment(''); }
+      setAddingClient(false); setClientQuery(''); setClientBirthdate(''); setClients([]);
       setInvitationStatus(''); setInvitationLink('');
     } catch (cause) { formValidation.capture(cause);
       if (cause instanceof RequestError && cause.code === 'possible_duplicate' && Array.isArray(cause.fields.candidates)) setDuplicateClients(cause.fields.candidates as Client[]);
@@ -540,6 +543,7 @@ function BookingFormValidated({ request, practitionerMode, canScheduleOthers, ca
           {clientMore && <Alert severity="info">{t('Showing the first 25 matches. Continue typing to narrow the results.')}</Alert>}
         </Stack>}
         {!client && canAddClients && <Box>
+          {newClientPendingAssignment && <Alert severity="success" sx={{ mb: 2 }}>{t('New client {{name}} was saved. A clinic administrator must assign you to this client’s care team before you can book or send a portal invitation.', { name: newClientPendingAssignment })}</Alert>}
           <Button variant="outlined" onClick={() => { setAddingClient(value => !value); formValidation.clear(); setNewClientError(''); setDuplicateClients([]); }}>{t(addingClient ? 'Cancel new client' : 'Add new client')}</Button>
           {addingClient && <Stack component="form" onSubmit={event => void createClient(event)} spacing={2} sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Alert severity="info">{t('Search for an existing client before creating a record. Saving a record does not link a sign-in account.')}</Alert>

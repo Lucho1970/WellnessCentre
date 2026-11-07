@@ -12,7 +12,7 @@ export type OverviewTab = 'appointments' | 'access' | 'forms';
 type Client = { id: number; display_name: string; status: string };
 type Appointment = { id: number; starts_at: string; ends_at: string; created_at: string; status: string; delivery_mode: string; service_name: string; service_name_fr: string | null; practitioner_name: string; location_name: string; timezone: string; room_name: string | null; base_price_cents: number | null; mobile_fee_cents: number; cancellation_fee_cents: number | null; currency: string; source: string };
 type History = { client: Client; items: Appointment[]; page: number; has_more: boolean; counts: { total: number; upcoming: number; past: number; canceled: number } };
-type Access = { practitioner_id: number; user_id: number; display_name: string; discipline: string; account_status: string; practitioner_active: boolean; membership_required: boolean; membership_status: string | null; identity_status: string | null; appointment_count: number; created_client: boolean; first_appointment_at: string | null; last_appointment_at: string | null; booking_mode: string; roles: string[]; permissions: string[]; configured_access: { staff_configuration_active: boolean; client_directory: boolean; booking_contact: boolean; client_administration: boolean; appointments: string; appointment_changes: string; logistics_notes: string } };
+type Access = { practitioner_id: number; user_id: number; display_name: string; discipline: string; account_status: string; practitioner_active: boolean; membership_required: boolean; membership_status: string | null; identity_status: string | null; appointment_count: number; created_client: boolean; care_assigned: boolean; first_appointment_at: string | null; last_appointment_at: string | null; booking_mode: string; roles: string[]; permissions: string[]; configured_access: { staff_configuration_active: boolean; client_directory: boolean; booking_contact: boolean; client_administration: boolean; appointments: string; appointment_changes: string; logistics_notes: string } };
 type AccessList = { client: Client; items: Access[]; page: number; has_more: boolean };
 type Request = (path: string, init?: RequestInit) => Promise<unknown>;
 
@@ -79,7 +79,7 @@ function ClientOverviewForm({ clientId, initialTab, request, back, onLockedChang
       </Stack></Paper>)}
     </>}
     {!busy && !error && tab === 'access' && access && <>
-      <Typography variant="body2">{t('All clinic practitioner profiles are shown, including inactive accounts and profiles without a relationship. Appointment relationships include cancelled appointments.')}</Typography>
+      <Typography variant="body2">{t('Past appointments and client creation are shown for review. Only a current care-team assignment grants practitioner access to this client’s directory and booking contact details.')}</Typography>
       {!access.items.length && <Typography>{t('No practitioner profiles in this clinic.')}</Typography>}
       {access.items.map(practitioner => <Paper key={practitioner.practitioner_id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}>
         <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center"><Typography fontWeight={750}>{practitioner.display_name}</Typography><Chip size="small" label={t(practitioner.account_status === 'active' ? 'Active account' : 'Account access blocked')} color={practitioner.account_status === 'active' ? 'success' : 'default'}/></Stack>
@@ -87,6 +87,7 @@ function ClientOverviewForm({ clientId, initialTab, request, back, onLockedChang
         {practitioner.membership_required && !practitioner.configured_access.staff_configuration_active && practitioner.account_status === 'active' && <Alert severity="warning">{t('The required staff identity or membership is inactive or missing. Membership access is blocked.')}</Alert>}
         {!practitioner.practitioner_active && <Alert severity="warning">{t('The practitioner profile is inactive. Deactivate the staff account to block its configured staff access.')}</Alert>}
         <Typography>{t('Appointments with this client: {{count}}', { count: practitioner.appointment_count })}</Typography>
+        <Typography>{t('Current care team')}: {t(practitioner.care_assigned ? 'Assigned' : 'Not assigned')}</Typography>
         {practitioner.created_client && <Typography>{t('This practitioner created the client record.')}</Typography>}
         {!practitioner.appointment_count && !practitioner.created_client && <Typography color="text.secondary">{t('No appointment or client-creation relationship.')}</Typography>}
         {practitioner.first_appointment_at && <Typography variant="body2">{t('First scheduled appointment (UTC)')}: {time(practitioner.first_appointment_at, 'UTC')}</Typography>}

@@ -49,7 +49,8 @@ try {
         [$status,$data,,$raw]=$call($path,$practitionerToken);
         $expect($status===200&&!str_contains($raw,'Synthetic Appointment')&&!in_array(101,array_map('intval',array_column($data['data']['items']??$data['data'],'client_id')),true),'Search/calendar excludes restricted patient before pagination: '.$path.' status '.$status);
     }
-    [$status]=$call('/api/v1/booking-clients/104/address',$practitionerToken);$expect($status===200,'Unrestricted client access still works');
+    [$status]=$call('/api/v1/booking-clients/102/address',$practitionerToken);$expect($status===200,'Unrestricted assigned client access still works');
+    [$status]=$call('/api/v1/booking-clients/104/address',$practitionerToken);$expect($status===404,'Unassigned client remains hidden without a restriction');
     [$status]=$call('/api/v1/booking-clients/101/address',$adminToken);$expect($status===200,'Named restriction does not block other authorized staff');
     foreach(['/api/v1/admin/reminder-schedules','/api/v1/admin/dashboard-widgets'] as $path){[$status]=$call($path,$practitionerToken);$expect($status===403,'Unfiltered aggregate/list route fails closed');}
     [$status]=$call('/api/v1/appointments',$practitionerToken,'POST',['client_id'=>101,'practitioner_id'=>2]);$expect($status===403,'Restriction checked before booking side effects');

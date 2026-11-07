@@ -207,10 +207,13 @@ final class CustomerOnboarding
     }
     private function staffClient(AuthContext $actor, int $client, bool $allowCreator = false): void {
         if ($allowCreator && $actor->userType === 'staff' && !$actor->hasAnyRole('super_admin','clinic_admin','reception') && $actor->hasAnyRole('practitioner') && $actor->hasPermission('add_clients')) {
-            if (!$this->query("SELECT 1 FROM audit_logs WHERE clinic_id=? AND actor_user_id=? AND action='client.create' AND entity_type='client' AND entity_id=? LIMIT 1", [$actor->clinicId, $actor->userId, $client])->fetchColumn())
-                throw new ApiException(403, 'forbidden', 'You can invite only clients you created.');
+            if (!$this->query("SELECT 1 FROM practitioners p JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=? AND staff.status='active'
+                JOIN client_care_assignments care ON care.clinic_id=staff.clinic_id AND care.practitioner_id=p.id AND care.client_id=? AND care.active=1
+                WHERE p.user_id=? AND p.active=1 LIMIT 1", [$actor->clinicId, $client, $actor->userId])->fetchColumn())
+                throw new ApiException(403, 'forbidden', 'A current care assignment is required to invite this client.');
         } else ClientService::authorize($actor);
         $this->clinic();
+        (new ConsentAccess($this->db))->assertClient($actor,$client);
         if ($actor->clinicId !== $this->clinicId || !$this->query("SELECT id FROM users WHERE id=? AND clinic_id=? AND user_type='client'", [$client, $actor->clinicId])->fetchColumn()) throw new ApiException(404, 'client_not_found', 'Client not found.');
     }
     public function invitations(AuthContext $actor, int $client): array {

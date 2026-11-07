@@ -36,7 +36,7 @@ final class ClientFormsService
         if(!$row||($actor->userType==='client'&&$actor->userId!==$id))throw new ApiException(404,'client_not_found','Client not found.');
         if(!$this->operator($actor)&&$actor->userType!=='client'){
             $p=$this->ownPractitioner($actor);if(!$p)throw new ApiException(403,'forbidden','Practitioner access is required.');
-            $s=$this->database->connection()->prepare("SELECT 1 FROM DUAL WHERE EXISTS(SELECT 1 FROM appointments WHERE clinic_id=? AND client_id=? AND practitioner_id=?) OR EXISTS(SELECT 1 FROM audit_logs WHERE clinic_id=? AND actor_user_id=? AND action='client.create' AND entity_type='client' AND entity_id=? AND outcome='success') OR EXISTS(SELECT 1 FROM client_form_tasks WHERE clinic_id=? AND client_id=? AND practitioner_id=? AND status<>'revoked')");$s->execute([$actor->clinicId,$id,$p,$actor->clinicId,$actor->userId,$id,$actor->clinicId,$id,$p]);
+            $s=$this->database->connection()->prepare('SELECT 1 FROM client_care_assignments WHERE clinic_id=? AND client_id=? AND practitioner_id=? AND active=1');$s->execute([$actor->clinicId,$id,$p]);
             if(!$s->fetchColumn())throw new ApiException(404,'client_not_found','Client not found.');
         }
         return $row;

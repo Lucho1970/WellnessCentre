@@ -12,7 +12,10 @@ $pdo->exec("DELETE up FROM user_permissions up JOIN permissions p ON p.id=up.per
     UPDATE practitioners SET booking_mode='practitioner_managed',active=1 WHERE id IN(2,3);
     UPDATE locations SET address_line1='1 Synthetic Base',city='Toronto',province='ON',postal_code='M5V 1A1' WHERE id=1;
     UPDATE practitioner_services SET offers_mobile=1,mobile_radius_km=50,mobile_free_radius_km=NULL,mobile_fee_cents=1500 WHERE service_id=1 AND practitioner_id IN(2,3);
-    DELETE FROM onsite_area_approvals;");
+    DELETE FROM onsite_area_approvals;
+    INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at)
+        VALUES(1,104,2,1,1,UTC_TIMESTAMP())
+        ON DUPLICATE KEY UPDATE active=1,ended_by=NULL,ended_at=NULL;");
 $destination=['address_line1'=>'2 Synthetic Visit','address_line2'=>'','city'=>'Toronto','province'=>'ON','postal_code'=>'M5V 1A1','country'=>'Canada','instructions'=>'PRIVATE-VISIT-INSTRUCTIONS'];
 $base=['client_id'=>104,'location_id'=>1,'service_id'=>1,'practitioner_id'=>2,'destination'=>$destination];
 $log=dirname(__DIR__,3).'/.tmp/consent-coverage-provider.jsonl';file_put_contents($log,'');
@@ -41,6 +44,9 @@ try{
     [$status,$data]=$coverageCall('approve',$approvedBody);$expect($status===200&&$data['data']['approved']===true,'Permitted practitioner with approval capability can persist approval');
     [$status,$data]=$coverageCall('approval',$base);$expect($status===200&&$data['data']['approved']===true,'Authorized status lookup returns the saved approval');
     $expect($calls()===3,'Approval and status use the existing proof and make no further provider requests');
+    $pdo->exec('UPDATE client_care_assignments SET active=0 WHERE clinic_id=1 AND client_id=104 AND practitioner_id=2');
+    foreach(['validate','approval','approve','revoke'] as $action)$blocked($action,$approvedBody);
+    $pdo->exec('UPDATE client_care_assignments SET active=1 WHERE clinic_id=1 AND client_id=104 AND practitioner_id=2');
     foreach([101,9001,105,106,107,999999] as $client)foreach(['validate','approval','approve','revoke'] as $action)$blocked($action,array_replace($approvedBody,['client_id'=>$client]));
     // Ordinary scope and target practitioner management remain separate requirements.
     foreach(['validate','approval','approve','revoke'] as $action)$blocked($action,array_replace($approvedBody,['practitioner_id'=>3]),403);

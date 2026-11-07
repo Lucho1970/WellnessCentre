@@ -165,7 +165,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
         {allowedNavigation.map((item) => (
           <ListItemButton component={Link} to={pagePath(workspace, item.id)} aria-current={page === item.id ? 'page' : undefined} key={item.id} selected={page === item.id} sx={{ borderRadius: 2, mb: 0.75, alignItems: "flex-start" }}>
             <ListItemIcon sx={{ minWidth: 40, mt: 0.4, color: page === item.id ? "primary.main" : "text.secondary" }}>{item.icon}</ListItemIcon>
-            <ListItemText primary={t(workspace === 'practitioner' && item.id === 'clients' ? 'My clients' : item.label)} secondary={t(workspace === 'practitioner' && item.id === 'clients' ? 'Clients linked to your appointments' : item.description)} primaryTypographyProps={{ fontWeight: page === item.id ? 750 : 600 }} />
+            <ListItemText primary={t(workspace === 'practitioner' && item.id === 'clients' ? 'My clients' : item.label)} secondary={t(workspace === 'practitioner' && item.id === 'clients' ? 'Clients currently assigned to your care' : item.description)} primaryTypographyProps={{ fontWeight: page === item.id ? 750 : 600 }} />
           </ListItemButton>
         ))}
       </List>
@@ -182,7 +182,7 @@ export function StaffPortal({ roles, permissions = [] }: { roles: string[]; perm
           {!desktop && <IconButton aria-label={t('Open portal menu')} onClick={() => setDrawerOpen(true)} sx={{ border: "1px solid", borderColor: "divider" }}><Menu /></IconButton>}
           <Box>
             <Typography variant="h4" component="h1">{t(workspace === 'practitioner' && page === 'clients' ? 'My clients' : current.label)}</Typography>
-            <Typography color="text.secondary">{t(workspace === 'practitioner' && page === 'clients' ? 'Clients linked to your appointments' : current.description)}</Typography>
+            <Typography color="text.secondary">{t(workspace === 'practitioner' && page === 'clients' ? 'Clients currently assigned to your care' : current.description)}</Typography>
           </Box>
         </Stack>
         <Suspense fallback={<Typography role="status">{t('Loading workspace…')}</Typography>}>

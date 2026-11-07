@@ -7,7 +7,7 @@ use Wellness\Auth\AuthContext;
 use Wellness\Config;
 use Wellness\Database;
 use Wellness\Http\ApiException;
-use Wellness\Service\{AddressCoverageService,AuditLogger,BookingService,ClientOverviewService,RecurringBookingService};
+use Wellness\Service\{AddressCoverageService,AuditLogger,BookingService,ClientOverviewService,ClientService,CustomerOnboarding,RecurringBookingService};
 
 if(getenv('RECURRING_TEST_ALLOW_CREATE')!=='true')throw new RuntimeException('Explicit disposable database setup is required.');
 $port=(int)(getenv('RECURRING_TEST_PORT')?:13317);
@@ -35,13 +35,13 @@ $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Synthetic A'),(2,'Synthetic B
 $clientInsert=$pdo->prepare("INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(?,?,?,?,'client',?)");
 $profileInsert=$pdo->prepare("INSERT INTO client_profiles(user_id,phone,date_of_birth) VALUES(?,?,'1990-01-01')");
 $addressInsert=$pdo->prepare('INSERT INTO client_contact_addresses(client_id,address_json) VALUES(?,?)');
-foreach([101=>'Appointment',102=>'Created',103=>'Form',104=>'Unrelated',105=>'Foreign',106=>'Inactive',107=>'Merged',108=>'Revoked form',109=>'No address'] as $id=>$label){
+foreach([101=>'Appointment',102=>'Created',103=>'Form',104=>'Unrelated',105=>'Foreign',106=>'Inactive',107=>'Merged',108=>'Revoked form',109=>'No address',110=>'Historical only'] as $id=>$label){
     $clientInsert->execute([$id,$id===105?2:1,"client$id@example.test","Synthetic $label",$id===106?'inactive':'active']);
     $profileInsert->execute([$id,'+1416555'.str_pad((string)$id,4,'0',STR_PAD_LEFT)]);
     if($id!==109)$addressInsert->execute([$id,json_encode(['address_line1'=>"$id Synthetic Street",'address_line2'=>'','city'=>'Toronto','province'=>'ON','postal_code'=>'M5V 1A1','country'=>'Canada'],JSON_THROW_ON_ERROR)]);
 }
 $appointmentInsert=$pdo->prepare("INSERT INTO appointments(clinic_id,location_id,client_id,practitioner_id,service_id,starts_at,ends_at,buffer_starts_at,buffer_ends_at,status,source,created_by) VALUES(1,1,?,?,1,'2026-01-01 10:00:00','2026-01-01 11:00:00','2026-01-01 10:00:00','2026-01-01 11:00:00','completed','admin',1)");
-foreach([[101,2],[104,3],[106,2],[107,2],[109,2]] as $row)$appointmentInsert->execute($row);
+foreach([[101,2],[104,3],[106,2],[107,2],[109,2],[110,2]] as $row)$appointmentInsert->execute($row);
 $config=new Config('test',false,'test',[],'127.0.0.1',$port,$name,'','','workforce','api','scope',300);
 $database=new Database($config);$audit=new AuditLogger($database);
 (new ReflectionProperty(Database::class,'connection'))->setValue($database,$pdo);
@@ -51,10 +51,15 @@ $audit->write(1,$practitioner,'synthetic-created','client.create','client',102);
 $pdo->exec("INSERT INTO form_templates(id,clinic_id,owner_practitioner_id,name,form_type,definition) VALUES(1,1,2,'Synthetic form','intake','{}');
     INSERT INTO user_roles(user_id,role_id) SELECT 2,id FROM roles WHERE code='practitioner';
     INSERT INTO client_form_tasks(clinic_id,client_id,practitioner_id,form_template_id,assigned_by,status) VALUES(1,103,2,1,1,'pending'),(1,108,2,1,1,'revoked');
+    INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES
+      (1,101,2,1,1,UTC_TIMESTAMP()),(1,102,2,1,1,UTC_TIMESTAMP()),(1,103,2,1,1,UTC_TIMESTAMP()),(1,109,2,1,1,UTC_TIMESTAMP());
     INSERT INTO client_merge_records(clinic_id,survivor_client_id,duplicate_client_id,merged_by,reason,primary_email_source,profile_source,address_source,relationship_counts)
     VALUES(1,101,107,1,'Synthetic merge','survivor','survivor','survivor','{}');");
 $_ENV['CLIENT_FORMS_ENABLED']='true';
 $bookings=new BookingService($database,$audit,new AddressCoverageService($database,$config));
+$directory=new ClientService($database,$audit);
+$onboardingConfig=new Config('test',false,'test',[],'127.0.0.1',$port,$name,'','','workforce','api','scope',300,customerOnboardingEnabled:true,customerClinicId:1);
+$onboarding=new CustomerOnboarding($pdo,$onboardingConfig);
 $series=new RecurringBookingService($database,$bookings);$checks=0;
 $overview=new ClientOverviewService($database,$audit,$config);
 $check=function(bool $ok,string $why)use(&$checks){if(!$ok)throw new RuntimeException($why);$checks++;};
@@ -62,7 +67,7 @@ $deny=function(callable $action,int $status,string $code)use($check){try{$action
 $ids=function(AuthContext $who,array $query=['q'=>'Synthetic'])use($bookings):array{
     $ids=array_map('intval',array_column($bookings->bookingClients($who,$query,'synthetic-search')['items'],'id'));sort($ids);return $ids;
 };
-$own=[101,102,103,109];$all=[101,102,103,104,108,109];
+$own=[101,102,103,109];$all=[101,102,103,104,108,109,110];
 $overviewContact=function(int $id)use($overview,$operator):bool{
     foreach($overview->practitionerAccess($operator,$id,[],'synthetic-overview')['items'] as $row)if((int)$row['user_id']===2)return $row['configured_access']['booking_contact'];
     throw new RuntimeException('Missing synthetic practitioner');
@@ -73,13 +78,18 @@ foreach([[],['scope'=>'clinic'],['scope'=>'practitioner'],['practitioner_id'=>3]
 }
 $check($ids($practitioner,['date_of_birth'=>'1990-01-01'])===$own,'DOB-only searches retain scope');
 $check($ids($practitioner,['q'=>'Unrelated'])===[],'Other practitioner contacts are hidden');
+$check($ids($practitioner,['q'=>'Historical only'])===[],'Past appointment alone does not grant contact access');
+$check(array_map('intval',array_column($directory->practitionerList($practitioner,[])['items'],'id'))===$own,'Practitioner directory requires active care assignments');
+$inviter=$actor(2,['practitioner'],['add_clients']);
+$check($onboarding->invitations($inviter,101)['items']===[],'Current care assignment permits practitioner invitation review');
+$deny(fn()=>$onboarding->invitations($inviter,110),403,'forbidden');
 $check($ids($practitioner,['q'=>"%' OR 1=1 --"])===[],'Search text cannot change SQL scope');
 foreach([101,102,103] as $id){
     $check($bookings->bookingClientAddress($practitioner,$id,'synthetic-address')['address']['address_line1']==="$id Synthetic Street",'Related address available');
     $bookings->assertBookingClientAccess($practitioner,$id);$checks++;
 }
 $check($bookings->bookingClientAddress($practitioner,109,'synthetic-address')===['address'=>null],'Authorized client without address stays distinguishable from no access');
-foreach([104,105,106,107,108,99999] as $id){
+foreach([104,105,106,107,108,110,99999] as $id){
     $deny(fn()=>$bookings->bookingClientAddress($practitioner,$id,'synthetic-denied'),404,'client_not_found');
     $deny(fn()=>$bookings->assertBookingClientAccess($practitioner,$id),422,'invalid_client');
 }
@@ -89,8 +99,8 @@ foreach([['super_admin'],['clinic_admin'],['reception'],['reception','practition
     $deny(fn()=>$bookings->bookingClientAddress($who,105,'synthetic-foreign'),404,'client_not_found');
 }
 $delegated=$actor(2,['practitioner'],['schedule_for_other_practitioners']);
-$check($ids($delegated)===$all,'Explicit delegation permits clinic contact lookup');
-$check($bookings->bookingClientAddress($delegated,104,'synthetic-delegated')['address']!==null,'Explicit delegation permits saved address lookup');
+$check($ids($delegated)===$own,'Scheduling delegation does not grant unrelated contact lookup');
+$deny(fn()=>$bookings->bookingClientAddress($delegated,104,'synthetic-delegated'),404,'client_not_found');
 $deny(fn()=>$bookings->bookingClientAddress($delegated,105,'synthetic-foreign'),404,'client_not_found');
 // Permission revocation takes effect with the next server-derived AuthContext.
 $check($ids($practitioner)===$own,'No fallback to delegated scope after permission removal');
@@ -103,13 +113,18 @@ foreach([$actor(1,['accountant'],['schedule_for_other_practitioners']),$actor(10
     $deny(fn()=>$bookings->bookingClientAddress($who,101,'synthetic-denied'),403,'forbidden');
 }
 $_ENV['CLIENT_FORMS_ENABLED']='false';
-$check($ids($practitioner)===[101,102,109],'Disabled forms cannot grant access');
-$check(!$overviewContact(103),'Access summary respects disabled forms');
-$deny(fn()=>$bookings->bookingClientAddress($practitioner,103,'synthetic-disabled'),404,'client_not_found');
+$check($ids($practitioner)===$own,'Forms feature toggle does not change explicit care assignment');
+$check($overviewContact(103),'Access summary uses care assignment, not form availability');
+$check($bookings->bookingClientAddress($practitioner,103,'synthetic-forms-off')['address']!==null,'Care assignment remains active when forms are disabled');
 $_ENV['CLIENT_FORMS_ENABLED']='true';
 $pdo->exec("UPDATE client_form_tasks SET status='revoked' WHERE client_id=103");
-$check(!$overviewContact(103),'Access summary respects revoked form relationships');
+$check($overviewContact(103),'Revoked form does not end care assignment');
+$pdo->exec('UPDATE client_care_assignments SET active=0 WHERE client_id=103');
+$check(!$overviewContact(103),'Ending care assignment removes contact access immediately');
+$check(!in_array(103,array_map('intval',array_column($directory->practitionerList($practitioner,[])['items'],'id')),true),'Ending care assignment removes directory access');
+$deny(fn()=>$onboarding->invitations($inviter,103),403,'forbidden');
 $deny(fn()=>$bookings->bookingClientAddress($practitioner,103,'synthetic-revoked'),404,'client_not_found');
+$pdo->exec('UPDATE client_care_assignments SET active=1 WHERE client_id=103');
 $pdo->exec("UPDATE client_form_tasks SET status='pending' WHERE client_id=103");
 // Direct writes must not manufacture an appointment relationship for a guessed client ID.
 $body=['client_id'=>104,'delivery_mode'=>'clinic','location_id'=>1,'practitioner_id'=>2,'service_id'=>1,'duration_option_id'=>1,'starts_at'=>'2027-01-20T10:00:00-05:00','idempotency_key'=>'synthetic-unauthorized-booking'];
@@ -130,7 +145,7 @@ $pdo->exec("UPDATE practitioners SET booking_mode='practitioner_managed' WHERE i
     INSERT INTO service_locations(service_id,location_id) VALUES(1,1);");
 for($day=1;$day<=7;$day++)$pdo->prepare("INSERT INTO availability_rules(practitioner_id,location_id,weekday,start_time,end_time,valid_from) VALUES(2,1,?,'09:00:00','18:00:00','2020-01-01')")->execute([$day]);
 $start=(new DateTimeImmutable('now',new DateTimeZone('America/Toronto')))->modify('+14 days')->setTime(10,0);
-foreach([[$practitioner,101],[$delegated,104],[$operator,104]] as $index=>[$who,$clientId]){
+foreach([[$practitioner,101],[$delegated,102],[$operator,104]] as $index=>[$who,$clientId]){
     $request=array_replace($body,['client_id'=>$clientId,'starts_at'=>$start->modify("+$index days")->format('Y-m-d\TH:i:sP'),'idempotency_key'=>'synthetic-allowed-'.$index]);
     $saved=$bookings->create($who,$request,'synthetic-allowed');
     $check((int)$saved['client_id']===$clientId,'Authorized writer retains booking behavior');

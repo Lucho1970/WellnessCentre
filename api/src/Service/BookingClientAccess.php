@@ -19,15 +19,9 @@ final class BookingClientAccess
             return " AND $activeActor AND $notMerged";
         }
         $params['booking_practitioner_user'] = $actor->userId;
-        $relationship = '';
-        if (!$actor->hasPermission('schedule_for_other_practitioners')) {
-            $relationship = " AND (EXISTS(SELECT 1 FROM appointments relationship WHERE relationship.clinic_id=u.clinic_id AND relationship.client_id=u.id AND relationship.practitioner_id=booking_practitioner.id)
-                OR EXISTS(SELECT 1 FROM audit_logs created WHERE created.clinic_id=u.clinic_id AND created.actor_user_id=booking_practitioner.user_id AND created.action='client.create' AND created.entity_type='client' AND created.entity_id=u.id AND created.outcome='success')";
-            if (ClientFormsService::enabled()) {
-                $relationship .= " OR EXISTS(SELECT 1 FROM client_form_tasks task WHERE task.clinic_id=u.clinic_id AND task.client_id=u.id AND task.practitioner_id=booking_practitioner.id AND task.status<>'revoked')";
-            }
-            $relationship .= ')';
-        }
-        return " AND $activeActor AND $notMerged AND EXISTS(SELECT 1 FROM practitioners booking_practitioner WHERE booking_practitioner.user_id=:booking_practitioner_user AND booking_practitioner.active=1 $relationship)";
+        return " AND $activeActor AND $notMerged AND EXISTS(SELECT 1 FROM practitioners booking_practitioner
+            JOIN client_care_assignments care ON care.clinic_id=u.clinic_id AND care.client_id=u.id
+                AND care.practitioner_id=booking_practitioner.id AND care.active=1
+            WHERE booking_practitioner.user_id=:booking_practitioner_user AND booking_practitioner.active=1)";
     }
 }

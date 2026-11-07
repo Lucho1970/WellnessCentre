@@ -33,9 +33,12 @@ $review=function(array $body,?string $token=null)use($register,$expect,$snapshot
 try{
     $ready=false;for($i=0;$i<100;$i++){$connection=@stream_socket_client('tcp://'.$address,$errno,$error,0.1);if($connection){fclose($connection);$ready=true;break;}usleep(20000);}$expect($ready,'Registration API ready');
     [$status,$data]=$register($body('Distinct','Practitioner'));$created=(int)($data['data']['id']??0);$expect($status===201&&$created>0,'Unrelated restriction no longer blocks authorized practitioner creation');
-    [$status,$data]=$call('/api/v1/booking-clients?q=Distinct',$practitionerToken);$expect($status===200&&in_array($created,$ids($data['data']['items']),true),'Only committed creation establishes the intended booking relationship');
+    [$status,$data]=$call('/api/v1/booking-clients?q=Distinct',$practitionerToken);$expect($status===200&&!in_array($created,$ids($data['data']['items']),true),'Creation alone does not establish a care assignment');
+    $pdo->prepare('INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES(1,?,2,1,1,UTC_TIMESTAMP())')->execute([$created]);
+    [$status,$data]=$call('/api/v1/booking-clients?q=Distinct',$practitionerToken);$expect($status===200&&in_array($created,$ids($data['data']['items']),true),'Reviewed care assignment enables booking contact access');
     [$status]=$register($body('Distinct','Operator'),$adminToken);$expect($status===201,'Restricted administrator can register an unrelated patient');
-    foreach([$practitionerToken,$adminToken] as $token){
+    $review($body('Permitted','Patient'));
+    foreach([$adminToken] as $token){
         [$status,$data,$cid,$raw]=$register($body('Permitted','Patient'),$token);
         $expect($status===409&&$data['error']['code']==='possible_duplicate'&&$ids($data['error']['fields']['candidates'])===[104],'Permitted duplicate review retains existing candidates');
         $expect(!str_contains($raw,'date_of_birth'),'Duplicate review minimizes fields, omitting birthdate');
@@ -62,7 +65,7 @@ try{
     $set(101,0,true);$set(101,1,false);$review($body('Restricted','Patient')+['confirm_possible_duplicate'=>true],$adminToken);
     $set(101,0,false);[$status,$data]=$register($body('Restricted','Patient'),$adminToken);$expect($status===409&&$ids($data['error']['fields']['candidates'])===[101],'Restoration returns only the permitted current record');
     $pdo->exec("INSERT IGNORE INTO user_permissions(user_id,permission_id) SELECT 2,id FROM permissions WHERE code='schedule_for_other_practitioners'");
-    [$status,$data]=$register($body('Unrelated','Patient'));$expect($status===409&&$ids($data['error']['fields']['candidates'])===[9001],'Existing delegated booking scope permits duplicate contact review');
+    $review($body('Unrelated','Patient')); // Delegated scheduling does not broaden patient contact access.
     $review($body('Restricted','Patient')); // Target 2 still restricted.
     $pdo->exec("DELETE up FROM user_permissions up JOIN permissions p ON p.id=up.permission_id WHERE up.user_id=2 AND p.code='schedule_for_other_practitioners'");
     $denies(fn()=>$clients->save($actor(2,['super_admin','practitioner'],['add_clients']),$body('Restricted','Patient'),'direct-refusal'),409);

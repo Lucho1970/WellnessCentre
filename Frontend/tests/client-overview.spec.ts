@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const host = 'http://localhost:5184';
 const client = { id: '8', display_name: 'Avery Client', given_name: 'Avery', family_name: 'Client', email: 'avery@example.test', phone: '905-555-0188', preferred_contact: 'email', date_of_birth: '1991-04-12', emergency_contact_name: 'Morgan Client', emergency_contact_phone: '905-555-0189', administrative_notes: 'Prefers afternoon calls', status: 'active', revision: 'client-rev', address: null };
 const appointment = { id: '71', client_id: '8', practitioner_id: '2', starts_at: '2026-09-01 14:00:00', ends_at: '2026-09-01 15:00:00', created_at: '2026-08-01 12:00:00', status: 'completed', delivery_mode: 'clinic', service_name: 'Massage therapy', service_name_fr: 'Massothérapie', practitioner_name: 'Esther Practitioner', location_name: 'Main clinic', timezone: 'America/Toronto', room_name: 'Room A', base_price_cents: '10000', mobile_fee_cents: '0', cancellation_fee_cents: null, currency: 'CAD', source: 'portal', duration_option_id: '1', room_id: '1', version: '1', destination_snapshot: null, travel_buffer_minutes: '0', client_name: 'Avery Client' };
-const access = { practitioner_id: '2', user_id: '2', display_name: 'Esther Practitioner', discipline: 'Massage', account_status: 'active', practitioner_active: true, membership_required: false, membership_status: null, identity_status: null, appointment_count: 2, created_client: true, first_appointment_at: '2026-08-01 14:00:00', last_appointment_at: '2026-09-01 14:00:00', booking_mode: 'practitioner_managed', roles: ['practitioner'], permissions: [], configured_access: { staff_configuration_active: true, client_directory: true, booking_contact: true, client_administration: false, appointments: 'own', appointment_changes: 'own', logistics_notes: 'own' } };
+const access = { practitioner_id: '2', user_id: '2', display_name: 'Esther Practitioner', discipline: 'Massage', account_status: 'active', practitioner_active: true, membership_required: false, membership_status: null, identity_status: null, appointment_count: 2, created_client: true, care_assigned: true, first_appointment_at: '2026-08-01 14:00:00', last_appointment_at: '2026-09-01 14:00:00', booking_mode: 'practitioner_managed', roles: ['practitioner'], permissions: [], configured_access: { staff_configuration_active: true, client_directory: true, booking_contact: true, client_administration: false, appointments: 'own', appointment_changes: 'own', logistics_notes: 'own' } };
 
 async function fixtures(page: Page, roles = ['super_admin']) {
   await page.route('**/src/auth/AuthProvider.tsx', route => route.fulfill({ contentType: 'application/javascript', body: `
@@ -81,10 +81,10 @@ test('history filters retain cancelled appointments, pagination and an empty vie
   await expect(page.getByText('canceled by client', { exact: true })).toBeVisible();
 });
 
-test('access report distinguishes relationships, broad booking access and inactive accounts', async ({ page }) => {
+test('access report distinguishes current care assignment from history and inactive accounts', async ({ page }) => {
   await fixtures(page, ['clinic_admin']);
   await page.route('**/api/v1/clients/8/practitioner-access?**', route => route.fulfill({ json: { data: { client, page: 1, has_more: false, items: [access,
-    { ...access, practitioner_id: 3, display_name: 'Unrelated Practitioner', created_client: false, appointment_count: 0, first_appointment_at: null, last_appointment_at: null, configured_access: { ...access.configured_access, client_directory: false } },
+    { ...access, practitioner_id: 3, display_name: 'Unrelated Practitioner', created_client: false, care_assigned: false, appointment_count: 0, first_appointment_at: null, last_appointment_at: null, configured_access: { ...access.configured_access, client_directory: false, booking_contact: false } },
     { ...access, practitioner_id: 4, display_name: 'Inactive Practitioner', account_status: 'inactive', practitioner_active: false, configured_access: { staff_configuration_active: false, client_directory: false, booking_contact: false, client_administration: false, appointments: 'none', appointment_changes: 'none', logistics_notes: 'none' } },
   ] } } }));
   await page.goto(`${host}/admin/clients?client_id=8`);
@@ -93,7 +93,8 @@ test('access report distinguishes relationships, broad booking access and inacti
   await expect(page.getByText('Appointments with this client: 2').first()).toBeVisible();
   const unrelated = page.locator('.MuiPaper-root').filter({ has: page.getByText('Unrelated Practitioner', { exact: true }) }).last();
   await expect(unrelated.getByText('Client directory: No configured access')).toBeVisible();
-  await expect(unrelated.getByText('Booking contact details: Configured access')).toBeVisible();
+  await expect(unrelated.getByText('Current care team: Not assigned')).toBeVisible();
+  await expect(unrelated.getByText('Booking contact details: No configured access')).toBeVisible();
   const inactive = page.locator('.MuiPaper-root').filter({ has: page.getByText('Inactive Practitioner', { exact: true }) }).last();
   await expect(inactive.getByText('Account access blocked')).toBeVisible();
   await expect(inactive.getByText('Appointment visibility: No configured access')).toBeVisible();

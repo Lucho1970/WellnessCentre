@@ -66,16 +66,15 @@ final class ClientService
         $page=filter_var($query['page']??1,FILTER_VALIDATE_INT,['options'=>['min_range'=>1,'max_range'=>100000]]);
         if($page===false)throw new ApiException(422,'validation_error','Invalid page.');
         $offset=($page-1)*25;
-        $formRelated=ClientFormsService::enabled()?" OR EXISTS(SELECT 1 FROM client_form_tasks ft WHERE ft.clinic_id=u.clinic_id AND ft.client_id=u.id AND ft.practitioner_id=p.id AND ft.status<>'revoked')":'';
         $sql="SELECT u.id,u.display_name,u.email,u.status,cp.phone,cp.preferred_contact,
             (SELECT COUNT(*) FROM appointments counted WHERE counted.clinic_id=u.clinic_id AND counted.practitioner_id=p.id AND counted.client_id=u.id) appointment_count,
             (SELECT recent.id FROM appointments recent WHERE recent.clinic_id=u.clinic_id AND recent.practitioner_id=p.id AND recent.client_id=u.id ORDER BY recent.starts_at DESC,recent.id DESC LIMIT 1) recent_appointment_id
-            FROM practitioners p JOIN users u ON u.clinic_id=:clinic AND u.user_type='client'
+            FROM practitioners p JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=:clinic AND staff.status='active'
+            JOIN client_care_assignments care ON care.clinic_id=staff.clinic_id AND care.practitioner_id=p.id AND care.active=1
+            JOIN users u ON u.id=care.client_id AND u.clinic_id=staff.clinic_id AND u.user_type='client'
             LEFT JOIN client_profiles cp ON cp.user_id=u.id
-            WHERE p.user_id=:actor AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id)
-            AND (EXISTS(SELECT 1 FROM appointments own WHERE own.clinic_id=u.clinic_id AND own.practitioner_id=p.id AND own.client_id=u.id)
-              OR EXISTS(SELECT 1 FROM audit_logs created WHERE created.clinic_id=u.clinic_id AND created.actor_user_id=:creator AND created.action='client.create' AND created.entity_type='client' AND created.entity_id=u.id AND created.outcome='success'){$formRelated})";
-        $params=['clinic'=>$actor->clinicId,'actor'=>$actor->userId,'creator'=>$actor->userId];
+            WHERE p.user_id=:actor AND p.active=1 AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id)";
+        $params=['clinic'=>$actor->clinicId,'actor'=>$actor->userId];
         $sql.=ConsentAccess::condition($actor,$params);
         if($term!==''){
             $like='%'.str_replace(['!','%','_'],['!!','!%','!_'],$term).'%';

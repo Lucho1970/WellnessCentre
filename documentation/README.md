@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Practitioner client-access boundary — 6 November 2026](PRACTITIONER_CLIENT_ACCESS_BOUNDARY_2026-11-06.md): current care assignments replace historical grants for practitioner contacts, forms and invitations; local evidence and remaining release gates.
+
 - [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.
 
 - [HTTPS enforcement — 5 November 2026](HTTPS_ENFORCEMENT_2026-11-05.md): Netfirms host-specific 302 staging, HTTP API denial, backup/verification/rollback and control ledger.

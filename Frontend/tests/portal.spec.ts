@@ -3808,7 +3808,7 @@ test("practitioner mobile navigation can book and change only the scoped schedul
   ).toBeVisible();
 });
 
-for (const queued of [false, true]) test(`permitted practitioner adds a booking client and emails a portal invitation without identity approval (${queued ? "queued" : "legacy"})`, async ({ page }) => {
+test('practitioner-created client waits for clinic care assignment before booking or invitation', async ({ page }) => {
   await fixtures(page, ["practitioner"], ["add_clients"]);
   const created: Record<string, unknown>[] = [];
   const invitations: Record<string, unknown>[] = [];
@@ -3824,7 +3824,7 @@ for (const queued of [false, true]) test(`permitted practitioner adds a booking 
   });
   await page.route("**/api/v1/clients/42/invitations", route => {
     invitations.push(route.request().postDataJSON());
-    return route.fulfill({ json: { data: { id: 7, ...(queued ? { delivery: "email_queued" } : { token: "a".repeat(64), delivery: "email_accepted" }) } } });
+    return route.fulfill({ status: 403, json: { error: { code: 'forbidden' } } });
   });
   page.on("dialog", dialog => void dialog.accept());
   await page.goto(`${portalHost}/practitioner/schedule`);
@@ -3835,14 +3835,12 @@ for (const queued of [false, true]) test(`permitted practitioner adds a booking 
   await page.getByRole("textbox", { name: "Last name" }).fill("Client");
   await page.getByRole("textbox", { name: "Email", exact: true }).fill("new-client@example.test");
   await page.getByRole("button", { name: "Save new client" }).click();
-  await expect(page.getByText("Selected client")).toBeVisible();
-  await page.getByRole("button", { name: "Send portal invitation email" }).click();
-  await expect(page.getByText(queued ? "Invitation email queued. Delivery has not been confirmed. The client must still complete sign-in and identity review." : "The mail provider accepted the invitation. The client must still complete sign-in and identity review.", { exact: true })).toBeVisible();
+  await expect(page.getByText("New client New Client was saved. A clinic administrator must assign you to this client’s care team before you can book or send a portal invitation.")).toBeVisible();
+  await expect(page.getByText("Selected client")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send portal invitation email" })).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: /Private invitation/ })).toHaveCount(0);
-  if (queued) await expect(page.getByText(/mail provider accepted the invitation/i)).toHaveCount(0);
-  else await expect(page.getByText(/mail provider accepted the invitation/i)).toBeVisible();
   expect(created).toMatchObject([{ given_name: "New", family_name: "Client", email: "new-client@example.test", preferred_contact: "email" }]);
-  expect(invitations).toEqual([{ delivery: "email" }]);
+  expect(invitations).toEqual([]);
   await expect(page.getByRole("link", { name: /My clients/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Approve client link" })).toHaveCount(0);
 });
