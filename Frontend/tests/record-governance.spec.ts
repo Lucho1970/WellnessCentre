@@ -74,7 +74,12 @@ test('clinic admin explicitly assigns care when SQL reports an unassigned text z
     if (path === '/clients/8') return client;
     if (path === '/clients/8/invitations') return { items: [], linked: false };
     if (path === '/clients/8/care-team' && method === 'GET') return { items: [{ practitioner_id: 7, display_name: 'Synthetic Practitioner', assigned: assigned ? '1' : '0' }] };
-    if (path === '/clients/8/care-team/7' && method === 'PUT') { expect(body).toEqual({ assigned: true }); assigned = true; return { assigned: true }; }
+    if (path === '/clients/8/care-team/7' && method === 'PUT') {
+      expect(body).toEqual(assigned
+        ? { assigned: false, reason_code: 'care_completed', review_confirmed: true }
+        : { assigned: true, reason_code: 'starting_care', review_confirmed: true });
+      assigned = !assigned; return { assigned };
+    }
     return [];
   });
   await page.goto(`${host}/admin/clients`);
@@ -82,6 +87,19 @@ test('clinic admin explicitly assigns care when SQL reports an unassigned text z
   await page.getByRole('button', { name: 'Details', exact: true }).click();
   await expect(page.getByText('Synthetic Practitioner · Not assigned')).toBeVisible();
   await page.getByRole('button', { name: 'Assign care' }).click();
-  await page.getByRole('button', { name: 'Confirm care change' }).click();
+  const confirm = page.getByRole('button', { name: 'Confirm care change' });
+  await expect(confirm).toBeDisabled();
+  await page.getByRole('combobox', { name: 'Reason for care change' }).click();
+  await page.getByRole('option', { name: 'Starting care' }).click();
+  await page.getByRole('checkbox', { name: 'I confirmed this change reflects the current care relationship.' }).check();
+  await confirm.click();
   await expect(page.getByText('Synthetic Practitioner · Assigned')).toBeVisible();
+  await page.getByRole('button', { name: 'End care assignment' }).click();
+  await expect(page.getByText('Ending care removes practitioner access to this client’s contact, appointments, shared notes and financial details. Records remain with the clinic.')).toBeVisible();
+  await expect(confirm).toBeDisabled();
+  await page.getByRole('combobox', { name: 'Reason for care change' }).click();
+  await page.getByRole('option', { name: 'Care completed' }).click();
+  await page.getByRole('checkbox', { name: 'I confirmed this change reflects the current care relationship.' }).check();
+  await confirm.click();
+  await expect(page.getByText('Synthetic Practitioner · Not assigned')).toBeVisible();
 });

@@ -66,6 +66,10 @@ final class ClinicCareRecordService
     {
         if(!isset($body['assigned'])||!is_bool($body['assigned']))throw new ApiException(422,'validation_error','Choose whether care is assigned.');
         $assigned=$body['assigned'];$pdo=$this->database->connection();
+        $reasons=$assigned?['starting_care','care_transfer','temporary_coverage','access_correction']:['care_completed','care_transfer','temporary_coverage','access_correction','practitioner_departure'];
+        $reason=$body['reason_code']??null;
+        if(!is_string($reason)||!in_array($reason,$reasons,true)||($body['review_confirmed']??null)!==true)
+            throw new ApiException(422,'validation_error','Select a care-change reason and confirm the current care relationship was reviewed.');
         if($pdo->inTransaction())throw new \LogicException('Care assignment requires its own transaction.');
         $lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
         try{
@@ -89,7 +93,7 @@ final class ClinicCareRecordService
                 $q=$pdo->prepare('UPDATE client_care_assignments SET active=0,ended_by=?,ended_at=UTC_TIMESTAMP() WHERE clinic_id=? AND client_id=? AND practitioner_id=? AND active=1');
                 $q->execute([$actor->userId,$actor->clinicId,$clientId,$practitionerId]);
             }
-            $this->audit->write($actor->clinicId,$actor,$cid,$assigned?'care_team.assign':'care_team.end','client',$clientId,'success',['practitioner_id'=>$practitionerId]);
+            $this->audit->write($actor->clinicId,$actor,$cid,$assigned?'care_team.assign':'care_team.end','client',$clientId,'success',['practitioner_id'=>$practitionerId,'reason_code'=>$reason]);
             $pdo->commit();return ['client_id'=>$clientId,'practitioner_id'=>$practitionerId,'assigned'=>$assigned];
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
         finally{$lock->release();}
