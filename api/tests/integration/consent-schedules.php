@@ -3,13 +3,15 @@ declare(strict_types=1);
 // Local synthetic SQL/HTTP only; retains all previous consent/access authorization regressions.
 require __DIR__.'/consent-directives.php';
 
-use Wellness\Service\{AdminService,DashboardService,PractitionerVisitService,PractitionerTravelService};
+use Wellness\Service\{AdminService,AppointmentLogisticsNotesService,DashboardService,PractitionerVisitService,PractitionerTravelService};
 
 $checks=0;
 $pdo->exec("UPDATE appointments SET status='canceled_by_clinic'; UPDATE notification_events SET status='canceled';
     INSERT INTO user_roles(user_id,role_id) SELECT 3,id FROM roles WHERE code='practitioner';
     INSERT INTO identity_links(user_id,provider,tenant_id,provider_subject) VALUES(3,'microsoft','audit-tenant','other');
     INSERT INTO practitioner_locations(practitioner_id,location_id) VALUES(3,1);
+    INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES
+      (1,104,2,1,1,UTC_TIMESTAMP()),(1,102,3,1,1,UTC_TIMESTAMP());
     INSERT INTO locations(id,clinic_id,name,timezone) VALUES(2,2,'Foreign location','America/Toronto');
     INSERT INTO services(id,clinic_id,slug,name,price_cents) VALUES(2,2,'foreign','Foreign service',100);");
 $utc=new DateTimeZone('UTC');$zone=new DateTimeZone('America/Toronto');
@@ -102,6 +104,17 @@ try{
     $travel=new PractitionerTravelService($database,$routeConfig,$audit,function()use(&$transports){$transports++;return ['routes'=>[['duration'=>'60s','distanceMeters'=>1000]]];});
     $denies(fn()=>$travel->estimate($practitioner,$hidden,['source'=>'clinic'],'hidden-travel'),404);
     $expect($transports===0,'Restricted destinations never reach a map provider');
+    $logistics=new AppointmentLogisticsNotesService($database,$audit);
+    $expect($logistics->list($practitioner,$next,'assigned-logistics')['appointment_id']===$next,'Assigned practitioner may read appointment logistics');
+    $pdo->exec('UPDATE client_care_assignments SET active=0 WHERE clinic_id=1 AND client_id=104 AND practitioner_id=2');
+    try{
+        [$status,$data]=$call('/api/v1/practitioner/today',$practitionerToken);$expect($status===200&&$data['data']['appointments']===[],'Revoked care assignment hides day cards');
+        [$status,$data]=$call('/api/v1/practitioner/next-onsite',$practitionerToken);$expect($status===200&&$data['data']===null,'Revoked care assignment hides travel destination');
+        $denies(fn()=>$visits->history($practitioner,$past,'revoked-visit-history'),404);
+        $denies(fn()=>$travel->estimate($practitioner,$next,['source'=>'clinic'],'revoked-travel'),404);
+        $denies(fn()=>$logistics->list($practitioner,$next,'revoked-logistics'),404);
+        $expect($transports===0,'Revoked assignment prevents provider calls');
+    }finally{$pdo->exec('UPDATE client_care_assignments SET active=1 WHERE clinic_id=1 AND client_id=104 AND practitioner_id=2');}
 
 
     [$status,$data]=$call('/api/v1/dashboard?workspace=admin',$adminToken);$expect($status===200,'Restricted administrator can still see filtered dashboard');

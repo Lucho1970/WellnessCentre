@@ -102,6 +102,20 @@ $delegated=$actor(2,['practitioner'],['schedule_for_other_practitioners']);
 $check($ids($delegated)===$own,'Scheduling delegation does not grant unrelated contact lookup');
 $deny(fn()=>$bookings->bookingClientAddress($delegated,104,'synthetic-delegated'),404,'client_not_found');
 $deny(fn()=>$bookings->bookingClientAddress($delegated,105,'synthetic-foreign'),404,'client_not_found');
+$appointmentId=fn(int $client):int=>(int)$pdo->query('SELECT id FROM appointments WHERE client_id='.$client.' ORDER BY id LIMIT 1')->fetchColumn();
+$listed=fn(AuthContext $who):array=>array_map('intval',array_column($bookings->list($who),'client_id'));
+$visible=$listed($practitioner);sort($visible);$check($visible===[101,109],'Practitioner appointment list requires current care assignments');
+$visible=$listed($delegated);sort($visible);$check($visible===[101,109],'Scheduling delegation does not expose unrelated appointment rows');
+$check((int)$bookings->getForStaff($practitioner,$appointmentId(101),['scope'=>'practitioner'],'synthetic-detail')['client_id']===101,'Assigned appointment detail remains available');
+$deny(fn()=>$bookings->getForStaff($practitioner,$appointmentId(110),['scope'=>'practitioner'],'synthetic-history'),404,'appointment_not_found');
+$deny(fn()=>$bookings->getForStaff($delegated,$appointmentId(104),[],'synthetic-delegated-detail'),404,'appointment_not_found');
+$deny(fn()=>$bookings->manageable($practitioner,$appointmentId(110)),404,'appointment_not_found');
+$calendar=$bookings->practitionerCalendar($practitioner,['start'=>'2026-01-01T00:00:00Z','end'=>'2026-01-02T00:00:00Z']);
+$calendarClients=array_map('strval',array_column($calendar,'client_name'));sort($calendarClients);$check($calendarClients===['Synthetic Appointment','Synthetic No address'],'Practitioner calendar hides appointments without current care assignment');
+$pdo->exec('UPDATE client_care_assignments SET active=0 WHERE clinic_id=1 AND client_id=101 AND practitioner_id=2');
+$deny(fn()=>$bookings->getForStaff($practitioner,$appointmentId(101),[],'synthetic-care-revoked'),404,'appointment_not_found');
+$deny(fn()=>$bookings->manageable($practitioner,$appointmentId(101)),404,'appointment_not_found');
+$pdo->exec('UPDATE client_care_assignments SET active=1 WHERE clinic_id=1 AND client_id=101 AND practitioner_id=2');
 // Permission revocation takes effect with the next server-derived AuthContext.
 $check($ids($practitioner)===$own,'No fallback to delegated scope after permission removal');
 foreach([$actor(4),$actor(4,['practitioner'],['schedule_for_other_practitioners']),$actor(6),$actor(5)] as $who){

@@ -146,7 +146,13 @@ SessionTest::deny(fn()=>$onboarding->invite($external,7,'no-invite-permission','
 $root->exec("INSERT INTO user_permissions(user_id,permission_id) SELECT 2,id FROM permissions WHERE code='add_clients'; INSERT INTO audit_logs(clinic_id,actor_user_id,correlation_id,action,entity_type,entity_id) VALUES(1,2,'synthetic-create','client.create','client',7)");
 SessionTest::deny(fn()=>$onboarding->invite($external,7,'old-effective-permission','email'),403,'Later persisted permission cannot broaden original effective principal');
 $creator=new AuthContext(2,1,'api-microsoft','microsoft@example.test','Synthetic Microsoft','staff',['practitioner'],['add_clients']);
+SessionTest::deny(fn()=>$onboarding->invite($creator,7,'creator-without-care','email'),403,'Client creation history alone cannot authorize a practitioner invitation');
+$root->exec('INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES(1,7,1,1,1,UTC_TIMESTAMP())');
 $onboarding->invite($creator,7,'creator-invitation','email');$outbox->run($mailer);$checkTerminal('accepted');
+$onboarding->invite($creator,7,'care-revoked-before-send','email');
+$root->exec('UPDATE client_care_assignments SET active=0,ended_by=1,ended_at=UTC_TIMESTAMP() WHERE clinic_id=1 AND client_id=7 AND practitioner_id=1');
+$before=count($sent);$outbox->run($mailer);$checkTerminal('canceled');SessionTest::check(count($sent)===$before,'Revoked care assignment prevents queued invitation delivery');
+$root->exec('UPDATE client_care_assignments SET active=1,ended_by=NULL,ended_at=NULL WHERE clinic_id=1 AND client_id=7 AND practitioner_id=1');
 $onboarding->invite($creator,7,'creator-permission-revoke','email');
 $root->exec("DELETE up FROM user_permissions up JOIN permissions p ON p.id=up.permission_id WHERE up.user_id=2 AND p.code='add_clients'; INSERT INTO user_permissions(user_id,permission_id) SELECT 2,id FROM permissions WHERE code='add_clients'");$outbox->run($mailer);$checkTerminal('canceled');
 $root->exec("INSERT INTO client_consent_directives(clinic_id,client_id,scope,target_staff_id,restricted,version) VALUES(1,7,'patient_communications',0,1,1)");

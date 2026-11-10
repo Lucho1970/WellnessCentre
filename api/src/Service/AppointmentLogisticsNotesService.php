@@ -80,10 +80,11 @@ final class AppointmentLogisticsNotesService
 
     private function appointment(PDO $pdo, AuthContext $actor, int $appointmentId, bool $ownOnly, bool $lock = false): void
     {
-        $query = $pdo->prepare('SELECT a.id FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id
-            WHERE a.id=:appointment AND a.clinic_id=:clinic' . ($ownOnly ? ' AND p.user_id=:author' : '') . ($lock ? ' FOR UPDATE' : ''));
         $params = ['appointment'=>$appointmentId, 'clinic'=>$actor->clinicId];
         if ($ownOnly) $params['author'] = $actor->userId;
+        $care = BookingClientAccess::careCondition($actor,$params,'a.client_id');
+        $query = $pdo->prepare('SELECT a.id FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id
+            WHERE a.id=:appointment AND a.clinic_id=:clinic' . ($ownOnly ? ' AND p.user_id=:author' : '') . $care . ($lock ? ' FOR UPDATE' : ''));
         $query->execute($params);
         if (!$query->fetchColumn()) throw new ApiException(404, 'not_found', 'Appointment not found.');
     }

@@ -27,7 +27,7 @@ final class PractitionerTravelService
     {
         BookingService::authorizePractitionerCalendar($actor);
         $params=['user'=>$actor->userId,'clinic'=>$actor->clinicId];
-        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id').BookingClientAccess::careCondition($actor,$params,'a.client_id');
         $statement = $this->database->connection()->prepare(
             "SELECT a.id,a.starts_at,a.destination_snapshot,a.travel_buffer_minutes,
                     s.name service_name,u.display_name client_name,l.name location_name,l.timezone,
@@ -62,7 +62,7 @@ final class PractitionerTravelService
         if(!in_array($source,['current','clinic'],true))throw new ApiException(422,'validation_error','Choose current or clinic as the starting point.');
         $coordinates=$source==='current'?self::coordinates($body):null;
         $params=['id'=>$appointmentId,'user'=>$actor->userId,'clinic'=>$actor->clinicId];
-        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id').BookingClientAccess::careCondition($actor,$params,'a.client_id');
         $statement=$this->database->connection()->prepare(
             "SELECT a.id,a.starts_at,a.destination_snapshot,l.address_line1,l.address_line2,l.city,l.province,l.postal_code
              FROM appointments a

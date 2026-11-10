@@ -135,8 +135,8 @@ final class CommitSafeEmail
             if ($job['kind']==='enquiry_retry' && !array_intersect($roles,['super_admin','clinic_admin'])) throw new ApiException(409,'email_stale','Administrator access changed.');
             if ($job['kind']==='client_invitation' && !array_intersect($roles,['super_admin','clinic_admin','reception'])) {
                 $permission=$this->query("SELECT 1 FROM user_permissions up JOIN permissions p ON p.id=up.permission_id WHERE up.user_id=? AND p.code='add_clients'",[$id])->fetchColumn();
-                $creator=$this->query("SELECT 1 FROM audit_logs WHERE clinic_id=? AND actor_user_id=? AND action='client.create' AND entity_type='client' AND entity_id=? LIMIT 1",[$clinic,$id,$payload['client_id']])->fetchColumn();
-                if (!in_array('practitioner',$roles,true) || !in_array('add_clients',$payload['principal']['permissions'],true) || !$permission || !$creator)
+                $assigned=$this->query("SELECT 1 FROM practitioners p JOIN client_care_assignments care ON care.practitioner_id=p.id AND care.clinic_id=? AND care.client_id=? AND care.active=1 WHERE p.user_id=? AND p.active=1 LIMIT 1",[$clinic,$payload['client_id'],$id])->fetchColumn();
+                if (!in_array('practitioner',$roles,true) || !in_array('add_clients',$payload['principal']['permissions'],true) || !$permission || !$assigned)
                     throw new ApiException(409,'email_stale','Invitation authority changed.');
             }
         } elseif ($job['application_admin_id']!==null && $job['kind']==='enquiry_retry') {

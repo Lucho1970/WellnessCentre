@@ -16,7 +16,7 @@ final class ScheduleChangeAccess
     private function query(AuthContext $actor,array $record,string $start,?string $end,int $after=0): array
     {
         $params=['clinic'=>$actor->clinicId,'practitioner'=>$record['practitioner_id'],'location'=>$record['location_id'],'start'=>$start,'after'=>$after];
-        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id').BookingClientAccess::careCondition($actor,$params,'a.client_id');
         $upper='';if($end!==null){$upper=' AND a.buffer_starts_at<:end';$params['end']=$end;}
         $sql=" FROM appointments a WHERE a.clinic_id=:clinic AND a.practitioner_id=:practitioner AND a.location_id=:location
             AND a.id>:after AND a.status NOT IN('canceled_by_client','canceled_by_clinic') AND a.buffer_ends_at>:start $upper

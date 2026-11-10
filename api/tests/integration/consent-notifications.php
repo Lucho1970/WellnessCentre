@@ -52,6 +52,9 @@ try{
     [$status,$data]=$call('/api/v1/practitioner/notifications?recipient_user_id=3&clinic_id=2',$practitionerToken);$expect($status===200&&$data['data']['total']===31&&$ids($data['data']['items'])===array_slice($ownIds,0,25),'Practitioner sees only own permitted notices despite delegation and submitted IDs');
     [$status,$data]=$call('/api/v1/practitioner/notifications?page=2',$practitionerToken);$expect($status===200&&$ids($data['data']['items'])===array_slice($ownIds,25),'Practitioner pagination counts permitted rows only');
     [$status,$data]=$call('/api/v1/practitioner/notifications?channel=sms&status=needs_review&period=today',$practitionerToken);$expect($status===200&&$ids($data['data']['items'])===[$visible]&&$data['data']['total']===1,'Own-history filters preserve recipient scope');
+    $pdo->exec('UPDATE client_care_assignments SET active=0 WHERE clinic_id=1 AND client_id=104 AND practitioner_id=2');
+    try{[$status,$data]=$call('/api/v1/practitioner/notifications',$practitionerToken);$expect($status===200&&$data['data']['items']===[]&&$data['data']['total']===0,'Revoked care assignment hides practitioner notification history before pagination');}
+    finally{$pdo->exec('UPDATE client_care_assignments SET active=1 WHERE clinic_id=1 AND client_id=104 AND practitioner_id=2');}
     $pdo->exec('UPDATE practitioners SET active=0 WHERE id=2');
     try{[$status,$data]=$call('/api/v1/practitioner/notifications',$practitionerToken);$expect($status===200&&$data['data']['items']===[]&&$data['data']['total']===0,'Inactive practitioner profile discloses no contact history');}
     finally{$pdo->exec('UPDATE practitioners SET active=1 WHERE id=2');}

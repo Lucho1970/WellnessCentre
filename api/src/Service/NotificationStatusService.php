@@ -104,6 +104,8 @@ final class NotificationStatusService
         $where = "n.clinic_id=:clinic AND n.recipient_user_id=:recipient AND n.event_code IN ('staff_booking_confirmation','staff_booking_change','staff_booking_cancellation','staff_booking_reassigned_away')";
         $params = ['clinic' => $actor->clinicId, 'recipient' => $actor->userId];
         $where .= ConsentAccess::notificationCondition($actor,$params);
+        $care = BookingClientAccess::careCondition($actor,$params,'a.client_id');
+        $where .= " AND EXISTS(SELECT 1 FROM appointments a WHERE a.id=n.appointment_id AND a.clinic_id=n.clinic_id{$care})";
         $where .= " AND EXISTS(SELECT 1 FROM practitioners notification_practitioner JOIN users notification_recipient ON notification_recipient.id=notification_practitioner.user_id WHERE notification_practitioner.user_id=n.recipient_user_id AND notification_practitioner.active=1 AND notification_recipient.clinic_id=n.clinic_id AND notification_recipient.user_type='staff' AND notification_recipient.status='active')";
         if ($status !== '') { $where .= ' AND n.status=:status'; $params['status'] = $status; }
         if ($channel !== '') { $where .= ' AND n.channel=:channel'; $params['channel'] = $channel; }

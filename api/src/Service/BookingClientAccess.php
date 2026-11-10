@@ -8,6 +8,20 @@ use Wellness\Auth\AuthContext;
 /** Shared SQL boundary for booking contacts; the candidate client is aliased as u. */
 final class BookingClientAccess
 {
+    /** Current practitioner relationship for appointment reads and writes; callers supply a fixed SQL client expression. */
+    public static function careCondition(AuthContext $actor, array &$params, string $clientExpression): string
+    {
+        if (!in_array($clientExpression, ['a.client_id', 'u.id'], true)) throw new \LogicException('Unsupported client expression.');
+        if ($actor->userType!=='staff' || $actor->hasAnyRole('super_admin','clinic_admin','reception') || !$actor->hasAnyRole('practitioner')) return '';
+        $params['care_actor']=$actor->userId;
+        $params['care_clinic']=$actor->clinicId;
+        return " AND EXISTS(SELECT 1 FROM practitioners care_practitioner
+            JOIN users care_staff ON care_staff.id=care_practitioner.user_id AND care_staff.clinic_id=:care_clinic AND care_staff.status='active'
+            JOIN client_care_assignments care ON care.clinic_id=care_staff.clinic_id AND care.client_id={$clientExpression}
+                AND care.practitioner_id=care_practitioner.id AND care.active=1
+            WHERE care_practitioner.user_id=:care_actor AND care_practitioner.active=1)";
+    }
+
     public static function condition(AuthContext $actor, array &$params): string
     {
         BookingService::authorizeBookingClientAddress($actor);

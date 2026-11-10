@@ -23,6 +23,7 @@ $pdo->exec("INSERT INTO clinics(id,name) VALUES(3,'Synthetic communications');IN
  INSERT INTO locations(id,clinic_id,name,timezone) VALUES(3,3,'Virtual','America/Toronto');
  INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(200,3,'practitioner@example.test','Private Staff','staff','active'),(201,3,'patient@example.test','Private Patient','client','active');
  INSERT INTO practitioners(id,user_id,discipline) VALUES(200,200,'Synthetic');
+ INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES(3,201,200,1,200,UTC_TIMESTAMP());
  INSERT INTO user_roles(user_id,role_id,location_id) SELECT 200,id,3 FROM roles WHERE code='practitioner';
  INSERT INTO product_identities(id,adapter,issuer,subject) VALUES(100,'synthetic','test','communications-member');
  INSERT INTO staff_memberships(id,identity_id,clinic_id,local_user_id,status) VALUES(100,100,3,200,'active');
@@ -61,6 +62,9 @@ $sms=new VoipMsSmsClient('synthetic@example.test','synthetic','4165550100',funct
 $worker=new NotificationWorker($pdo,$mailer,'https://communications.test/client',$sms,false,new SmsDeliveryGuard($pdo),new ClinicMailRouter($pdo,$mailer));
 $blocked=$create();$email=$create(true);$check($worker->run(1,$blocked['appointment'])['canceled']===1&&$calls===0,'Over-cap stops SMS before provider transport');
 $check($worker->run(1,$email['appointment'])['sent']===1&&count($mails)===1,'Eligible email remains independent when SMS is capped');
+$revoked=$create(true);$pdo->exec('UPDATE client_care_assignments SET active=0,ended_by=200,ended_at=UTC_TIMESTAMP() WHERE clinic_id=3 AND client_id=201 AND practitioner_id=200');
+$check($worker->run(1,$revoked['appointment'])['canceled']===1&&count($mails)===1,'Care revocation cancels queued staff email before provider submission');
+$pdo->exec('UPDATE client_care_assignments SET active=1,ended_by=NULL,ended_at=NULL WHERE clinic_id=3 AND client_id=201 AND practitioner_id=200');
 $check(str_contains($mails[0][0],'clinic%40example.test')&&$mails[0][1]['message']['replyTo'][0]['emailAddress']['address']==='clinic-reply@example.test','Email uses the exact clinic sender and reply routing');
 $pdo->exec("UPDATE staff_notification_preferences SET personal_email='private-notifications@example.test',personal_email_verified_at=UTC_TIMESTAMP() WHERE user_id=200");
 $routing=new ClinicMailRouter($pdo,$mailer);

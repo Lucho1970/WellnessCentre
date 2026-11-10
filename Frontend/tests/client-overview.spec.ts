@@ -83,18 +83,21 @@ test('history filters retain cancelled appointments, pagination and an empty vie
 
 test('access report distinguishes current care assignment from history and inactive accounts', async ({ page }) => {
   await fixtures(page, ['clinic_admin']);
-  await page.route('**/api/v1/clients/8/practitioner-access?**', route => route.fulfill({ json: { data: { client, page: 1, has_more: false, items: [access,
-    { ...access, practitioner_id: 3, display_name: 'Unrelated Practitioner', created_client: false, care_assigned: false, appointment_count: 0, first_appointment_at: null, last_appointment_at: null, configured_access: { ...access.configured_access, client_directory: false, booking_contact: false } },
+  await page.route('**/api/v1/clients/8/practitioner-access?**', route => route.fulfill({ json: { data: { client, page: 1, has_more: false, items: [
+    { ...access, permissions: ['schedule_for_other_practitioners'], configured_access: { ...access.configured_access, appointments: 'assigned_clinic', appointment_changes: 'assigned_clinic' } },
+    { ...access, practitioner_id: 3, display_name: 'Unrelated Practitioner', created_client: false, care_assigned: false, appointment_count: 0, first_appointment_at: null, last_appointment_at: null, configured_access: { ...access.configured_access, client_directory: false, booking_contact: false, appointments: 'none', appointment_changes: 'none', logistics_notes: 'none' } },
     { ...access, practitioner_id: 4, display_name: 'Inactive Practitioner', account_status: 'inactive', practitioner_active: false, configured_access: { staff_configuration_active: false, client_directory: false, booking_contact: false, client_administration: false, appointments: 'none', appointment_changes: 'none', logistics_notes: 'none' } },
   ] } } }));
   await page.goto(`${host}/admin/clients?client_id=8`);
   await page.getByRole('tab', { name: 'Practitioner access', exact: true }).click();
   await expect(page.getByText('This practitioner created the client record.').first()).toBeVisible();
   await expect(page.getByText('Appointments with this client: 2').first()).toBeVisible();
+  await expect(page.getByText('Appointment visibility: Clinic appointments for clients currently assigned to their care')).toBeVisible();
   const unrelated = page.locator('.MuiPaper-root').filter({ has: page.getByText('Unrelated Practitioner', { exact: true }) }).last();
   await expect(unrelated.getByText('Client directory: No configured access')).toBeVisible();
   await expect(unrelated.getByText('Current care team: Not assigned')).toBeVisible();
   await expect(unrelated.getByText('Booking contact details: No configured access')).toBeVisible();
+  await expect(unrelated.getByText('Appointment visibility: No configured access')).toBeVisible();
   const inactive = page.locator('.MuiPaper-root').filter({ has: page.getByText('Inactive Practitioner', { exact: true }) }).last();
   await expect(inactive.getByText('Account access blocked')).toBeVisible();
   await expect(inactive.getByText('Appointment visibility: No configured access')).toBeVisible();

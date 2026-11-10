@@ -121,7 +121,7 @@ final class DashboardService
     private function project(AuthContext $actor,string $workspace,string $timezone,array $definition): mixed
     {
         if($definition['dataProjection']==='notification_summary')return $this->notificationSummary($actor,$timezone);
-        $params=['clinic'=>$actor->clinicId];$where='a.clinic_id=:clinic';if($workspace==='practitioner'){$where.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user AND active=1 LIMIT 1)';$params['user']=$actor->userId;}$where.=ConsentAccess::condition($actor,$params,'a.client_id');$configuration=$definition['parameters']??[];
+        $params=['clinic'=>$actor->clinicId];$where='a.clinic_id=:clinic';if($workspace==='practitioner'){$where.=' AND a.practitioner_id=(SELECT id FROM practitioners WHERE user_id=:user AND active=1 LIMIT 1)';$params['user']=$actor->userId;}$where.=ConsentAccess::condition($actor,$params,'a.client_id');if($workspace==='practitioner')$where.=BookingClientAccess::careCondition($actor,$params,'a.client_id');$configuration=$definition['parameters']??[];
         if(($configuration['date']??null)==='today'){$local=new DateTimeImmutable('now',new DateTimeZone($timezone));$from=$local->setTime(0,0)->setTimezone(new DateTimeZone('UTC'));$to=$local->modify('+1 day')->setTime(0,0)->setTimezone(new DateTimeZone('UTC'));$where.=' AND a.starts_at>=:from_time AND a.starts_at<:to_time';$params['from_time']=$from->format('Y-m-d H:i:s');$params['to_time']=$to->format('Y-m-d H:i:s');}
         $statuses=$configuration['statuses']??self::STATUSES;if($statuses){$marks=[];foreach($statuses as $index=>$status){$key='status_'.$index;$marks[]=':'.$key;$params[$key]=$status;}$where.=' AND a.status IN ('.implode(',',$marks).')';}if(isset($configuration['delivery_mode'])){$where.=' AND a.delivery_mode=:delivery_mode';$params['delivery_mode']=$configuration['delivery_mode'];}
         if($definition['dataProjection']==='appointment_count'){$statement=$this->database->connection()->prepare("SELECT COUNT(*) FROM appointments a WHERE {$where}");$statement->execute($params);return (int)$statement->fetchColumn();}
@@ -163,7 +163,7 @@ final class DashboardService
             WHERE a.clinic_id=:clinic AND p.user_id=:user AND p.active=1
             AND a.ends_at>UTC_TIMESTAMP() AND a.status IN ('requested','confirmed','rescheduled')";
         $params=['clinic'=>$actor->clinicId,'user'=>$actor->userId];
-        $from.=ConsentAccess::condition($actor,$params,'a.client_id');
+        $from.=ConsentAccess::condition($actor,$params,'a.client_id').BookingClientAccess::careCondition($actor,$params,'a.client_id');
         $pdo=$this->database->connection();
         $count=$pdo->prepare("SELECT COUNT(DISTINCT a.id) {$from}");
         $count->execute($params);

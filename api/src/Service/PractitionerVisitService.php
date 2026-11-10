@@ -35,7 +35,7 @@ final class PractitionerVisitService
         $start=$local->setTime(0,0)->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
         $end=$local->modify('+1 day')->setTime(0,0)->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
         $params=['clinic'=>$actor->clinicId,'user'=>$actor->userId,'start'=>$start,'end'=>$end];
-        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id').BookingClientAccess::careCondition($actor,$params,'a.client_id');
         $query=$pdo->prepare("SELECT a.id,a.client_id,a.service_id,a.starts_at,a.ends_at,a.status,a.version,a.delivery_mode,
                    s.name service_name,u.display_name client_name,u.email client_email,cp.phone client_phone,l.name location_name,l.timezone
             FROM appointments a
@@ -89,7 +89,7 @@ final class PractitionerVisitService
         $last=$local->modify('+1 day')->setTime(0,0);
         $utc=new DateTimeZone('UTC');
         $params=['clinic'=>$actor->clinicId,'user'=>$actor->userId,'start'=>$first->setTimezone($utc)->format('Y-m-d H:i:s'),'end'=>$last->setTimezone($utc)->format('Y-m-d H:i:s')];
-        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id').BookingClientAccess::careCondition($actor,$params,'a.client_id');
         $query=$pdo->prepare("SELECT a.id,a.status,a.delivery_mode,a.ends_at FROM appointments a
             JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1
             WHERE a.clinic_id=:clinic $visible AND a.starts_at>=:start AND a.starts_at<:end
@@ -231,7 +231,7 @@ final class PractitionerVisitService
     private function ownedAppointment(PDO $pdo,AuthContext $actor,int $appointmentId,bool $forUpdate=true): array
     {
         $params=['id'=>$appointmentId,'clinic'=>$actor->clinicId,'user'=>$actor->userId];
-        $visible=ConsentAccess::condition($actor,$params,'a.client_id');
+        $visible=ConsentAccess::condition($actor,$params,'a.client_id').BookingClientAccess::careCondition($actor,$params,'a.client_id');
         $query=$pdo->prepare('SELECT a.id,a.status,a.version,a.delivery_mode,a.starts_at,a.ends_at FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id AND p.user_id=:user AND p.active=1 WHERE a.id=:id AND a.clinic_id=:clinic'.$visible.($forUpdate?' FOR UPDATE':''));
         $query->execute($params);
         $appointment=$query->fetch();

@@ -140,16 +140,17 @@ final class ClientOverviewService
         $operator = $active && empty($row['consent_restricted']) && (bool)array_intersect($roles, ['super_admin','clinic_admin','reception']);
         $practitioner = $active && empty($row['consent_restricted']) && in_array('practitioner', $roles, true);
         $related = (bool)($row['care_assigned'] ?? false);
-        $clinicScheduling = $operator || ($practitioner && in_array('schedule_for_other_practitioners', $permissions, true));
+        $assignedPractitioner = $practitioner && (bool)$row['practitioner_active'] && (bool)($row['care_assigned'] ?? false);
+        $clinicScheduling = $operator || ($assignedPractitioner && in_array('schedule_for_other_practitioners', $permissions, true));
         return [
             'client_directory' => $operator || ($practitioner && (bool)$row['practitioner_active'] && $related),
             'staff_configuration_active' => $active,
             'booking_contact' => $clientStatus === 'active' && ($operator || ($practitioner && (bool)$row['practitioner_active'] && $related)),
             'client_administration' => $operator,
-            'appointments' => $clinicScheduling ? 'clinic' : ($practitioner ? 'own' : 'none'),
-            'appointment_changes' => $clinicScheduling ? 'clinic' : ($practitioner && (bool)$row['practitioner_active'] && $row['booking_mode']==='practitioner_managed' ? 'own' : 'none'),
+            'appointments' => $operator ? 'clinic' : ($clinicScheduling ? 'assigned_clinic' : ($assignedPractitioner ? 'own' : 'none')),
+            'appointment_changes' => $operator ? 'clinic' : ($clinicScheduling ? 'assigned_clinic' : ($assignedPractitioner && $row['booking_mode']==='practitioner_managed' ? 'own' : 'none')),
             // Scheduling permission does not broaden access to another practitioner's logistics notes.
-            'logistics_notes' => $operator ? 'clinic' : ($practitioner ? 'own' : 'none'),
+            'logistics_notes' => $operator ? 'clinic' : ($assignedPractitioner ? 'own' : 'none'),
         ];
     }
 

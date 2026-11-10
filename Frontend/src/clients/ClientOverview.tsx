@@ -41,7 +41,7 @@ function ClientOverviewForm({ clientId, initialTab, request, back, onLockedChang
   }, [clientId, tab, view, historyPage, accessPage, request, retry, t]);
   const time = (value: string, zone: string) => formatDateTime(`${value.replace(' ', 'T')}Z`, i18n.language, { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
   const money = (cents: number, currency: string) => new Intl.NumberFormat(appLocale(i18n.language), { style: 'currency', currency }).format(cents / 100);
-  const scope = (value: string) => value === 'clinic' ? t('All clinic appointments') : value === 'own' ? t('Their own appointments only') : t('No configured access');
+  const scope = (value: string) => value === 'clinic' ? t('All clinic appointments') : value === 'assigned_clinic' ? t('Clinic appointments for clients currently assigned to their care') : value === 'own' ? t('Their own appointments for clients currently assigned to their care') : t('No configured access');
   const current = tab === 'appointments' ? history : access;
   const page = tab === 'appointments' ? historyPage : accessPage;
   const setPage = tab === 'appointments' ? setHistoryPage : setAccessPage;

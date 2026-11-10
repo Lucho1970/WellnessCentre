@@ -14,8 +14,8 @@ function check(bool $ok): void {global $checks;if(!$ok)throw new RuntimeExceptio
 function denies(callable $f,int $status): void {try{$f();}catch(ApiException $e){check($e->status===$status);return;}throw new RuntimeException('Expected overview denial');}
 $row=['account_status'=>'active','practitioner_active'=>1,'roles'=>'practitioner','permissions'=>'','appointment_count'=>0,'created_client'=>0,'care_assigned'=>0,'booking_mode'=>'practitioner_managed'];
 $access=Overview::configuredAccess($row);
-check(!$access['client_directory']&&!$access['booking_contact']&&$access['appointments']==='own'&&$access['logistics_notes']==='own');
-check($access['appointment_changes']==='own'&&!$access['client_administration']);
+check(!$access['client_directory']&&!$access['booking_contact']&&$access['appointments']==='none'&&$access['logistics_notes']==='none');
+check($access['appointment_changes']==='none'&&!$access['client_administration']);
 check(!Overview::configuredAccess(array_replace($row,['appointment_count'=>1,'created_client'=>1,'assigned_form'=>true]))['client_directory']);
 check(!Overview::configuredAccess(array_replace($row,['appointment_count'=>1,'created_client'=>1,'assigned_form'=>true]))['booking_contact']);
 check(Overview::configuredAccess(array_replace($row,['care_assigned'=>1]))['client_directory']);
@@ -23,15 +23,16 @@ check(Overview::configuredAccess(array_replace($row,['care_assigned'=>1]))['book
 check(!Overview::configuredAccess(array_replace($row,['care_assigned'=>1,'practitioner_active'=>0]))['booking_contact']);
 check(!Overview::configuredAccess($row,'inactive')['booking_contact']);
 $access=Overview::configuredAccess(array_replace($row,['permissions'=>'schedule_for_other_practitioners']));
-check(!$access['booking_contact']&&$access['appointments']==='clinic'&&$access['appointment_changes']==='clinic'&&$access['logistics_notes']==='own'&&!$access['client_directory']);
+check(!$access['booking_contact']&&$access['appointments']==='none'&&$access['appointment_changes']==='none'&&$access['logistics_notes']==='none'&&!$access['client_directory']);
+check(Overview::configuredAccess(array_replace($row,['care_assigned'=>1,'permissions'=>'schedule_for_other_practitioners']))['appointments']==='assigned_clinic');
 check(Overview::configuredAccess(array_replace($row,['booking_mode'=>'clinic_managed']))['appointment_changes']==='none');
 $inactiveProfile=Overview::configuredAccess(array_replace($row,['practitioner_active'=>0,'care_assigned'=>1]));
-check(!$inactiveProfile['client_directory']&&$inactiveProfile['appointments']==='own'&&$inactiveProfile['appointment_changes']==='none');
+check(!$inactiveProfile['client_directory']&&$inactiveProfile['appointments']==='none'&&$inactiveProfile['appointment_changes']==='none');
 foreach(['inactive','locked','pending'] as $status){$denied=Overview::configuredAccess(array_replace($row,['account_status'=>$status,'roles'=>'super_admin,practitioner','appointment_count'=>10]));check(!$denied['client_directory']&&!$denied['booking_contact']&&$denied['appointments']==='none'&&$denied['logistics_notes']==='none');}
 foreach(['super_admin','clinic_admin','reception'] as $role){$operator=Overview::configuredAccess(array_replace($row,['roles'=>$role]));check($operator['client_administration']&&$operator['appointments']==='clinic'&&$operator['logistics_notes']==='clinic');}
 $none=Overview::configuredAccess(array_replace($row,['roles'=>'accountant','permissions'=>'schedule_for_other_practitioners']));check(!$none['booking_contact']&&$none['appointments']==='none');
 $external=array_replace($row,['identity_adapter'=>'entra-external-staff','identity_status'=>'active','membership_status'=>'active','roles'=>'super_admin,practitioner','appointment_count'=>1]);
-$restricted=Overview::configuredAccess($external);check(!$restricted['client_administration']&&$restricted['appointments']==='own'&&$restricted['logistics_notes']==='own');
+$restricted=Overview::configuredAccess($external);check(!$restricted['client_administration']&&$restricted['appointments']==='none'&&$restricted['logistics_notes']==='none');
 check(Overview::configuredAccess(array_replace($external,['membership_status'=>'revoked']))['appointments']==='none');
 check(!Overview::configuredAccess(array_replace($row,['membership_required'=>true]))['staff_configuration_active']);
 foreach([['page'=>0],['page'=>-1],['page'=>'1.5'],['page'=>100001],['page'=>[]]] as $invalid)denies(fn()=>Overview::page($invalid),422);
