@@ -1,10 +1,14 @@
 # Wellnexa practitioner governance release preparation — 10 November 2026
 
-**Scope:** `feature/practitioner-governance-release-prep`, based on `212fd2794d51c2f28b495fb4f44492c6483a7cce`. This is a review plan, not a deployment instruction or release approval. `main` and production are unchanged. The seven stacked implementation/fix branches from `feature/wellnexa-record-governance` through `bugs/practitioner-mysql57-join-order` are unmerged; they must be reviewed and integrated as one compatible change. The accepted operating rule is **clinic review only** for any practitioner request for historical appointment/receipt information after a care assignment ends.
+**Scope:** `feature/practitioner-governance-release-prep`, based on `212fd2794d51c2f28b495fb4f44492c6483a7cce` and reconciled with `origin/main` `aaa8347` at `e5cd7e3`. This is a review plan, not a deployment instruction or release approval. `main` and production are unchanged. The seven stacked implementation/fix branches from `feature/wellnexa-record-governance` through `bugs/practitioner-mysql57-join-order` are unmerged into `main`; they must be reviewed and integrated as one compatible change. The accepted operating rule is **clinic review only** for any practitioner request for historical appointment/receipt information after a care assignment ends.
 
 ## Rehearsal evidence and current blockers
 
 Migrations 062, 063 and 064 were applied in order by `api/tests/integration/clinic-care-records.php` to a synthetic reconstructed pre-migration schema. On MySQL 5.7.44, the final run passed 97 booking-access and 126 care-record checks; the emergency-hold suite passed 97 booking-access and 118 hold checks. On MariaDB 11.4.8, the final care run passed 97 and 126 checks. The initial MySQL runs exposed two correlated-query compatibility failures; `212fd27` corrected them and the reruns passed. These tests do not inspect the hosted schema, existing note data, database grants or a restored copy of the live database. See [the compatibility report](PRACTITIONER_MYSQL57_COMPATIBILITY_2026-11-10.md) and preceding branch reports for exact commands and limitations.
+
+The first combined diff against current `main` showed older branch history would remove current Fullscript, Jane comparison, receipt-roadmap and portal-release documents. Merging `origin/main` into this preparation branch and resolving `documentation/README.md` preserved those files; the final diff has no deleted paths. This is branch reconciliation only, not a merge into `main`.
+
+**Integrated local checkpoint on the reconciled source:** `Frontend/npm run build` passed ESLint, content/i18n, TypeScript and public/portal/application-admin builds. `Wellnexa/npm run lint` and `npm run build` exited 0; lint reported four existing React warnings. `Frontend/npx playwright test tests/record-governance.spec.ts tests/client-overview.spec.ts --workers=1 --reporter=line` passed 9/9; `--config playwright.build.config.ts` passed 16/16; `--config playwright.application-admin.config.ts` passed 46/46. `Wellnexa/npm run test:browser -- --workers=1 --reporter=line` passed 27/27. `php -l` passed for all 36 PHP files changed against current `main`; `php api/tests/client-overview.php` passed 65 policy/query checks with a PDO double; `api/composer validate --strict` passed. Node 22.22.1, npm 11.19.0 and PHP 8.4.14 were local runtimes. Existing large-bundle/mixed-import warnings remain. The default full portal browser suite, invitation/application-specific configs, clean dependency restore/audit, manual accessibility, restored-live-copy rehearsal and hosted acceptance were not run at this checkpoint. Earlier parent reports record initial browser fixture failures; this checkpoint does not erase them.
 
 The following are release blockers: actual hosted schema/migration state unknown; fresh backup and restore unverified; existing `practitioner_client_notes` disposition not reviewed; clinic/operator access and runtime DB grants unverified; draft bilingual practitioner agreements lack custodian/privacy/legal and clinical approval; no executed-signature method is approved; patient rights, retention/departure and real-PHI gates remain incomplete; broad hosted synthetic acceptance and rollback have not occurred. Approval to implement or to apply earlier migrations 053–055 does not approve 062–064 or deployment.
 
@@ -61,14 +65,14 @@ This sequence is not authorization to use the hosted database. Existing `practit
 | SEC-07 | Partial | Safe errors retained; hosted PHP/provider log redaction pending. |
 | SEC-08 | Partial | No new provider; existing endpoint/subprocessor register approval pending. |
 | SEC-09 | Partial | Local queued-send revocation; hosted provider/opt-out check pending. |
-| DEV-01 | Partial | Dedicated prep branch; source/config/migrations reviewed; commit/push pending. |
+| DEV-01 | Partial | Dedicated prep branch reconciled with current main; commit/push and review remain. |
 | DEV-02 | Partial | Compatibility failure fixed on ancestor; human full diff review pending. |
 | DEV-03 | Unverified | No dependency change; clean restore and audit pending. |
-| DEV-04 | Partial | Dual-engine local suites; broad/hosted checks pending. |
+| DEV-04 | Partial | Dual-engine SQL and integrated build/browser checks above; full and hosted checks pending. |
 | DEV-05 | Partial | Parent bilingual UI tests; manual accessibility pending. |
 | DEV-06 | Unverified | Representative query plans/bundle warning review pending. |
 | REL-01 | Partial | This dated ledger; final SHA and named decisions pending. |
-| REL-02 | Partial | Local checks in branch reports; full integrated checkpoint pending. |
+| REL-02 | Partial | Integrated local checkpoint above; omitted suites and hosted checks pending. |
 | REL-03 | Missing | No final artifact or hosted synthetic acceptance. |
 | REL-04 | Missing | Required gates remain, so no release decision. |
 | REL-05 | Partial | No live changes; distinct schema/deployment approvals pending. |
