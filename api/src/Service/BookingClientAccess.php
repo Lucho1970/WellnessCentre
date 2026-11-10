@@ -17,9 +17,9 @@ final class BookingClientAccess
         $params['care_clinic']=$actor->clinicId;
         return " AND EXISTS(SELECT 1 FROM practitioners care_practitioner
             JOIN users care_staff ON care_staff.id=care_practitioner.user_id AND care_staff.clinic_id=:care_clinic AND care_staff.user_type='staff' AND care_staff.status='active'
-            JOIN client_care_assignments care ON care.clinic_id=care_staff.clinic_id AND care.client_id={$clientExpression}
-                AND care.practitioner_id=care_practitioner.id AND care.active=1
-            WHERE care_practitioner.user_id=:care_actor AND care_practitioner.active=1
+            JOIN client_care_assignments care ON care.practitioner_id=care_practitioner.id AND care.active=1
+            WHERE care.clinic_id=care_staff.clinic_id AND care.client_id={$clientExpression}
+                AND care_practitioner.user_id=:care_actor AND care_practitioner.active=1
                 AND EXISTS(SELECT 1 FROM user_roles care_user_role JOIN roles care_role ON care_role.id=care_user_role.role_id AND care_role.code='practitioner'
                     WHERE care_user_role.user_id=care_staff.id))";
     }
@@ -36,9 +36,9 @@ final class BookingClientAccess
         }
         $params['booking_practitioner_user'] = $actor->userId;
         return " AND $activeActor AND $notMerged AND EXISTS(SELECT 1 FROM practitioners booking_practitioner
-            JOIN client_care_assignments care ON care.clinic_id=u.clinic_id AND care.client_id=u.id
-                AND care.practitioner_id=booking_practitioner.id AND care.active=1
-            WHERE booking_practitioner.user_id=:booking_practitioner_user AND booking_practitioner.active=1
+            JOIN client_care_assignments care ON care.practitioner_id=booking_practitioner.id AND care.active=1
+            WHERE care.clinic_id=u.clinic_id AND care.client_id=u.id
+                AND booking_practitioner.user_id=:booking_practitioner_user AND booking_practitioner.active=1
                 AND EXISTS(SELECT 1 FROM user_roles booking_user_role JOIN roles booking_role ON booking_role.id=booking_user_role.role_id AND booking_role.code='practitioner'
                     WHERE booking_user_role.user_id=booking_practitioner.user_id))";
     }
