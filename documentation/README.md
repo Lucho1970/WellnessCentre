@@ -7,6 +7,7 @@
 # Wellness Centre Documentation
 
 - [Practitioner access route review — 10 November 2026](PRACTITIONER_ACCESS_ROUTE_REVIEW_2026-11-10.md): appointment, worker, dashboard and visit boundaries; remaining historical-record decisions and local validation.
+- [Practitioner historical financial access — 10 November 2026](PRACTITIONER_HISTORICAL_FINANCIAL_ACCESS_2026-11-10.md): owner decision for clinic review after care ends, receipt/fee access, concurrency and local evidence.
 
 - [Practitioner client-access boundary — 6 November 2026](PRACTITIONER_CLIENT_ACCESS_BOUNDARY_2026-11-06.md): current care assignments replace historical grants for practitioner contacts, forms and invitations; local evidence and remaining release gates.
 

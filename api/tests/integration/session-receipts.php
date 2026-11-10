@@ -4,7 +4,7 @@ declare(strict_types=1);
 require __DIR__.'/recurring-bookings.php';
 use Wellness\Auth\AuthContext;
 use Wellness\Http\ApiException;
-use Wellness\Service\{AuditLogger,SessionReceiptService};
+use Wellness\Service\{AuditLogger,ConsentLock,SessionReceiptService};
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/043_session_receipts.sql'));
 // Current persisted clinic authority is required for issuer-template maintenance.
 $pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 1,id FROM roles WHERE code='super_admin'");
@@ -29,6 +29,9 @@ $deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['template_
 $deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['paid_on'=>'2026-02-30']),'receipt-test'),'validation_error');
 $r=$receipts->issue($practitioner,90001,$body,'receipt-test');$id=$r['id'];
 $assert($r['total_cents']===12995,'Receipt totals must include historical travel and explicit tax.');
+$blockingPdo=new PDO("mysql:host=127.0.0.1;port=$port;dbname=$name;charset=utf8mb4",'root','');$blockingLock=new ConsentLock($blockingPdo);$blockingLock->acquire(1);
+try{$deny(fn()=>$receipts->issue($practitioner,90001,$body,'receipt-test'),'consent_busy');}
+finally{$blockingLock->release();}
 $assert($receipts->issue($practitioner,90001,$body,'receipt-test')['id']===$id,'An identical retry must return the original receipt.');
 $deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['tax_cents'=>0]),'receipt-test'),'receipt_request_changed');
 $deny(fn()=>$receipts->issue($practitioner,90001,array_replace($body,['idempotency_key'=>'synthetic-receipt-key-002']),'receipt-test'),'receipt_session_changed');
@@ -38,6 +41,27 @@ $assert($receipts->list($client,[])['items'][0]['id']===$id,'Client portal must 
 $assert($receipts->list($other,[])['items']===[],'Other clients cannot list receipts.');
 $assert($receipts->list($foreign,[])['items']===[],'Other clinics cannot list receipts.');
 $deny(fn()=>$receipts->pdf($other,$id,'receipt-test'),'receipt_not_found');$deny(fn()=>$receipts->pdf($foreign,$id,'receipt-test'),'receipt_not_found');$deny(fn()=>$receipts->pdf($colleague,$id,'receipt-test'),'receipt_not_found');
+$pdo->exec('UPDATE client_care_assignments SET active=0,ended_by=1,ended_at=UTC_TIMESTAMP() WHERE clinic_id=1 AND client_id=8 AND practitioner_id=3');
+try{
+    $assert($receipts->list($practitioner,[])['items']===[],'Ended care hides past receipt list before pagination');
+    $deny(fn()=>$receipts->context($practitioner,90001),'receipt_not_found');
+    $deny(fn()=>$receipts->pdf($practitioner,$id,'receipt-test'),'receipt_not_found');
+    $deny(fn()=>$receipts->issue($practitioner,90001,$body,'receipt-test'),'receipt_not_found');
+    $deny(fn()=>$receipts->void($practitioner,$id,['reason'=>'Synthetic correction','kind'=>'recording_error','confirmed'=>true],'receipt-test'),'receipt_not_found');
+    $assert($receipts->list($client,[])['items'][0]['id']===$id,'Client keeps own issued receipt after practitioner care ends');
+    $assert(str_starts_with(base64_decode($receipts->pdf($client,$id,'receipt-test')['pdf_base64']),'%PDF-'),'Client keeps PDF access after practitioner care ends');
+    $assert($receipts->list($admin,[])['items'][0]['id']===$id,'Clinic administrator retains receipt for reviewed requests');
+}finally{$pdo->exec('UPDATE client_care_assignments SET active=1,ended_by=NULL,ended_at=NULL WHERE clinic_id=1 AND client_id=8 AND practitioner_id=3');}
+$pdo->exec("DELETE ur FROM user_roles ur JOIN roles role ON role.id=ur.role_id WHERE ur.user_id=2 AND role.code='practitioner'");
+try{
+    $assert($receipts->list($practitioner,[])['items']===[],'Revoked practitioner role hides historical receipts despite stale identity context');
+    $deny(fn()=>$receipts->pdf($practitioner,$id,'receipt-test'),'receipt_not_found');
+}finally{$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 2,id FROM roles WHERE code='practitioner'");}
+$pdo->exec("UPDATE users SET user_type='client' WHERE id=2");
+try{
+    $assert($receipts->list($practitioner,[])['items']===[],'Changed staff account type hides receipts despite stale identity context');
+    $deny(fn()=>$receipts->pdf($practitioner,$id,'receipt-test'),'receipt_not_found');
+}finally{$pdo->exec("UPDATE users SET user_type='staff' WHERE id=2");}
 $template['version']=1;$template['issuer_name']='Changed clinic';$receipts->saveTemplate($admin,$template,'receipt-test');
 $profile['version']=1;$profile['designation']='Changed designation';$receipts->saveProfile($practitioner,90001,$profile,'receipt-test');
 $assert(base64_decode($receipts->pdf($client,$id,'receipt-test')['pdf_base64'])===$original,'Template and credential edits must not change an issued PDF.');

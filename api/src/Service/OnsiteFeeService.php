@@ -14,8 +14,10 @@ final class OnsiteFeeService
     private function appointment(AuthContext $actor, int $id, bool $lock = false): array
     {
         if ($actor->userType !== 'staff' || !$actor->hasAnyRole('practitioner', 'super_admin', 'clinic_admin')) throw new ApiException(403, 'forbidden', 'Travel fee access is not permitted.');
-        $q = $this->database->connection()->prepare('SELECT a.*,p.user_id practitioner_user_id FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id WHERE a.id=? AND a.clinic_id=?'.($lock ? ' FOR UPDATE' : ''));
-        $q->execute([$id, $actor->clinicId]);
+        $params = ['id'=>$id,'clinic'=>$actor->clinicId];
+        $care = BookingClientAccess::careCondition($actor,$params,'a.client_id');
+        $q = $this->database->connection()->prepare('SELECT a.*,p.user_id practitioner_user_id FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id WHERE a.id=:id AND a.clinic_id=:clinic'.$care.($lock ? ' FOR UPDATE' : ''));
+        $q->execute($params);
         $a = $q->fetch();
         if (!$a) throw new ApiException(404, 'appointment_not_found', 'Appointment not found.');
         SessionReceiptService::assertAccess($actor, $a);
@@ -43,6 +45,7 @@ final class OnsiteFeeService
         $reason = $body['reason'] ?? null;
         if (!is_string($reason) || trim($reason)==='' || mb_strlen($reason)>300 || preg_match('/[\x00-\x1f\x7f]/', $reason) || !is_int($body['version'] ?? null)) throw new ApiException(422, 'validation_error', 'Enter a waiver reason of up to 300 characters and refresh the appointment version.');
         $pdo = $this->database->connection();
+        $lock = new ConsentLock($pdo);$lock->acquire($actor->clinicId);
         try {
             $pdo->beginTransaction();
             // Same lock order as booking and receipt issuance, so payment cannot race a waiver.
@@ -55,5 +58,6 @@ final class OnsiteFeeService
             $pdo->commit();
             return $this->context($actor, $id);
         } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+        finally { $lock->release(); }
     }
 }

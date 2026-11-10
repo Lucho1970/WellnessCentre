@@ -25,6 +25,8 @@ $pdo->exec("INSERT INTO clinics(id,name) VALUES(1,'Synthetic A'),(2,'Synthetic B
  INSERT INTO locations(id,clinic_id,name,timezone) VALUES(1,1,'Main','America/Toronto');
  INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(1,1,'admin@example.test','Admin','staff','active'),(2,1,'practitioner@example.test','Practitioner','staff','active'),(8,1,'client@example.test','Client','client','active'),(9,1,'other@example.test','Other','client','active'),(10,2,'other-clinic@example.test','Other clinic','client','active');
  INSERT INTO practitioners(id,user_id,discipline,booking_mode) VALUES(3,2,'Massage','practitioner_managed');
+ INSERT INTO user_roles(user_id,role_id) SELECT 2,id FROM roles WHERE code='practitioner';
+ INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES(1,8,3,1,1,UTC_TIMESTAMP());
  INSERT INTO services(id,clinic_id,slug,name,price_cents,requires_room,recurrence_allowed,lead_time_minutes,booking_horizon_days) VALUES(4,1,'massage','Massage',10000,0,1,0,365);
  INSERT INTO service_duration_options(id,service_id,duration_minutes,price_cents) VALUES(8,4,60,10000);
  INSERT INTO practitioner_locations(practitioner_id,location_id) VALUES(3,1);

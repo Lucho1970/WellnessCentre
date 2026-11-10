@@ -20,6 +20,7 @@ final class SessionReceiptService
         if($actor->userType==='client'&&!$write)return;
         if($actor->userType!=='staff'||!$actor->hasAnyRole('practitioner','super_admin','clinic_admin'))throw new ApiException(403,'forbidden','Receipt access is not permitted.');
     }
+    /** Base clinic, owner and role check. Database queries also enforce current practitioner care. */
     public static function assertAccess(AuthContext $actor,array $row): void
     {
         $allowed=$actor->clinicId===(int)$row['clinic_id']&&($actor->userType==='client'
@@ -29,12 +30,14 @@ final class SessionReceiptService
     }
     private function appointment(AuthContext $actor,int $id,bool $lock=false): array
     {
-        $q=$this->database->connection()->prepare('SELECT a.*,p.user_id practitioner_user_id,u.display_name practitioner_name,c.display_name client_name,s.name service_name,l.timezone FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id JOIN users u ON u.id=p.user_id AND u.clinic_id=a.clinic_id JOIN users c ON c.id=a.client_id AND c.clinic_id=a.clinic_id JOIN services s ON s.id=a.service_id AND s.clinic_id=a.clinic_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.id=? AND a.clinic_id=?'.($lock?' FOR UPDATE':''));
-        $q->execute([$id,$actor->clinicId]);$row=$q->fetch();if(!$row)throw new ApiException(404,'receipt_not_found','Receipt not found.');self::assertAccess($actor,$row);return $row;
+        $params=['id'=>$id,'clinic'=>$actor->clinicId];$care=BookingClientAccess::careCondition($actor,$params,'a.client_id');
+        $q=$this->database->connection()->prepare('SELECT a.*,p.user_id practitioner_user_id,u.display_name practitioner_name,c.display_name client_name,s.name service_name,l.timezone FROM appointments a JOIN practitioners p ON p.id=a.practitioner_id JOIN users u ON u.id=p.user_id AND u.clinic_id=a.clinic_id JOIN users c ON c.id=a.client_id AND c.clinic_id=a.clinic_id JOIN services s ON s.id=a.service_id AND s.clinic_id=a.clinic_id JOIN locations l ON l.id=a.location_id AND l.clinic_id=a.clinic_id WHERE a.id=:id AND a.clinic_id=:clinic'.$care.($lock?' FOR UPDATE':''));
+        $q->execute($params);$row=$q->fetch();if(!$row)throw new ApiException(404,'receipt_not_found','Receipt not found.');self::assertAccess($actor,$row);return $row;
     }
     private function receipt(AuthContext $actor,int $id,bool $lock=false): array
     {
-        $q=$this->database->connection()->prepare('SELECT r.*,CAST(r.snapshot AS BINARY) snapshot,p.user_id practitioner_user_id FROM session_receipts r JOIN practitioners p ON p.id=r.practitioner_id WHERE r.id=? AND r.clinic_id=?'.($lock?' FOR UPDATE':''));$q->execute([$id,$actor->clinicId]);$row=$q->fetch();
+        $params=['id'=>$id,'clinic'=>$actor->clinicId];$care=BookingClientAccess::careCondition($actor,$params,'a.client_id');
+        $q=$this->database->connection()->prepare('SELECT r.*,CAST(r.snapshot AS BINARY) snapshot,p.user_id practitioner_user_id FROM session_receipts r JOIN practitioners p ON p.id=r.practitioner_id JOIN appointments a ON a.id=r.appointment_id AND a.clinic_id=r.clinic_id WHERE r.id=:id AND r.clinic_id=:clinic'.$care.($lock?' FOR UPDATE':''));$q->execute($params);$row=$q->fetch();
         if(!$row)throw new ApiException(404,'receipt_not_found','Receipt not found.');self::assertAccess($actor,$row);return $row;
     }
     private static function summary(array $row): array
@@ -67,9 +70,11 @@ final class SessionReceiptService
     }
     public function saveProfile(AuthContext $actor,int $appointmentId,array $body,string $correlation): array
     {
-        $this->guard($actor,true);$a=$this->appointment($actor,$appointmentId);
-        $settings=['practitioner_name'=>self::text($body,'practitioner_name',150),'designation'=>self::text($body,'designation',100),'registration_number'=>self::text($body,'registration_number',100,false),'practitioner_logo'=>self::logo($body['practitioner_logo']??'')];
-        return $this->saveSettings($actor,$body,$settings,$a,$correlation);
+        $this->guard($actor,true);$lock=new ConsentLock($this->database->connection());$lock->acquire($actor->clinicId);
+        try{$a=$this->appointment($actor,$appointmentId);
+            $settings=['practitioner_name'=>self::text($body,'practitioner_name',150),'designation'=>self::text($body,'designation',100),'registration_number'=>self::text($body,'registration_number',100,false),'practitioner_logo'=>self::logo($body['practitioner_logo']??'')];
+            return $this->saveSettings($actor,$body,$settings,$a,$correlation);
+        }finally{$lock->release();}
     }
     private function saveSettings(AuthContext $actor,array $body,array $settings,?array $a,string $correlation): array
     {
@@ -110,10 +115,11 @@ final class SessionReceiptService
     public function list(AuthContext $actor,array $query): array
     {
         if(!self::enabled())return ['enabled'=>false,'items'=>[],'has_more'=>false];
-        $this->guard($actor);$page=ClientOverviewService::page($query);$scope='';$params=[$actor->clinicId];
-        if($actor->userType==='client'){$scope=' AND r.client_id=?';$params[]=$actor->userId;}
-        elseif(!$actor->hasAnyRole('super_admin','clinic_admin')){$scope=' AND p.user_id=?';$params[]=$actor->userId;}
-        $offset=($page-1)*20;$q=$this->database->connection()->prepare("SELECT r.id,r.receipt_number,r.appointment_id,r.status,r.issued_at,r.void_reason,CAST(r.snapshot AS BINARY) snapshot FROM session_receipts r JOIN practitioners p ON p.id=r.practitioner_id WHERE r.clinic_id=? $scope ORDER BY r.id DESC LIMIT 21 OFFSET $offset");$q->execute($params);$rows=$q->fetchAll();$more=count($rows)>20;
+        $this->guard($actor);$page=ClientOverviewService::page($query);$scope='';$params=['clinic'=>$actor->clinicId];
+        if($actor->userType==='client'){$scope=' AND r.client_id=:user';$params['user']=$actor->userId;}
+        elseif(!$actor->hasAnyRole('super_admin','clinic_admin')){$scope=' AND p.user_id=:user';$params['user']=$actor->userId;}
+        $scope.=BookingClientAccess::careCondition($actor,$params,'a.client_id');
+        $offset=($page-1)*20;$q=$this->database->connection()->prepare("SELECT r.id,r.receipt_number,r.appointment_id,r.status,r.issued_at,r.void_reason,CAST(r.snapshot AS BINARY) snapshot FROM session_receipts r JOIN practitioners p ON p.id=r.practitioner_id JOIN appointments a ON a.id=r.appointment_id AND a.clinic_id=r.clinic_id WHERE r.clinic_id=:clinic $scope ORDER BY r.id DESC LIMIT 21 OFFSET $offset");$q->execute($params);$rows=$q->fetchAll();$more=count($rows)>20;
         return ['enabled'=>true,'items'=>array_map(function(array $row)use($actor): array {$item=self::summary($row);if($actor->userType==='client')$item['void_reason']=null;return $item;},array_slice($rows,0,20)),'has_more'=>$more];
     }
     public static function validated(array $body): array
@@ -132,7 +138,7 @@ final class SessionReceiptService
     }
     public function issue(AuthContext $actor,int $appointmentId,array $body,string $correlation): array
     {
-        $this->guard($actor,true);$pdo=$this->database->connection();
+        $this->guard($actor,true);$pdo=$this->database->connection();$lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);
         try{
             $pdo->beginTransaction();$q=$pdo->prepare('SELECT id FROM clinics WHERE id=? FOR UPDATE');$q->execute([$actor->clinicId]);$a=$this->appointment($actor,$appointmentId,true);
             // Hash the submitted intent rather than current settings: a network retry after a template edit still retrieves the original receipt.
@@ -169,6 +175,7 @@ final class SessionReceiptService
             $this->audit->write($actor->clinicId,$actor,$correlation,'receipt.issue','session_receipt',$id,'success',['appointment_id'=>$appointmentId,'invoice_id'=>$invoice,'payment_id'=>$payment]);
             $row=$this->receipt($actor,$id);$pdo->commit();return self::summary($row);
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$lock->release();}
     }
     public function pdf(AuthContext $actor,int $id,string $correlation): array
     {
@@ -180,7 +187,7 @@ final class SessionReceiptService
     {
         $this->guard($actor,true);$reason=$body['reason']??'';$kind=$body['kind']??'';
         if(!is_string($reason)||strlen(trim($reason))<5||strlen($reason)>500||!in_array($kind,['recording_error','refunded'],true)||($body['confirmed']??false)!==true)throw new ApiException(422,'validation_error','Confirm a recording correction or an already completed full refund, with a reason.');
-        $pdo=$this->database->connection();try{
+        $pdo=$this->database->connection();$lock=new ConsentLock($pdo);$lock->acquire($actor->clinicId);try{
             $pdo->beginTransaction();
             // Same lock order as issuance: appointment first, then receipt.
             $initial=$this->receipt($actor,$id);$a=$this->appointment($actor,(int)$initial['appointment_id'],true);$r=$this->receipt($actor,$id,true);
@@ -193,5 +200,6 @@ final class SessionReceiptService
             $q=$pdo->prepare("INSERT INTO appointment_status_history(appointment_id,from_status,to_status,actor_user_id,reason) VALUES(?,'paid','completed',?,'Receipt voided; see financial audit')");$q->execute([$a['id'],$actor->userId]);
             $this->audit->write($actor->clinicId,$actor,$correlation,'receipt.void','session_receipt',$id,'success',['kind'=>$kind]);$pdo->commit();return ['void'=>true];
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{$lock->release();}
     }
 }

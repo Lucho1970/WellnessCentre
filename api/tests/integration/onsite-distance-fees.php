@@ -5,7 +5,7 @@ require __DIR__.'/recurring-bookings.php';
 use Wellness\Auth\AuthContext;
 use Wellness\Config;
 use Wellness\Http\ApiException;
-use Wellness\Service\{AddressCoverageService,AdminService,AuditLogger,BookingService,OnsiteFee,OnsiteFeeService,SessionReceiptService,RecurringBookingService};
+use Wellness\Service\{AddressCoverageService,AdminService,AuditLogger,BookingService,ConsentLock,OnsiteFee,OnsiteFeeService,SessionReceiptService,RecurringBookingService};
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/038_practitioner_private_locations.sql'));
 $pdo->exec(file_get_contents(dirname(__DIR__,2).'/database/migrations/043_session_receipts.sql'));
 // Current persisted clinic authority is required for issuer-template maintenance.
@@ -58,13 +58,22 @@ $request['quoted_mobile_fee_cents']=1500;$paid=$bookings->create($practitioner,$
 $assert((int)$paid['mobile_fee_cents']===1500,'Extended-distance fee saved');
 $assert($bookings->create($practitioner,$request,'onsite-test')['id']===$paid['id'],'Confirmation retry stays idempotent');
 $deny(fn()=>$waivers->waive($client,(int)$paid['id'],['version'=>1,'reason'=>'Local courtesy'],'test'),'forbidden');
-$deny(fn()=>$waivers->waive($colleague,(int)$paid['id'],['version'=>1,'reason'=>'Local courtesy'],'test'),'receipt_not_found');
+$deny(fn()=>$waivers->waive($colleague,(int)$paid['id'],['version'=>1,'reason'=>'Local courtesy'],'test'),'appointment_not_found');
 $deny(fn()=>$waivers->context(new AuthContext(2,2,'','','','staff',['super_admin']),(int)$paid['id']),'appointment_not_found');
 $deny(fn()=>$waivers->waive($practitioner,(int)$paid['id'],['version'=>0,'reason'=>'Local courtesy'],'test'),'appointment_changed');
 $waived=$waivers->waive($practitioner,(int)$paid['id'],['version'=>1,'reason'=>'Local courtesy'],'test');
 $assert($waived['fee_cents']===0&&$waived['assessed_fee_cents']===1500&&$waived['waived']&&$waived['version']===2,'Waiver keeps original fee and advances version');
 $assert((int)$pdo->query('SELECT mobile_fee_cents FROM appointments WHERE id='.(int)$free['id'])->fetchColumn()===0,'Other session unchanged');
 $assert((int)$pdo->query("SELECT COUNT(*) FROM audit_logs WHERE action='appointment.travel_fee_waive'")->fetchColumn()===1,'Waiver audit');
+$blockingPdo=new PDO("mysql:host=127.0.0.1;port=$port;dbname=$name;charset=utf8mb4",'root','');$blockingLock=new ConsentLock($blockingPdo);$blockingLock->acquire(1);
+try{$deny(fn()=>$waivers->waive($practitioner,(int)$paid['id'],['version'=>2,'reason'=>'Again'],'test'),'consent_busy');}
+finally{$blockingLock->release();}
+$pdo->exec('UPDATE client_care_assignments SET active=0,ended_by=1,ended_at=UTC_TIMESTAMP() WHERE clinic_id=1 AND client_id=8 AND practitioner_id=3');
+try{
+ $deny(fn()=>$waivers->context($practitioner,(int)$paid['id']),'appointment_not_found');
+ $deny(fn()=>$waivers->waive($practitioner,(int)$paid['id'],['version'=>2,'reason'=>'Again'],'test'),'appointment_not_found');
+ $assert($waivers->context($admin,(int)$paid['id'])['waived']===true,'Clinic administrator retains fee context after care ends');
+}finally{$pdo->exec('UPDATE client_care_assignments SET active=1,ended_by=NULL,ended_at=NULL WHERE clinic_id=1 AND client_id=8 AND practitioner_id=3');}
 $deny(fn()=>$waivers->waive($practitioner,(int)$paid['id'],['version'=>2,'reason'=>'Again'],'test'),'travel_fee_locked');
 $pdo->exec('UPDATE practitioner_services SET mobile_fee_cents=2500 WHERE practitioner_id=3 AND service_id=4');
 $deny(fn()=>$coverage->verifyBooking($practitioner,$request,$destination),'coverage_validation_mismatch');
