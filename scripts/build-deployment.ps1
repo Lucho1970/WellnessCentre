@@ -36,9 +36,16 @@ $requiredFrontendSettings = @(
     'VITE_CUSTOMER_ENTRA_SPA_CLIENT_ID',
     'VITE_GOOGLE_MAPS_BROWSER_API_KEY'
 )
-$staffInvitationFlag = [Environment]::GetEnvironmentVariable('VITE_STAFF_INVITATIONS_ENABLED', 'Process')
-if ([string]::IsNullOrWhiteSpace($staffInvitationFlag)) { $staffInvitationFlag = $productionSettings['VITE_STAFF_INVITATIONS_ENABLED'] }
-if ($staffInvitationFlag -eq 'true') {
+$externalFlags = @{}
+foreach ($flag in @('VITE_STAFF_INVITATIONS_ENABLED','VITE_PRACTITIONER_APPLICATIONS_ENABLED','VITE_STAFF_EXTERNAL_AUTH_ENABLED','VITE_PRACTITIONER_SOCIAL_SIGN_IN_ENABLED')) {
+    $value = [Environment]::GetEnvironmentVariable($flag, 'Process')
+    if ([string]::IsNullOrWhiteSpace($value)) { $value = $productionSettings[$flag] }
+    if (-not [string]::IsNullOrWhiteSpace($value) -and $value -notin @('true','false')) { throw "Invalid frontend feature flag: $flag" }
+    $externalFlags[$flag] = $value
+}
+$externalEnabled = @('VITE_STAFF_INVITATIONS_ENABLED','VITE_PRACTITIONER_APPLICATIONS_ENABLED','VITE_STAFF_EXTERNAL_AUTH_ENABLED') | Where-Object { $externalFlags[$_] -eq 'true' }
+if ($externalFlags['VITE_PRACTITIONER_SOCIAL_SIGN_IN_ENABLED'] -eq 'true' -and -not $externalEnabled) { throw 'Practitioner social sign-in requires an external practitioner entry.' }
+if ($externalEnabled) {
     $requiredFrontendSettings += @('VITE_STAFF_EXTERNAL_TENANT_ID','VITE_STAFF_EXTERNAL_SUBDOMAIN','VITE_STAFF_EXTERNAL_API_CLIENT_ID','VITE_STAFF_EXTERNAL_SPA_CLIENT_ID')
 }
 $resolvedFrontendSettings = @{}
@@ -128,9 +135,13 @@ if ($DeploymentGuide -eq 'CLIENT_INTAKE_FORMS_RELEASE.md') {
 $commit = git -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit' }
 $manifest = [ordered]@{ release_name=$ReleaseName; source_commit=$commit; built_at_utc=[DateTime]::UtcNow.ToString('o'); layout='shared-clinic-portal-and-separate-marketing-sites'; deployment_guide=$DeploymentGuide; archives=@() }
-if ($staffInvitationFlag -eq 'true') {
+if ($externalEnabled) {
     $manifest.staff_authentication = [ordered]@{
         enabled_in_portal=$true
+        invitations_enabled=($externalFlags['VITE_STAFF_INVITATIONS_ENABLED'] -eq 'true')
+        applications_enabled=($externalFlags['VITE_PRACTITIONER_APPLICATIONS_ENABLED'] -eq 'true')
+        external_auth_enabled=($externalFlags['VITE_STAFF_EXTERNAL_AUTH_ENABLED'] -eq 'true')
+        social_sign_in_enabled=($externalFlags['VITE_PRACTITIONER_SOCIAL_SIGN_IN_ENABLED'] -eq 'true')
         tenant_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_TENANT_ID']
         subdomain=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_SUBDOMAIN']
         api_client_id=$resolvedFrontendSettings['VITE_STAFF_EXTERNAL_API_CLIENT_ID']

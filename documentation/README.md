@@ -14,12 +14,17 @@
 - [Wellnexa practitioner governance release preparation — 10 November 2026](PRACTITIONER_GOVERNANCE_RELEASE_PREP_2026-11-10.md): ordered migrations, backup/rollback rehearsal, hosted synthetic acceptance and owner gates.
 
 - [Practitioner client-access boundary — 6 November 2026](PRACTITIONER_CLIENT_ACCESS_BOUNDARY_2026-11-06.md): current care assignments replace historical grants for practitioner contacts, forms and invitations; local evidence and remaining release gates.
+- [Fullscript integration roadmap — 6 November 2026](FULLSCRIPT_INTEGRATION.md): documentation-only proposal, vendor/privacy approval gates, secure architecture and synthetic sandbox acceptance; no integration enabled.
+- [Shared portal sign-in release preparation — 5 November 2026](PORTAL_SIGNIN_RELEASE_PREP_2026-11-05.md): merged-source package, narrow upload/rollback, local verifier, hosted baseline and release gates.
 
 - [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.
 
 - [HTTPS enforcement — 5 November 2026](HTTPS_ENFORCEMENT_2026-11-05.md): Netfirms host-specific 302 staging, HTTP API denial, backup/verification/rollback and control ledger.
 
 - [Wellnexa privacy statement — 4 November 2026](WELLNEXA_PRIVACY_STATEMENT_2026-11-04.md): bilingual public statement, custody/contact wording, site and portal links, validation, controlled upload and 38-control ledger.
+- [Jane public feature inventory — 4 November 2026](JANE_FEATURE_INVENTORY_2026-11-04.md): source-linked Jane capabilities, including Canadian insurance and plan/add-on distinctions.
+- [Jane / Copihue feature comparison — 4 November 2026](JANE_FEATURE_COMPARISON_2026-11-04.md): local evidence, gaps and review priorities; no roadmap commitment or hosted acceptance implied.
+- [Receipt-first insurance roadmap decision — 4 November 2026](RECEIPT_FIRST_INSURANCE_ROADMAP_DECISION_2026-11-04.md): client-submittable receipts for initial release; direct insurer billing after initial release, with acceptance gaps and control ledger.
 
 - [Main integration checkpoint — 3 November 2026](MAIN_INTEGRATION_2026-11-03.md): local build, browser, PHP and disposable SQL results for the reviewed source merge; remaining release gates and branch scope.
 
