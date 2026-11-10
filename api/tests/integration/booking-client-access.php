@@ -116,6 +116,14 @@ $pdo->exec('UPDATE client_care_assignments SET active=0 WHERE clinic_id=1 AND cl
 $deny(fn()=>$bookings->getForStaff($practitioner,$appointmentId(101),[],'synthetic-care-revoked'),404,'appointment_not_found');
 $deny(fn()=>$bookings->manageable($practitioner,$appointmentId(101)),404,'appointment_not_found');
 $pdo->exec('UPDATE client_care_assignments SET active=1 WHERE clinic_id=1 AND client_id=101 AND practitioner_id=2');
+$pdo->exec("DELETE ur FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=2 AND r.code='practitioner'");
+try{
+    $check($ids($practitioner)===[],'Stale practitioner role cannot search booking contacts');
+    $check($directory->practitionerList($practitioner,[])['items']===[],'Stale practitioner role cannot list client directory');
+    $deny(fn()=>$bookings->bookingClientAddress($practitioner,101,'synthetic-role-revoked'),404,'client_not_found');
+    $deny(fn()=>$onboarding->invitations($inviter,101),403,'forbidden');
+    $check($listed($practitioner)===[],'Stale practitioner role cannot list appointments');
+}finally{$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 2,id FROM roles WHERE code='practitioner'");}
 // Permission revocation takes effect with the next server-derived AuthContext.
 $check($ids($practitioner)===$own,'No fallback to delegated scope after permission removal');
 foreach([$actor(4),$actor(4,['practitioner'],['schedule_for_other_practitioners']),$actor(6),$actor(5)] as $who){

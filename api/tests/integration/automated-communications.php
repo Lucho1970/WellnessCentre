@@ -65,6 +65,9 @@ $check($worker->run(1,$email['appointment'])['sent']===1&&count($mails)===1,'Eli
 $revoked=$create(true);$pdo->exec('UPDATE client_care_assignments SET active=0,ended_by=200,ended_at=UTC_TIMESTAMP() WHERE clinic_id=3 AND client_id=201 AND practitioner_id=200');
 $check($worker->run(1,$revoked['appointment'])['canceled']===1&&count($mails)===1,'Care revocation cancels queued staff email before provider submission');
 $pdo->exec('UPDATE client_care_assignments SET active=1,ended_by=NULL,ended_at=NULL WHERE clinic_id=3 AND client_id=201 AND practitioner_id=200');
+$revokedRole=$create(true);$pdo->exec("DELETE ur FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=200 AND r.code='practitioner'");
+try{$check($worker->run(1,$revokedRole['appointment'])['canceled']===1&&count($mails)===1,'Persisted practitioner-role revocation cancels queued staff email before provider submission');}
+finally{$pdo->exec("INSERT INTO user_roles(user_id,role_id,location_id) SELECT 200,id,3 FROM roles WHERE code='practitioner'");}
 $check(str_contains($mails[0][0],'clinic%40example.test')&&$mails[0][1]['message']['replyTo'][0]['emailAddress']['address']==='clinic-reply@example.test','Email uses the exact clinic sender and reply routing');
 $pdo->exec("UPDATE staff_notification_preferences SET personal_email='private-notifications@example.test',personal_email_verified_at=UTC_TIMESTAMP() WHERE user_id=200");
 $routing=new ClinicMailRouter($pdo,$mailer);

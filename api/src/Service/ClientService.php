@@ -69,11 +69,13 @@ final class ClientService
         $sql="SELECT u.id,u.display_name,u.email,u.status,cp.phone,cp.preferred_contact,
             (SELECT COUNT(*) FROM appointments counted WHERE counted.clinic_id=u.clinic_id AND counted.practitioner_id=p.id AND counted.client_id=u.id) appointment_count,
             (SELECT recent.id FROM appointments recent WHERE recent.clinic_id=u.clinic_id AND recent.practitioner_id=p.id AND recent.client_id=u.id ORDER BY recent.starts_at DESC,recent.id DESC LIMIT 1) recent_appointment_id
-            FROM practitioners p JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=:clinic AND staff.status='active'
+            FROM practitioners p JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=:clinic AND staff.user_type='staff' AND staff.status='active'
             JOIN client_care_assignments care ON care.clinic_id=staff.clinic_id AND care.practitioner_id=p.id AND care.active=1
             JOIN users u ON u.id=care.client_id AND u.clinic_id=staff.clinic_id AND u.user_type='client'
             LEFT JOIN client_profiles cp ON cp.user_id=u.id
-            WHERE p.user_id=:actor AND p.active=1 AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id)";
+            WHERE p.user_id=:actor AND p.active=1
+                AND EXISTS(SELECT 1 FROM user_roles care_role_link JOIN roles care_role ON care_role.id=care_role_link.role_id AND care_role.code='practitioner' WHERE care_role_link.user_id=staff.id)
+                AND NOT EXISTS(SELECT 1 FROM client_merge_records cm WHERE cm.duplicate_client_id=u.id)";
         $params=['clinic'=>$actor->clinicId,'actor'=>$actor->userId];
         $sql.=ConsentAccess::condition($actor,$params);
         if($term!==''){

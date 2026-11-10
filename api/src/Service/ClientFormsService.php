@@ -19,7 +19,7 @@ final class ClientFormsService
     private function operator(AuthContext $actor): bool { return $actor->userType==='staff'&&$actor->hasAnyRole('super_admin','clinic_admin','reception'); }
     private function ownPractitioner(AuthContext $actor): ?int {
         if($actor->userType!=='staff'||!$actor->hasAnyRole('practitioner'))return null;
-        $s=$this->database->connection()->prepare("SELECT p.id FROM practitioners p JOIN users u ON u.id=p.user_id WHERE u.id=? AND u.clinic_id=? AND u.status='active' AND p.active=1");$s->execute([$actor->userId,$actor->clinicId]);return ($id=$s->fetchColumn())?(int)$id:null;
+        $s=$this->database->connection()->prepare("SELECT p.id FROM practitioners p JOIN users u ON u.id=p.user_id WHERE u.id=? AND u.clinic_id=? AND u.user_type='staff' AND u.status='active' AND p.active=1 AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id AND r.code='practitioner' WHERE ur.user_id=u.id)");$s->execute([$actor->userId,$actor->clinicId]);return ($id=$s->fetchColumn())?(int)$id:null;
     }
     private function templateAuthor(AuthContext $actor): void {
         $this->guard($actor);

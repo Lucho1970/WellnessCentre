@@ -9,6 +9,7 @@
 - [Practitioner access route review — 10 November 2026](PRACTITIONER_ACCESS_ROUTE_REVIEW_2026-11-10.md): appointment, worker, dashboard and visit boundaries; remaining historical-record decisions and local validation.
 - [Practitioner historical financial access — 10 November 2026](PRACTITIONER_HISTORICAL_FINANCIAL_ACCESS_2026-11-10.md): owner decision for clinic review after care ends, receipt/fee access, concurrency and local evidence.
 - [Care-assignment review workflow — 10 November 2026](CARE_ASSIGNMENT_REVIEW_WORKFLOW_2026-11-10.md): structured reason and operator review confirmation for clinic care-team changes.
+- [Practitioner stale-role integration — 10 November 2026](PRACTITIONER_STALE_ROLE_INTEGRATION_2026-11-10.md): current-role checks across client, form, invitation and queued staff notification paths.
 
 - [Practitioner client-access boundary — 6 November 2026](PRACTITIONER_CLIENT_ACCESS_BOUNDARY_2026-11-06.md): current care assignments replace historical grants for practitioner contacts, forms and invitations; local evidence and remaining release gates.
 

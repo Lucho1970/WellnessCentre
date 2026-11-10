@@ -15,8 +15,8 @@ $assert=function(bool $ok,string $message)use(&$checks){if(!$ok)throw new Runtim
 $denies=function(callable $action,string $code)use($assert){try{$action();}catch(ApiException $e){$assert($e->errorCode===$code,'Expected '.$code.', got '.$e->errorCode);return;}throw new RuntimeException('Expected '.$code);};
 $assert($pdo->query('SELECT family_key FROM form_templates WHERE id='.$legacy)->fetchColumn()===null,'Legacy template must remain unchanged');
 $clinician=new AuthContext(2,1,'','','','staff',['practitioner']);$reception=new AuthContext(1,1,'','','','staff',['reception']);
-$pdo->exec('INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES(1,8,3,1,1,UTC_TIMESTAMP()),(1,9,3,1,1,UTC_TIMESTAMP())');
-$pdo->exec("INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(11,1,'other-practitioner@example.test','Other practitioner','staff','active'); INSERT INTO practitioners(id,user_id,discipline,booking_mode) VALUES(12,11,'Massage','practitioner_managed')");
+$pdo->exec('INSERT INTO client_care_assignments(clinic_id,client_id,practitioner_id,active,assigned_by,assigned_at) VALUES(1,9,3,1,1,UTC_TIMESTAMP())');
+$pdo->exec("INSERT INTO users(id,clinic_id,email,display_name,user_type,status) VALUES(11,1,'other-practitioner@example.test','Other practitioner','staff','active'); INSERT INTO practitioners(id,user_id,discipline,booking_mode) VALUES(12,11,'Massage','practitioner_managed'); INSERT INTO user_roles(user_id,role_id) SELECT 11,id FROM roles WHERE code='practitioner'");
 $other=new AuthContext(11,1,'','','','staff',['practitioner']);
 $definition=['instructions'=>'Synthetic test only','questions'=>[['id'=>'text','label'=>'Test text','label_fr'=>'Texte fictif','type'=>'text','required'=>true],['id'=>'yes','label'=>'Test yes/no','type'=>'yes_no','required'=>true],['id'=>'consent','label'=>'Test acknowledgement','type'=>'consent','required'=>true]]];
 $publish=['owner_practitioner_id'=>3,'name'=>'Synthetic intake','form_type'=>'consent','definition'=>$definition,'service_ids'=>[4],'idempotency_key'=>'synthetic-form-publish-one'];
@@ -26,6 +26,12 @@ $denies(fn()=>$forms->publish($client,$publish,'forms-test'),'forbidden');
 $denies(fn()=>$forms->publish($other,array_replace($publish,['idempotency_key'=>'other-practitioner-publication']),'forms-test'),'forbidden');
 $assignment=['template_id'=>$first['id'],'idempotency_key'=>'synthetic-form-assignment-one'];
 $task=$forms->assign($clinician,8,$assignment,'forms-test');$assert($forms->assign($clinician,8,$assignment,'forms-test')===$task,'Assignment replay');
+$pdo->exec("DELETE ur FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=2 AND r.code='practitioner'");
+try{
+    $assert($forms->templates($clinician,[])['items']===[],'Stale practitioner context cannot list form templates after role removal');
+    $denies(fn()=>$forms->detail($clinician,$task['id'],'forms-test'),'form_not_found');
+    $denies(fn()=>$forms->assign($clinician,8,['template_id'=>$first['id'],'idempotency_key'=>'revoked-role-form-assignment'],'forms-test'),'forbidden');
+}finally{$pdo->exec("INSERT INTO user_roles(user_id,role_id) SELECT 2,id FROM roles WHERE code='practitioner'");}
 $assert(count($forms->list($client,8,[],'forms-test')['items'])===1,'Own form list');
 $assert(!$forms->list($admin,8,[],'forms-test')['items'][0]['can_read_answers'],'Admin metadata must exclude clinical answers');
 $denies(fn()=>$forms->detail($admin,$task['id'],'forms-test'),'forbidden');

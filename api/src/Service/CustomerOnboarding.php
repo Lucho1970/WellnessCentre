@@ -207,9 +207,9 @@ final class CustomerOnboarding
     }
     private function staffClient(AuthContext $actor, int $client, bool $allowCreator = false): void {
         if ($allowCreator && $actor->userType === 'staff' && !$actor->hasAnyRole('super_admin','clinic_admin','reception') && $actor->hasAnyRole('practitioner') && $actor->hasPermission('add_clients')) {
-            if (!$this->query("SELECT 1 FROM practitioners p JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=? AND staff.status='active'
+            if (!$this->query("SELECT 1 FROM practitioners p JOIN users staff ON staff.id=p.user_id AND staff.clinic_id=? AND staff.user_type='staff' AND staff.status='active'
                 JOIN client_care_assignments care ON care.clinic_id=staff.clinic_id AND care.practitioner_id=p.id AND care.client_id=? AND care.active=1
-                WHERE p.user_id=? AND p.active=1 LIMIT 1", [$actor->clinicId, $client, $actor->userId])->fetchColumn())
+                WHERE p.user_id=? AND p.active=1 AND EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id AND r.code='practitioner' WHERE ur.user_id=staff.id) LIMIT 1", [$actor->clinicId, $client, $actor->userId])->fetchColumn())
                 throw new ApiException(403, 'forbidden', 'A current care assignment is required to invite this client.');
         } else ClientService::authorize($actor);
         $this->clinic();

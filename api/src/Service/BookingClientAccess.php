@@ -38,6 +38,8 @@ final class BookingClientAccess
         return " AND $activeActor AND $notMerged AND EXISTS(SELECT 1 FROM practitioners booking_practitioner
             JOIN client_care_assignments care ON care.clinic_id=u.clinic_id AND care.client_id=u.id
                 AND care.practitioner_id=booking_practitioner.id AND care.active=1
-            WHERE booking_practitioner.user_id=:booking_practitioner_user AND booking_practitioner.active=1)";
+            WHERE booking_practitioner.user_id=:booking_practitioner_user AND booking_practitioner.active=1
+                AND EXISTS(SELECT 1 FROM user_roles booking_user_role JOIN roles booking_role ON booking_role.id=booking_user_role.role_id AND booking_role.code='practitioner'
+                    WHERE booking_user_role.user_id=booking_practitioner.user_id))";
     }
 }
