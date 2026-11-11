@@ -13,6 +13,7 @@
 - [Practitioner MySQL 5.7 care SQL — 10 November 2026](PRACTITIONER_MYSQL57_COMPATIBILITY_2026-11-10.md): correlated-query compatibility fix and dual-engine migration rehearsal evidence.
 - [Wellnexa practitioner governance release preparation — 10 November 2026](PRACTITIONER_GOVERNANCE_RELEASE_PREP_2026-11-10.md): ordered migrations, backup/rollback rehearsal, hosted synthetic acceptance and owner gates.
 - [Practitioner emergency-hold edit guard — 11 November 2026](PRACTITIONER_HOLD_EDIT_GUARD_2026-11-11.md): prevents ordinary Staff and practitioner edits from stranding an active hold; records the final-disable gap.
+- [Practitioner hold Inactive resolution — 11 November 2026](PRACTITIONER_HOLD_INACTIVE_RESOLUTION_2026-11-11.md): explicit Super Admin choice to restore access or keep an account Inactive without a reactivation interval.
 
 - [Practitioner client-access boundary — 6 November 2026](PRACTITIONER_CLIENT_ACCESS_BOUNDARY_2026-11-06.md): current care assignments replace historical grants for practitioner contacts, forms and invitations; local evidence and remaining release gates.
 - [Fullscript integration roadmap — 6 November 2026](FULLSCRIPT_INTEGRATION.md): documentation-only proposal, vendor/privacy approval gates, secure architecture and synthetic sandbox acceptance; no integration enabled.

@@ -77,9 +77,11 @@ final class AdminService
     {
         if(!isset($body['hold'])||!is_bool($body['hold']))throw new ApiException(422,'validation_error','Choose whether to hold access.');
         $hold=$body['hold'];$reason=$body['reason_code']??null;
+        $resolution=$body['resolution']??null;
         if($hold&&!in_array($reason,['security_concern','departure_review','other'],true))throw new ApiException(422,'validation_error','Choose a reason for the access hold.');
-        if(!$hold&&$reason!==null)throw new ApiException(422,'validation_error','A release does not set a new hold reason.');
-        return $this->clinicAdministration($actor,function()use($actor,$practitionerId,$hold,$reason,$cid):array{
+        if($hold&&$resolution!==null)throw new ApiException(422,'validation_error','A new hold cannot resolve an existing one.');
+        if(!$hold&&($reason!==null||!in_array($resolution,['active','inactive'],true)))throw new ApiException(422,'validation_error','Choose whether to restore access or leave the account inactive.');
+        return $this->clinicAdministration($actor,function()use($actor,$practitionerId,$hold,$reason,$resolution,$cid):array{
             $this->assertEmergencyAuthority($actor,!$hold);
             $pdo=$this->database->connection();
             $q=$pdo->prepare("SELECT u.id,u.status FROM practitioners p JOIN users u ON u.id=p.user_id AND u.clinic_id=:clinic AND u.user_type='staff'
@@ -98,12 +100,13 @@ final class AdminService
                 if($q->rowCount()!==1)throw new ApiException(409,'access_state_changed','Practitioner access changed. Refresh and review it again.');
             }else{
                 if((int)$existing!==1||$target['status']!=='locked')throw new ApiException(409,'access_state_changed','Practitioner access changed. Refresh and review it again.');
-                $q=$pdo->prepare("UPDATE users SET status='active' WHERE id=? AND clinic_id=? AND status='locked'");$q->execute([(int)$target['id'],$actor->clinicId]);
+                $q=$pdo->prepare("UPDATE users SET status=? WHERE id=? AND clinic_id=? AND status='locked'");$q->execute([$resolution,(int)$target['id'],$actor->clinicId]);
                 if($q->rowCount()!==1)throw new ApiException(409,'access_state_changed','Practitioner access changed. Refresh and review it again.');
                 $q=$pdo->prepare('UPDATE practitioner_emergency_holds SET active=0,released_by=?,released_at=UTC_TIMESTAMP() WHERE user_id=? AND clinic_id=? AND active=1');$q->execute([$actor->userId,(int)$target['id'],$actor->clinicId]);
             }
-            $this->audit->write($actor->clinicId,$actor,$cid,$hold?'practitioner.access_hold':'practitioner.access_restore','practitioner',$practitionerId,'success',$hold?['reason_code'=>$reason]:[]);
-            return ['practitioner_id'=>$practitionerId,'access_held'=>$hold,'status'=>$hold?'locked':'active'];
+            $action=$hold?'practitioner.access_hold':($resolution==='active'?'practitioner.access_restore':'practitioner.access_deactivate');
+            $this->audit->write($actor->clinicId,$actor,$cid,$action,'practitioner',$practitionerId,'success',$hold?['reason_code'=>$reason]:['resolution'=>$resolution]);
+            return ['practitioner_id'=>$practitionerId,'access_held'=>$hold,'status'=>$hold?'locked':$resolution];
         },['super_admin','clinic_admin','reception'],true);
     }
 

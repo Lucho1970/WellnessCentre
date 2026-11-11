@@ -37,6 +37,57 @@ test('clinic admin can immediately hold a practitioner and cannot restore the ho
   await expect(hold).toBeDisabled();
 });
 
+for (const resolution of ['active', 'inactive'] as const) {
+  test(`Super Admin resolves a practitioner hold to ${resolution} without an intermediate save`, async ({ page }) => {
+    let status = 'locked';
+    let held = true;
+    await fixture(page, ['super_admin'], (path, method, body) => {
+      if (path === '/admin/practitioner-emergency-access') return [{ practitioner_id: 7, user_id: 9, display_name: 'Synthetic Practitioner', status, access_held: held ? '1' : '0', reason_code: held ? 'departure_review' : null }];
+      if (path === '/admin/practitioners/7/emergency-access' && method === 'POST') {
+        expect(body).toEqual({ hold: false, resolution });
+        held = false; status = resolution; return { practitioner_id: 7, access_held: false, status };
+      }
+      return [];
+    });
+    await page.goto(`${host}/admin/practitioner-safety`);
+    const hold = page.getByRole('switch', { name: 'Block practitioner access: Synthetic Practitioner' });
+    await expect(hold).toBeChecked();
+    await hold.click();
+    const dialog = page.getByRole('dialog', { name: 'Resolve practitioner access hold' });
+    await expect(dialog).toBeVisible();
+    const save = dialog.getByRole('button', { name: 'Resolve hold' });
+    await expect(save).toBeDisabled();
+    await dialog.getByRole('combobox', { name: 'Resolve hold to' }).click();
+    await page.getByRole('option', { name: resolution === 'active' ? 'Restore active access' : 'Keep account inactive' }).click();
+    await save.click();
+    await expect(hold).not.toBeChecked();
+    if (resolution === 'inactive') await expect(hold).toBeDisabled();
+    else await expect(hold).toBeEnabled();
+    await expect(page.getByText(resolution === 'inactive' ? 'Hold resolved; account remains inactive.' : 'Practitioner access restored.')).toBeVisible();
+  });
+}
+
+test('French mobile hold resolution keeps the practitioner inactive', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let inactive = false;
+  await fixture(page, ['super_admin'], (path, method, body) => {
+    if (path === '/admin/practitioner-emergency-access') return [{ practitioner_id: 7, user_id: 9, display_name: 'Praticien fictif', status: inactive ? 'inactive' : 'locked', access_held: inactive ? '0' : '1', reason_code: inactive ? null : 'departure_review' }];
+    if (path === '/admin/practitioners/7/emergency-access' && method === 'POST') {
+      expect(body).toEqual({ hold: false, resolution: 'inactive' }); inactive = true;
+      return { practitioner_id: 7, access_held: false, status: 'inactive' };
+    }
+    return [];
+  });
+  await page.goto(`${host}/admin/practitioner-safety?lang=fr`);
+  await page.getByRole('switch', { name: 'Bloquer l’accès du praticien: Praticien fictif' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Résoudre le blocage de l’accès du praticien' });
+  await dialog.getByRole('combobox', { name: 'Résoudre le blocage en' }).click();
+  await page.getByRole('option', { name: 'Garder le compte inactif' }).click();
+  await dialog.getByRole('button', { name: 'Résoudre le blocage' }).click();
+  await expect(page.getByText('Blocage levé; le compte demeure inactif.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('office user with explicit hold permission can open only the hold workflow', async ({ page }) => {
   await fixture(page, ['reception'], path => path === '/admin/practitioner-emergency-access'
     ? [{ practitioner_id: 7, user_id: 9, display_name: 'Synthetic Practitioner', status: 'active', access_held: '0', reason_code: null }]

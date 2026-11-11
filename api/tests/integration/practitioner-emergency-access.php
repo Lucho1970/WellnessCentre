@@ -31,13 +31,15 @@ $denied(fn()=>$admin->emergencyPractitionerAccess($actor(6,['reception']),2,['ho
 $denied(fn()=>$admin->emergencyPractitionerAccess($clinicAdmin,5,['hold'=>true,'reason_code'=>'security_concern'],'foreign'),404);
 $denied(fn()=>$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>'yes','reason_code'=>'security_concern'],'bad'),422);
 $denied(fn()=>$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>true,'reason_code'=>'patient-name'],'bad'),422);
+$denied(fn()=>$admin->emergencyPractitionerAccess($operator,2,['hold'=>false],'missing-resolution'),422);
+$denied(fn()=>$admin->emergencyPractitionerAccess($operator,2,['hold'=>true,'reason_code'=>'other','resolution'=>'inactive'],'invalid-hold-resolution'),422);
 $result=$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>true,'reason_code'=>'security_concern'],'hold-1');
 $assert($result['status']==='locked'&&(int)$pdo->query('SELECT COUNT(*) FROM practitioner_emergency_holds WHERE user_id=2 AND active=1')->fetchColumn()===1,'Clinic admin holds access');
 $assert($pdo->query('SELECT status FROM users WHERE id=2')->fetchColumn()==='locked','Existing token will fail active-user check');
 $assert((int)$pdo->query('SELECT COUNT(*) FROM appointments')->fetchColumn()===$before,'Hold preserves bookings');
 $denied(fn()=>$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>true,'reason_code'=>'other'],'duplicate'),409);
-$denied(fn()=>$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>false],'restore-denied'),403);
-$denied(fn()=>$admin->emergencyPractitionerAccess($office,2,['hold'=>false],'office-restore-denied'),403);
+$denied(fn()=>$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>false,'resolution'=>'active'],'restore-denied'),403);
+$denied(fn()=>$admin->emergencyPractitionerAccess($office,2,['hold'=>false,'resolution'=>'inactive'],'office-inactive-denied'),403);
 $update=['given_name'=>'Synthetic','family_name'=>'Practitioner','display_name'=>'Synthetic Practitioner','email'=>'practitioner@example.test','location_id'=>1,'discipline'=>'Massage','booking_mode'=>'clinic_managed','status'=>'active','active'=>true];
 $denied(fn()=>$admin->updatePractitioner($operator,2,$update,'bypass-denied'),409);
 $denied(fn()=>$admin->updatePractitioner($operator,2,array_replace($update,['status'=>'inactive']),'inactive-while-held'),409);
@@ -48,16 +50,29 @@ $denied(fn()=>$admin->updateStaff($operator,2,array_replace($staffUpdate,['statu
 $assert($pdo->query('SELECT status FROM users WHERE id=2')->fetchColumn()==='locked'
     &&(int)$pdo->query("SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=2 AND r.code='practitioner'")->fetchColumn()===1,
     'Ordinary edits cannot strand an active emergency hold');
-$result=$admin->emergencyPractitionerAccess($operator,2,['hold'=>false],'restore-1');
+$result=$admin->emergencyPractitionerAccess($operator,2,['hold'=>false,'resolution'=>'active'],'restore-1');
 $assert($result['status']==='active'&&(int)$pdo->query('SELECT active FROM practitioner_emergency_holds WHERE user_id=2')->fetchColumn()===0,'Super Admin restores access');
-$denied(fn()=>$admin->emergencyPractitionerAccess($operator,2,['hold'=>false],'duplicate-release'),409);
+$denied(fn()=>$admin->emergencyPractitionerAccess($operator,2,['hold'=>false,'resolution'=>'active'],'duplicate-release'),409);
 $officeHold=$admin->emergencyPractitionerAccess($office,2,['hold'=>true,'reason_code'=>'security_concern'],'office-hold');
 $assert($officeHold['status']==='locked','Explicit office permission can stop access');
-$admin->emergencyPractitionerAccess($operator,2,['hold'=>false],'office-hold-release');
+$admin->emergencyPractitionerAccess($operator,2,['hold'=>false,'resolution'=>'active'],'office-hold-release');
 $officeBody['permissions']=[];$admin->updateStaff($operator,6,$officeBody,'revoke-office-hold');
 $denied(fn()=>$admin->emergencyPractitioners($office),403);
 $pdo->exec("CREATE TRIGGER emergency_audit_failure BEFORE INSERT ON audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic audit failure'");
 try{$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>true,'reason_code'=>'departure_review'],'audit-fail');throw new RuntimeException('Audit failure accepted');}
 catch(PDOException $e){}finally{$pdo->exec('DROP TRIGGER emergency_audit_failure');}
 $assert($pdo->query('SELECT status FROM users WHERE id=2')->fetchColumn()==='active'&&(int)$pdo->query('SELECT active FROM practitioner_emergency_holds WHERE user_id=2')->fetchColumn()===0,'Audit failure rolls back hold');
+$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>true,'reason_code'=>'departure_review'],'hold-for-inactive');
+$pdo->exec("CREATE TRIGGER emergency_audit_failure BEFORE INSERT ON audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic audit failure'");
+try{$admin->emergencyPractitionerAccess($operator,2,['hold'=>false,'resolution'=>'inactive'],'inactive-audit-fail');throw new RuntimeException('Audit failure accepted');}
+catch(PDOException $e){}finally{$pdo->exec('DROP TRIGGER emergency_audit_failure');}
+$assert($pdo->query('SELECT status FROM users WHERE id=2')->fetchColumn()==='locked'
+    &&(int)$pdo->query('SELECT active FROM practitioner_emergency_holds WHERE user_id=2')->fetchColumn()===1,
+    'Audit failure rolls back inactive resolution and preserves the hold');
+$result=$admin->emergencyPractitionerAccess($operator,2,['hold'=>false,'resolution'=>'inactive'],'resolve-inactive');
+$assert($result['status']==='inactive'&&(int)$pdo->query('SELECT active FROM practitioner_emergency_holds WHERE user_id=2')->fetchColumn()===0
+    &&$pdo->query('SELECT status FROM users WHERE id=2')->fetchColumn()==='inactive',
+    'Super Admin resolves a hold directly to inactive without reactivation');
+$assert($pdo->query("SELECT action FROM audit_logs WHERE entity_type='practitioner' AND entity_id=2 ORDER BY id DESC LIMIT 1")->fetchColumn()==='practitioner.access_deactivate',
+    'Inactive resolution has a distinct audit action');
 echo "Emergency practitioner access: $checks checks passed; disposable synthetic SQL only.\n";
