@@ -167,7 +167,8 @@ final class AdminService
         $pdo=$this->database->connection();
 
         $find=$pdo->prepare('SELECT p.user_id FROM practitioners p JOIN users u ON u.id=p.user_id AND u.user_type=\'staff\' WHERE p.id=:practitioner AND u.clinic_id=:clinic FOR UPDATE');$find->execute(['practitioner'=>$practitionerId,'clinic'=>$actor->clinicId]);$userId=$find->fetchColumn();if(!$userId)throw new ApiException(404,'practitioner_not_found','Practitioner not found.');
-        if($status==='active'){$hold=$pdo->prepare('SELECT 1 FROM practitioner_emergency_holds WHERE user_id=? AND clinic_id=? AND active=1');$hold->execute([(int)$userId,$actor->clinicId]);if($hold->fetchColumn())throw new ApiException(409,'access_held','Restore emergency access in its dedicated workflow first.');}
+        $hold=$pdo->prepare('SELECT 1 FROM practitioner_emergency_holds WHERE user_id=? AND clinic_id=? AND active=1');$hold->execute([(int)$userId,$actor->clinicId]);
+        if($hold->fetchColumn())throw new ApiException(409,'access_held','Resolve the emergency hold in its dedicated workflow before editing this practitioner.');
         if($this->globalPractitionersEnabled){
             $global=$pdo->prepare('SELECT a.status,p.discipline,p.credentials FROM global_practitioner_clinics a JOIN practitioners p ON p.id=a.practitioner_id WHERE a.practitioner_id=?');$global->execute([$practitionerId]);$registered=$global->fetch();
             if($registered){
@@ -560,7 +561,8 @@ final class AdminService
             $pdo->beginTransaction();
             $target=$pdo->prepare("SELECT id FROM users WHERE id=? AND clinic_id=? AND user_type='staff' FOR UPDATE");$target->execute([$userId,$actor->clinicId]);
             if(!$target->fetchColumn())throw new ApiException(404,'staff_not_found','Staff member not found.');
-            if($body['status']==='active'){$hold=$pdo->prepare('SELECT 1 FROM practitioner_emergency_holds WHERE user_id=? AND clinic_id=? AND active=1');$hold->execute([$userId,$actor->clinicId]);if($hold->fetchColumn())throw new ApiException(409,'access_held','Restore emergency access in its dedicated workflow first.');}
+            $hold=$pdo->prepare('SELECT 1 FROM practitioner_emergency_holds WHERE user_id=? AND clinic_id=? AND active=1');$hold->execute([$userId,$actor->clinicId]);
+            if($hold->fetchColumn())throw new ApiException(409,'access_held','Resolve the emergency hold in its dedicated workflow before editing this staff account.');
             $s=$pdo->prepare("UPDATE users SET display_name=:name,email=:email,status=:status WHERE id=:id AND clinic_id=:clinic AND user_type='staff'");$s->execute(['name'=>trim((string)$body['display_name']),'email'=>strtolower(trim((string)$body['email'])),'status'=>$body['status'],'id'=>$userId,'clinic'=>$actor->clinicId]);
             $check=$pdo->prepare('SELECT 1 FROM users WHERE id=:id AND clinic_id=:clinic');$check->execute(['id'=>$userId,'clinic'=>$actor->clinicId]);if(!$check->fetchColumn())throw new ApiException(404,'staff_not_found','Staff member not found.');
             $pdo->prepare('DELETE FROM user_roles WHERE user_id=:id')->execute(['id'=>$userId]);$insert=$pdo->prepare('INSERT INTO user_roles(user_id,role_id,assigned_by) SELECT :user,id,:actor FROM roles WHERE code=:role');foreach($roles as $role)$insert->execute(['user'=>$userId,'actor'=>$actor->userId,'role'=>$role]);

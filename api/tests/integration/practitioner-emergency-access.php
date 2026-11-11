@@ -40,6 +40,14 @@ $denied(fn()=>$admin->emergencyPractitionerAccess($clinicAdmin,2,['hold'=>false]
 $denied(fn()=>$admin->emergencyPractitionerAccess($office,2,['hold'=>false],'office-restore-denied'),403);
 $update=['given_name'=>'Synthetic','family_name'=>'Practitioner','display_name'=>'Synthetic Practitioner','email'=>'practitioner@example.test','location_id'=>1,'discipline'=>'Massage','booking_mode'=>'clinic_managed','status'=>'active','active'=>true];
 $denied(fn()=>$admin->updatePractitioner($operator,2,$update,'bypass-denied'),409);
+$denied(fn()=>$admin->updatePractitioner($operator,2,array_replace($update,['status'=>'inactive']),'inactive-while-held'),409);
+$staff=$pdo->query('SELECT display_name,email FROM users WHERE id=2')->fetch();
+$staffUpdate=['display_name'=>$staff['display_name'],'email'=>$staff['email'],'status'=>'inactive','roles'=>['practitioner'],'permissions'=>[]];
+$denied(fn()=>$admin->updateStaff($operator,2,$staffUpdate,'staff-inactive-while-held'),409);
+$denied(fn()=>$admin->updateStaff($operator,2,array_replace($staffUpdate,['status'=>'locked','roles'=>[]]),'staff-role-removal-while-held'),409);
+$assert($pdo->query('SELECT status FROM users WHERE id=2')->fetchColumn()==='locked'
+    &&(int)$pdo->query("SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=2 AND r.code='practitioner'")->fetchColumn()===1,
+    'Ordinary edits cannot strand an active emergency hold');
 $result=$admin->emergencyPractitionerAccess($operator,2,['hold'=>false],'restore-1');
 $assert($result['status']==='active'&&(int)$pdo->query('SELECT active FROM practitioner_emergency_holds WHERE user_id=2')->fetchColumn()===0,'Super Admin restores access');
 $denied(fn()=>$admin->emergencyPractitionerAccess($operator,2,['hold'=>false],'duplicate-release'),409);
