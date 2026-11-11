@@ -1,5 +1,7 @@
 # Wellnexa practitioner governance release preparation — 10 November 2026
 
+**Local restore follow-up, 11 November 2026:** the synthetic export was restored into a networkless disposable Docker MySQL 5.7.44 container, and migrations 059–064 applied in order. See the [dated rehearsal report](PRACTITIONER_DOCKER_RESTORE_REHEARSAL_2026-11-11.md) for exact counts, the corrected CLI delimiter invocation, storage limitation and outstanding hosted gates. This adds local evidence only; the release status below remains unchanged.
+
 **Source integration update, 11 November 2026:** the reviewed stack was fast-forward merged into local and `origin/main` at `87e4c41408286a6d47baff1b42ea906dba5ce402`. All ten task branches were verified as merged and unused, then removed locally and remotely. The working tree was clean and `main` matched `origin/main`. This records a **source merge only**: no production deployment, migration, provider, hosted account or private configuration was changed. The accepted operating rule is **clinic review only** for any practitioner request for historical appointment/receipt information after a care assignment ends.
 
 **Preparation history:** this plan began on `feature/practitioner-governance-release-prep` from `212fd2794d51c2f28b495fb4f44492c6483a7cce`, reconciled with the then-current `main` `aaa8347` at `e5cd7e3`, and incorporated the hold fixes documented below. It remains a review plan, not deployment or real-data approval.
