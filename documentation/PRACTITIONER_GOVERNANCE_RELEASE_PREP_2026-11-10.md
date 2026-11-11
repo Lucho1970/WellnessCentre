@@ -1,6 +1,8 @@
 # Wellnexa practitioner governance release preparation — 10 November 2026
 
-**Scope:** prepared on `feature/practitioner-governance-release-prep`, based on `212fd2794d51c2f28b495fb4f44492c6483a7cce` and reconciled with `origin/main` `aaa8347` at `e5cd7e3`. The subsequent local review branches `bugs/practitioner-hold-edit-guard` and `feature/practitioner-hold-inactive-resolution` add the hold-state corrections linked below. This is a review plan, not a deployment instruction or release approval. `main` and production are unchanged. The ten stacked implementation, fix and preparation branches from `feature/wellnexa-record-governance` through `feature/practitioner-hold-inactive-resolution` are unmerged into `main`; they must be reviewed and integrated as one compatible change. The accepted operating rule is **clinic review only** for any practitioner request for historical appointment/receipt information after a care assignment ends.
+**Source integration update, 11 November 2026:** the reviewed stack was fast-forward merged into local and `origin/main` at `87e4c41408286a6d47baff1b42ea906dba5ce402`. All ten task branches were verified as merged and unused, then removed locally and remotely. The working tree was clean and `main` matched `origin/main`. This records a **source merge only**: no production deployment, migration, provider, hosted account or private configuration was changed. The accepted operating rule is **clinic review only** for any practitioner request for historical appointment/receipt information after a care assignment ends.
+
+**Preparation history:** this plan began on `feature/practitioner-governance-release-prep` from `212fd2794d51c2f28b495fb4f44492c6483a7cce`, reconciled with the then-current `main` `aaa8347` at `e5cd7e3`, and incorporated the hold fixes documented below. It remains a review plan, not deployment or real-data approval.
 
 ## Rehearsal evidence and current blockers
 
@@ -73,7 +75,7 @@ This sequence is not authorization to use the hosted database. Existing `practit
 | DEV-04 | Partial | Dual-engine SQL and integrated build/browser checks above; full and hosted checks pending. |
 | DEV-05 | Partial | Parent bilingual UI tests; manual accessibility pending. |
 | DEV-06 | Unverified | Representative query plans/bundle warning review pending. |
-| REL-01 | Partial | This dated ledger; final SHA and named decisions pending. |
+| REL-01 | Partial | Source merged at `87e4c41`; named release-owner decisions and hosted evidence pending. |
 | REL-02 | Partial | Integrated local checkpoint above; omitted suites and hosted checks pending. |
 | REL-03 | Missing | No final artifact or hosted synthetic acceptance. |
 | REL-04 | Missing | Required gates remain, so no release decision. |
