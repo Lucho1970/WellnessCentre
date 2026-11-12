@@ -698,8 +698,8 @@ const fr: Record<string, string> = {
   "Review appointment": "Vérifier le rendez-vous",
   "Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.":
     "Les prix sont affichés avant les taxes applicables. Le calcul des taxes et la facturation ne sont pas encore activés.",
-  "Availability is checked again when you confirm. A confirmation email will be sent to the client.":
-    "La disponibilité est vérifiée de nouveau à la confirmation. Un courriel de confirmation sera envoyé au client.",
+  "Availability is checked again when you confirm. Check the appointment list for the result.":
+    "La disponibilité est vérifiée de nouveau à la confirmation. Vérifiez le résultat dans la liste des rendez-vous.",
   "Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.":
     "La confirmation n’a pas pu être vérifiée. Réessayez la même demande pour la récupérer ou la terminer en toute sécurité. Vérifiez la liste des rendez-vous avant de commencer une autre réservation.",
   Cancel: "Annuler",
@@ -1135,8 +1135,8 @@ const fr: Record<string, string> = {
   "The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.":
     "Le serveur a retourné une réponse illisible (HTTP {{status}}). Réessayez ou communiquez avec l’administrateur.",
   "Request failed (HTTP {{status}}).": "La requête a échoué (HTTP {{status}}).",
-  "Appointment #{{id}} confirmed. A confirmation email is being sent.":
-    "Rendez-vous no {{id}} confirmé. Un courriel de confirmation est en cours d’envoi.",
+  "Appointment #{{id}} confirmed. Check the appointment list for details.":
+    "Rendez-vous no {{id}} confirmé. Vérifiez les détails dans la liste des rendez-vous.",
   "Address unavailable": "Adresse non disponible",
   "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)":
     "Traitement {{treatment}} + frais de visite sur place {{mobile}} (avant les taxes applicables)",
@@ -1390,8 +1390,8 @@ const fr: Record<string, string> = {
   Unavailable: "Indisponible",
   "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
     "Choisissez un service, un praticien et un type de visite. Aucune plage horaire n’est réservée avant votre confirmation.",
-  "Availability is checked again when you confirm. We will email your confirmation; keep the appointment number for reference.":
-    "La disponibilité est vérifiée de nouveau lors de la confirmation. Nous vous enverrons un courriel de confirmation; conservez le numéro de rendez-vous comme référence.",
+  "Availability is checked again when you confirm. Keep the appointment number and check My appointments for the result.":
+    "La disponibilité est vérifiée de nouveau lors de la confirmation. Conservez le numéro de rendez-vous et vérifiez le résultat dans Mes rendez-vous.",
   "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
     "Réservez un nouveau rendez-vous ici. Communiquez avec la clinique si vous avez besoin d’aide pour modifier un rendez-vous existant.",
   "Unable to load booking options.":
