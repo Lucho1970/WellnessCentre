@@ -1699,6 +1699,7 @@ test("mobile-only booking captures destination and price without requesting a ro
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Review appointment" }).click();
   await expect(page.getByText(/Subtotal:.*145/)).toBeVisible();
+  await expect(page.getByText("Availability is checked again when you confirm. Check the appointment list for the result.")).toBeVisible();
   await page
     .getByRole("button", { name: "Confirm appointment", exact: true })
     .click();

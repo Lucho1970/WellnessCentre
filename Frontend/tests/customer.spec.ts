@@ -940,10 +940,11 @@ for (const quotedFee of [0, 1500]) test(`linked client reviews distance fee ${qu
   await page.getByRole("button", { name: "Find times" }).click();
   await page.getByRole("button", { name: /Oct.*1.*2099/i }).click();
   await page.getByRole("button", { name: "Review appointment" }).click();
+  await expect(page.getByText("Availability is checked again when you confirm. Keep the appointment number and check My appointments for the result.")).toBeVisible();
   await page.getByRole("button", { name: "Confirm appointment" }).click();
   await expect(
     page.getByText(
-      "Appointment #91 confirmed. A confirmation email is being sent.",
+      "Appointment #91 confirmed. Check the appointment list for details.",
     ),
   ).toBeVisible();
   expect(confirmations).toBe(1);
