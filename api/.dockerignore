@@ -1,0 +1,3 @@
+# Local test image mounts only reviewed source, public entry and vendor at run time.
+# Never send private .env files, dumps, diagnostics or attachments to Docker builds.
+**

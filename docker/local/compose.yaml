@@ -1,0 +1,80 @@
+name: wellness-local-test
+
+services:
+  db:
+    image: mysql:5.7@sha256:4bc6bc963e6d8443453676cae56536f4b8156d78bae03c0145cbe47c2aad73bb
+    command: --skip-log-bin
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TEST_DB_ROOT_PASSWORD:?Generate local test settings first}
+      MYSQL_DATABASE: wellness_centre
+      MYSQL_USER: wellness_test
+      MYSQL_PASSWORD: ${TEST_DB_PASSWORD:?Generate local test settings first}
+    tmpfs:
+      - /var/lib/mysql:rw,nosuid,size=2g
+      - /tmp:rw,nosuid,size=256m
+    networks: [private]
+    logging: {driver: none}
+    restart: 'no'
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping --silent -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD"']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ../../api
+      dockerfile: ../docker/local/Api.Dockerfile
+    environment:
+      APP_ENV: development
+      APP_DEBUG: 'false'
+      APP_KEY: ${TEST_APP_KEY:?Generate local test settings first}
+      APP_URL: http://localhost:18080
+      PUBLIC_WEBSITE_URL: http://localhost:18083/
+      DB_HOST: db
+      DB_PORT: '3306'
+      DB_NAME: wellness_centre
+      DB_USER: wellness_test
+      DB_PASSWORD: ${TEST_DB_PASSWORD:?Generate local test settings first}
+      CLINIC_HOST_MAP: '{"localhost:18080":4,"localhost:18081":4,"localhost:18083":1}'
+      CORS_ALLOWED_ORIGINS: http://localhost:18080,http://localhost:18081,http://localhost:18082,http://localhost:18083
+      PILOT_MODE: 'false'
+      MAIL_ENABLED: 'false'
+      SMS_ENABLED: 'false'
+      AUTOMATED_COMMUNICATIONS_ENABLED: 'false'
+      COMMIT_SAFE_EMAIL_ENABLED: 'false'
+      BROWSER_SESSION_CLINIC_IDS: '[]'
+      BROWSER_SESSION_CENTRAL_ENABLED: 'false'
+      APPLICATION_ADMIN_ENABLED: 'false'
+    volumes:
+      - ../../api/src:/var/www/html/src:ro
+      - ../../api/public:/var/www/html/public:ro
+      - ../../api/vendor:/var/www/html/vendor:ro
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [private]
+    logging: {driver: none}
+    restart: 'no'
+
+  web:
+    image: nginx:1.25-alpine@sha256:516475cc129da42866742567714ddc681e5eed7b9ee0b9e9c015e464b4221a00
+    ports:
+      - 127.0.0.1:18080:80
+      - 127.0.0.1:18081:81
+      - 127.0.0.1:18082:82
+      - 127.0.0.1:18083:83
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../Frontend/dist/portal:/srv/portal:ro
+      - ../../Frontend/dist/application-admin:/srv/admin:ro
+      - ../../Frontend/dist/public:/srv/livinlively:ro
+      - ../../Wellnexa/dist:/srv/wellnexa:ro
+    depends_on: [api]
+    networks: [private, edge]
+    logging: {driver: none}
+    restart: 'no'
+
+networks:
+  private:
+    internal: true
+  edge: {}
