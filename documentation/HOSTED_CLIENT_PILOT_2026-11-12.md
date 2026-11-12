@@ -1,0 +1,55 @@
+# Wellnexa hosted client pilot — 12 November 2026
+
+## Scope and decision
+
+The custodian chose the existing production-hosted Wellnexa system for **synthetic testing today**, starting with a newly registered client identity. This is a supervised test, not approval for real patient information, general client access, payment collection, or a production release of newer source. Keep `PILOT_MODE=true`, app mail/SMS delivery closed, practitioner application intake/activation closed, and LivinLively settings unchanged. Pilot approval must use the verified customer issuer and stable subject; an email address alone does not grant access or a client link.
+
+The proposed test covers client registration, pilot denial/approval, profile onboarding, public availability, one synthetic booking only after the tester reviews it, own appointment visibility, sign-out and revocation. Use only synthetic names, addresses, service reasons, notes and bookings. Do not enter payment details or trigger provider mail/SMS. A tester should stop before final booking confirmation until the exact price, destination and notification behavior are reviewed.
+
+## Evidence captured before the client sign-in
+
+| Check | Hosted result | Limit |
+| --- | --- | --- |
+| HTTPS pages | Wellnexa `/`, `/client`, `/staff/external`, central `/admin/` and LivinLively `/` returned 200. | Page response does not prove sign-in or role access. |
+| API/DB | Wellnexa `/api/v1/health` and `/api/v1/health/database` returned 200; MySQL 5.7.44 shown in Netfirms. | Health does not prove booking transactions or permissions. |
+| Client intake | Anonymous Wellnexa and LivinLively `/api/v1/customer/auth/options` returned `onboarding_enabled: true`; unauthenticated `/api/v1/customer/profile` returned 401 on both hosts. | Pilot identity gating and a new account's own onboarding remain untested. The anonymous option must not be treated as an invitation to public testers. |
+| Client page browser | The hosted `/client` page rendered in English and French. Both showed the client account entry, no-reservation notice, privacy-statement link, clinic contact and beta feedback link. The page identified release `portal-signin-pilot-corrected-2026-11-05`. | No credential redirect or authenticated page was tested by this anonymous browser check. The beta feedback link currently addresses `wellnexacollective@gmail.com`; privacy requests should use the separately published privacy contact. |
+| Identity entry | The client button opened the configured External ID provider picker with email sign-in, `No account? Create one`, Google and personal Microsoft choices; its callback destination is the Wellnexa client path. | The provider screen still displays `Wellness Centre Clients Dev` branding on the live site. No account credentials were entered in the independent check. |
+| Public booking data | Wellnexa `/locations`, `/services`, `/public/practitioners` and a seven-day `mobile` availability request returned 200; the latter listed 1,272 duration-specific slots. A `clinic` request returned 422 `delivery_unavailable`, consistent with this synthetic practitioner's configuration. | No slot was reserved. Published records and schedule quality need owner review before booking. |
+| Schema | Read-only `information_schema.tables` query in hosted phpMyAdmin returned zero of ten tables introduced by migrations 059–064. | Do not deploy newer server-session, commit-safe mail or practitioner-governance code against this schema. No hosted migration was run. |
+| Client baseline | Read-only hosted aggregate counts before the new client's application return: eight `customer_identities`, seven `customer_client_links`, nine `client_profiles`. No identifying rows were displayed. | Repeat after sign-in/onboarding and check that no existing client link is inherited. Counts alone do not prove record isolation. |
+| Response headers | `/client` and API had five-minute HSTS and no-store. API had nosniff/no-referrer; `/client` did not expose CSP, nosniff or referrer headers in this check. | This is a security-header gap for release review, not a claim about every route or proxy layer. |
+| Backup rehearsal | Custodian identified private synthetic export `D:\Dev\WellnessCentre-backup\database\wellness_centre.sql.gz` (568,043 bytes; SHA-256 `52d0d2d9700961fab26bea437985ad4c3a89e50a9f09c1efde7fe04e16c28a1c`). A local Docker restore and 059–064 migration rehearsal passed on the separate `feature/local-fullstack-docker-test` branch. | The 11 November export is not a fresh pre-change backup; local restore does not establish hosted rollback or encryption. |
+
+Current hosted client shell references `/assets/index-kq95j7Df.js`, the portal-only asset from the 5 November release record. Current `main` is `deccccd24a5e31a78359b9000eb63da7e69874a6`; this is **not** evidence that the private hosted API matches that revision. No source, dependency, permission, identity-provider, endpoint, schema or private setting changed during the preflight.
+
+Focused current-source local checks on PHP 8.4 exited 0: `php api/tests/customer-auth.php` (25 authentication, one staff-boundary and six ID-proof checks), `php api/tests/customer-onboarding.php` (25), `php api/tests/pilot-policy.php` (80), and `php api/tests/booking-request.php` (14). They do not prove the older hosted API or actual identity-provider configuration.
+
+`cd Frontend; npx playwright test tests/customer.spec.ts --workers=1 --reporter=line` passed 32/32 on Node 22.22.1/npm 11.19.0. It includes the unlinked-new-client, pilot denial, own-only appointment, sign-in handoff, booking-price, stale-slot and cancel/reschedule cases. It used a local mock web server, not the hosted account. Only routine `NO_COLOR`/`FORCE_COLOR` warnings appeared.
+
+## Remaining same-day sequence
+
+1. The custodian creates/signs in with a new test-only client identity through `https://wellnexa.copihue.ca/client`, completing credential and MFA steps personally. **Observed:** the new Gmail-address test identity returned to Wellnexa with the expected “pilot is limited to approved test accounts” denial. The exact provider choice and External ID object ID are still being verified. Never copy a token or long diagnostic reference into the repository.
+2. If the pilot gate denies access, use the External ID administration interface to verify that **specific account's** tenant, issuer and stable object ID. The first administrator session opened the unrelated `lucho1970` home directory only; the alternate organization account's sign-in is pending. The tester chose the email-code path but saw Google sign-in, so inspect the actual identity-provider record rather than assuming the account type from its address. Prepare a private, exact allowlist change that preserves all existing entries; review the current hosted private settings and a fresh backup before updating them. Never disable pilot mode as a shortcut. A pilot allowlist entry grants no client-record link.
+3. Recheck the authenticated client's own onboarding. Confirm no existing client is linked automatically. Enter a synthetic profile only, then verify own-only reads and a second-account/cross-clinic denial without using real records.
+4. Review the public service, delivery mode, practitioner and price; select a synthetic slot. Confirm booking only after the custodian reviews the final action and notification behavior. Verify persisted appointment, duplicate/retry response, reschedule/cancel and own receipt if applicable. Keep app mail/SMS blocked.
+5. Revoke the temporary customer pilot identity in private settings, reload/restart the effective PHP environment if required, and verify the next protected request is denied and sensitive UI state clears. Preserve the synthetic account/history for audit; use the normal account deactivation process rather than deleting rows.
+
+No practitioner test, schema update or broad deployment is required to start this client-only slice. If any step fails, stop at that boundary, preserve a short correlation ID and redacted error classification, and do not broaden access or change unrelated settings.
+
+## Control ledger for this hosted slice
+
+The 38-control [10 November governance ledger](PRACTITIONER_GOVERNANCE_RELEASE_PREP_2026-11-10.md#change-scoped-38-control-ledger) remains the baseline. Dated automated reviewer: Codex, 12 November 2026. For GOV-01–05, PRIV-01–07, AUTH-01–05, SEC-01–09, DEV-01–06 and REL-01–06, statuses remain as recorded there unless narrowed below. An unlisted status is explicitly **unchanged and unmet where the baseline says Partial, Missing or Unverified**, not silently implemented. The custodian/privacy owner, security/operations owner, clinical owner and release owner must add their own decisions before real-data or general release.
+
+| Controls | Status for today's client test | Remaining owner action |
+| --- | --- | --- |
+| GOV-05, PRIV-02, PRIV-03 | Partial | Synthetic attestation; verify exact client authority, link, restrictions and revocation on host. |
+| AUTH-01, AUTH-02, AUTH-03 | Partial | Anonymous 401 proved; registered identity, MFA, realm/clinic/record separation and stale-session denial pending. |
+| AUTH-04, AUTH-05 | Unverified | Deployed browser storage/session mode and actual grants pending; 059–060 absent. |
+| SEC-01, SEC-02 | Partial | Backup identified and rehearsed locally; fresh hosted backup/encryption and private API provenance pending. |
+| SEC-03 | Partial | HTTPS/HSTS/no-store sampled; client-shell CSP/nosniff/referrer headers absent in this sample. |
+| SEC-04–09 | Partial or Unverified per baseline | Booking concurrency, audit, provider/worker, transport and abuse checks pending; no mail/SMS enabled for this test. |
+| DEV-01–06 | Partial or Unverified per baseline | No source change here; full current revision gates and manual accessibility/load review not repeated. |
+| REL-01–06 | Partial or Missing per baseline | Hosted client journey, release provenance, rollback, named decisions and real-data gate pending. This record does not authorize migrations or deployment. |
+
+RELEASE STATUS: NOT READY FOR RELEASE
