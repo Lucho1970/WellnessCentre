@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Shared portal sign-in chooser — 13 November 2026](UNIFIED_PORTAL_SIGN_IN_2026-11-13.md): one guest-header entry, distinct client/practitioner/workforce routes, bilingual accessibility checks and deployment limits.
+
 - [Practitioner access route review — 10 November 2026](PRACTITIONER_ACCESS_ROUTE_REVIEW_2026-11-10.md): appointment, worker, dashboard and visit boundaries; remaining historical-record decisions and local validation.
 - [Practitioner historical financial access — 10 November 2026](PRACTITIONER_HISTORICAL_FINANCIAL_ACCESS_2026-11-10.md): owner decision for clinic review after care ends, receipt/fee access, concurrency and local evidence.
 - [Care-assignment review workflow — 10 November 2026](CARE_ASSIGNMENT_REVIEW_WORKFLOW_2026-11-10.md): structured reason and operator review confirmation for clinic care-team changes.

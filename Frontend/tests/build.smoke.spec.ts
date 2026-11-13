@@ -43,6 +43,20 @@ test("English and French resource catalogs contain the same keys", () => {
   expect(Object.keys(fr).sort()).toEqual(Object.keys(en).sort());
 });
 
+test("built guest portal has one sign-in entry with clinic-scoped destinations", async ({ page }, info) => {
+  await page.route("**/api/v1/**", route => route.fulfill({ json: { data: route.request().url().endsWith('/site-config') ? { name: "Synthetic rollout clinic" } : [] } }));
+  await page.goto(`${portalOrigin}${info.config.metadata.portalBase}`);
+  await expect(page.getByRole("button", { name: "Log in", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "My appointments", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  const chooser = page.getByRole("dialog", { name: "Who is signing in?" });
+  await expect(chooser.getByRole("link", { name: /Client.*Book and manage your appointments/ })).toHaveAttribute("href", /\/client\?return=browse$/);
+  await expect(chooser.getByRole("link", { name: /Clinic staff.*Use your organization Microsoft account/ })).toHaveAttribute("href", /\/staff\/login$/);
+  const practitioner = chooser.getByRole("link", { name: /Practitioner.*Use your personal practitioner account/ });
+  if (process.env.BUILD_PRACTITIONER_SIGN_IN === "1") await expect(practitioner).toHaveAttribute("href", /\/staff\/external$/);
+  else await expect(practitioner).toHaveCount(0);
+});
+
 test("built practitioner rollout retains separate workforce login and the staff broker boundary", async ({ page }, info) => {
   await page.route("**/api/v1/**", route => route.fulfill({ json: { data: { name: "Synthetic rollout clinic" } } }));
   const root = `${portalOrigin}${info.config.metadata.portalBase}`;

@@ -2015,6 +2015,11 @@ const fr: Record<string, string> = {
   "Review the cancellation fee before confirming.": "Vérifiez les frais d’annulation avant de confirmer.",
   "The cancellation fee changed. Review the updated fee before confirming.": "Les frais d’annulation ont changé. Vérifiez les nouveaux frais avant de confirmer.",
   "The requested time is no longer bookable. Refresh availability and choose another time.": "Ce créneau n’est plus disponible. Actualisez les disponibilités et choisissez une autre heure.",
+  "Who is signing in?": "Qui se connecte?",
+  "Clinic staff": "Personnel de la clinique",
+  "Book and manage your appointments": "Réserver et gérer vos rendez-vous",
+  "Use your personal practitioner account": "Utiliser votre compte personnel de praticien",
+  "Use your organization Microsoft account": "Utiliser le compte Microsoft de votre organisation",
 };
 
 export default fr;
