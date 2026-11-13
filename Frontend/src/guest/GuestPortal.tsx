@@ -10,6 +10,7 @@ import { WellnexaPrivacyLink } from '../shared/WellnexaPrivacyLink';
 import { GuestCatalogue } from './GuestCatalogue';
 import { GuestPractitionerDetails } from './GuestPractitionerDetails';
 import { GuestBooking } from './GuestBooking';
+import { GuestSignInChooser } from './GuestSignInChooser';
 import { practitionerIdentityEnabled } from '../auth/practitionerIdentity';
 
 function hasRecentClientSession() {
@@ -46,10 +47,12 @@ export function GuestPortal() {
         <Button href={publicLink()} size="small">{t('Public website')}</Button>
         <WellnexaPrivacyLink />
         <Button href={import.meta.env.BASE_URL} size="small">{t('Treatments')}</Button>
-        <Button href={`${import.meta.env.BASE_URL}client`} size="small">{t('My appointments')}</Button>
-        <Button href={`${import.meta.env.BASE_URL}client${hasClientSession ? '' : '?return=browse'}`} variant="contained" size="small">{t(hasClientSession ? 'My account' : 'Log in')}</Button>
-        <Button href={`${import.meta.env.BASE_URL}staff/login`} variant="outlined" size="small">{t(practitionerIdentityEnabled ? 'Clinic staff sign-in' : 'Staff sign in')}</Button>
-        {practitionerIdentityEnabled && <Button href={`${import.meta.env.BASE_URL}staff/external`} size="small">{t('Practitioner sign-in')}</Button>}
+        {hasClientSession && <Button href={`${import.meta.env.BASE_URL}client`} size="small">{t('My appointments')}</Button>}
+        <GuestSignInChooser
+          clientHref={`${import.meta.env.BASE_URL}client${hasClientSession ? '' : '?return=browse'}`}
+          staffHref={`${import.meta.env.BASE_URL}staff/login`}
+          practitionerHref={practitionerIdentityEnabled ? `${import.meta.env.BASE_URL}staff/external` : undefined}
+        />
         <LanguageSwitcher/>
       </Stack>
     </Toolbar></Container></AppBar>

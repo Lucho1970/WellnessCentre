@@ -2275,6 +2275,11 @@ const en = {
     "The cancellation fee changed. Review the updated fee before confirming.",
   "The requested time is no longer bookable. Refresh availability and choose another time.":
     "The requested time is no longer bookable. Refresh availability and choose another time.",
+  "Who is signing in?": "Who is signing in?",
+  "Clinic staff": "Clinic staff",
+  "Book and manage your appointments": "Book and manage your appointments",
+  "Use your personal practitioner account": "Use your personal practitioner account",
+  "Use your organization Microsoft account": "Use your organization Microsoft account",
 } as const;
 
 export default en;

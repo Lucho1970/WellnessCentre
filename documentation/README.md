@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Shared portal sign-in chooser — 13 November 2026](UNIFIED_PORTAL_SIGN_IN_2026-11-13.md): one guest-header entry, distinct client/practitioner/workforce routes, bilingual accessibility checks and deployment limits.
+
 - [Shared portal sign-in release preparation — 5 November 2026](PORTAL_SIGNIN_RELEASE_PREP_2026-11-05.md): merged-source package, narrow upload/rollback, local verifier, hosted baseline and release gates.
 
 - [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.
