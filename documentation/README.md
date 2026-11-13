@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Unified sign-in hosted release preparation — 13 November 2026](UNIFIED_SIGNIN_HOSTED_RELEASE_2026-11-13.md): narrow shared-portal candidate, pilot build settings, artifact verification, rollback and hosted test sequence.
+
 - [Shared portal sign-in chooser — 13 November 2026](UNIFIED_PORTAL_SIGN_IN_2026-11-13.md): one guest-header entry, distinct client/practitioner/workforce routes, bilingual accessibility checks and deployment limits.
 
 - [Shared portal sign-in release preparation — 5 November 2026](PORTAL_SIGNIN_RELEASE_PREP_2026-11-05.md): merged-source package, narrow upload/rollback, local verifier, hosted baseline and release gates.
