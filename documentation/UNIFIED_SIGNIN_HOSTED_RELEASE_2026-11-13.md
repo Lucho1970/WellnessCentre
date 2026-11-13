@@ -26,6 +26,12 @@ After the source commit and artifact manifest/hash review, obtain a new explicit
 
 If either host's shell or sign-in fails, restore `live-index-before.html` to that one shared `index.html` path. Leave added content-addressed assets in place pending separate cleanup. Recheck both hosts and their routes after rollback. The release owner is Luis Duran; operations/monitoring and incident contact must be confirmed at action time. Custodian/privacy, security/operations, clinical and release-owner decisions remain separate from a successful build. This candidate is for the existing synthetic, pilot-restricted hosted test; it does not authorize real PHI intake or broaden tester access.
 
+### Hosted pilot upload and public smoke — 13 November 2026
+
+The owner requested exact transfer instructions and uploaded the 68 ZIP assets additively with Beyond Compare. Before the shell switch, all 68 assets matched their ZIP SHA-256 on **both** clinic hosts (136/136), and both hosts still returned the saved previous `index.html` hash. The owner then replaced only the shared `index.html`. Both hosts returned HTTP 200 with the exact candidate shell hash `1cb8dd99db62526f20dd7b96640b84279d8594291a7707cdcc7f4164adb4fa3f`, `no-store` and the existing five-minute HSTS header. No API, SQL, private setting, pilot grant, role, provider registration, messaging channel or `.htaccess` was changed by this transfer.
+
+A fresh Edge browser on each host rendered one **Log in** button and three chooser links, closed the dialog with Escape, and reported zero page errors. At 375 pixels, French chooser labels remained readable with no horizontal overflow. `/client`, `/staff/external` and `/staff/login` returned HTTP 200 with visible page content and no page errors on each host. The first Escape smoke assertion checked visibility before MUI's close animation finished and falsely failed; waiting for the dialog to become hidden passed on both hosts. These are unauthenticated route checks, not proof of identity-provider return, API authority, booking or revocation. The Wellnexa client provider picker is open for an owner-controlled Google sign-in; authenticated results are pending. The Microsoft practitioner account remains Inactive with pilot access revoked.
+
 ## Hosted acceptance sequence
 
 1. In a clean browser on each host, verify one guest **Log in** button, the correct clinic name, three readable English/French choices, keyboard Escape/focus return and narrow layout.
