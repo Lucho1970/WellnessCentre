@@ -10,7 +10,11 @@ On `bugs/client-account-display`, based on the deployed guest-navigation branch 
 
 `Frontend/npm run lint` passed with ESLint 10.13.0 and zero warnings. `npm run validate:content` passed four bilingual entries; `npm run validate:i18n` passed 2,579 keys; `npx tsc --noEmit` passed TypeScript 5.7.2. `npx playwright test --config playwright.config.ts --grep "placeholder provider name|linked client sees only their appointments|client verification stays stable" --workers=1 --reporter=line` passed **3/3**. After the final keyboard/filter assertion, the changed test alone passed **1/1** in 14.0 seconds. The first extension of that test timed out because it attempted to click the public-site link while the MUI account menu was still open and had made the background inaccessible; pressing Escape before navigation fixed the test. This was a test-sequence error, not a product failure. The test explicitly checks that every `label[for]` in the initial client appointment view targets a labelable control; the earlier, weaker check only verified that the target ID existed and did not detect the warning.
 
-A pilot-flagged `npm run build:portal -- --outDir D:\Dev\WelnessCentre\.tmp\client-account-display-build` passed with Vite 6.4.5 and the existing four public External ID identifiers. It retained practitioner applications/social sign-in and kept invitations/server sessions disabled. The existing 553 kB large-chunk warning remains. No dependencies or lockfiles changed. The full default browser suite, dedicated application/admin suites, PHP/SQL tests, hosted provider return after this new fix, manual screen-reader/200% zoom checks, operational security sign-offs and rollback rehearsal were not repeated for this narrow UI slice. The live portal still serves the previous deployed bundle; this fix is **not deployed**. A new source-bound release artifact, scan, backup, explicit REL-05 production decision, hosted smoke and owner test are required before upload. Real-data release remains separately blocked.
+A pilot-flagged `npm run build:portal -- --outDir D:\Dev\WelnessCentre\.tmp\client-account-display-build` passed with Vite 6.4.5 and the existing four public External ID identifiers. It retained practitioner applications/social sign-in and kept invitations/server sessions disabled. The existing 553 kB large-chunk warning remains. No dependencies or lockfiles changed. A local preview of the built guest chooser passed **1/1**. The full default browser suite, dedicated application/admin suites, PHP/SQL tests, hosted provider return after this new fix, manual screen-reader/200% zoom checks, operational security sign-offs and rollback rehearsal were not repeated for this narrow UI slice.
+
+The ignored local package `deployments/client-account-display-2026-11-14/01-shared-portal-assets-only.zip` is from source `0c30d850135c479b5ce640b97e6b1d41b7fa2f9b` on this branch. Its SHA-256 is `dc57390505b71b730612e8dd882e4fa1a8d54447650f4c1ad457516691d5355b` (816,050 bytes). It contains exactly `index.html` and 69 `assets/` files; all 70 ZIP entry hashes were checked against the build. The entry page hash is `2bc51f6107a50c5b452bf2f50a52381f6ca52594d012eb58cd340689cc6efafc`. The ignored manifest records the lockfile hash, tool versions, date, flags and file hashes. The four expected public identity identifiers are present. The output has no source maps, private environment files, PHP, SQL or private keys. No API or `.htaccess` file is in the ZIP.
+
+The live portal still serves the previous deployed bundle; this fix is **not deployed**. Before upload, confirm the live shared `index.html` hash `0b6e79eb3fc55b7a3c01a2c8bf9d12f74cf6022567822609aaefb6b859be6ee2`, back it up outside the web root, and obtain a new explicit REL-05 production decision for this ZIP. Copy only assets additively, verify both clinic hosts, then replace only the shared entry page. For rollback, restore the saved old `index.html`; leave added hashed assets in place pending separate cleanup. Owner smoke should repeat Google client entry, account-menu display, **Show** selector and sign-out. Real-data release remains separately blocked.
 
 ## Scoped 38-control ledger
 
@@ -44,7 +48,7 @@ Review date: 14 November 2026. Release owner: Luis Duran; privacy/security/clini
 | SEC-07 | Partial | Placeholder suppressed in UI; browser callback diagnostic reviewed without retaining code. |
 | SEC-08 | Unverified | No new service; endpoint register review remains. |
 | SEC-09 | Unverified | Mail/SMS unchanged and pilot channels stay disabled. |
-| DEV-01 | Partial | Dedicated bugs branch and unchanged lockfile; review/commit/push pending. |
+| DEV-01 | Partial | Dedicated bugs branch, source commit `0c30d85` and unchanged lockfile; review/push pending. |
 | DEV-02 | Partial | Focused typed UI changes reviewed; human review pending. |
 | DEV-03 | Partial | No dependency change; existing development advisories remain. |
 | DEV-04 | Partial | Lint/content/i18n/typecheck, targeted browser and portal build passed; omitted suites above. |
@@ -52,7 +56,7 @@ Review date: 14 November 2026. Release owner: Luis Duran; privacy/security/clini
 | DEV-06 | Partial | Existing large-chunk warning; representative-load review not repeated. |
 | REL-01 | Partial | Dated scoped ledger; accountable reviewer decision pending. |
 | REL-02 | Partial | Narrow frontend checkpoint passed; broad PHP/SQL suites omitted. |
-| REL-03 | Missing | No source-bound artifact or hosted acceptance for this new fix. |
+| REL-03 | Partial | Source-bound ZIP and entry hashes verified; hosted acceptance for this new fix pending. |
 | REL-04 | Missing | Real-data release decision remains blocked by open gates. |
 | REL-05 | Partial | No live change; explicit new artifact/deployment decision required. |
 | REL-06 | Partial | Files, tests, omissions, risk and rollback scope recorded; hosted result pending. |
