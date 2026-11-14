@@ -18,7 +18,9 @@ The controlled transfer required the previous shared `index.html` hash `0b6e79eb
 
 ### Hosted pilot transfer and asset retention — 14 November 2026
 
-The owner uploaded the ZIP's 69 assets additively. Independent HTTPS reads matched each SHA-256 on both shared clinic hosts (**138/138**). Both hosts still served the expected previous `index.html` before the switch. An exact copy of that shell was saved outside the web root at `D:\Dev\WellnessCentre-backup\client-account-display-2026-11-14\live-index-before.html` and matched the previous hash. The owner then replaced only the shared `index.html`. Both hosts returned 200 with the exact new hash `2bc51f6107a50c5b452bf2f50a52381f6ca52594d012eb58cd340689cc6efafc`, `no-store` and five-minute HSTS. Their two shell-linked assets and `/client`, `/staff/external`, `/staff/login` returned 200. Fresh anonymous Edge checks showed three correct chooser destinations, Escape closure and zero page errors on both hosts. Authenticated account-menu and label behavior on this deployed bundle remains pending an owner refresh; no booking was made for this check.
+The owner uploaded the ZIP's 69 assets additively. Independent HTTPS reads matched each SHA-256 on both shared clinic hosts (**138/138**). Both hosts still served the expected previous `index.html` before the switch. An exact copy of that shell was saved outside the web root at `D:\Dev\WellnessCentre-backup\client-account-display-2026-11-14\live-index-before.html` and matched the previous hash. The owner then replaced only the shared `index.html`. Both hosts returned 200 with the exact new hash `2bc51f6107a50c5b452bf2f50a52381f6ca52594d012eb58cd340689cc6efafc`, `no-store` and five-minute HSTS. Their two shell-linked assets and `/client`, `/staff/external`, `/staff/login` returned 200. Fresh anonymous Edge checks showed three correct chooser destinations, Escape closure and zero page errors on both hosts. No booking was made for this check.
+
+After refreshing the signed-in Wellnexa client workspace, the owner confirmed **C** and **Client** in the account menu. **MY PROFILE** opened the saved test profile; the **Show** filter changed views; the earlier incorrect-label warning was absent from the refreshed Issues panel. No profile fields or sign-in URL were copied to this record. The menu's disabled **Client** label still looks like an action even though profile access lives in the workspace button row; improve that discovery in a separately reviewed UI change. This owner check covers the named account, profile and selector on the synthetic pilot only. Sign-out, other identities, real session expiry and real-data release remain outside this check.
 
 The owner observed about ten hashed versions of some remote assets. **Do not mirror-delete `assets/`.** The current package has 69 assets and its immediate rollback package has 68; six filenames overlap, so the minimum current-plus-rollback keep set is **131 distinct paths**. The ignored local `deployments/client-account-display-2026-11-14/MINIMUM_ASSETS_TO_KEEP.txt` lists those paths, but it is not a deletion list: older open browser tabs may still request earlier lazy-loaded chunks, and other retained entry pages or rollback packages may reference them. A cleanup needs a remote inventory, a full off-web-root backup, reference checks against every retained shell/rollback, an agreed old-tab grace period, and a separately reviewed list of files to remove. No hosted asset was deleted in this release.
 
@@ -58,13 +60,13 @@ Review date: 14 November 2026. Release owner: Luis Duran; privacy/security/clini
 | DEV-02 | Partial | Focused typed UI changes reviewed; human review pending. |
 | DEV-03 | Partial | No dependency change; existing development advisories remain. |
 | DEV-04 | Partial | Lint/content/i18n/typecheck, targeted browser and portal build passed; omitted suites above. |
-| DEV-05 | Partial | Label/role/keyboard/browser assertions passed; manual assistive technology/zoom audit remains. |
+| DEV-05 | Partial | Label/role/keyboard/browser assertions and owner-hosted selector check passed; manual assistive technology/zoom audit remains. |
 | DEV-06 | Partial | Existing large-chunk warning; representative-load review not repeated. |
 | REL-01 | Partial | Dated scoped ledger; accountable reviewer decision pending. |
 | REL-02 | Partial | Narrow frontend checkpoint passed; broad PHP/SQL suites omitted. |
-| REL-03 | Partial | ZIP plus 138 hosted asset hashes and two entry hashes verified; authenticated acceptance pending. |
+| REL-03 | Partial | ZIP, 138 hosted asset hashes, two entry hashes and owner-authenticated client display/profile/filter verified; other roles/session cases pending. |
 | REL-04 | Missing | Real-data release decision remains blocked by open gates. |
 | REL-05 | Partial | Owner performed controlled portal-only transfer with prior-shell backup; operational sign-offs remain. |
-| REL-06 | Partial | Files, tests, hashes, rollback and asset-retention boundary recorded; signed-in result pending. |
+| REL-06 | Partial | Files, tests, hashes, rollback, asset-retention boundary and owner-signed-in result recorded; broader gates remain. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
