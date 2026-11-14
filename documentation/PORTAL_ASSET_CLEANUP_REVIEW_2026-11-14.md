@@ -17,6 +17,10 @@ Do not mirror-delete the remote folder. Current and rollback entry pages require
 
 No code, dependency, API, SQL, identity, permission, consent, endpoint, mail/SMS or private configuration change is proposed. This review does not authorize real PHI use or a site-wide deployment. The current portal rollback remains the saved `index.html` at `D:\Dev\WellnessCentre-backup\client-account-display-2026-11-14\live-index-before.html`; restoring an older entry page also requires its referenced assets. Release/operations owner: Luis Duran. A production deletion needs a separate REL-05 decision and operational record.
 
+### Approved selection, transfer boundary
+
+The owner approved removal of the exact 377-file candidate list and confirmed testers can refresh old tabs. A local `D:\Dev\WellnessCentre-backup\asset-cleanup-2026-11-14\candidate-older-assets\` folder now contains only those 377 files; each byte hash matches the full backup. This supports a names-and-content comparison with the remote folder before any delete. The active Beyond Compare window showed a **passive FTP** connection, so no deletion was attempted through it. Use the previously verified encrypted SFTP/SSH2 profile or the hosting HTTPS File Manager. Recheck that the remote `assets/` inventory is still the confirmed 632-file/24,766,141-byte snapshot and that the candidate comparison has exactly 377 matches. Stop on any mismatch. The destructive UI action still needs action-time confirmation under the computer-use skill; approval of the list does not justify deleting a different set. No remote asset has been deleted as of this note.
+
 ## Scoped 38-control ledger
 
 Review date: 14 November 2026. Statuses address this inventory and proposed cleanup only; unresolved application findings in the current audit and release records remain. For every unverified item, the accountable owner must use the existing release process; this document is not an exception.
@@ -41,7 +45,7 @@ Review date: 14 November 2026. Statuses address this inventory and proposed clea
 | AUTH-04 | Unverified | Browser storage exception unchanged. |
 | AUTH-05 | Unverified | No API grant change. |
 | SEC-01 | Partial | Asset names/hashes only in local lists; no private files committed. |
-| SEC-02 | Partial | Backup kept outside web root; encryption/access/recovery operational evidence remains. |
+| SEC-02 | Partial | Backup kept outside web root; passive FTP observed and excluded from deletion; SFTP/HTTPS and encryption/access/recovery evidence remain. |
 | SEC-03 | Partial | Current shell hash checked; full header/TLS review remains. |
 | SEC-04 | Unverified | No source/input processing change. |
 | SEC-05 | Unverified | No request/upload/worker change. |
@@ -59,7 +63,7 @@ Review date: 14 November 2026. Statuses address this inventory and proposed clea
 | REL-02 | Partial | Read-only asset/manifest checks; broad checkpoint not claimed. |
 | REL-03 | Partial | Current/rollback hashes and hosted shell observed; deletion acceptance pending. |
 | REL-04 | Missing | Real-data release remains separately blocked. |
-| REL-05 | Partial | No delete; exact-list approval and restore/smoke plan required. |
-| REL-06 | Partial | Inventory, candidate list, keep set, risk and restore path recorded; action pending. |
+| REL-05 | Partial | Owner approved exact 377-file list; no delete pending SFTP comparison and action-time confirmation. |
+| REL-06 | Partial | Inventory, candidate list, keep set, owner decision, risk and restore path recorded; action pending. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
