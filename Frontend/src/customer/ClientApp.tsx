@@ -39,6 +39,7 @@ import { bookingSignInKey, customerBookingIntent } from "./bookingIntent";
 import { savedSession } from './session';
 import { BetaFeedbackLink } from "../shared/BetaFeedbackLink";
 import { pendingAppointmentLink } from './appointmentLink';
+import { clientAccountDisplayName, clientAccountInitials } from './accountDisplay';
 
 export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const { config } = useClinicConfig();
@@ -212,14 +213,8 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
       setBusy(false);
     }
   };
-  const name = account?.name || t("Client");
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+  const name = clientAccountDisplayName(account?.name, t("Client"));
+  const initials = clientAccountInitials(name);
   return (
     <>
       <Box component="a" href="#main-content" className="skip-link">

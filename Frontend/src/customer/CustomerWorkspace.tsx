@@ -1,7 +1,7 @@
 import { privateSessionStorage } from '../auth/privateSessionStorage';
 import { Alert, FormControlLabel, TextField, withFormValidation, useFormValidation } from '../shared/FormValidation';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Box, Button, Checkbox, Chip, CircularProgress, Divider, Grid, MenuItem, Paper, Stack, Typography } from '@mui/material';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Box, Button, Checkbox, Chip, CircularProgress, Divider, FormControl, Grid, InputLabel, MenuItem, Paper, Select, Stack, Typography } from '@mui/material';
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { customerFetch } from './session';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +30,7 @@ const appointmentInstant = (value: string) => new Date(`${value.replace(' ', 'T'
 function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; onRefresh: () => void }) {
   const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
+  const appointmentViewLabelId = useId();
   const canBook=status.capabilities?.includes('book_own_appointments')??false;
   const previousOnboarding = useRef(status.onboarding_status);
   const [workflowLocked, setWorkflowLocked] = useState(false);
@@ -120,9 +121,12 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between" mb={2}>
         <Box><Typography variant="h6">{t('My appointments')}</Typography><Typography color="text.secondary">{t('Book a new appointment or manage an upcoming appointment here.')}</Typography></Box>
         <Stack direction="row" spacing={1} alignItems="center">
-          <TextField name="appointmentView" select size="small" label={t('Show')} value={appointmentView} onChange={event => setAppointmentView(event.target.value as AppointmentView)} sx={{ minWidth: 170 }}>
-            <MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem>
-          </TextField>
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel id={appointmentViewLabelId}>{t('Show')}</InputLabel>
+            <Select labelId={appointmentViewLabelId} value={appointmentView} label={t('Show')} onChange={event => setAppointmentView(event.target.value as AppointmentView)}>
+              <MenuItem value="upcoming">{t('Upcoming')}</MenuItem><MenuItem value="past">{t('Past')}</MenuItem><MenuItem value="all">{t('All appointments')}</MenuItem>
+            </Select>
+          </FormControl>
           <Button startIcon={<RefreshCw size={16} />} disabled={loading} onClick={() => setReload(value => value + 1)}>{t('Refresh')}</Button>
         </Stack>
       </Stack>

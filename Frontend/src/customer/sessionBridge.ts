@@ -1,5 +1,6 @@
 import { publicUrl } from '../shared/urls';
 import { customerConfigured, customerInstance, selectCustomerAccount } from './auth';
+import { clientAccountDisplayName, clientAccountInitials } from './accountDisplay';
 
 // Read-only account display hint for our public site. No token acquisition, account
 // identifiers, emails, permissions, or clinical data ever cross the origin boundary.
@@ -15,7 +16,7 @@ export async function bootstrap() {
         const account = selectCustomerAccount();
         const expiry = account?.idTokenClaims?.exp;
         if (account && typeof expiry === 'number' && expiry * 1000 > Date.now()) {
-          initials = (account.name || 'Client').split(/\s+/).filter(Boolean).slice(0, 2).map(part => Array.from(part)[0]).join('').toUpperCase();
+          initials = clientAccountInitials(clientAccountDisplayName(account.name, 'Client'));
         }
       }
     } catch { /* Storage may be blocked: public navigation must still work. */ }

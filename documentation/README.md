@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Client account display and label correction — 14 November 2026](CLIENT_ACCOUNT_DISPLAY_2026-11-14.md): provider placeholder name, appointment filter label, browser diagnostics, validation and remaining hosted gate.
+
 - [Guest client session navigation — 14 November 2026](GUEST_CLIENT_SESSION_NAVIGATION_2026-11-14.md): hosted Google return diagnosis, direct client workspace entry, truthful account/address copy, local checks and remaining release gates.
 
 - [Unified sign-in hosted release preparation — 13 November 2026](UNIFIED_SIGNIN_HOSTED_RELEASE_2026-11-13.md): narrow shared-portal candidate, pilot build settings, artifact verification, rollback and hosted test sequence.

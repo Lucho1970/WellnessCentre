@@ -177,13 +177,13 @@ test('clients retrieve receipt PDFs and see voided receipts on mobile', async ({
   await page.screenshot({ path: test.info().outputPath('client-receipts-mobile.png'), fullPage: true });
 });
 
-async function fixture(page: Page, signedIn = false, callbackFails = false) {
+async function fixture(page: Page, signedIn = false, callbackFails = false, accountName = 'Test Client') {
   // Only Playwright intercepts this module; no production bypass or fake tokens.
   await page.route("**/src/customer/auth.ts", (route) =>
     route.fulfill({
       contentType: "application/javascript",
       body: `
-    const account=${signedIn ? "{homeAccountId:'customer',name:'Test Client'}" : "null"};
+    const account=${signedIn ? `{homeAccountId:'customer',name:${JSON.stringify(accountName)}}` : "null"};
     export const customerConfigured=true;
     export const customerHome='http://localhost:5184/client';
     export const customerInstance={initialize:async()=>{},handleRedirectPromise:async()=>{${callbackFails ? "throw new Error('test callback failure');" : "return null;"}},getActiveAccount:()=>account?{...account}:null,getAllAccounts:()=>account?[{...account}]:[],setActiveAccount:()=>{}};
@@ -198,6 +198,35 @@ async function fixture(page: Page, signedIn = false, callbackFails = false) {
     route.fulfill({ json: { data: { name: "Test Wellness" } } }),
   );
 }
+test('placeholder provider name is not shown in the verified client account menu', async ({ page }) => {
+  await fixture(page, true, false, 'unknown');
+  const now = Math.floor(Date.now() / 1000);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ json: { data: {
+    authenticated: true, authentication_context: 'customer', onboarding_status: 'linked', capabilities: ['own_appointments'],
+    session: { idle_expires_at: now + 1800, absolute_expires_at: now + 28800 },
+  } } }));
+  await page.route('**/api/v1/customer/appointments*', route => route.fulfill({ json: { data: { items: [] } } }));
+  await page.goto('http://localhost:5184/client');
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Show' })).toHaveText('Upcoming');
+  await expect(page.getByRole('button', { name: 'Open client account menu' }).getByText('C', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open client account menu' }).click();
+  await expect(page.getByRole('menu').getByText('Client', { exact: true })).toBeVisible();
+  await expect(page.getByText('unknown', { exact: true })).toHaveCount(0);
+  const invalidLabels = await page.locator('label[for]').evaluateAll(labels => labels
+    .filter(label => {
+      const target = document.getElementById(label.htmlFor);
+      return !target || !['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName);
+    })
+    .map(label => ({ forId: label.htmlFor, text: label.textContent?.trim() })));
+  expect(invalidLabels).toEqual([]);
+  await page.keyboard.press('Escape');
+  await page.getByRole('combobox', { name: 'Show' }).click();
+  await page.getByRole('option', { name: 'Past' }).click();
+  await expect(page.getByRole('combobox', { name: 'Show' })).toHaveText('Past');
+  await page.getByRole('link', { name: 'Public website' }).click();
+  await expect(page.getByRole('link', { name: 'Open client account' }).getByText('C', { exact: true })).toBeVisible();
+});
 test("customer route offers sign-in without running staff authentication", async ({
   page,
 }) => {
