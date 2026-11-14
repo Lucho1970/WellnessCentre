@@ -194,7 +194,7 @@ test('the public portal separates practitioner and clinic workforce entry points
   await open.click();
   const chooser = page.getByRole('dialog', { name: 'Who is signing in?' });
   await expect(chooser).toBeVisible();
-  await expect(chooser.getByRole('link', { name: /Client.*Book and manage your appointments/ })).toHaveAttribute('href', '/client?return=browse');
+  await expect(chooser.getByRole('link', { name: /Client.*Book and manage your appointments/ })).toHaveAttribute('href', '/client');
   await expect(chooser.getByRole('link', { name: /Practitioner.*Use your personal practitioner account/ })).toHaveAttribute('href', '/staff/external');
   await expect(chooser.getByRole('link', { name: /Clinic staff.*Use your organization Microsoft account/ })).toHaveAttribute('href', '/staff/login');
   await page.keyboard.press('Escape');
@@ -208,6 +208,33 @@ test('the public portal separates practitioner and clinic workforce entry points
   await expect(page.getByRole('button', { name: 'Sign in with Microsoft', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBeNull();
+});
+
+test('a recent client session shows My account on the public portal without a sign-in prompt', async ({ page }) => {
+  await fixture(page, false);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.session.v1', JSON.stringify({
+    session_token: 'synthetic-client-session', idle_expires_at: Math.floor(Date.now() / 1000) + 3600,
+    absolute_expires_at: Math.floor(Date.now() / 1000) + 7200,
+  })));
+  await page.goto(host);
+  await expect(page.getByRole('link', { name: 'My account', exact: true })).toHaveAttribute('href', '/client');
+  await expect(page.getByRole('button', { name: 'Log in', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Open my account to use my saved address' })).toHaveAttribute('href', '/client#discover=1');
+  await page.locator('button[aria-haspopup="dialog"]').click();
+  await page.getByText('Français (Canada)').click();
+  await expect(page.getByRole('link', { name: 'Mon compte', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ouvrir mon compte pour utiliser mon adresse enregistrée' })).toBeVisible();
+});
+
+test('an expired client session keeps the public sign-in chooser', async ({ page }) => {
+  await fixture(page, false);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.session.v1', JSON.stringify({
+    session_token: 'synthetic-expired-session', idle_expires_at: Math.floor(Date.now() / 1000) - 60,
+    absolute_expires_at: Math.floor(Date.now() / 1000) + 3600,
+  })));
+  await page.goto(host);
+  await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'My account', exact: true })).toHaveCount(0);
 });
 
 test('sign-in choices are readable in French on a small screen', async ({ page }) => {

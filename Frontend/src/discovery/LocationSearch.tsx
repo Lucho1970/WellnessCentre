@@ -65,7 +65,7 @@ export function LocationSearch({request,onResult,defaultArea,savedAddressLink,t=
   return <div className="discovery-ui discovery-search">
     <h3>{t('Find care near your visit location')}</h3>
     <p>{t('Choose where the appointment would take place. Your search area does not change your profile or appointment address.')}</p>
-    {savedAddressLink&&<p><a href={savedAddressLink}>{t('Sign in to use my saved address')}</a></p>}
+    {savedAddressLink&&<p><a href={savedAddressLink}>{t('Open my account to use my saved address')}</a></p>}
     <fieldset disabled={busy}>
       <label>{t('City, postal code or address')}<input value={area} maxLength={250} onChange={event=>setArea(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(area.trim().length>=3)void search({area});}}}/></label>
       <div className="discovery-actions"><button type="button" disabled={area.trim().length<3} onClick={()=>void search({area})}>{t('Search this area')}</button><button type="button" onClick={locate}>{t('Use my current location')}</button><button type="button" onClick={()=>setShowMap(value=>!value)}>{t('Choose on map')}</button></div>

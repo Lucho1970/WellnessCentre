@@ -47,12 +47,13 @@ export function GuestPortal() {
         <Button href={publicLink()} size="small">{t('Public website')}</Button>
         <WellnexaPrivacyLink />
         <Button href={import.meta.env.BASE_URL} size="small">{t('Treatments')}</Button>
-        {hasClientSession && <Button href={`${import.meta.env.BASE_URL}client`} size="small">{t('My appointments')}</Button>}
-        <GuestSignInChooser
-          clientHref={`${import.meta.env.BASE_URL}client${hasClientSession ? '' : '?return=browse'}`}
-          staffHref={`${import.meta.env.BASE_URL}staff/login`}
-          practitionerHref={practitionerIdentityEnabled ? `${import.meta.env.BASE_URL}staff/external` : undefined}
-        />
+        {hasClientSession
+          ? <Button href={`${import.meta.env.BASE_URL}client`} variant="contained" size="small">{t('My account')}</Button>
+          : <GuestSignInChooser
+              clientHref={`${import.meta.env.BASE_URL}client`}
+              staffHref={`${import.meta.env.BASE_URL}staff/login`}
+              practitionerHref={practitionerIdentityEnabled ? `${import.meta.env.BASE_URL}staff/external` : undefined}
+            />}
         <LanguageSwitcher/>
       </Stack>
     </Toolbar></Container></AppBar>
