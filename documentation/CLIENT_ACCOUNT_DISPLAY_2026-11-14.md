@@ -14,7 +14,13 @@ A pilot-flagged `npm run build:portal -- --outDir D:\Dev\WelnessCentre\.tmp\clie
 
 The ignored local package `deployments/client-account-display-2026-11-14/01-shared-portal-assets-only.zip` is from source `0c30d850135c479b5ce640b97e6b1d41b7fa2f9b` on this branch. Its SHA-256 is `dc57390505b71b730612e8dd882e4fa1a8d54447650f4c1ad457516691d5355b` (816,050 bytes). It contains exactly `index.html` and 69 `assets/` files; all 70 ZIP entry hashes were checked against the build. The entry page hash is `2bc51f6107a50c5b452bf2f50a52381f6ca52594d012eb58cd340689cc6efafc`. The ignored manifest records the lockfile hash, tool versions, date, flags and file hashes. The four expected public identity identifiers are present. The output has no source maps, private environment files, PHP, SQL or private keys. No API or `.htaccess` file is in the ZIP.
 
-The live portal still serves the previous deployed bundle; this fix is **not deployed**. Before upload, confirm the live shared `index.html` hash `0b6e79eb3fc55b7a3c01a2c8bf9d12f74cf6022567822609aaefb6b859be6ee2`, back it up outside the web root, and obtain a new explicit REL-05 production decision for this ZIP. Copy only assets additively, verify both clinic hosts, then replace only the shared entry page. For rollback, restore the saved old `index.html`; leave added hashed assets in place pending separate cleanup. Owner smoke should repeat Google client entry, account-menu display, **Show** selector and sign-out. Real-data release remains separately blocked.
+The controlled transfer required the previous shared `index.html` hash `0b6e79eb3fc55b7a3c01a2c8bf9d12f74cf6022567822609aaefb6b859be6ee2`, an off-web-root backup and a new REL-05 production decision for this ZIP. Assets were to be copied additively and verified on both clinic hosts before replacing the shared entry page. For rollback, restore the saved old `index.html`; leave added hashed assets in place pending separate cleanup. Owner smoke should repeat Google client entry, account-menu display, **Show** selector and sign-out. Real-data release remains separately blocked.
+
+### Hosted pilot transfer and asset retention — 14 November 2026
+
+The owner uploaded the ZIP's 69 assets additively. Independent HTTPS reads matched each SHA-256 on both shared clinic hosts (**138/138**). Both hosts still served the expected previous `index.html` before the switch. An exact copy of that shell was saved outside the web root at `D:\Dev\WellnessCentre-backup\client-account-display-2026-11-14\live-index-before.html` and matched the previous hash. The owner then replaced only the shared `index.html`. Both hosts returned 200 with the exact new hash `2bc51f6107a50c5b452bf2f50a52381f6ca52594d012eb58cd340689cc6efafc`, `no-store` and five-minute HSTS. Their two shell-linked assets and `/client`, `/staff/external`, `/staff/login` returned 200. Fresh anonymous Edge checks showed three correct chooser destinations, Escape closure and zero page errors on both hosts. Authenticated account-menu and label behavior on this deployed bundle remains pending an owner refresh; no booking was made for this check.
+
+The owner observed about ten hashed versions of some remote assets. **Do not mirror-delete `assets/`.** The current package has 69 assets and its immediate rollback package has 68; six filenames overlap, so the minimum current-plus-rollback keep set is **131 distinct paths**. The ignored local `deployments/client-account-display-2026-11-14/MINIMUM_ASSETS_TO_KEEP.txt` lists those paths, but it is not a deletion list: older open browser tabs may still request earlier lazy-loaded chunks, and other retained entry pages or rollback packages may reference them. A cleanup needs a remote inventory, a full off-web-root backup, reference checks against every retained shell/rollback, an agreed old-tab grace period, and a separately reviewed list of files to remove. No hosted asset was deleted in this release.
 
 ## Scoped 38-control ledger
 
@@ -41,7 +47,7 @@ Review date: 14 November 2026. Release owner: Luis Duran; privacy/security/clini
 | AUTH-05 | Unverified | No grant change; deployed inventory remains. |
 | SEC-01 | Partial | No secret or one-time code in source; eventual artifact scan pending. |
 | SEC-02 | Unverified | HTTPS, database transport and backup encryption unchanged. |
-| SEC-03 | Unverified | Existing hosted header/cache gaps remain. |
+| SEC-03 | Partial | Hosted shell has no-store and five-minute HSTS; other header/cache gaps remain. |
 | SEC-04 | Partial | Display text is React encoded; no HTML sink or dynamic URL added. |
 | SEC-05 | Unverified | No request/worker change; abuse review remains. |
 | SEC-06 | Unverified | Audit routes unchanged; hosted review remains. |
@@ -56,9 +62,9 @@ Review date: 14 November 2026. Release owner: Luis Duran; privacy/security/clini
 | DEV-06 | Partial | Existing large-chunk warning; representative-load review not repeated. |
 | REL-01 | Partial | Dated scoped ledger; accountable reviewer decision pending. |
 | REL-02 | Partial | Narrow frontend checkpoint passed; broad PHP/SQL suites omitted. |
-| REL-03 | Partial | Source-bound ZIP and entry hashes verified; hosted acceptance for this new fix pending. |
+| REL-03 | Partial | ZIP plus 138 hosted asset hashes and two entry hashes verified; authenticated acceptance pending. |
 | REL-04 | Missing | Real-data release decision remains blocked by open gates. |
-| REL-05 | Partial | No live change; explicit new artifact/deployment decision required. |
-| REL-06 | Partial | Files, tests, omissions, risk and rollback scope recorded; hosted result pending. |
+| REL-05 | Partial | Owner performed controlled portal-only transfer with prior-shell backup; operational sign-offs remain. |
+| REL-06 | Partial | Files, tests, hashes, rollback and asset-retention boundary recorded; signed-in result pending. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
