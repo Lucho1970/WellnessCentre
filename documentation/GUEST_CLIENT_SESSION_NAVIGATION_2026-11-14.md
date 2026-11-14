@@ -14,7 +14,13 @@ Changed source: `Frontend/src/guest/GuestPortal.tsx`, `Frontend/src/discovery/Lo
 
 The ignored local package `deployments/guest-client-session-2026-11-14/01-shared-portal-assets-only.zip` is from source `78de4b1528a8e71a1ad51d8ea836255b37d6c02b` on this branch. Its SHA-256 is `dbf1df23c8a94518c71e1e2ca18ca6dad79f50dea01f3e8c9069719c83f1e3d6` (815,744 bytes). It contains exactly `index.html` and 68 content-addressed `assets/` files; all 69 ZIP entry hashes were checked against the build. The new `index.html` hash is `0b6e79eb3fc55b7a3c01a2c8bf9d12f74cf6022567822609aaefb6b859be6ee2`. Its ignored manifest records the lockfile hash, Node/npm/Vite versions, build time, flags and file hashes. All four expected public External ID identifiers are present in the bundle. A scan found no source maps, private keys or `127.0.0.1`; one third-party bundled library contains a dormant `http://localhost` fallback for a null browser origin, and one auth-library chunk contains a `.env` text match. No build configuration points to localhost or includes a private environment file. No PHP, SQL, `.htaccess` or private setting is in the ZIP.
 
-This package has **not** been uploaded. Before a hosted change, confirm the current shared shell matches `1cb8dd99db62526f20dd7b96640b84279d8594291a7707cdcc7f4164adb4fa3f`, save its exact bytes outside the web root, and obtain a new REL-05 production decision. Upload the assets additively and verify them on both hosts before switching the single shared `index.html`. Both Wellnexa and LivinLively use this folder. A hosted synthetic client sign-in must then verify landing in `/client`, profile navigation, optional catalogue return, French/English, and signed-out/expired recovery. Restore the saved shared `index.html` for rollback; leave added hashed assets pending separate cleanup. Existing pilot restrictions, inactive practitioner test accounts and disabled mail/SMS must remain in force. Release/operations owner: Luis Duran; clinic privacy/security/clinical decisions and incident contact must be confirmed at action time. This does not approve real PHI use.
+The controlled upload required the current shared shell hash `1cb8dd99db62526f20dd7b96640b84279d8594291a7707cdcc7f4164adb4fa3f`, an off-site backup and a new REL-05 production decision. The assets were to be copied additively and checked on both hosts before switching the single shared `index.html`. Both Wellnexa and LivinLively use this folder. For rollback, restore the saved shared `index.html`; leave added hashed assets pending separate cleanup. Existing pilot restrictions, inactive practitioner test accounts and disabled mail/SMS remain in force. Release/operations owner: Luis Duran; clinic privacy/security/clinical decisions and incident contact still require separate confirmation. This does not approve real PHI use.
+
+### Controlled hosted pilot update — 14 November 2026
+
+The owner approved this exact ZIP and performed the Beyond Compare transfer. Before the entry-page switch, the ZIP was rehashed and confirmed to contain one root `index.html` and 68 assets. Both live hosts still served the expected previous shell. The owner copied the assets additively and kept an off-site `index.html` backup. A first bulk verifier using a direct .NET HTTP client received proxy status 465 for every request; a direct PowerShell `Invoke-WebRequest` returned 200 and matched the asset bytes. Re-running all entries through the working request path verified **68/68 SHA-256 matches on each host (136/136)**. The old shell still matched on both hosts immediately before the switch.
+
+After the owner replaced only the shared `index.html`, both hosts returned 200 with the exact new shell hash `0b6e79eb3fc55b7a3c01a2c8bf9d12f74cf6022567822609aaefb6b859be6ee2`, `no-store` and the existing five-minute HSTS header. Both shell-linked assets returned 200 on each host. `/client`, `/staff/external` and `/staff/login` returned 200 on each host. Fresh headless Edge guest checks showed one login chooser with the exact `/client`, `/staff/external` and `/staff/login` links, Escape closure and zero page errors on each host. This establishes deployed shell/asset integrity and unauthenticated navigation only. The owner-controlled Google client return, signed-in profile/account display and sign-out/expiry remain to be verified; no booking was made for this check.
 
 ## Scoped 38-control ledger
 
@@ -34,14 +40,14 @@ Source owner: Luis Duran for release decision; implementation evidence is this b
 | PRIV-05 | Unverified | Full access/correction process remains open. |
 | PRIV-06 | Unverified | Profession/record retention approval remains open. |
 | PRIV-07 | Unverified | Breach rehearsal remains open. |
-| AUTH-01 | Partial | Existing `/client` identity path retained; hosted callback retest pending. |
+| AUTH-01 | Partial | Existing `/client` identity path retained; hosted route 200, provider callback retest pending. |
 | AUTH-02 | Partial | Client-side check changes labels only; server clinic/record negative tests remain. |
 | AUTH-03 | Unverified | MFA, idle/absolute and departure review unchanged. |
 | AUTH-04 | Unverified | Existing browser session storage exception remains unresolved for real data. |
 | AUTH-05 | Unverified | No grant change; deployed permission inventory remains. |
 | SEC-01 | Partial | No secret added to source; final package scan pending. |
 | SEC-02 | Unverified | Hosted TLS, backup encryption and transport unchanged. |
-| SEC-03 | Unverified | Existing hosted CSP/nosniff/referrer gaps remain. |
+| SEC-03 | Partial | Hosted shell has no-store and five-minute HSTS; existing CSP/nosniff/referrer gaps remain. |
 | SEC-04 | Partial | Fixed internal route and translated plain text only; no new HTML sink. |
 | SEC-05 | Unverified | No request/worker changes; abuse review remains. |
 | SEC-06 | Unverified | API audit unchanged; hosted sensitive-access evidence remains. |
@@ -56,9 +62,9 @@ Source owner: Luis Duran for release decision; implementation evidence is this b
 | DEV-06 | Partial | Existing bundle-size warning; representative load not rerun. |
 | REL-01 | Partial | This dated scoped ledger; accountable decision pending. |
 | REL-02 | Partial | Focused frontend checkpoint only; unrelated PHP/SQL suites not rerun. |
-| REL-03 | Partial | Committed-source narrow artifact hash/entry verification passed; hosted acceptance pending. |
+| REL-03 | Partial | ZIP and hosted shell/assets hash verified on two hosts; authenticated acceptance pending. |
 | REL-04 | Missing | Real-data release decision remains blocked by open gates. |
-| REL-05 | Partial | No deployment; new explicit decision and rollback evidence required. |
-| REL-06 | Partial | Changed files, tests, risk and rollback recorded; hosted result pending. |
+| REL-05 | Partial | Owner approved and copied narrow portal artifact after backup; operational sign-offs remain. |
+| REL-06 | Partial | Changed files, tests, hashes and rollback recorded; authenticated result pending. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
