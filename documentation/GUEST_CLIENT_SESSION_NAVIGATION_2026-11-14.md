@@ -22,6 +22,8 @@ The owner approved this exact ZIP and performed the Beyond Compare transfer. Bef
 
 After the owner replaced only the shared `index.html`, both hosts returned 200 with the exact new shell hash `0b6e79eb3fc55b7a3c01a2c8bf9d12f74cf6022567822609aaefb6b859be6ee2`, `no-store` and the existing five-minute HSTS header. Both shell-linked assets returned 200 on each host. `/client`, `/staff/external` and `/staff/login` returned 200 on each host. Fresh headless Edge guest checks showed one login chooser with the exact `/client`, `/staff/external` and `/staff/login` links, Escape closure and zero page errors on each host. This establishes deployed shell/asset integrity and unauthenticated navigation only. The owner-controlled Google client return, signed-in profile/account display and sign-out/expiry remain to be verified; no booking was made for this check.
 
+The owner then used a fresh/private Wellnexa tab with the existing pilot-approved Google test identity. The provider return landed in the **Client portal**, showing **Customer sign-in verified**, the client workspace/profile navigation and the existing cancelled synthetic test appointment. This closes the specific guest-login destination defect. The account menu displayed the identity provider's placeholder `unknown` and a `U` avatar; that separate presentation defect is tracked for follow-up. No new booking or client record was created in this check. Sign-out, real session expiry, other identities and real-data release remain unverified.
+
 ## Scoped 38-control ledger
 
 Source owner: Luis Duran for release decision; implementation evidence is this branch at the commit recorded in Git. Review date: 14 November 2026. These statuses cover this navigation slice; earlier audit findings remain open. **Unverified** means this edit does not prove the control. Next action for every unverified control is the accountable owner's existing release review, not an inferred waiver.
@@ -40,7 +42,7 @@ Source owner: Luis Duran for release decision; implementation evidence is this b
 | PRIV-05 | Unverified | Full access/correction process remains open. |
 | PRIV-06 | Unverified | Profession/record retention approval remains open. |
 | PRIV-07 | Unverified | Breach rehearsal remains open. |
-| AUTH-01 | Partial | Existing `/client` identity path retained; hosted route 200, provider callback retest pending. |
+| AUTH-01 | Partial | Owner-controlled Google return reached verified `/client`; other identity/session cases remain. |
 | AUTH-02 | Partial | Client-side check changes labels only; server clinic/record negative tests remain. |
 | AUTH-03 | Unverified | MFA, idle/absolute and departure review unchanged. |
 | AUTH-04 | Unverified | Existing browser session storage exception remains unresolved for real data. |
@@ -62,9 +64,9 @@ Source owner: Luis Duran for release decision; implementation evidence is this b
 | DEV-06 | Partial | Existing bundle-size warning; representative load not rerun. |
 | REL-01 | Partial | This dated scoped ledger; accountable decision pending. |
 | REL-02 | Partial | Focused frontend checkpoint only; unrelated PHP/SQL suites not rerun. |
-| REL-03 | Partial | ZIP and hosted shell/assets hash verified on two hosts; authenticated acceptance pending. |
+| REL-03 | Partial | ZIP and hosted shell/assets verified on two hosts; Google client return succeeded, other role/expiry acceptance pending. |
 | REL-04 | Missing | Real-data release decision remains blocked by open gates. |
 | REL-05 | Partial | Owner approved and copied narrow portal artifact after backup; operational sign-offs remain. |
-| REL-06 | Partial | Changed files, tests, hashes and rollback recorded; authenticated result pending. |
+| REL-06 | Partial | Changed files, tests, hashes, rollback and owner-observed Google return recorded; other gates remain. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
