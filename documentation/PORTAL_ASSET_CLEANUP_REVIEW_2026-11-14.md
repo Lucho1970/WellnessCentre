@@ -2,7 +2,7 @@
 
 ## Scope and observed inventory
 
-The shared `/public_html/wellness-common-portal/assets/` folder serves both Wellnexa and LivinLively. Repeated frontend releases leave content-addressed JavaScript/CSS files in place so open tabs and rollback shells can continue to load lazy chunks. The owner asked whether older copies could be removed. **No hosted file was deleted in this review.** This is `feature/portal-asset-cleanup-review`, based on the deployed client-display branch at `6faa1fc`.
+The shared `/public_html/wellness-common-portal/assets/` folder serves both Wellnexa and LivinLively. Repeated frontend releases leave content-addressed JavaScript/CSS files in place so open tabs and rollback shells can continue to load lazy chunks. The owner asked whether older copies could be removed. The exact 377-file approved cleanup was completed on 15 November 2026. This is `feature/portal-asset-cleanup-review`, based on the deployed client-display branch at `6faa1fc`.
 
 After the current `client-account-display-2026-11-14` portal upload, the owner downloaded the entire remote `assets/` folder to `D:\Dev\WellnessCentre-backup\asset-cleanup-2026-11-14\assets\` without changing the server. The confirmed local inventory has **632 files / 24,766,141 bytes** in one directory. All **131 distinct assets** in the current 69-file package and immediate 68-file rollback package are present and SHA-256 match their package manifests; six filenames overlap. Both live clinic hosts served the current shared shell hash `2bc51f6107a50c5b452bf2f50a52381f6ca52594d012eb58cd340689cc6efafc` at the time of review.
 
@@ -19,11 +19,19 @@ No code, dependency, API, SQL, identity, permission, consent, endpoint, mail/SMS
 
 ### Approved selection, transfer boundary
 
-The owner approved removal of the exact 377-file candidate list and confirmed testers can refresh old tabs. A local `D:\Dev\WellnessCentre-backup\asset-cleanup-2026-11-14\candidate-older-assets\` folder now contains only those 377 files; each byte hash matches the full backup. This supports a names-and-content comparison with the remote folder before any delete. The active Beyond Compare window showed a **passive FTP** connection, so no deletion was attempted through it. Use the previously verified encrypted SFTP/SSH2 profile or the hosting HTTPS File Manager. Recheck that the remote `assets/` inventory is still the confirmed 632-file/24,766,141-byte snapshot and that the candidate comparison has exactly 377 matches. Stop on any mismatch. The destructive UI action still needs action-time confirmation under the computer-use skill; approval of the list does not justify deleting a different set. No remote asset has been deleted as of this note.
+The owner approved removal of the exact 377-file candidate list and confirmed testers can refresh old tabs. A local `D:\Dev\WellnessCentre-backup\asset-cleanup-2026-11-14\candidate-older-assets\` folder contains only those 377 files; each byte hash matches the full backup. The initial Beyond Compare window used **passive FTP**, and no deletion was attempted through it. The actual operation used the saved **Netfirms SFTP 2222** profile; its log showed `sftp://...:2222/` and SFTP protocol negotiation. The owner gave a separate action-time confirmation immediately before deletion, as required by the computer-use skill.
+
+## Hosted cleanup and verification — 15 November 2026
+
+Beyond Compare loaded the local 377-file candidate folder on the left and `/public_html/wellness-common-portal/assets/` over SFTP on the right. Before deletion, the right side showed **632 files / 23.6 MiB**. A content comparison completed for all 632 items. The **Same** filter showed the exact 377 named candidates on both sides, with 377 selected on the right. In the Delete dialog, **Left side was unchecked** and **Right side was checked**; the dialog listed **377 files, zero folders** on the right. The log then reported **“Successfully deleted 377 items. Completed in 13.6 seconds.”** No error was shown. The **All** filter afterward showed **255 remote files / 9.58 MiB**, exactly the retained count. The local candidate and full backup folders were unchanged. This was one exact-list batch rather than the previously proposed staged batches; the full content comparison, right-only dialog count and complete local backup were used as controls. No other hosted path was touched.
+
+The 255-file retained list was copied from the full local backup into `D:\Dev\WellnessCentre-backup\asset-cleanup-2026-11-14\retained-assets\` for read-only comparison; this local folder contains 255 files. A post-deletion **binary content comparison of all 255 local and remote files** completed in 50.9 seconds; the **Same** filter showed all 255 files and no extra remote files. Static HTTP smoke checks downloaded `index.html`, three current assets and two immediate-rollback assets from **each** of `wellnexa.copihue.ca` and `livinlively.copihue.ca`; all 12 SHA-256 values matched their manifests. `/client`, `/staff` and `/staff/external` returned HTTP 200 with `text/html` on both hosts (six route checks). These checks establish the shell and sampled static delivery, not an authenticated browser flow. A tester should refresh an existing synthetic client session and check client/staff/practitioner navigation and the browser console for chunk-load errors. Restore an individual older file from the full local backup through SFTP if a pre-12-November open tab needs it; a refresh should normally load the current shell.
+
+No source, dependency, API, SQL, identity, permission, consent, endpoint, mail/SMS or private configuration changed. The asset cleanup is a hosted operational action, not a real-PHI release decision. Release/operations owner: Luis Duran. Monitor shared portal errors and restore from the full backup if a missing chunk is reported.
 
 ## Scoped 38-control ledger
 
-Review date: 14 November 2026. Statuses address this inventory and proposed cleanup only; unresolved application findings in the current audit and release records remain. For every unverified item, the accountable owner must use the existing release process; this document is not an exception.
+Review dates: 14–15 November 2026. Statuses address this inventory and completed asset cleanup only; unresolved application findings in the current audit and release records remain. For every unverified item, the accountable owner must use the existing release process; this document is not an exception.
 
 | Control | Status | Evidence or next action |
 | --- | --- | --- |
@@ -45,25 +53,25 @@ Review date: 14 November 2026. Statuses address this inventory and proposed clea
 | AUTH-04 | Unverified | Browser storage exception unchanged. |
 | AUTH-05 | Unverified | No API grant change. |
 | SEC-01 | Partial | Asset names/hashes only in local lists; no private files committed. |
-| SEC-02 | Partial | Backup kept outside web root; passive FTP observed and excluded from deletion; SFTP/HTTPS and encryption/access/recovery evidence remain. |
-| SEC-03 | Partial | Current shell hash checked; full header/TLS review remains. |
+| SEC-02 | Partial | Backup kept outside web root; passive FTP excluded from deletion; SFTP/SSH2 used for the hosted operation. Wider encryption/access/recovery evidence remains. |
+| SEC-03 | Partial | Current shell and sampled asset hashes checked on both hosts; full header/TLS review remains. |
 | SEC-04 | Unverified | No source/input processing change. |
 | SEC-05 | Unverified | No request/upload/worker change. |
-| SEC-06 | Unverified | Hosting-level file deletion audit/log procedure remains to be recorded. |
-| SEC-07 | Unverified | Chunk-load failure monitoring/restoration still to be rehearsed. |
+| SEC-06 | Partial | Beyond Compare SFTP log records successful 377-item deletion; independent hosting audit/log retention remains unverified. |
+| SEC-07 | Partial | Safe restoration source exists; chunk-load failure monitoring and restoration rehearsal remain. |
 | SEC-08 | Unverified | No external endpoint change. |
 | SEC-09 | Unverified | Messaging unchanged. |
-| DEV-01 | Partial | Dedicated branch and preserved source; review/commit/push pending. |
+| DEV-01 | Partial | Dedicated branch and preserved source; operational follow-up commit/push pending. |
 | DEV-02 | Partial | Inventory classification reviewed; no runtime code edit. |
 | DEV-03 | Unverified | No dependency/toolchain change; earlier advisory review remains. |
-| DEV-04 | Partial | Manifest/local SHA checks and live shell reads; no code build or full browser rerun for doc-only review. |
+| DEV-04 | Partial | Manifest/local SHA checks, 12 hosted static hashes and six route responses; no source build or full browser rerun for this operational cleanup. |
 | DEV-05 | Unverified | Accessibility unchanged; smoke after any deletion required. |
-| DEV-06 | Partial | 14.7 MB older candidates identified; no runtime performance assertion. |
-| REL-01 | Partial | Dated scoped ledger; owner decision pending. |
-| REL-02 | Partial | Read-only asset/manifest checks; broad checkpoint not claimed. |
-| REL-03 | Partial | Current/rollback hashes and hosted shell observed; deletion acceptance pending. |
+| DEV-06 | Partial | 14,724,477 older bytes removed; no runtime performance assertion. |
+| REL-01 | Partial | Dated scoped ledger and owner approval recorded; wider release ledger remains. |
+| REL-02 | Partial | Pre/post binary asset comparisons and hosted static smoke; broad checkpoint not claimed. |
+| REL-03 | Partial | Current/rollback hashes, hosted shell and routes observed; authenticated browser acceptance pending. |
 | REL-04 | Missing | Real-data release remains separately blocked. |
-| REL-05 | Partial | Owner approved exact 377-file list; no delete pending SFTP comparison and action-time confirmation. |
-| REL-06 | Partial | Inventory, candidate list, keep set, owner decision, risk and restore path recorded; action pending. |
+| REL-05 | Partial | Owner approved exact list and action-time deletion; SFTP right-only operation verified. Wider release sign-offs remain. |
+| REL-06 | Partial | Inventory, exact delete result, static smoke, risk and restore path recorded; authenticated smoke pending. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
