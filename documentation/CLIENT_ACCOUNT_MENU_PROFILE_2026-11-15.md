@@ -38,6 +38,10 @@ During hosted acceptance, the owner pressed Enter on the focused **C** avatar, t
 
 The updated Playwright test uses Enter, Tab, Enter and asserts profile-heading focus; it also checks second Tab and Escape focus restoration. The form-lock and sign-out selectors were updated to match the button group. `npm run build` passed lint, content/i18n, strict TypeScript and all three frontend builds. Focused tests passed **3/3**, followed by the profile keyboard test **1/1**. A broader customer/client-form run passed **73/74**; one unrelated draft-save test reached the generic application-boot error while local modules loaded and timed out waiting for **My forms**. Its isolated rerun passed **1/1**. This intermittent test-environment failure is retained as initial evidence; it is not counted as a clean 74/74 run. Hosted acceptance of the corrected keyboard path remains pending.
 
+The corrected portal-only pilot ZIP is `D:\Dev\WelnessCentre\deployments\client-account-keyboard-2026-11-15\01-shared-portal-assets-only.zip`, source commit `ecd9014d90eb911f1a0753d84565a604057f4b63`, SHA-256 `4d826f4435856af6115eaf9990f5148cbb98e452ca25e793774390cbb40756a5`. It contains `index.html` (SHA-256 `bca0b2dbab3294b1ff28444c7bb355d510428b362b02808afccc4373961959a5`) and 69 JS/CSS assets, exactly 70 entries; every entry hash matches the local ignored manifest, with no source maps or private/server file paths. The lockfile SHA-256 remains `cb46757cdd6fd546aa12a1149ddd66bc7ebf576f595f8af075f73b8b5be7970c`. The prior live index was downloaded from both hosts to `D:\Dev\WellnessCentre-backup\client-account-keyboard-2026-11-15\` and both copies matched `28b4e4b6b63c43cba62b1dce290cbc13362771f19dba92c27d373d561645944a`.
+
+The first corrected portal build omitted the existing public External ID practitioner identifiers: its built smoke suite passed **16/17**, with the Google practitioner button disabled. This was a packaging configuration error, not a source change. The portal was rebuilt with the same reviewed public pilot identity identifiers and five pilot flags as the preceding live artifact; server sessions and invitations remain off. The built smoke suite then passed **17/17**, including practitioner versus workforce sign-in boundaries. The ZIP above contains only this corrected build; the first build was not packaged or uploaded. Upload requires an additive transfer of the ZIP's `assets/`, hash checks on both clinic hosts, then replacement of only the shared `index.html`; no mirroring or deletion. Rollback is the saved previous `index.html`, retaining both sets of hashed assets. No API, database, identity grant, runtime dependency, consent or private-setting change is required. The owner has not yet authorized or performed this new production transfer. The current live keyboard behavior remains the earlier MUI menu until then.
+
 ## Scoped 38-control ledger
 
 Review date: 15 November 2026. Statuses apply to this UI slice, not the whole application. Unverified items require the accountable privacy, security, clinical or release owner to follow the existing release process; this record grants no exception.
@@ -74,13 +78,13 @@ Review date: 15 November 2026. Statuses apply to this UI slice, not the whole ap
 | DEV-02 | Partial | Typed, focused UI change; human code review pending. |
 | DEV-03 | Partial | Lockfile restore passed; nine moderate build-tool advisories, zero runtime advisories; separate remediation needed. |
 | DEV-04 | Partial | Build/content/i18n/typecheck and scoped browser tests passed after recorded local network retry; full suites omitted. |
-| DEV-05 | Partial | Semantic menu action, label, keyboard/focus and lock assertions passed; manual screen reader, zoom and hosted bilingual/mobile checks remain. |
+| DEV-05 | Partial | Corrected Enter/Tab/Enter, next Tab and Escape focus assertions passed; manual screen reader, zoom and hosted bilingual/mobile checks remain. |
 | DEV-06 | Partial | Existing bundle and import warnings recorded; representative performance review remains. |
 | REL-01 | Partial | Dated scoped ledger; accountable reviewer decision pending. |
 | REL-02 | Partial | Frontend build and relevant browser checks passed; broad PHP/SQL and dedicated admin suites omitted because backend is unchanged. |
-| REL-03 | Partial | ZIP, manifest, 17 built-smoke checks, 138 asset hashes, two entry hashes, eight hosted route responses and the owner's signed-in Wellnexa profile opening passed; other authenticated scenarios remain. |
+| REL-03 | Partial | Earlier deployed ZIP has 138 asset hashes, two entry hashes, eight hosted route responses and signed-in profile opening. Corrected keyboard ZIP has 70 matched entries and 17/17 built smoke checks; corrected ZIP is not hosted yet. |
 | REL-04 | Missing | Real-data release remains separately blocked. |
-| REL-05 | Partial | Owner transferred exact ZIP in reviewed order with current-shell backup; broader operational sign-offs remain. |
-| REL-06 | Partial | Files, versions, results, advisories, artifact, rollback, hosted static checks, signed-in profile result and browser-extension Console classification recorded; wider acceptance remains. |
+| REL-05 | Partial | Earlier ZIP transferred in reviewed order; corrected keyboard ZIP is prepared with current-shell backup but requires a fresh production decision and transfer. Broader operational sign-offs remain. |
+| REL-06 | Partial | Files, versions, results, initial failed checks and reruns, artifact hashes, rollback, hosted static checks and keyboard finding recorded; corrected hosted acceptance remains. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
