@@ -10,9 +10,8 @@ import {
   Button,
   Container,
   IconButton,
-  Menu,
-  MenuItem,
   Paper,
+  Popover,
   Stack,
   Toolbar,
   Typography,
@@ -265,35 +264,39 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
                 )}
               </Stack>
             </Stack>
-            <Menu
+            <Popover
               anchorEl={anchor}
               open={Boolean(anchor)}
               onClose={() => setAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              <Box px={2} py={1}>
-                <Typography fontWeight={700}>{name}</Typography>
-              </Box>
-              {verified && status?.onboarding_status === 'linked' && (
-                <MenuItem
-                  disabled={busy || profileNavigationDisabled}
+              <Stack role="group" aria-label={t('My client account')} sx={{ minWidth: 180, p: 1 }}>
+                <Typography fontWeight={700} sx={{ px: 1, py: 0.5 }}>{name}</Typography>
+                {verified && status?.onboarding_status === 'linked' && (
+                  <Button
+                    disabled={busy || profileNavigationDisabled}
+                    onClick={() => {
+                      setAnchor(null);
+                      setProfileRequest(value => value + 1);
+                    }}
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
+                    {t('My profile')}
+                  </Button>
+                )}
+                <Button
+                  disabled={busy}
                   onClick={() => {
-                    setAnchor(null);
-                    setProfileRequest(value => value + 1);
+                    setVerified(false);
+                    void run(customerSignOut);
                   }}
+                  sx={{ justifyContent: 'flex-start' }}
                 >
-                  {t('My profile')}
-                </MenuItem>
-              )}
-              <MenuItem
-                disabled={busy}
-                onClick={() => {
-                  setVerified(false);
-                  void run(customerSignOut);
-                }}
-              >
-                {t("SignOut")}
-              </MenuItem>
-            </Menu>
+                  {t("SignOut")}
+                </Button>
+              </Stack>
+            </Popover>
           </Toolbar>
         </Container>
       </AppBar>

@@ -214,14 +214,25 @@ test('placeholder provider name is not shown in the verified client account menu
   await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Show' })).toHaveText('Upcoming');
   await expect(page.getByRole('button', { name: 'Open client account menu' }).getByText('C', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Open client account menu' }).click();
-  await expect(page.getByRole('menu').getByText('Client', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open client account menu' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByText('Client', { exact: true })).toBeVisible();
   await expect(page.getByText('unknown', { exact: true })).toHaveCount(0);
-  await page.getByRole('menuitem', { name: 'My profile', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByRole('button', { name: 'My profile', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'My profile', exact: true })).toBeFocused();
   await expect(page.getByRole('button', { name: 'Save profile', exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'First name' })).toHaveValue('Synthetic');
+  const accountButton = page.getByRole('button', { name: 'Open client account menu' });
+  await accountButton.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByRole('button', { name: 'My profile', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByRole('button', { name: 'Sign out', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(accountButton).toBeFocused();
   const invalidLabels = await page.locator('label[for]').evaluateAll(labels => labels
     .filter(label => {
       const target = document.getElementById(label.htmlFor);
@@ -322,7 +333,7 @@ test("verified identity remains unlinked with no client records or staff roles",
   });
   await page.getByRole("button", { name: "Open client account menu" }).click();
   expect(checks).toBe(1);
-  await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
+  await page.getByRole("group", { name: "My client account" }).getByRole("button", { name: "Sign out", exact: true }).click();
   expect(await page.evaluate(() => (window as Window & { customerSignOutCalled?: boolean }).customerSignOutCalled)).toBe(
     true,
   );
