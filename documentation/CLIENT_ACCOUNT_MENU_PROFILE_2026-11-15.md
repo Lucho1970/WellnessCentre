@@ -46,6 +46,8 @@ The owner approved and transferred this new portal-only artifact on 15 November 
 
 The owner subsequently confirmed that the French profile and sign-out actions were translated and that the panel and profile remained usable at about 390 px without horizontal clipping. A hosted screenshot showed the **Mon profil** heading with visible programmatic focus after keyboard activation, confirming the heading-focus behavior. Its `tabIndex=-1` keeps the heading out of normal Tab traversal; the next Tab should reach an editable control. No profile fields or contact details from the screenshot are recorded here. The owner then signed out and refreshed `/client`; the C avatar, saved profile and appointment details remained hidden and sign-in was offered. Authenticated LivinLively acceptance remains pending.
 
+For the shared frontend's second clinic, the owner tried a different Google identity and a personal Microsoft identity on LivinLively. Both returned to `/client` with the generic client callback error. In DevTools, the `customer/auth/session` response was HTTP **403** with short code `pilot_access_denied`; no request headers, body, tokens or callback parameters were retained. The owner confirmed the Google picker had selected a different account. Repeating with the already approved synthetic Google identity succeeded and showed **verified but not linked** on LivinLively, without a Wellnexa client profile or appointments. This is expected: the global pilot allowlist does not grant clinic record linkage. The owner signed out and refreshed `/client`; sign-in was offered and no Wellnexa profile or appointments appeared. The generic callback message obscures the specific pilot denial; a separately reviewed safe client callback message could improve recovery, but this finding did not require widening pilot access. A linked synthetic LivinLively client fixture remains necessary to test its profile action on that host.
+
 ## Scoped 38-control ledger
 
 Review date: 15 November 2026. Statuses apply to this UI slice, not the whole application. Unverified items require the accountable privacy, security, clinical or release owner to follow the existing release process; this record grants no exception.
@@ -65,7 +67,7 @@ Review date: 15 November 2026. Statuses apply to this UI slice, not the whole ap
 | PRIV-06 | Unverified | Record/profession retention approvals remain. |
 | PRIV-07 | Unverified | Breach rehearsal remains. |
 | AUTH-01 | Partial | Existing client verification path retained; hosted test of new bundle pending. |
-| AUTH-02 | Partial | Menu opens only the existing linked client's workspace; server boundary tests remain. |
+| AUTH-02 | Partial | Menu opens only the existing linked client's workspace; hosted approved identity was verified but unlinked on LivinLively without Wellnexa records. Wider server boundary tests remain. |
 | AUTH-03 | Unverified | MFA, idle/absolute limits and departure controls unchanged. |
 | AUTH-04 | Unverified | Existing browser storage exception remains for real-data gate. |
 | AUTH-05 | Unverified | No API grant change; deployed inventory remains. |
@@ -86,7 +88,7 @@ Review date: 15 November 2026. Statuses apply to this UI slice, not the whole ap
 | DEV-06 | Partial | Existing bundle and import warnings recorded; representative performance review remains. |
 | REL-01 | Partial | Dated scoped ledger; accountable reviewer decision pending. |
 | REL-02 | Partial | Frontend build and relevant browser checks passed; broad PHP/SQL and dedicated admin suites omitted because backend is unchanged. |
-| REL-03 | Partial | Corrected ZIP has 70 matched entries and 17/17 built smoke checks; hosted asset 138/138, both entry hashes, eight routes, Wellnexa keyboard/French/narrow/profile and signed-out privacy checks passed. LivinLively authenticated acceptance remains. |
+| REL-03 | Partial | Corrected ZIP has 70 matched entries and 17/17 built smoke checks; hosted asset 138/138, both entry hashes, eight routes, Wellnexa keyboard/French/narrow/profile and sign-out passed. LivinLively approved identity returned verified but unlinked, then sign-out passed; linked-client fixture remains. |
 | REL-04 | Missing | Real-data release remains separately blocked. |
 | REL-05 | Partial | Owner approved and transferred corrected keyboard ZIP in reviewed order after previous-shell backup and both-host asset hashes. Broader operational sign-offs remain. |
 | REL-06 | Partial | Files, versions, initial failed checks and reruns, artifact hashes, rollback, hosted static checks, keyboard finding and signed-in correction result recorded; wider acceptance remains. |
