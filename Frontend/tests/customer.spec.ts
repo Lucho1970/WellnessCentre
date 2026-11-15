@@ -177,7 +177,7 @@ test('clients retrieve receipt PDFs and see voided receipts on mobile', async ({
   await page.screenshot({ path: test.info().outputPath('client-receipts-mobile.png'), fullPage: true });
 });
 
-async function fixture(page: Page, signedIn = false, callbackFails = false, accountName = 'Test Client') {
+async function fixture(page: Page, signedIn = false, callbackFails = false, accountName = 'Test Client', callbackSession = false) {
   // Only Playwright intercepts this module; no production bypass or fake tokens.
   await page.route("**/src/customer/auth.ts", (route) =>
     route.fulfill({
@@ -186,7 +186,7 @@ async function fixture(page: Page, signedIn = false, callbackFails = false, acco
     const account=${signedIn ? `{homeAccountId:'customer',name:${JSON.stringify(accountName)}}` : "null"};
     export const customerConfigured=true;
     export const customerHome='http://localhost:5184/client';
-    export const customerInstance={initialize:async()=>{},handleRedirectPromise:async()=>{${callbackFails ? "throw new Error('test callback failure');" : "return null;"}},getActiveAccount:()=>account?{...account}:null,getAllAccounts:()=>account?[{...account}]:[],setActiveAccount:()=>{}};
+    export const customerInstance={initialize:async()=>{},handleRedirectPromise:async()=>{${callbackFails ? "throw new Error('test callback failure');" : callbackSession ? "return {account,idToken:'synthetic-id-proof',accessToken:'synthetic-access-proof'};" : "return null;"}},getActiveAccount:()=>account?{...account}:null,getAllAccounts:()=>account?[{...account}]:[],setActiveAccount:()=>{}};
     export const selectCustomerAccount=()=>account?{...account,idTokenClaims:{exp:Math.floor(Date.now()/1000)+3600}}:null;
     export const customerToken=async()=>'customer-test-token';
     export const customerSignIn=async()=>{window.customerSignInCalled=true;};
@@ -533,6 +533,36 @@ test("callback failure strips response and offers deliberate recovery", async ({
   await expect(
     page.getByRole("button", { name: "Sign in or create client account" }),
   ).toBeEnabled();
+});
+
+for (const [language, message] of [
+  ['en', 'This pilot is limited to approved test accounts. Contact the clinic for access.'],
+  ['fr', 'Ce projet pilote est réservé aux comptes de test approuvés. Contactez la clinique pour obtenir un accès.'],
+] as const) test(`client callback explains a pilot session denial in ${language}`, async ({ page }) => {
+  await fixture(page, true, false, 'Synthetic Client', true);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.challenge.v1', 'pending'));
+  let privateReads = 0;
+  await page.route('**/api/v1/customer/auth/me', route => { privateReads++; return route.fulfill({ status: 403 }); });
+  await page.route('**/api/v1/customer/auth/session', route => route.fulfill({ status: 403, json: { error: {
+    code: 'pilot_access_denied', message: 'This pilot is limited to approved test accounts.',
+  } } }));
+  await page.goto(`http://localhost:5184/client/auth/callback?code=synthetic&state=synthetic&lang=${language}`);
+  await expect(page).toHaveURL('http://localhost:5184/client');
+  await expect(page.getByRole('alert').filter({ hasText: message })).toBeVisible();
+  expect(privateReads).toBe(0);
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toHaveCount(0);
+});
+
+test('client callback keeps unrelated authorization failures generic', async ({ page }) => {
+  await fixture(page, true, false, 'Synthetic Client', true);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.challenge.v1', 'pending'));
+  await page.route('**/api/v1/customer/auth/session', route => route.fulfill({ status: 403, json: { error: {
+    code: 'missing_scope', message: 'Provider details must not be displayed.',
+  } } }));
+  await page.goto('http://localhost:5184/client/auth/callback?code=synthetic&state=synthetic');
+  await expect(page).toHaveURL('http://localhost:5184/client');
+  await expect(page.getByText(/Client sign-in could not be completed/)).toBeVisible();
+  await expect(page.getByText('Provider details must not be displayed.')).toHaveCount(0);
 });
 
 test("real customer MSAL starts code flow with PKCE and customer-only scope", async ({
