@@ -124,6 +124,9 @@ test('uncertain submission locks answers and retries the identical request', asy
   await fixture(page); const bodies: unknown[] = [];
   await page.route('**/api/v1/customer/forms/19/submit', route => { bodies.push(route.request().postDataJSON()); return route.fulfill(bodies.length === 1 ? { status: 503, json: { error: { code: 'unavailable', message: 'Retry' } } } : { json: { data: { id: 19, status: 'submitted' } } }); });
   await complete(page); await page.getByRole('button', { name: 'Submit form', exact: true }).click(); await expect(page.getByRole('button', { name: 'Retry confirmation', exact: true })).toBeVisible(); await expect(page.getByLabel('Synthetic answer')).toBeDisabled(); await expect(page.getByRole('button', { name: 'My profile', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Open client account menu' }).click();
+  await expect(page.getByRole('menuitem', { name: 'My profile', exact: true })).toBeDisabled();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Retry confirmation', exact: true }).click(); await expect(page.getByText('Form submitted. Your answers have been saved.')).toBeVisible(); expect(bodies[1]).toEqual(bodies[0]);
 });
 test('administrator client forms show status without an answer-reading action', async ({ page }) => {

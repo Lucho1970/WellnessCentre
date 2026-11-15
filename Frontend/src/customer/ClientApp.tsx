@@ -55,6 +55,8 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [profileRequest, setProfileRequest] = useState(0);
+  const [profileNavigationDisabled, setProfileNavigationDisabled] = useState(false);
   const [status, setStatus] = useState<CustomerStatus | null>(null);
   const [session, setSession] = useState<SessionTimes | null>(null);
   useEffect(() => {
@@ -268,7 +270,20 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
               open={Boolean(anchor)}
               onClose={() => setAnchor(null)}
             >
-              <MenuItem disabled>{name}</MenuItem>
+              <Box px={2} py={1}>
+                <Typography fontWeight={700}>{name}</Typography>
+              </Box>
+              {verified && status?.onboarding_status === 'linked' && (
+                <MenuItem
+                  disabled={busy || profileNavigationDisabled}
+                  onClick={() => {
+                    setAnchor(null);
+                    setProfileRequest(value => value + 1);
+                  }}
+                >
+                  {t('My profile')}
+                </MenuItem>
+              )}
               <MenuItem
                 disabled={busy}
                 onClick={() => {
@@ -343,6 +358,8 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
             <CustomerWorkspace
               status={status}
               onRefresh={() => setAttempt((value) => value + 1)}
+              profileRequest={profileRequest}
+              onProfileNavigationDisabledChange={setProfileNavigationDisabled}
             />
           )}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mt={3}>

@@ -27,12 +27,15 @@ type Profile = typeof emptyProfile;
 type Appointment = CustomerAppointment;
 type AppointmentView = 'upcoming' | 'past' | 'all';
 const appointmentInstant = (value: string) => new Date(`${value.replace(' ', 'T')}Z`).getTime();
-function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; onRefresh: () => void }) {
+function CustomerWorkspaceForm({ status, onRefresh, profileRequest, onProfileNavigationDisabledChange }: { status: CustomerStatus; onRefresh: () => void; profileRequest: number; onProfileNavigationDisabledChange: (disabled: boolean) => void }) {
   const formValidation = useFormValidation();
   const { t, i18n } = useTranslation();
   const appointmentViewLabelId = useId();
+  const preferredContactLabelId = useId();
   const canBook=status.capabilities?.includes('book_own_appointments')??false;
   const previousOnboarding = useRef(status.onboarding_status);
+  const profileHeadingRef = useRef<HTMLHeadingElement>(null);
+  const pendingProfileFocus = useRef(false);
   const [workflowLocked, setWorkflowLocked] = useState(false);
   const [mode, setMode] = useState<'choose' | 'profile' | 'invite' | 'appointments' | 'booking' | 'manage' | 'link' | 'forms' | 'receipts' | 'discovery' | 'travel' | 'consent'>(status.onboarding_status === 'linked' ? (privateSessionStorage.getItem('wellness.discover-requested') === '1' ? 'discovery' : pendingAppointmentLink() ? 'link' : canBook&&customerBookingIntent() ? 'booking' : 'appointments') : 'choose');
   const [discoverySelection,setDiscoverySelection]=useState<Match|undefined>();
@@ -45,6 +48,22 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
   const [token, setToken] = useState(() => privateSessionStorage.getItem('wellness.customer.invitation') ?? '');
   const [claimantName, setClaimantName] = useState('');
   const [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const lastProfileRequest = useRef(profileRequest);
+  useEffect(() => onProfileNavigationDisabledChange(workflowLocked || saving), [workflowLocked, saving, onProfileNavigationDisabledChange]);
+  useEffect(() => {
+    if (profileRequest === lastProfileRequest.current) return;
+    lastProfileRequest.current = profileRequest;
+    if (status.onboarding_status === 'linked' && !workflowLocked && !saving) {
+      pendingProfileFocus.current = true;
+      setMode('profile');
+    }
+  }, [profileRequest, status.onboarding_status, workflowLocked, saving]);
+  useEffect(() => {
+    if (mode === 'profile' && pendingProfileFocus.current && profileHeadingRef.current) {
+      profileHeadingRef.current.focus();
+      pendingProfileFocus.current = false;
+    }
+  }, [mode, profileRequest]);
   const [reload, setReload] = useState(0);
   const [calendarDownloading, setCalendarDownloading] = useState<number | null>(null);
   const { markDirty, markClean } = useUnsavedForm();
@@ -116,6 +135,7 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
     {status.onboarding_status === 'linked' ? <Stack direction="row" spacing={1} flexWrap="wrap"><Button variant={mode === 'appointments' ? 'contained' : 'text'} disabled={saving || workflowLocked} onClick={() => setMode('appointments')}>{t('My appointments')}</Button>{canBook&&<Button variant={mode === 'booking' ? 'contained' : 'text'} disabled={saving || workflowLocked} onClick={() => { setDiscoverySelection(undefined); setNotice(''); setMode('booking'); }}>{t('Book appointment')}</Button>}<Button variant={mode === 'profile' ? 'contained' : 'text'} disabled={saving || workflowLocked} onClick={() => setMode('profile')}>{t('My profile')}</Button><Button disabled={saving || workflowLocked} variant={mode === 'forms' ? 'contained' : 'text'} onClick={() => setMode('forms')}>{t('My forms')}</Button><Button disabled={saving || workflowLocked} variant={mode === 'receipts' ? 'contained' : 'text'} onClick={() => setMode('receipts')}>{t('My receipts')}</Button><Button disabled={saving || workflowLocked} onClick={()=>setMode('discovery')}>{t('Find nearby care')}</Button><Button disabled={saving || workflowLocked} onClick={()=>setMode('travel')}>{t('Travel enquiries')}</Button><Button disabled={saving || workflowLocked} onClick={()=>setMode('consent')}>{t('Privacy instructions')}</Button></Stack>
       : <><Typography>{t('If the clinic has booked you before, request an invitation instead of creating another record. Email matching does not link accounts.')}</Typography><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}><Button onClick={() => setMode('profile')}>{t('I am a new client')}</Button><Button onClick={() => setMode('invite')}>{t('I have an invitation')}</Button></Stack></>}
     {error && <Alert severity="error">{error}{status.onboarding_status === 'linked' && <Button disabled={saving || loading} onClick={() => setReload(v => v + 1)}>{t('Reload saved information')}</Button>}</Alert>}{notice && <Alert severity="success">{notice}</Alert>}
+    {mode === 'profile' && <Typography ref={profileHeadingRef} variant="h6" component="h2" tabIndex={-1}>{t('My profile')}</Typography>}
     {status.onboarding_status === 'linked' && <TravelEnquiryNotice request={travelClientRequest} open={()=>{if(!workflowLocked)setMode('travel');}}/>}
     {mode === 'consent' ? <CustomerConsent onLockedChange={setWorkflowLocked}/> : mode === 'discovery' ? <ClientDiscovery canBook={canBook} onLockedChange={setWorkflowLocked} book={match=>{clearCustomerBookingIntent();setDiscoverySelection(match);setMode('booking');}} openInbox={()=>setMode('travel')}/> : mode === 'travel' ? <TravelEnquiries client request={travelClientRequest} onLockedChange={setWorkflowLocked}/> : mode === 'receipts' ? <CustomerReceipts /> : mode === 'forms' ? <CustomerForms onLockedChange={setWorkflowLocked}/> : mode === 'link' ? <CustomerAppointmentLink onLockedChange={setWorkflowLocked} close={() => { clearAppointmentLink(); setMode('appointments'); }} complete={message => { setWorkflowLocked(false); setNotice(message); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }}/> : mode === 'booking' ? <CustomerBooking onDiscover={()=>setMode('discovery')} selection={discoverySelection} onLockedChange={setWorkflowLocked} cancel={() => { clearCustomerBookingIntent(); setMode('appointments'); }} complete={(id, message) => { setWorkflowLocked(false); clearCustomerBookingIntent(); setNotice(message ?? t('Appointment #{{id}} confirmed. Check the appointment list for details.', { id })); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : mode === 'manage' && managing ? <CustomerAppointmentManager onLockedChange={setWorkflowLocked} appointment={managing} close={() => { setManaging(null); setMode('appointments'); }} complete={message => { setWorkflowLocked(false); setManaging(null); setNotice(message); setAppointmentView('upcoming'); setReload(value => value + 1); setMode('appointments'); }} /> : loading ? <CircularProgress aria-label={t(mode === 'appointments' ? 'Loading appointments' : 'Loading your information…')} /> : mode === 'appointments' ? <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between" mb={2}>
@@ -145,7 +165,12 @@ function CustomerWorkspaceForm({ status, onRefresh }: { status: CustomerStatus; 
       {mode === 'invite' ? <><TextField name="claimantName" required label={t('Your full name')} inputProps={{ maxLength: 150 }} value={claimantName} onChange={e => setClaimantName(e.target.value)} /><TextField name="token" required label={t('Invitation code')} value={token} inputProps={{ maxLength: 64 }} onChange={e => setToken(e.target.value.trim())} /><Typography>{t('Accepting submits a claim for staff review; it does not reveal or change an existing client record.')}</Typography></> : <>
         <Grid container spacing={2}><Grid size={{ xs: 12, sm: 6 }}>{field('given_name',t('First name'),100)}</Grid><Grid size={{ xs: 12, sm: 6 }}>{field('family_name',t('Last name'),100)}</Grid></Grid>
         {field('email',t('Contact email'),190)}{field('phone',t('Phone'),40)}
-        <TextField name="preferred_contact" select label={t('Preferred contact')} value={profile.preferred_contact} disabled={saving} onChange={e => setProfile(p => ({ ...p, preferred_contact: e.target.value }))}><MenuItem value="email">{t('Email')}</MenuItem><MenuItem value="phone">{t('Phone')}</MenuItem></TextField>
+        <FormControl disabled={saving}>
+          <InputLabel id={preferredContactLabelId}>{t('Preferred contact')}</InputLabel>
+          <Select name="preferred_contact" labelId={preferredContactLabelId} value={profile.preferred_contact} label={t('Preferred contact')} onChange={e => setProfile(p => ({ ...p, preferred_contact: e.target.value }))}>
+            <MenuItem value="email">{t('Email')}</MenuItem><MenuItem value="phone">{t('Phone')}</MenuItem>
+          </Select>
+        </FormControl>
         <Typography variant="subtitle1">{t('On-Site visit address')}</Typography>
         <AddressEntry required showInstructions disabled={saving} value={profile.address} onChange={address => setProfile(p => ({ ...p, address: { ...emptyAddress, ...address, instructions: address.instructions ?? '' } }))} />
         <Typography variant="body2">{t('Contact details do not change your sign-in identity. Do not enter clinical notes here.')}</Typography>

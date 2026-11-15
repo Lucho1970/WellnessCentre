@@ -206,6 +206,10 @@ test('placeholder provider name is not shown in the verified client account menu
     session: { idle_expires_at: now + 1800, absolute_expires_at: now + 28800 },
   } } }));
   await page.route('**/api/v1/customer/appointments*', route => route.fulfill({ json: { data: { items: [] } } }));
+  await page.route('**/api/v1/customer/profile', route => route.fulfill({ json: { data: {
+    given_name: 'Synthetic', family_name: 'Client', email: 'synthetic@example.invalid', phone: '',
+    preferred_contact: 'email', address: { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' }, revision: '1',
+  } } }));
   await page.goto('http://localhost:5184/client');
   await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Show' })).toHaveText('Upcoming');
@@ -213,6 +217,11 @@ test('placeholder provider name is not shown in the verified client account menu
   await page.getByRole('button', { name: 'Open client account menu' }).click();
   await expect(page.getByRole('menu').getByText('Client', { exact: true })).toBeVisible();
   await expect(page.getByText('unknown', { exact: true })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: 'My profile', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'My profile', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Save profile', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'First name' })).toHaveValue('Synthetic');
   const invalidLabels = await page.locator('label[for]').evaluateAll(labels => labels
     .filter(label => {
       const target = document.getElementById(label.htmlFor);
@@ -220,7 +229,7 @@ test('placeholder provider name is not shown in the verified client account menu
     })
     .map(label => ({ forId: label.htmlFor, text: label.textContent?.trim() })));
   expect(invalidLabels).toEqual([]);
-  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'My appointments', exact: true }).click();
   await page.getByRole('combobox', { name: 'Show' }).click();
   await page.getByRole('option', { name: 'Past' }).click();
   await expect(page.getByRole('combobox', { name: 'Show' })).toHaveText('Past');

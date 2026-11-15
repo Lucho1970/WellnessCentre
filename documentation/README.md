@@ -9,6 +9,7 @@
 - [Shared portal asset cleanup review — 14 November 2026](PORTAL_ASSET_CLEANUP_REVIEW_2026-11-14.md): verified backup inventory, current/rollback/recent keep set, older removal candidates and deletion safeguards.
 
 - [Client account display and label correction — 14 November 2026](CLIENT_ACCOUNT_DISPLAY_2026-11-14.md): provider placeholder name, appointment filter label, browser diagnostics, validation and remaining hosted gate.
+- [Client account menu profile action — 15 November 2026](CLIENT_ACCOUNT_MENU_PROFILE_2026-11-15.md): account menu usability, keyboard and focus, profile selector label, local validation and remaining hosted gate.
 
 - [Guest client session navigation — 14 November 2026](GUEST_CLIENT_SESSION_NAVIGATION_2026-11-14.md): hosted Google return diagnosis, direct client workspace entry, truthful account/address copy, local checks and remaining release gates.
 
