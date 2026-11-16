@@ -18,9 +18,9 @@ Source commit: `d351acb0baae8b8c1330fd263b8f08b6fd5b06db`, based on the unmerged
 
 The ignored portal-only ZIP is `D:\Dev\WelnessCentre\deployments\client-pilot-denial-callback-2026-11-15\01-shared-portal-assets-only.zip`, SHA-256 `06e14dc332421423c8fe84912a25b5d9e959fb38ecfd7764f54050407bfa0d44`. It has exactly `index.html` (SHA-256 `f2d9e80d8749c1b00d45f606e7b31dbdefa96c3c425fea997d84aa0cbb31c2f8`) and 69 JS/CSS assets. All 70 archive hashes match the local manifest; no unexpected path, source map or private-key marker was found. The new browser bundle contains existing public identity identifiers and the existing browser Maps key; no new external endpoint or permission was introduced. The previous live `index.html` on both hosts matched SHA-256 `bca0b2dbab3294b1ff28444c7bb355d510428b362b02808afccc4373961959a5` and is backed up outside the web root at `D:\Dev\WellnessCentre-backup\client-pilot-denial-callback-2026-11-15\`. The owner approved and uploaded the portal-only artifact. Rollback restores that saved entry page and retains hashed assets. No SQL, API, `.htaccess`, identity grant or private setting is in the package.
 
-Before the entry switch, HTTPS downloads of **69/69** packaged assets on each host matched the manifest SHA-256 values (**138/138**), while both hosts still served the previous exact entry hash. After the owner replaced only the shared `index.html`, both hosts served the new exact entry hash. `/`, `/client`, `/client/auth/callback`, `/staff/login` and `/staff/external` returned HTTP 200 `text/html` on both hosts (ten route checks), with the existing `no-store` entry cache and five-minute HSTS. The owner then repeated sign-in on LivinLively with the same unapproved synthetic Google identity that previously received `pilot_access_denied`: the specific English pilot access message appeared instead of the generic callback error, and the address bar was clean `/client` without `code=` or `state=`. Separately, the approved synthetic Google identity returned **verified but not linked**, without Wellnexa profile or appointments, and sign-out passed. Hosted French message verification remains. Keep the prior entry backup and both sets of hashed assets.
+Before the entry switch, HTTPS downloads of **69/69** packaged assets on each host matched the manifest SHA-256 values (**138/138**), while both hosts still served the previous exact entry hash. After the owner replaced only the shared `index.html`, both hosts served the new exact entry hash. `/`, `/client`, `/client/auth/callback`, `/staff/login` and `/staff/external` returned HTTP 200 `text/html` on both hosts (ten route checks), with the existing `no-store` entry cache and five-minute HSTS. The owner then repeated sign-in on LivinLively with the same unapproved synthetic Google identity that previously received `pilot_access_denied`: the specific English pilot access message appeared instead of the generic callback error, and the address bar was clean `/client` without `code=` or `state=`. In a separate French-selected sign-in, the same denial appeared in French and the return URL was again clean. Separately, the approved synthetic Google identity returned **verified but not linked**, without Wellnexa profile or appointments, and sign-out passed. Keep the prior entry backup and both sets of hashed assets.
 
-Hosted acceptance of the new message is still required with a specifically approved synthetic identity and a separate disallowed test identity. Do not broaden pilot access to test the denial. A 403 alone is insufficient: verify the new text in English and French, no record exposure, cleared callback URL, normal approved sign-in and sign-out on both hosts. The remaining real-PHI release gates in the repository audit and pilot safety controls are unaffected.
+Hosted LivinLively acceptance used an approved synthetic identity and a separate disallowed test identity without broadening pilot access. English and French denial text, clean callback URL, no Wellnexa record exposure, normal approved sign-in and sign-out passed as recorded below. An equivalent signed-in Wellnexa regression and wider real-PHI release gates in the repository audit and pilot safety controls remain open.
 
 ## Scoped 38-control ledger
 
@@ -40,7 +40,7 @@ Review date: 15 November 2026. Owner: Luis Duran for release/operations; privacy
 | PRIV-05 | Unverified | Patient access/correction process unchanged. |
 | PRIV-06 | Unverified | Retention/hold process unchanged. |
 | PRIV-07 | Unverified | Breach process unchanged. |
-| AUTH-01 | Partial | Existing MSAL and server validation unchanged; callback error is classified only after API rejection. Hosted retest pending. |
+| AUTH-01 | Partial | Existing MSAL and server validation unchanged; callback error classified only after API rejection. Hosted LivinLively denied and approved returns passed; wider realm checks remain. |
 | AUTH-02 | Partial | No role/link grant; denial test checks no private read. Other clinic/record negative tests remain. |
 | AUTH-03 | Unverified | Session policy unchanged. |
 | AUTH-04 | Unverified | Existing sessionStorage exception/gate remains; no new storage. |
@@ -58,13 +58,13 @@ Review date: 15 November 2026. Owner: Luis Duran for release/operations; privacy
 | DEV-02 | Partial | Narrow typed error classification; human code review remains. |
 | DEV-03 | Partial | Exact unchanged lockfile used; prior advisory review remains; no runtime dependency added. |
 | DEV-04 | Partial | Lint, content/i18n, TypeScript, all builds, 36 customer and 17 built smoke tests passed; wider PHP/SQL suites omitted as unchanged. |
-| DEV-05 | Partial | English/French alert and callback recovery tested; manual screen reader/zoom and hosted check remain. |
+| DEV-05 | Partial | English/French alert and callback recovery passed locally and on hosted LivinLively; manual screen reader/zoom remains. |
 | DEV-06 | Partial | Existing bundle warnings recorded; representative performance review remains. |
 | REL-01 | Partial | This dated scoped ledger exists; accountable reviewer decision remains. |
 | REL-02 | Partial | Frontend/build/browser checks passed; broad API/SQL/admin suites omitted for this UI-only change. |
-| REL-03 | Partial | ZIP/manifest and built browser checks passed; hosted 138/138 assets, both entry hashes, ten routes, English denied-identity message/clean callback, approved unlinked sign-in and sign-out passed. Hosted French remains. |
+| REL-03 | Partial | ZIP/manifest and built browser checks passed; hosted 138/138 assets, both entry hashes, ten routes, English/French denied-identity messages with clean callback, approved unlinked sign-in and sign-out passed. Wider hosted acceptance remains. |
 | REL-04 | Missing | Real-data release still blocked by broader project gates. |
 | REL-05 | Partial | Owner approved and transferred exact package after prior entry backup and both-host asset checks; broader operational signatures remain. |
-| REL-06 | Partial | Files, versions, tests, package, no permission/data-flow changes, hosted static, English denial and approved sign-in results recorded; French and wider gates remain. |
+| REL-06 | Partial | Files, versions, tests, package, no permission/data-flow changes, hosted static, English/French denial and approved sign-in results recorded; wider gates remain. |
 
 RELEASE STATUS: NOT READY FOR RELEASE
