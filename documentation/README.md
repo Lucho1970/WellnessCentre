@@ -17,6 +17,18 @@
 
 - [Practitioner client-access boundary — 6 November 2026](PRACTITIONER_CLIENT_ACCESS_BOUNDARY_2026-11-06.md): current care assignments replace historical grants for practitioner contacts, forms and invitations; local evidence and remaining release gates.
 - [Fullscript integration roadmap — 6 November 2026](FULLSCRIPT_INTEGRATION.md): documentation-only proposal, vendor/privacy approval gates, secure architecture and synthetic sandbox acceptance; no integration enabled.
+- [Shared portal asset cleanup review — 14 November 2026](PORTAL_ASSET_CLEANUP_REVIEW_2026-11-14.md): verified backup inventory, current/rollback/recent keep set, older removal candidates and deletion safeguards.
+
+- [Client account display and label correction — 14 November 2026](CLIENT_ACCOUNT_DISPLAY_2026-11-14.md): provider placeholder name, appointment filter label, browser diagnostics, validation and remaining hosted gate.
+- [Client account menu profile action — 15 November 2026](CLIENT_ACCOUNT_MENU_PROFILE_2026-11-15.md): account menu usability, keyboard and focus, profile selector label, local validation and remaining hosted gate.
+- [Client pilot denial on sign-in return — 15 November 2026](CLIENT_PILOT_CALLBACK_DENIAL_2026-11-15.md): bilingual safe callback message, synthetic second-clinic finding, browser checks, portal-only package and remaining hosted gate.
+
+- [Guest client session navigation — 14 November 2026](GUEST_CLIENT_SESSION_NAVIGATION_2026-11-14.md): hosted Google return diagnosis, direct client workspace entry, truthful account/address copy, local checks and remaining release gates.
+
+- [Unified sign-in hosted release preparation — 13 November 2026](UNIFIED_SIGNIN_HOSTED_RELEASE_2026-11-13.md): narrow shared-portal candidate, pilot build settings, artifact verification, rollback and hosted test sequence.
+
+- [Shared portal sign-in chooser — 13 November 2026](UNIFIED_PORTAL_SIGN_IN_2026-11-13.md): one guest-header entry, distinct client/practitioner/workforce routes, bilingual accessibility checks and deployment limits.
+
 - [Shared portal sign-in release preparation — 5 November 2026](PORTAL_SIGNIN_RELEASE_PREP_2026-11-05.md): merged-source package, narrow upload/rollback, local verifier, hosted baseline and release gates.
 
 - [Staff sign-in interaction error — 5 November 2026](STAFF_SIGNIN_INTERACTION_2026-11-05.md): distinct workforce/practitioner routes, safe MSAL recovery, local regression and remaining hosted gates.

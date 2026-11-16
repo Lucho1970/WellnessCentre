@@ -3,6 +3,7 @@ const en = {
   "Edit name and email": "Edit name and email",
   "Cancel name and email changes": "Cancel name and email changes",
   "API error: pilot_access_denied": "This pilot is limited to approved test accounts. Contact the clinic for access.",
+  "Client sign-in could not be completed. Please try again. If it continues, contact the clinic.": "Client sign-in could not be completed. Please try again. If it continues, contact the clinic.",
   "API error: tax_already_exists": "A tax with this code already exists in this clinic.",
   "API error: service_privacy_review": "This service change needs a privacy review before it can be saved.",
   "API error: room_relocation_review": "Moving this room requires a reviewed migration of its booking history or assignments.",
@@ -749,8 +750,8 @@ const en = {
   "Review appointment": "Review appointment",
   "Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.":
     "Prices shown are before applicable taxes. Tax calculation and invoicing are not yet enabled.",
-  "Availability is checked again when you confirm. A confirmation email will be sent to the client.":
-    "Availability is checked again when you confirm. A confirmation email will be sent to the client.",
+  "Availability is checked again when you confirm. Check the appointment list for the result.":
+    "Availability is checked again when you confirm. Check the appointment list for the result.",
   "Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.":
     "Confirmation could not be verified. Retry this same request to safely retrieve or complete it. Check the appointment list before starting a different booking.",
   Cancel: "Cancel",
@@ -1185,8 +1186,8 @@ const en = {
   "The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.":
     "The server returned an unreadable response (HTTP {{status}}). Try again or contact the administrator.",
   "Request failed (HTTP {{status}}).": "Request failed (HTTP {{status}}).",
-  "Appointment #{{id}} confirmed. A confirmation email is being sent.":
-    "Appointment #{{id}} confirmed. A confirmation email is being sent.",
+  "Appointment #{{id}} confirmed. Check the appointment list for details.":
+    "Appointment #{{id}} confirmed. Check the appointment list for details.",
   "Address unavailable": "Address unavailable",
   "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)":
     "Treatment {{treatment}} + On-Site fee {{mobile}} (before applicable taxes)",
@@ -1442,8 +1443,8 @@ const en = {
   Unavailable: "Unavailable",
   "Choose a service, practitioner, and visit type. No time is reserved until you confirm.":
     "Choose a service, practitioner, and visit type. No time is reserved until you confirm.",
-  "Availability is checked again when you confirm. We will email your confirmation; keep the appointment number for reference.":
-    "Availability is checked again when you confirm. We will email your confirmation; keep the appointment number for reference.",
+  "Availability is checked again when you confirm. Keep the appointment number and check My appointments for the result.":
+    "Availability is checked again when you confirm. Keep the appointment number and check My appointments for the result.",
   "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.":
     "Book a new appointment here. Contact the clinic if you need help changing an existing appointment.",
   "Unable to load booking options.": "Unable to load booking options.",
@@ -2275,6 +2276,11 @@ const en = {
     "The cancellation fee changed. Review the updated fee before confirming.",
   "The requested time is no longer bookable. Refresh availability and choose another time.":
     "The requested time is no longer bookable. Refresh availability and choose another time.",
+  "Who is signing in?": "Who is signing in?",
+  "Clinic staff": "Clinic staff",
+  "Book and manage your appointments": "Book and manage your appointments",
+  "Use your personal practitioner account": "Use your personal practitioner account",
+  "Use your organization Microsoft account": "Use your organization Microsoft account",
 } as const;
 
 export default en;

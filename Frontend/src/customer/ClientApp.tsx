@@ -10,9 +10,8 @@ import {
   Button,
   Container,
   IconButton,
-  Menu,
-  MenuItem,
   Paper,
+  Popover,
   Stack,
   Toolbar,
   Typography,
@@ -39,6 +38,7 @@ import { bookingSignInKey, customerBookingIntent } from "./bookingIntent";
 import { savedSession } from './session';
 import { BetaFeedbackLink } from "../shared/BetaFeedbackLink";
 import { pendingAppointmentLink } from './appointmentLink';
+import { clientAccountDisplayName, clientAccountInitials } from './accountDisplay';
 
 export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const { config } = useClinicConfig();
@@ -54,6 +54,8 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [profileRequest, setProfileRequest] = useState(0);
+  const [profileNavigationDisabled, setProfileNavigationDisabled] = useState(false);
   const [status, setStatus] = useState<CustomerStatus | null>(null);
   const [session, setSession] = useState<SessionTimes | null>(null);
   useEffect(() => {
@@ -212,14 +214,8 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
       setBusy(false);
     }
   };
-  const name = account?.name || t("Client");
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+  const name = clientAccountDisplayName(account?.name, t("Client"));
+  const initials = clientAccountInitials(name);
   return (
     <>
       <Box component="a" href="#main-content" className="skip-link">
@@ -268,22 +264,39 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
                 )}
               </Stack>
             </Stack>
-            <Menu
+            <Popover
               anchorEl={anchor}
               open={Boolean(anchor)}
               onClose={() => setAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              <MenuItem disabled>{name}</MenuItem>
-              <MenuItem
-                disabled={busy}
-                onClick={() => {
-                  setVerified(false);
-                  void run(customerSignOut);
-                }}
-              >
-                {t("SignOut")}
-              </MenuItem>
-            </Menu>
+              <Stack role="group" aria-label={t('My client account')} sx={{ minWidth: 180, p: 1 }}>
+                <Typography fontWeight={700} sx={{ px: 1, py: 0.5 }}>{name}</Typography>
+                {verified && status?.onboarding_status === 'linked' && (
+                  <Button
+                    disabled={busy || profileNavigationDisabled}
+                    onClick={() => {
+                      setAnchor(null);
+                      setProfileRequest(value => value + 1);
+                    }}
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
+                    {t('My profile')}
+                  </Button>
+                )}
+                <Button
+                  disabled={busy}
+                  onClick={() => {
+                    setVerified(false);
+                    void run(customerSignOut);
+                  }}
+                  sx={{ justifyContent: 'flex-start' }}
+                >
+                  {t("SignOut")}
+                </Button>
+              </Stack>
+            </Popover>
           </Toolbar>
         </Container>
       </AppBar>
@@ -348,6 +361,8 @@ export function ClientApp({ initialError = "" }: { initialError?: string }) {
             <CustomerWorkspace
               status={status}
               onRefresh={() => setAttempt((value) => value + 1)}
+              profileRequest={profileRequest}
+              onProfileNavigationDisabledChange={setProfileNavigationDisabled}
             />
           )}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mt={3}>

@@ -4,7 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { AppProviders } from '../shared/AppProviders';
 import { ClientApp } from './ClientApp';
 import { customerConfigured, customerHome, customerInstance, selectCustomerAccount } from './auth';
-import { finishCustomerLogin } from './session';
+import { CustomerRequestError, finishCustomerLogin } from './session';
+import i18n from '../i18n';
 import { bookingSignInKey, captureCustomerBookingIntent, customerBookingIntent } from './bookingIntent';
 import { captureAppointmentLink } from './appointmentLink';
 import { captureTravelIntent } from '../discovery/travelIntent';
@@ -44,8 +45,12 @@ export async function bootstrap() {
       const account = selectCustomerAccount(result?.account ?? customerInstance.getActiveAccount());
       customerInstance.setActiveAccount(account);
       if (result && account) await finishCustomerLogin(result.idToken, result.accessToken);
-    } catch {
-      if(!serverSessionsEnabled())error = 'Client sign-in could not be completed. Please try again. If it continues, contact the clinic.';
+    } catch (cause) {
+      if (!serverSessionsEnabled()) {
+        error = cause instanceof CustomerRequestError && cause.status === 403 && cause.code === 'pilot_access_denied'
+          ? i18n.t('API error: pilot_access_denied')
+          : i18n.t('Client sign-in could not be completed. Please try again. If it continues, contact the clinic.');
+      }
     }
   }
   // Remove authorization response/query data before mounting any application UI.

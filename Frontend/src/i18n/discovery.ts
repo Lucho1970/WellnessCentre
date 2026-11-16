@@ -56,7 +56,7 @@ const fr = {
   'Send reply': 'Envoyer la réponse',
   'Send travel enquiry': 'Envoyer la demande de déplacement',
   'Showing results for:': 'Résultats pour :',
-  'Sign in to use my saved address': 'Se connecter pour utiliser mon adresse enregistrée',
+  'Open my account to use my saved address': 'Ouvrir mon compte pour utiliser mon adresse enregistrée',
   'The map could not load. Use an address or your current location instead.': 'La carte n’a pas pu être chargée. Utilisez une adresse ou votre position actuelle.',
   'These limits apply across all clinics. Discovery never overrides a practitioner’s booking limit.': 'Ces limites s’appliquent à toutes les cliniques. La recherche ne modifie jamais la limite de réservation d’un praticien.',
   'This enquiry is closed.': 'Cette demande est fermée.',

@@ -177,16 +177,16 @@ test('clients retrieve receipt PDFs and see voided receipts on mobile', async ({
   await page.screenshot({ path: test.info().outputPath('client-receipts-mobile.png'), fullPage: true });
 });
 
-async function fixture(page: Page, signedIn = false, callbackFails = false) {
+async function fixture(page: Page, signedIn = false, callbackFails = false, accountName = 'Test Client', callbackSession = false) {
   // Only Playwright intercepts this module; no production bypass or fake tokens.
   await page.route("**/src/customer/auth.ts", (route) =>
     route.fulfill({
       contentType: "application/javascript",
       body: `
-    const account=${signedIn ? "{homeAccountId:'customer',name:'Test Client'}" : "null"};
+    const account=${signedIn ? `{homeAccountId:'customer',name:${JSON.stringify(accountName)}}` : "null"};
     export const customerConfigured=true;
     export const customerHome='http://localhost:5184/client';
-    export const customerInstance={initialize:async()=>{},handleRedirectPromise:async()=>{${callbackFails ? "throw new Error('test callback failure');" : "return null;"}},getActiveAccount:()=>account?{...account}:null,getAllAccounts:()=>account?[{...account}]:[],setActiveAccount:()=>{}};
+    export const customerInstance={initialize:async()=>{},handleRedirectPromise:async()=>{${callbackFails ? "throw new Error('test callback failure');" : callbackSession ? "return {account,idToken:'synthetic-id-proof',accessToken:'synthetic-access-proof'};" : "return null;"}},getActiveAccount:()=>account?{...account}:null,getAllAccounts:()=>account?[{...account}]:[],setActiveAccount:()=>{}};
     export const selectCustomerAccount=()=>account?{...account,idTokenClaims:{exp:Math.floor(Date.now()/1000)+3600}}:null;
     export const customerToken=async()=>'customer-test-token';
     export const customerSignIn=async()=>{window.customerSignInCalled=true;};
@@ -198,6 +198,55 @@ async function fixture(page: Page, signedIn = false, callbackFails = false) {
     route.fulfill({ json: { data: { name: "Test Wellness" } } }),
   );
 }
+test('placeholder provider name is not shown in the verified client account menu', async ({ page }) => {
+  await fixture(page, true, false, 'unknown');
+  const now = Math.floor(Date.now() / 1000);
+  await page.route('**/api/v1/customer/auth/me', route => route.fulfill({ json: { data: {
+    authenticated: true, authentication_context: 'customer', onboarding_status: 'linked', capabilities: ['own_appointments'],
+    session: { idle_expires_at: now + 1800, absolute_expires_at: now + 28800 },
+  } } }));
+  await page.route('**/api/v1/customer/appointments*', route => route.fulfill({ json: { data: { items: [] } } }));
+  await page.route('**/api/v1/customer/profile', route => route.fulfill({ json: { data: {
+    given_name: 'Synthetic', family_name: 'Client', email: 'synthetic@example.invalid', phone: '',
+    preferred_contact: 'email', address: { address_line1: '', address_line2: '', city: '', province: '', postal_code: '', country: 'Canada', instructions: '' }, revision: '1',
+  } } }));
+  await page.goto('http://localhost:5184/client');
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Show' })).toHaveText('Upcoming');
+  await expect(page.getByRole('button', { name: 'Open client account menu' }).getByText('C', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open client account menu' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByText('Client', { exact: true })).toBeVisible();
+  await expect(page.getByText('unknown', { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByRole('button', { name: 'My profile', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'My profile', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Save profile', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'First name' })).toHaveValue('Synthetic');
+  const accountButton = page.getByRole('button', { name: 'Open client account menu' });
+  await accountButton.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByRole('button', { name: 'My profile', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('group', { name: 'My client account' }).getByRole('button', { name: 'Sign out', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(accountButton).toBeFocused();
+  const invalidLabels = await page.locator('label[for]').evaluateAll(labels => labels
+    .filter(label => {
+      const target = document.getElementById(label.htmlFor);
+      return !target || !['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName);
+    })
+    .map(label => ({ forId: label.htmlFor, text: label.textContent?.trim() })));
+  expect(invalidLabels).toEqual([]);
+  await page.getByRole('button', { name: 'My appointments', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Show' }).click();
+  await page.getByRole('option', { name: 'Past' }).click();
+  await expect(page.getByRole('combobox', { name: 'Show' })).toHaveText('Past');
+  await page.getByRole('link', { name: 'Public website' }).click();
+  await expect(page.getByRole('link', { name: 'Open client account' }).getByText('C', { exact: true })).toBeVisible();
+});
 test("customer route offers sign-in without running staff authentication", async ({
   page,
 }) => {
@@ -284,7 +333,7 @@ test("verified identity remains unlinked with no client records or staff roles",
   });
   await page.getByRole("button", { name: "Open client account menu" }).click();
   expect(checks).toBe(1);
-  await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
+  await page.getByRole("group", { name: "My client account" }).getByRole("button", { name: "Sign out", exact: true }).click();
   expect(await page.evaluate(() => (window as Window & { customerSignOutCalled?: boolean }).customerSignOutCalled)).toBe(
     true,
   );
@@ -484,6 +533,36 @@ test("callback failure strips response and offers deliberate recovery", async ({
   await expect(
     page.getByRole("button", { name: "Sign in or create client account" }),
   ).toBeEnabled();
+});
+
+for (const [language, message] of [
+  ['en', 'This pilot is limited to approved test accounts. Contact the clinic for access.'],
+  ['fr', 'Ce projet pilote est réservé aux comptes de test approuvés. Contactez la clinique pour obtenir un accès.'],
+] as const) test(`client callback explains a pilot session denial in ${language}`, async ({ page }) => {
+  await fixture(page, true, false, 'Synthetic Client', true);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.challenge.v1', 'pending'));
+  let privateReads = 0;
+  await page.route('**/api/v1/customer/auth/me', route => { privateReads++; return route.fulfill({ status: 403 }); });
+  await page.route('**/api/v1/customer/auth/session', route => route.fulfill({ status: 403, json: { error: {
+    code: 'pilot_access_denied', message: 'This pilot is limited to approved test accounts.',
+  } } }));
+  await page.goto(`http://localhost:5184/client/auth/callback?code=synthetic&state=synthetic&lang=${language}`);
+  await expect(page).toHaveURL('http://localhost:5184/client');
+  await expect(page.getByRole('alert').filter({ hasText: message })).toBeVisible();
+  expect(privateReads).toBe(0);
+  await expect(page.getByText('Customer sign-in verified.', { exact: true })).toHaveCount(0);
+});
+
+test('client callback keeps unrelated authorization failures generic', async ({ page }) => {
+  await fixture(page, true, false, 'Synthetic Client', true);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.challenge.v1', 'pending'));
+  await page.route('**/api/v1/customer/auth/session', route => route.fulfill({ status: 403, json: { error: {
+    code: 'missing_scope', message: 'Provider details must not be displayed.',
+  } } }));
+  await page.goto('http://localhost:5184/client/auth/callback?code=synthetic&state=synthetic');
+  await expect(page).toHaveURL('http://localhost:5184/client');
+  await expect(page.getByText(/Client sign-in could not be completed/)).toBeVisible();
+  await expect(page.getByText('Provider details must not be displayed.')).toHaveCount(0);
 });
 
 test("real customer MSAL starts code flow with PKCE and customer-only scope", async ({
@@ -940,10 +1019,11 @@ for (const quotedFee of [0, 1500]) test(`linked client reviews distance fee ${qu
   await page.getByRole("button", { name: "Find times" }).click();
   await page.getByRole("button", { name: /Oct.*1.*2099/i }).click();
   await page.getByRole("button", { name: "Review appointment" }).click();
+  await expect(page.getByText("Availability is checked again when you confirm. Keep the appointment number and check My appointments for the result.")).toBeVisible();
   await page.getByRole("button", { name: "Confirm appointment" }).click();
   await expect(
     page.getByText(
-      "Appointment #91 confirmed. A confirmation email is being sent.",
+      "Appointment #91 confirmed. Check the appointment list for details.",
     ),
   ).toBeVisible();
   expect(confirmations).toBe(1);

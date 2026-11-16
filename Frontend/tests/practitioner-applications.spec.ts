@@ -187,14 +187,68 @@ test('rapid workforce clicks start only one interactive sign-in', async ({ page 
 
 test('the public portal separates practitioner and clinic workforce entry points', async ({ page }) => {
   await fixture(page, false); await page.goto(host);
-  await expect(page.getByRole('link', { name: 'Clinic staff sign-in', exact: true })).toHaveAttribute('href', '/staff/login');
-  await page.getByRole('link', { name: 'Practitioner sign-in', exact: true }).click();
+  const open = page.getByRole('button', { name: 'Log in', exact: true });
+  await expect(open).toBeVisible();
+  await expect(page.getByRole('link', { name: 'My appointments', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Clinic staff sign-in', exact: true })).toHaveCount(0);
+  await open.click();
+  const chooser = page.getByRole('dialog', { name: 'Who is signing in?' });
+  await expect(chooser).toBeVisible();
+  await expect(chooser.getByRole('link', { name: /Client.*Book and manage your appointments/ })).toHaveAttribute('href', '/client');
+  await expect(chooser.getByRole('link', { name: /Practitioner.*Use your personal practitioner account/ })).toHaveAttribute('href', '/staff/external');
+  await expect(chooser.getByRole('link', { name: /Clinic staff.*Use your organization Microsoft account/ })).toHaveAttribute('href', '/staff/login');
+  await page.keyboard.press('Escape');
+  await expect(chooser).toHaveCount(0);
+  await expect(open).toBeFocused();
+  await open.click();
+  await chooser.getByRole('link', { name: /Practitioner.*Use your personal practitioner account/ }).click();
   await expect(page.getByRole('heading', { name: 'Practitioner sign-in', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Existing workforce staff sign-in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign in with Microsoft', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem('wellness.staff.provider'))).toBeNull();
+});
+
+test('a recent client session shows My account on the public portal without a sign-in prompt', async ({ page }) => {
+  await fixture(page, false);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.session.v1', JSON.stringify({
+    session_token: 'synthetic-client-session', idle_expires_at: Math.floor(Date.now() / 1000) + 3600,
+    absolute_expires_at: Math.floor(Date.now() / 1000) + 7200,
+  })));
+  await page.goto(host);
+  await expect(page.getByRole('link', { name: 'My account', exact: true })).toHaveAttribute('href', '/client');
+  await expect(page.getByRole('button', { name: 'Log in', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Open my account to use my saved address' })).toHaveAttribute('href', '/client#discover=1');
+  await page.locator('button[aria-haspopup="dialog"]').click();
+  await page.getByText('Français (Canada)').click();
+  await expect(page.getByRole('link', { name: 'Mon compte', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ouvrir mon compte pour utiliser mon adresse enregistrée' })).toBeVisible();
+});
+
+test('an expired client session keeps the public sign-in chooser', async ({ page }) => {
+  await fixture(page, false);
+  await page.addInitScript(() => sessionStorage.setItem('wellness.customer.session.v1', JSON.stringify({
+    session_token: 'synthetic-expired-session', idle_expires_at: Math.floor(Date.now() / 1000) - 60,
+    absolute_expires_at: Math.floor(Date.now() / 1000) + 3600,
+  })));
+  await page.goto(host);
+  await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'My account', exact: true })).toHaveCount(0);
+});
+
+test('sign-in choices are readable in French on a small screen', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await fixture(page, false); await page.goto(host);
+  await page.locator('button[aria-haspopup="dialog"]').click();
+  await page.getByText('Français (Canada)').click();
+  await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
+  const chooser = page.getByRole('dialog', { name: 'Qui se connecte?' });
+  await expect(chooser).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect(chooser.getByRole('link', { name: /Client.*Réserver et gérer vos rendez-vous/ })).toBeVisible();
+  await expect(chooser.getByRole('link', { name: /Praticien.*compte personnel de praticien/ })).toBeVisible();
+  await expect(chooser.getByRole('link', { name: /Personnel de la clinique.*compte Microsoft/ })).toBeVisible();
 });
 
 for (const label of ['Continue with Google', 'Continue with personal Microsoft account']) {
