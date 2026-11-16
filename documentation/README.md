@@ -6,6 +6,11 @@
 
 # Wellness Centre Documentation
 
+- [Remaining branch integration review — 16 November 2026](REMAINING_BRANCH_INTEGRATION_2026-11-16.md): five-branch reconciliation, local Docker validation, inherited control gaps and cleanup decision.
+- [Hosted Wellnexa client pilot — 12 November 2026](HOSTED_CLIENT_PILOT_2026-11-12.md): synthetic client sign-in, booking/cancellation evidence and unresolved address review.
+- [Local full-stack Docker rehearsal — 11 November 2026](LOCAL_DOCKER_FULL_STACK_2026-11-11.md): isolated MySQL, API and website test harness and its limits.
+- [Practitioner database restore rehearsal — 11 November 2026](PRACTITIONER_DOCKER_RESTORE_REHEARSAL_2026-11-11.md): synthetic MySQL 5.7 restore and migration evidence.
+
 - [Shared portal pilot merge review — 15 November 2026](PORTAL_CHAIN_MERGE_REVIEW_2026-11-15.md): combined branch validation, inherited control gaps and branch cleanup scope.
 
 - [Practitioner access route review — 10 November 2026](PRACTITIONER_ACCESS_ROUTE_REVIEW_2026-11-10.md): appointment, worker, dashboard and visit boundaries; remaining historical-record decisions and local validation.
