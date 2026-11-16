@@ -6,6 +6,8 @@
 
 # Wellness Centre Documentation
 
+- [Shared portal pilot merge review — 15 November 2026](PORTAL_CHAIN_MERGE_REVIEW_2026-11-15.md): combined branch validation, inherited control gaps and branch cleanup scope.
+
 - [Practitioner access route review — 10 November 2026](PRACTITIONER_ACCESS_ROUTE_REVIEW_2026-11-10.md): appointment, worker, dashboard and visit boundaries; remaining historical-record decisions and local validation.
 - [Practitioner historical financial access — 10 November 2026](PRACTITIONER_HISTORICAL_FINANCIAL_ACCESS_2026-11-10.md): owner decision for clinic review after care ends, receipt/fee access, concurrency and local evidence.
 - [Care-assignment review workflow — 10 November 2026](CARE_ASSIGNMENT_REVIEW_WORKFLOW_2026-11-10.md): structured reason and operator review confirmation for clinic care-team changes.
